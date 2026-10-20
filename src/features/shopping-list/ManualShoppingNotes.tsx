@@ -1,0 +1,665 @@
+import { useEffect, useRef, useState, type FormEvent, type Dispatch, type SetStateAction } from 'react'
+import './manualShoppingNotes.css'
+import { mergePrivateNotes, normalizePrivateNotes, serializePrivateNotes, PRIVATE_NOTES_BACKUP_MAX_BYTES } from './manualShoppingNotesBackup.ts'
+
+export type UnpricedShoppingNote = { id: string; label: string; store: 'Algemeen' | 'PLUS' | 'DekaMarkt'; done: boolean }
+type SetNotes = Dispatch<SetStateAction<UnpricedShoppingNote[]>>
+const stores = ['Algemeen', 'PLUS', 'DekaMarkt'] as const
+const privateSessionKey = 'supa:unpriced-notes:session:v1'
+const safeLabel = (value: string) => value.replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/gu, ' ')
+  .replace(/\s+/g, ' ').trim()
+const duplicateKey = (store: UnpricedShoppingNote['store'], label: string) =>
+  JSON.stringify([store, label.normalize('NFC').toLocaleLowerCase('nl-NL')])
+
+/** Private volatile notes; no product match, price or retailer-source authority. */
+export function ManualShoppingNotes({ notes, setNotes }: {
+  notes: UnpricedShoppingNote[]
+  setNotes: SetNotes
+}) {
+  const [name, setName] = useState('')
+  const [bulkDraft, setBulkDraft] = useState('')
+  const bulkFileSerial = useRef(0)
+  const [store, setStore] = useState<UnpricedShoppingNote['store']>('Algemeen')
+  const [onlyOpen, setOnlyOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const [firstShop, setFirstShop] = useState<'PLUS' | 'DekaMarkt'>('PLUS')
+  const [moveTargets, setMoveTargets] = useState<Record<UnpricedShoppingNote['store'], UnpricedShoppingNote['store']>>({
+    Algemeen: 'PLUS', PLUS: 'DekaMarkt', DekaMarkt: 'PLUS',
+  })
+  const [filterStore, setFilterStore] = useState<'Alle winkels' | UnpricedShoppingNote['store']>('Alle winkels')
+  const [exportVisible, setExportVisible] = useState(false)
+  const [message, setMessage] = useState('')
+  const [lastRemoved, setLastRemoved] = useState<{ note: UnpricedShoppingNote; index: number } | null>(null)
+  const [pendingCleared, setPendingCleared] = useState<UnpricedShoppingNote[] | null>(null)
+  const [lastCleared, setLastCleared] = useState<Array<{ note: UnpricedShoppingNote; index: number }> | null>(null)
+  const [editing, setEditing] = useState<{ id: string; initialLabel: string;
+    initialStore: UnpricedShoppingNote['store']; label: string;
+    store: UnpricedShoppingNote['store'] } | null>(null)
+  const [sessionEnabled, setSessionEnabled] = useState(false)
+  const [sessionProtected, setSessionProtected] = useState(false)
+  const [sessionRaw, setSessionRaw] = useState<string | null>(null)
+  const [sessionMessage, setSessionMessage] = useState('')
+  // A stored record exists only after a previous explicit user opt-in.
+  useEffect(() => {
+    try {
+      const raw = window.sessionStorage.getItem(privateSessionKey)
+      if (raw === null) return
+      if (new TextEncoder().encode(raw).length > PRIVATE_NOTES_BACKUP_MAX_BYTES) throw Error('size')
+      const restored = normalizePrivateNotes(JSON.parse(raw))
+      if (notes.length !== 0 && serializePrivateNotes(notes) !== serializePrivateNotes(restored)) {
+        throw Error('different-current-list')
+      }
+      if (notes.length === 0) setNotes(current => current.length ? current : restored)
+      setSessionRaw(raw)
+      setSessionEnabled(true)
+      setSessionMessage('Je eerder bewust bewaarde lijst is uit dit browsertabblad hersteld.')
+    } catch {
+      setSessionProtected(true)
+      setSessionMessage('Onbekende of afwijkende sessielijst blijft onaangeroerd. Gebruik de JSON-backup.')
+    }
+  }, [])
+  useEffect(() => {
+    if (!sessionEnabled || sessionProtected) return
+    try {
+      const raw = window.sessionStorage.getItem(privateSessionKey)
+      if (raw !== sessionRaw) {
+        setSessionProtected(true)
+        setSessionEnabled(false)
+        setSessionMessage('Sessielijst is elders gewijzigd; er is niets overschreven.')
+        return
+      }
+      const next = serializePrivateNotes(notes)
+      if (new TextEncoder().encode(next).length > PRIVATE_NOTES_BACKUP_MAX_BYTES) throw Error('size')
+      if (raw !== next) window.sessionStorage.setItem(privateSessionKey, next)
+      if (sessionRaw !== next) setSessionRaw(next)
+    } catch {
+      setSessionEnabled(false)
+      setSessionProtected(true)
+      setSessionMessage('Opslaan in dit tabblad is geweigerd; download je JSON-backup.')
+    }
+  }, [sessionEnabled, sessionProtected, sessionRaw, notes])
+  function changeSessionOptIn(checked: boolean) {
+    if (sessionProtected) return
+    try {
+      const actual = window.sessionStorage.getItem(privateSessionKey)
+      if (actual !== sessionRaw) {
+        setSessionProtected(true)
+        setSessionEnabled(false)
+        setSessionMessage('Een andere sessielijst blijft beschermd tegen overschrijven.')
+        return
+      }
+      if (!checked && actual !== null) window.sessionStorage.removeItem(privateSessionKey)
+      setSessionEnabled(checked)
+      if (!checked) setSessionRaw(null)
+      setSessionMessage(checked
+        ? 'Optioneel bewaren aan. Alleen in deze browsertab; geen server of prijzen.'
+        : 'Optioneel bewaren uit. De huidige lijst blijft zolang de app open is.')
+    } catch {
+      setSessionProtected(true)
+      setSessionEnabled(false)
+      setSessionMessage('Browsertab-opslag geweigerd; gebruik een eigen JSON-backup.')
+    }
+  }
+  const [backupPreview, setBackupPreview] = useState<UnpricedShoppingNote[] | null>(null)
+  const [backupBusy, setBackupBusy] = useState(false)
+  const readVersion = useRef(0)
+  function backupDownload() {
+    try {
+      const json = serializePrivateNotes(notes)
+      const url = URL.createObjectURL(new Blob([json], { type: 'application/json;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-eigen-ongeprijsde-lijst-backup.json'
+        document.body.append(link); link.click(); link.remove()
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setMessage('Je hele ongeprijsde lijst is lokaal als JSON-backup opgeslagen.')
+    } catch { setMessage('Kon deze privéboodschappen niet als backup opslaan.') }
+  }
+  async function backupRead(file?: File) {
+    const version = ++readVersion.current
+    setBackupPreview(null)
+    if (!file) return
+    setBackupBusy(true)
+    try {
+      if (file.size > PRIVATE_NOTES_BACKUP_MAX_BYTES) throw new Error('Backup is groter dan 64 kB.')
+      const bytes = await file.arrayBuffer()
+      if (version !== readVersion.current) return
+      if (bytes.byteLength > PRIVATE_NOTES_BACKUP_MAX_BYTES) throw new Error('Backup is te groot.')
+      const source = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+      const parsed = normalizePrivateNotes(JSON.parse(source))
+      const merged = mergePrivateNotes(notes, parsed)
+      setBackupPreview(parsed)
+      setMessage(merged.added + ' nieuwe boodschappen gevonden. Controleer en bevestig de import.')
+    } catch (error) {
+      if (version === readVersion.current) setMessage(error instanceof Error ? error.message : 'Kon backup niet inlezen.')
+    } finally { if (version === readVersion.current) setBackupBusy(false) }
+  }
+  function backupConfirm() {
+    if (!backupPreview) return
+    try {
+      const merged = mergePrivateNotes(notes, backupPreview)
+      setNotes(current => {
+        try { return mergePrivateNotes(current, backupPreview).notes }
+        catch { return current }
+      })
+      setBackupPreview(null)
+      setMessage(merged.added + ' boodschappen toegevoegd; bestaande items en vinkjes behouden.')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Import geweigerd.')
+    }
+  }
+
+  async function readBulkText(file?: File) {
+    const serial = ++bulkFileSerial.current
+    if (!file) return
+    try {
+      if (!file.size || file.size > 15000) throw Error('TXT groter dan 15 kB of leeg.')
+      const source = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      if (serial !== bulkFileSerial.current) return
+      if (source.length > 15000) throw Error('Deze tekst past niet in het invulveld.')
+      setBulkDraft(source)
+      setMessage('Je eigen TXT is lokaal ingelezen; bekijk de tekst en klik zelf op toevoegen.')
+    } catch (error) {
+      if (serial === bulkFileSerial.current) setMessage(error instanceof Error ? error.message : 'TXT kon niet worden gelezen.')
+    }
+  }
+  function addBulk(event: FormEvent) {
+    event.preventDefault()
+    // A Supa TXT export is a personal unpriced list, never retailer evidence.
+    const exported = bulkDraft.trimStart().startsWith('SUPA · EIGEN ONGEPRIJSDE BOODSCHAPPEN · ')
+    const parsed: { label: string; done: boolean; store: UnpricedShoppingNote['store'] }[] = []
+    let invalid = false
+    for (const source of bulkDraft.split(/\r?\n/u)) {
+      const row = source.trim().replace(/^(?:[-*•]\s+|\d{1,3}[.)]\s+)/u, '')
+      if (!row) continue
+      if (exported && (row.startsWith('SUPA · EIGEN ONGEPRIJSDE BOODSCHAPPEN · ') ||
+          row === 'Los van Planner, bronopnames, weekbudget en winkelmandtotalen.' ||
+          row === 'Alleen nog open artikelen:' ||
+          row === 'Geen winkelprijs, bronrecht of besparingsclaim.')) continue
+      const done = /^(?:☑|\[[xX]\])(?:\s|$)/u.test(row)
+      const content = row.replace(/^(?:☑|☐|\[[xX ]\])\s*/u, '')
+      const tagged = /^\[(Algemeen|PLUS|DekaMarkt)\]\s+(.+)$/u.exec(content)
+      if (exported && (!tagged || !tagged[2].endsWith(' · prijs onbekend'))) {
+        invalid = true
+        continue
+      }
+      const targetStore = tagged ? tagged[1] as UnpricedShoppingNote['store'] : store
+      const rawLabel = tagged ? tagged[2] : content
+      const label = safeLabel(exported ? rawLabel.slice(0, -' · prijs onbekend'.length) : rawLabel)
+      if (!label || label.length > 140) invalid = true
+      else parsed.push({ label, done, store: targetStore })
+    }
+    if (invalid || !parsed.length || parsed.length > 100) {
+      setMessage('Lijst ongeldig: maximaal 100 artikelen van 140 tekens; controleer de originele Supa TXT-regels.')
+      return
+    }
+    const seen = new Set(notes.map(item => duplicateKey(item.store, item.label)))
+    const distinct = parsed.filter(item => {
+      const key = duplicateKey(item.store, item.label)
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+    if (notes.length + distinct.length > 100) {
+      setMessage('Je lijst heeft ruimte voor maximaal 100 verschillende artikelen. Er is niets toegevoegd.')
+      return
+    }
+    const added = distinct.map(item => ({
+      id: 'own-note-' + crypto.randomUUID(), label: item.label, store: item.store, done: item.done,
+    }))
+    setNotes(current => {
+      const existing = new Set(current.map(item => duplicateKey(item.store, item.label)))
+      const newItems = added.filter(item => !existing.has(duplicateKey(item.store, item.label)))
+      return current.length + newItems.length > 100 ? current : [...current, ...newItems]
+    })
+    setBulkDraft('')
+    setMessage(distinct.length + ' eigen boodschappen toegevoegd met oorspronkelijke winkels en vinkjes; ' +
+      (parsed.length - distinct.length) + ' dubbele regels overgeslagen. Alles blijft ongeprijsd.')
+  }
+  function add(event: FormEvent) {
+    event.preventDefault()
+    const label = safeLabel(name)
+    if (!label || label.length > 140 || notes.length >= 100) {
+      setMessage('Vul een geldige omschrijving in (max. 140 tekens en 100 artikelen).')
+      return
+    }
+    if (notes.some(item => duplicateKey(item.store, item.label) === duplicateKey(store, label))) {
+      setMessage('Dit artikel staat al bij ' + store + '; de bestaande afvinking blijft behouden.')
+      return
+    }
+    setNotes(current => current.length >= 100 ||
+      current.some(item => duplicateKey(item.store, item.label) === duplicateKey(store, label))
+      ? current : [...current, { id: `own-note-${crypto.randomUUID()}`, label, store, done: false }])
+    setName('')
+    setMessage(`${label} toegevoegd zonder prijs. Dit verandert de supermarktvergelijking niet.`)
+  }
+  function saveEditedNote(event: FormEvent) {
+    event.preventDefault()
+    if (!editing) return
+    const label = safeLabel(editing.label)
+    const initial = notes.find(item => item.id === editing.id)
+    if (!label || label.length > 140) {
+      setMessage('Voer een geldige boodschap in van maximaal 140 tekens.')
+      return
+    }
+    if (!initial || initial.label !== editing.initialLabel ||
+        initial.store !== editing.initialStore) {
+      setEditing(null)
+      setMessage('Deze boodschap is intussen gewijzigd. Open de actuele regel opnieuw.')
+      return
+    }
+    if (notes.some(item => item.id !== editing.id &&
+        duplicateKey(item.store, item.label) === duplicateKey(editing.store, label))) {
+      setMessage('Dit artikel staat al bij deze winkel. Er is niets overschreven.')
+      return
+    }
+    setNotes(current => {
+      const row = current.find(item => item.id === editing.id)
+      if (!row || row.label !== editing.initialLabel ||
+          row.store !== editing.initialStore ||
+          current.some(item => item.id !== editing.id &&
+            duplicateKey(item.store, item.label) === duplicateKey(editing.store, label))) return current
+      return current.map(item => item.id === editing.id
+        ? { ...item, label, store: editing.store } : item)
+    })
+    setEditing(null)
+    setMessage('Je eigen boodschap is aangepast. De bestaande afvinking blijft behouden; er zijn geen prijzen toegevoegd.')
+  }
+  function removeOwnNote(id: string) {
+    const index = notes.findIndex(note => note.id === id)
+    if (index < 0) return
+    setLastRemoved({ note: notes[index], index })
+    setNotes(current => current.filter(note => note.id !== id))
+    setMessage('Boodschap verwijderd. Je kunt de laatste verwijdering herstellen.')
+  }
+  function undoRemove() {
+    if (!lastRemoved) return
+    if (notes.length >= 100 || notes.some(note => note.id === lastRemoved.note.id)) {
+      setMessage('Herstellen kan niet: de lijst is vol of dit artikel bestaat inmiddels opnieuw.')
+      return
+    }
+    const { note, index } = lastRemoved
+    setNotes(current => {
+      if (current.length >= 100 || current.some(entry => entry.id === note.id)) return current
+      const next = [...current]
+      next.splice(Math.min(index, next.length), 0, note)
+      return next
+    })
+    setLastRemoved(null)
+    setMessage('De laatste eigen boodschap is met zijn oorspronkelijke vinkje hersteld.')
+  }
+  const selected = notes.filter(note => filterStore === 'Alle winkels' ||
+    note.store === filterStore || note.store === 'Algemeen')
+  // Search only the shopper's own notes. Never infer a retailer identity.
+  const needle = search.normalize('NFKD').replace(/\p{M}/gu, '').toLocaleLowerCase('nl').trim()
+  const visible = selected.filter(note => (!onlyOpen || !note.done) &&
+    (!needle || note.label.normalize('NFKD').replace(/\p{M}/gu, '')
+      .toLocaleLowerCase('nl').includes(needle)))
+  const shopRoute: readonly UnpricedShoppingNote['store'][] = [
+    firstShop, firstShop === 'PLUS' ? 'DekaMarkt' : 'PLUS', 'Algemeen',
+  ]
+  const grouped = shopRoute.map(groupStore => ({
+    store: groupStore, items: visible.filter(note => note.store === groupStore),
+  })).filter(group => group.items.length > 0)
+  const nextOpenStore = grouped.find(group => group.items.some(item => !item.done))?.store ?? null
+  function goToStore(groupStore: UnpricedShoppingNote['store']) {
+    const target = document.getElementById('supa-own-trip-' + groupStore)
+    target?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    target?.focus({ preventScroll: true })
+  }
+  const visibleIds = new Set(visible.map(note => note.id))
+  const remainingVisible = visible.filter(note => !note.done).length
+  const completedVisible = visible.length - remainingVisible
+  function confirmClearCompleted() {
+    if (!pendingCleared?.length) return
+    const originals = pendingCleared.map(item => ({
+      note: item, index: notes.findIndex(current => current.id === item.id),
+    }))
+    if (originals.some(({ note, index }) => index < 0 ||
+        !notes[index].done || notes[index].label !== note.label ||
+        notes[index].store !== note.store)) {
+      setPendingCleared(null)
+      setMessage('Boodschappen zijn ondertussen veranderd. Bekijk de huidige afvinkingen opnieuw.')
+      return
+    }
+    const ids = new Set(pendingCleared.map(item => item.id))
+    setNotes(current => {
+      if (originals.some(({ note }) => !current.some(item => item.id === note.id &&
+          item.done && item.label === note.label && item.store === note.store))) return current
+      return current.filter(item => !ids.has(item.id))
+    })
+    setLastCleared(originals)
+    setPendingCleared(null)
+    setMessage(originals.length + ' afgeronde eigen boodschappen uit de actieve lijst gehaald. Herstel mogelijk; geen geprijsde regels gewijzigd.')
+  }
+  function undoCleared() {
+    if (!lastCleared?.length) return
+    const ids = new Set(lastCleared.map(item => item.note.id))
+    const labels = new Set(notes.map(item => duplicateKey(item.store, item.label)))
+    if (notes.length + lastCleared.length > 100 ||
+        notes.some(item => ids.has(item.id)) ||
+        lastCleared.some(({ note }) => labels.has(duplicateKey(note.store, note.label)))) {
+      setMessage('Herstellen kan niet: er zijn nieuwe conflicterende artikelen of de lijst is vol.')
+      return
+    }
+    setNotes(current => {
+      const currentKeys = new Set(current.map(item => duplicateKey(item.store, item.label)))
+      if (current.length + lastCleared.length > 100 ||
+          current.some(item => ids.has(item.id)) ||
+          lastCleared.some(({ note }) => currentKeys.has(duplicateKey(note.store, note.label)))) return current
+      const next = [...current]
+      for (const { note, index } of [...lastCleared].sort((a, b) => a.index - b.index))
+        next.splice(Math.min(index, next.length), 0, note)
+      return next
+    })
+    setLastCleared(null)
+    setMessage('Afgeronde boodschappen teruggezet op hun oorspronkelijke plek, met oorspronkelijke vinkjes.')
+  }
+  function markVisible(done: boolean) {
+    if (visibleIds.size === 0) return
+    setNotes(current => current.map(item => visibleIds.has(item.id) && item.done !== done
+      ? { ...item, done } : item))
+    setMessage((done ? 'Zichtbare boodschappen afgevinkt' : 'Zichtbare boodschappen weer opengezet') +
+      '; andere winkels en oorspronkelijke prijsdata blijven onaangeroerd.')
+  }
+  function markGroup(groupStore: UnpricedShoppingNote['store'], checked: boolean) {
+    const ids = new Set(visible.filter(item => item.store === groupStore).map(item => item.id))
+    if (ids.size === 0) return
+    setNotes(current => current.map(item => ids.has(item.id) && item.done !== checked
+      ? { ...item, done: checked } : item))
+    setMessage(groupStore + ': alleen de zichtbare persoonlijke boodschappen ' +
+      (checked ? 'afgevinkt.' : 'weer opengezet.') + ' Geen prijzen veranderd.')
+  }
+  function moveVisibleOwnNotes(from: UnpricedShoppingNote['store']) {
+    const target = moveTargets[from]
+    const candidates = visible.filter(note => note.store === from)
+    if (!candidates.length || target === from) return
+    const existing = new Set(notes.filter(item => item.store === target)
+      .map(item => duplicateKey(item.store, item.label)))
+    if (candidates.some(item => existing.has(duplicateKey(target, item.label)))) {
+      setMessage('Er bestaan al artikelen bij ' + target +
+        '. Niets verplaatst: bekijk eerst de dubbele boodschappen.')
+      return
+    }
+    // Snapshot the actual values to prevent a delayed user action from
+    // overwriting independent changes to shopping content or completion.
+    const byId = new Map(candidates.map(item => [item.id, item] as const))
+    setNotes(current => {
+      const currentTargetKeys = new Set(current.filter(item => item.store === target)
+        .map(item => duplicateKey(item.store, item.label)))
+      if (candidates.some(note => {
+        const actual = current.find(item => item.id === note.id)
+        return !actual || actual.store !== from || actual.label !== note.label ||
+          actual.done !== note.done ||
+          currentTargetKeys.has(duplicateKey(target, note.label))
+      })) return current
+      return current.map(item => byId.has(item.id) ? { ...item, store: target } : item)
+    })
+    setMessage(candidates.length + ' eigen boodschappen van ' + from + ' naar ' + target +
+      ' verplaatst met behoud van de vinkjes. Prijzen en artikelmatching blijven onaangeroerd.')
+  }
+  const routeItems = grouped.flatMap(group => group.items)
+  const exportText = [
+    'SUPA · EIGEN ONGEPRIJSDE BOODSCHAPPEN · ' + filterStore,
+    'Los van Planner, bronopnames, weekbudget en winkelmandtotalen.', '',
+    ...(onlyOpen ? ['Alleen nog open artikelen:'] : []),
+    ...routeItems.map(note => (note.done ? '☑ ' : '☐ ') + `[${note.store}] ${safeLabel(note.label)} · prijs onbekend`),
+    '', 'Geen winkelprijs, bronrecht of besparingsclaim.',
+  ].join('\n') + '\n'
+  function downloadPrintableList() {
+    if (!visible.length) return
+    // Static local HTML only: encode all user text and deny external resources.
+    const escapeHtml = (text: string) => text.replace(/&/gu, '&amp;')
+      .replace(/</gu, '&lt;').replace(/>/gu, '&gt;')
+      .replace(/"/gu, '&quot;').replace(/'/gu, '&#39;')
+    const groups = shopRoute.flatMap(shop => {
+      const items = visible.filter(note => note.store === shop)
+      if (!items.length) return []
+      return ['<section><h2>' + shop + '</h2><p>' +
+        items.filter(note => !note.done).length + ' open van ' + items.length + '</p><ul>' +
+        items.map(note => '<li><span aria-hidden="true">' + (note.done ? '☑' : '☐') +
+          '</span> ' + escapeHtml(safeLabel(note.label)) + '</li>').join('') +
+        '</ul></section>']
+    }).join('')
+    const html = '<!doctype html><html lang="nl"><head><meta charset="utf-8">' +
+      '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+      `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">` +
+      '<title>SUPA · Eigen ongeprijsde boodschappen</title>' +
+      '<style>body{font:16px/1.5 system-ui,sans-serif;max-width:760px;margin:auto;padding:24px;color:#202820}' +
+      'section{break-inside:avoid;border-top:2px solid #ccc;margin:16px 0;padding:12px 0}' +
+      'ul{padding:0;list-style:none}li{padding:7px 0;border-bottom:1px solid #ddd;overflow-wrap:anywhere}' +
+      'li span{font-size:1.3em;margin-right:.6em}small{color:#555}' +
+      '@media print{body{padding:0}section{break-inside:avoid}}</style></head><body>' +
+      '<h1>Mijn eigen boodschappen</h1><p>' + visible.length +
+      ' ongeprijsde items, ' + visible.filter(note => !note.done).length +
+      ' nog te kopen.</p>' + groups +
+      '<footer><small>Persoonlijke lijst zonder winkelprijzen. Geen winkelvergelijking, bronbewijs of besparingsclaim.</small></footer>' +
+      '</body></html>'
+    const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
+    try {
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'supa-eigen-boodschappen-print.html'
+      document.body.append(link); link.click(); link.remove()
+      setMessage('De zichtbare ongeprijsde boodschappen zijn als offline printbestand bewaard.')
+    } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+  }
+  function download() {
+    const uri = URL.createObjectURL(new Blob([exportText], { type: 'text/plain;charset=utf-8' }))
+    try {
+      const link = document.createElement('a')
+      link.href = uri
+      link.download = 'supa-mijn-ongeprijsde-boodschappen.txt'
+      document.body.append(link); link.click(); link.remove()
+      setMessage('Je ongeprijsde boodschappen zijn als privélijst gedownload.')
+    } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
+  }
+  return <section className="manual-shopping-notes" aria-label="Mijn ongeprijsde boodschappen">
+    <h2>Zelf toevoegen, zonder prijs</h2>
+    <p>Ook zonder prijsbestanden boodschappen toevoegen. Standaard tijdelijk; alleen met
+      jouw toestemming blijven de vinkjes en artikelen na verversen in deze browsertab.
+      Nooit meegenomen in weekbudget, twee winkelmanden of prijsverschil.</p>
+    <form onSubmit={add} className="manual-shopping-notes__add">
+      <label>Wat wil je meenemen?<input value={name} maxLength={140} autoComplete="off"
+        placeholder="Bijv. vuilniszakken" onChange={event => setName(event.target.value)} /></label>
+      <label>Winkellijst<select value={store} onChange={event => setStore(event.target.value as typeof store)}>
+        {stores.map(item => <option key={item} value={item}>{item}</option>)}</select></label>
+      <button type="submit" disabled={notes.length >= 100}>+ Voeg toe</button>
+    </form>
+    <details className="manual-shopping-notes__bulk">
+      <summary>Plak meerdere boodschappen tegelijk</summary>
+      <form onSubmit={addBulk}>
+        <p>Eén eigen artikel per regel. Opsommingstekens en originele vinkjes
+          (☐, ☑, [ ] of [x]) worden herkend; al afgevinkte artikelen blijven afgevinkt.
+          Gewone regels gaan naar {store}; bij gekopieerde Supa-TXT met [PLUS],
+          [DekaMarkt] of [Algemeen] blijven de oorspronkelijke winkels behouden.
+          Dubbele artikelen worden overgeslagen, zonder bestaande vinkjes of prijzen te wijzigen.</p>
+        <label>Je ongeprijsde boodschappen
+          <textarea rows={5} maxLength={15000} value={bulkDraft}
+            placeholder={'Vuilniszakken\nAfwasmiddel\nToiletpapier'}
+            onChange={event => { bulkFileSerial.current++; setBulkDraft(event.target.value) }} />
+        </label>
+        <label>Of kies een eerder gedownloade eigen Supa-lijst (TXT, maximaal 15 kB)
+          <input type="file" accept=".txt,text/plain"
+            onChange={event => { void readBulkText(event.currentTarget.files?.[0]); event.currentTarget.value = '' }} />
+        </label>
+        <button type="submit" disabled={!bulkDraft.trim() || notes.length >= 100}>
+          Voeg regels toe aan mijn lijst
+        </button>
+      </form>
+    </details>
+    <div className="manual-shopping-notes__top">
+      <strong>{notes.length} eigen {notes.length === 1 ? 'artikel' : 'artikelen'} · {notes.filter(n => n.done).length} afgevinkt</strong>
+      <label>Toon winkellijst
+        <select value={filterStore} onChange={event => setFilterStore(event.target.value as typeof filterStore)}>
+          <option value="Alle winkels">Alle winkels</option>
+          {stores.map(item => <option key={item} value={item}>{item}</option>)}
+        </select>
+      </label>
+      <label>Eerste winkel in mijn route
+        <select value={firstShop} onChange={event => setFirstShop(event.currentTarget.value as typeof firstShop)}>
+          <option value="PLUS">Eerst PLUS</option>
+          <option value="DekaMarkt">Eerst DekaMarkt</option>
+        </select>
+      </label>
+      <label>Zoek mijn eigen boodschappen
+        <input type="search" maxLength={120} value={search} placeholder="Zoek zonder accent"
+          onChange={event => setSearch(event.target.value)} />
+      </label>
+      <label><input type="checkbox" checked={onlyOpen} onChange={event => setOnlyOpen(event.target.checked)} /> Alleen open</label>
+    </div>
+    <div className="manual-shopping-notes__batch" role="group" aria-label="Zichtbare boodschappen beheren">
+      <button type="button" disabled={remainingVisible === 0} onClick={() => markVisible(true)}>
+        Vink {remainingVisible} zichtbare open boodschappen af
+      </button>
+      <button type="button" disabled={completedVisible === 0} onClick={() => markVisible(false)}>
+        Zet {completedVisible} zichtbare boodschappen weer open
+      </button>
+      <small>Alleen de huidige winkel- en open-filterselectie. Geen prijzen of bronmomenten wijzigen.</small>
+    </div>
+    <section className="manual-shopping-notes__finish-trip" aria-label="Afgeronde persoonlijke boodschappen opruimen">
+      <strong>Winkelronde afronden</strong>
+      <p>Verwijder alleen de zichtbare afgevinkte eigen artikelen als je klaar bent.
+        Niet-afgevinkte boodschappen, recepten, Planner en originele supermarktprijzen blijven staan.
+        Zet 'Alleen open' eerst uit om gekochte artikelen zichtbaar te maken.</p>
+      <button type="button" disabled={completedVisible === 0}
+        onClick={() => setPendingCleared(visible.filter(item => item.done))}>
+        Ruim {completedVisible} zichtbare gekochte eigen artikelen op…
+      </button>
+      {pendingCleared && <div role="group" className="manual-shopping-notes__clear-confirm"
+        aria-label="Bevestig het opruimen van persoonlijke boodschappen">
+        <p>{pendingCleared.length} eigen artikelen verdwijnen uit de actieve lijst;
+          dit verandert geen enkele bronprijs en wordt pas uitgevoerd na je bevestiging.</p>
+        <p>{pendingCleared.slice(0, 5).map(item => item.label).join(' · ')}
+          {pendingCleared.length > 5 ? ' · en ' + (pendingCleared.length - 5) + ' andere' : ''}</p>
+        <button type="button" onClick={confirmClearCompleted}>Ja, ruim deze afgeronde items op</button>
+        <button type="button" onClick={() => setPendingCleared(null)}>Annuleer</button>
+      </div>}
+      {lastCleared && <button type="button" onClick={undoCleared}>
+        Herstel laatste {lastCleared.length} opgeruimde artikelen
+      </button>}
+    </section>
+    <nav className="manual-shopping-notes__trip-nav" aria-label="Mijn persoonlijke winkelroute">
+      <strong>Winkelroute · alleen mijn eigen ongeprijsde artikelen</strong>
+      <div className="manual-shopping-notes__trip-nav-stores">
+        {grouped.map(group => <button type="button" key={group.store}
+          onClick={() => goToStore(group.store)}>
+          {group.store} · {group.items.filter(item => !item.done).length} open / {group.items.length}
+        </button>)}
+      </div>
+      <button type="button" disabled={!nextOpenStore} onClick={() => {
+        if (nextOpenStore) goToStore(nextOpenStore)
+      }}>
+        {nextOpenStore ? 'Ga naar eerstvolgende open winkel: ' + nextOpenStore : 'Alle zichtbare boodschappen klaar'}
+      </button>
+    </nav>
+    <div className="manual-shopping-notes__groups" aria-label="Boodschappen per winkel">
+      {grouped.map(group => <section className="manual-shopping-notes__group" key={group.store}
+        id={'supa-own-trip-' + group.store} tabIndex={-1}
+        aria-label={'Eigen ongeprijsde boodschappen bij ' + group.store}>
+        <header className="manual-shopping-notes__group-heading">
+          <h3>{group.store}</h3>
+          <span>{group.items.filter(item => !item.done).length} open · {group.items.length} zichtbaar</span>
+          <div className="manual-shopping-notes__group-actions">
+            <button type="button" disabled={!group.items.some(item => !item.done)}
+              onClick={() => markGroup(group.store, true)}>Vink deze winkel af</button>
+            <button type="button" disabled={!group.items.some(item => item.done)}
+              onClick={() => markGroup(group.store, false)}>Heropen deze winkel</button>
+          </div>
+          <div className="manual-shopping-notes__assign">
+            <label>Verplaats mijn zichtbare {group.store}-artikelen naar
+              <select value={moveTargets[group.store]} onChange={event => {
+                const target = event.currentTarget.value as UnpricedShoppingNote['store']
+                setMoveTargets(current => ({ ...current, [group.store]: target }))
+              }}>
+                {stores.filter(target => target !== group.store).map(target =>
+                  <option key={target} value={target}>{target}</option>)}
+              </select>
+            </label>
+            <button type="button" onClick={() => moveVisibleOwnNotes(group.store)}>
+              Verplaats {group.items.length} eigen artikelen
+            </button>
+            <small>Alleen jouw eigen ongeprijsde lijst: bestaande dubbelen blokkeren verplaatsing;
+              de afvinkingen en brongegevens blijven behouden.</small>
+          </div>
+        </header>
+        <ul>{group.items.map(note => <li key={note.id}>
+      {editing?.id === note.id ? <form className="manual-shopping-notes__edit" onSubmit={saveEditedNote}>
+        <label>Omschrijving
+          <input maxLength={140} value={editing.label} autoFocus
+            onChange={event => {
+              const value = event.currentTarget.value
+              setEditing(current => current?.id === note.id ? { ...current, label: value } : current)
+            }} />
+        </label>
+        <label>Winkel
+          <select value={editing.store} onChange={event => {
+            const value = event.currentTarget.value as UnpricedShoppingNote['store']
+            setEditing(current => current?.id === note.id ? { ...current, store: value } : current)
+          }}>
+            {stores.map(item => <option key={item} value={item}>{item}</option>)}
+          </select>
+        </label>
+        <button type="submit">Bewaar</button>
+        <button type="button" onClick={() => setEditing(null)}>Annuleer</button>
+        <small>Het vinkje en privé-ID blijven behouden; nooit automatisch een prijs.</small>
+      </form> : <>
+        <label><input type="checkbox" checked={note.done}
+          onChange={() => setNotes(current => current.map(item => item.id === note.id
+            ? { ...item, done: !item.done } : item))} />
+          <span>{note.label} <small>· {note.store} · prijs onbekend</small></span></label>
+        <button type="button" onClick={() => setEditing({ id: note.id,
+          initialLabel: note.label, initialStore: note.store, label: note.label, store: note.store })}
+          aria-label={`Bewerk ${note.label}`}>Bewerk</button>
+        <button type="button" onClick={() => removeOwnNote(note.id)}
+          aria-label={`Verwijder ${note.label}`}>Verwijder</button>
+      </>}
+        </li>)}</ul>
+      </section>)}
+    </div>
+    {!visible.length && <p role="status">
+      {needle ? 'Geen eigen boodschappen gevonden voor deze zoekopdracht.' :
+        selected.length ? 'Alle boodschappen in deze selectie zijn afgevinkt.' :
+          'Nog geen boodschappen in deze selectie. De lijst werkt zonder winkelprijzen.'}
+    </p>}
+    {lastRemoved && <button type="button" className="ghost-button" onClick={undoRemove}>
+      Herstel laatste verwijderde boodschap: {lastRemoved.note.label}
+    </button>}
+    <section className="manual-shopping-notes__session" aria-label="Optioneel bewaren in dit tabblad">
+      <label><input type="checkbox" checked={sessionEnabled} disabled={sessionProtected}
+        onChange={event => changeSessionOptIn(event.target.checked)} />
+        Bewaar mijn eigen ongeprijsde lijst tijdelijk in deze browsertab</label>
+      <small>Niet automatisch ingeschakeld. Geen cloud, geen winkelprijzen; stoppen wist
+        alleen deze optionele sessiekopie, niet je geopende lijst of JSON-backup.</small>
+      {sessionMessage && <p role="status" aria-live="polite">{sessionMessage}</p>}
+    </section>
+    <div className="manual-shopping-notes__actions">
+      <button type="button" disabled={!visible.length} onClick={() => setExportVisible(value => !value)}>
+        {exportVisible ? 'Verberg kopieertekst' : 'Toon kopieertekst'}</button>
+      <button type="button" disabled={!visible.length} onClick={download}>Download lijst (TXT)</button>
+      <button type="button" disabled={!visible.length} onClick={downloadPrintableList}>
+        Offline afdrukbare lijst (HTML)
+      </button>
+      <button type="button" disabled={!notes.length} onClick={backupDownload}>Backup hele lijst (JSON)</button>
+      <label>Herstel lijst uit JSON-backup (max. 64 kB)
+        <input type="file" accept=".json,application/json" disabled={backupBusy}
+          onChange={event => { void backupRead(event.currentTarget.files?.[0]); event.currentTarget.value = '' }} />
+      </label>
+    </div>
+    {backupPreview && <div className="manual-shopping-notes__backup" role="group"
+      aria-label="Voorbeeld van de boodschappenbackup">
+      <strong>Privébackup klaar: {backupPreview.length} artikelen</strong>
+      <p>Bestaande artikelen worden niet overschreven. Conflicterende IDs en meer
+        dan 100 artikelen worden geweigerd. Niets wordt geüpload of geprijsd.</p>
+      <button type="button" onClick={backupConfirm}>Bevestig toevoegen aan mijn lijst</button>
+      <button type="button" onClick={() => { readVersion.current++; setBackupPreview(null) }}>
+        Annuleer import
+      </button>
+    </div>}
+    {exportVisible && visible.length > 0 && <label>Kopieer mijn ongeprijsde boodschappen
+      <textarea rows={Math.min(selected.length + 6, 15)} readOnly value={exportText}
+        onFocus={event => event.currentTarget.select()} /></label>}
+    <p role="status" aria-live="polite">{message}</p>
+  </section>
+}

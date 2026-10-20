@@ -1,0 +1,72 @@
+.manual-shopping-notes { margin:16px 0; padding:18px; background:#eff8f1; border:1px solid #bed4c4; border-radius:18px; display:grid; gap:12px; }
+.manual-shopping-notes h2,.manual-shopping-notes p { margin:0; }
+.manual-shopping-notes__add { display:flex; flex-wrap:wrap; align-items:end; gap:10px; }
+.manual-shopping-notes__add label { display:grid; gap:5px; flex:1; min-width:150px; }
+.manual-shopping-notes input:not([type=checkbox]),.manual-shopping-notes select { min-height:44px; width:100%; max-width:100%; background:white; border:1px solid #98b6a0; border-radius:10px; padding:9px; }
+.manual-shopping-notes button { min-height:44px; padding:10px 14px; border-radius:10px; border:1px solid #8eae99; background:white; }
+.manual-shopping-notes__top,.manual-shopping-notes__actions { display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; }
+.manual-shopping-notes ul { margin:0; padding:0; list-style:none; display:grid; gap:8px; }
+.manual-shopping-notes li { display:flex; align-items:center; gap:8px; background:white; padding:8px 10px; border-radius:12px; }
+.manual-shopping-notes li label { display:flex; flex:1; gap:12px; align-items:center; overflow-wrap:anywhere; }
+.manual-shopping-notes li small { display:block; color:#54725c; }
+.manual-shopping-notes input[type=checkbox] { min-width:20px; min-height:20px; }
+.manual-shopping-notes textarea { width:100%; min-height:100px; }
+.manual-shopping-notes :is(button,input,select,textarea):focus-visible { outline:3px solid #005135; outline-offset:2px; }
+
+.manual-shopping-notes__backup { display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding:14px; border:1px solid #98b6a0; border-radius:12px; background:white; }
+.manual-shopping-notes__backup p { flex-basis:100%; }
+.manual-shopping-notes__actions label { min-width:220px; font-size:.92rem; }
+.manual-shopping-notes__actions input[type=file] { display:block; min-height:44px; padding:8px; }
+
+.manual-shopping-notes__bulk { background:#fff; border:1px solid #bed4c4; border-radius:12px; padding:12px; }
+.manual-shopping-notes__bulk summary { cursor:pointer; font-weight:700; }
+.manual-shopping-notes__bulk form { display:grid; gap:10px; margin-top:12px; }
+.manual-shopping-notes__bulk textarea { min-height:110px; border-radius:10px; padding:10px; border:1px solid #98b6a0; }
+
+
+.manual-shopping-notes__session { background:#fff; border:1px solid #bed4c4; border-radius:12px; padding:12px; display:grid; gap:7px; }
+.manual-shopping-notes__session label { display:flex; gap:10px; align-items:center; }
+.manual-shopping-notes__session small { color:#405c4e; }
+.manual-shopping-notes__session p { margin:0; overflow-wrap:anywhere; }
+
+/* Edit an own grocery in-place without deleting its personal checkmark. */
+.manual-shopping-notes__edit { flex:1; min-width:0; display:flex; flex-wrap:wrap; align-items:end; gap:10px; }
+.manual-shopping-notes__edit label { display:grid !important; gap:4px !important; min-width:140px; flex:1; font-weight:650; }
+.manual-shopping-notes__edit small { flex-basis:100%; }
+@media(max-width:540px) { .manual-shopping-notes__edit label { flex-basis:100%; } .manual-shopping-notes li { flex-wrap:wrap; } }
+
+.manual-shopping-notes__batch { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+.manual-shopping-notes__batch button:disabled { opacity:.55; cursor:not-allowed; }
+.manual-shopping-notes__batch small { flex-basis:100%; color:#405c4e; }
+
+/* Scan actual own shopping stops by store, without implying priced retailer products. */
+.manual-shopping-notes__groups { display:grid; gap:1rem; }
+.manual-shopping-notes__group { min-width:0; border:1px solid #c5dbcd; border-radius:13px; padding:12px; background:#f8fbf8; }
+.manual-shopping-notes__group-heading { display:flex; flex-wrap:wrap; gap:.6rem; align-items:center; margin-bottom:10px; }
+.manual-shopping-notes__group-heading h3 { margin:0; font-size:1.06rem; }
+.manual-shopping-notes__group-heading span { color:#405c4e; font-size:.88rem; }
+.manual-shopping-notes__group-actions { display:flex; flex-wrap:wrap; gap:.4rem; margin-left:auto; }
+.manual-shopping-notes__group-actions button { font-size:.85rem; padding:7px 9px; }
+.manual-shopping-notes__group-actions button:disabled { opacity:.55; cursor:not-allowed; }
+.manual-shopping-notes__top label { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.manual-shopping-notes__top input[type=search] { max-width:230px; }
+@media(max-width:600px) { .manual-shopping-notes__top label { width:100%; } .manual-shopping-notes__top input[type=search] { max-width:100%; flex:1; } .manual-shopping-notes__group-actions { margin-left:0; width:100%; } }
+
+/* Personal shopping order and explicit assignment are local display controls. */
+.manual-shopping-notes__assign { display:flex; flex-wrap:wrap; align-items:end; gap:.65rem; flex-basis:100%; padding:.7rem; background:#e9f5ed; border-radius:10px; }
+.manual-shopping-notes__assign label { display:grid; gap:.3rem; font-weight:650; min-width:170px; }
+.manual-shopping-notes__assign select { min-width:140px; }
+.manual-shopping-notes__assign small { flex-basis:100%; color:#425c4b; }
+.manual-shopping-notes__assign button { min-height:44px; }
+
+.manual-shopping-notes__trip-nav { display:grid; gap:.65rem; padding:1rem; border:1px solid #b9d5be; border-radius:13px; background:#f5fbf6; }
+.manual-shopping-notes__trip-nav-stores { display:flex; gap:.5rem; flex-wrap:wrap; }
+.manual-shopping-notes__trip-nav > button { justify-self:start; }
+.manual-shopping-notes__trip-nav button:disabled { opacity:.55; cursor:not-allowed; }
+.manual-shopping-notes__group:focus { outline:3px solid #236d4d; outline-offset:3px; }
+
+.manual-shopping-notes__finish-trip { display:grid; justify-items:start; gap:.65rem; padding:1rem; border:1px solid #bfd6c6; border-radius:12px; background:#f8faf6; }
+.manual-shopping-notes__finish-trip p { margin:0; overflow-wrap:anywhere; }
+.manual-shopping-notes__clear-confirm { display:flex; flex-wrap:wrap; gap:.65rem; align-items:center; padding:1rem; border:1px solid #e0c89c; border-radius:10px; background:#fff8e8; }
+.manual-shopping-notes__clear-confirm p { flex-basis:100%; }
+.manual-shopping-notes__finish-trip button:disabled { opacity:.55; cursor:not-allowed; }

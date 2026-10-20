@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../domain/basket.ts'
 import { groupShoppingByRecipe } from '../shopping-list/shoppingRecipeGroups.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
+import type { UnpricedShoppingNote } from '../shopping-list/ManualShoppingNotes.tsx'
 import { exportUnpricedProgress, importUnpricedProgress, unpricedProgressMaxBytes, unpricedProgressStorageKey } from './unpricedPlannerProgress.ts'
 import { exportPrivatePlannerWeek } from './exportPrivatePlannerWeek.ts'
 import { exportUnpricedPlannerCsv } from './unpricedPlannerCsv.ts'
@@ -11,6 +12,8 @@ type ChecklistProps = {
   plan: PlannedMeal[]
   recipes: RecipeWithIngredients[]
   activeDays: string[]
+  manualNotes?: readonly UnpricedShoppingNote[]
+  onToggleManualNote?: (id: string) => void
   onOpenPriceImport?: () => void
   onOpenRecipes?: () => void
 }
@@ -35,7 +38,7 @@ const portableQuantity = (item: DemandRow) =>
  * The exact physical week demand, independent of either supermarket.
  * No sample product, inferred SKU, price, license or retailer observation.
  */
-export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPriceImport, onOpenRecipes }: ChecklistProps) {
+export function UnpricedPlannerChecklist({ plan, recipes, activeDays, manualNotes = [], onToggleManualNote, onOpenPriceImport, onOpenRecipes }: ChecklistProps) {
   const [progress, setProgress] = useState<{ identity: string; checked: Record<string, boolean> }>({ identity: '', checked: {} })
   const [backupMessage, setBackupMessage] = useState('')
   const currentDemand = useRef('')
@@ -105,7 +108,16 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPric
   const completed = items.filter(item => checked[itemKey(item)]).length
   const visible = items.filter(item => !openOnly || !checked[itemKey(item)])
   const recipeGroups = groupShoppingByRecipe(visible, plan, recipes, activeDays)
-  const copyKey = JSON.stringify([demandIdentity, checked, openOnly])
+  const handwritten = manualNotes.filter(note =>
+    note && typeof note.id === 'string' && typeof note.label === 'string' &&
+    note.label.length > 0 && note.label.length <= 140 &&
+    ['Algemeen', 'PLUS', 'DekaMarkt'].includes(note.store) &&
+    typeof note.done === 'boolean')
+  const visibleHandwritten = handwritten.filter(note => !openOnly || !note.done)
+  const safeHandwritten = (label: string) => label
+    .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim()
+  const copyKey = JSON.stringify([demandIdentity, checked, openOnly,
+    handwritten.map(note => [note.id, note.label, note.store, note.done])])
   const activeCopyKey = useRef(copyKey)
   activeCopyKey.current = copyKey
   const copy = prepared?.key === copyKey ? prepared.text : null
@@ -117,7 +129,11 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPric
     ...(visible.length ? visible.map(item =>
       (checked[itemKey(item)] ? '☑ ' : '☐ ') + item.label + ' · ' + portableQuantity(item)) :
       ['Alle boodschappen zijn afgevinkt.']),
-    'Geen supermarktproduct of actuele prijs gekoppeld.',
+    ...(visibleHandwritten.length ? ['', 'ZELF TOEGEVOEGDE BOODSCHAPPEN — niet in het Planner-mandje',
+      ...visibleHandwritten.map(note => (note.done ? '☑ ' : '☐ ') +
+        safeHandwritten(note.label) + ' [' + note.store + '] · prijs onbekend'),
+    ] : []),
+    'Geen supermarktproduct of actuele prijs gekoppeld. Handmatige artikelen blijven buiten het Planner- en winkelmandtotaal.',
   ].join('\n')
 
   function prepareCopy() {
@@ -143,7 +159,7 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPric
       }
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(content)
-        if (currentDemand.current === expectedDemand && copyKey === expectedCopyKey)
+        if (currentDemand.current === expectedDemand && activeCopyKey.current === expectedCopyKey)
           setBackupMessage('Weekboodschappen naar je klembord gekopieerd, zonder winkelprijzen.')
         return
       }
@@ -152,7 +168,7 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPric
       // Denied permissions are normal on private browsing and insecure pages.
     }
     // Never silently fail when the OS/browser denies a native share or clipboard.
-    if (currentDemand.current === expectedDemand && copyKey === expectedCopyKey) {
+    if (currentDemand.current === expectedDemand && activeCopyKey.current === expectedCopyKey) {
       setPrepared({ key: expectedCopyKey, text: content })
       setBackupMessage('Delen of kopiëren is niet beschikbaar. Selecteer de tekst hieronder om zelf te kopiëren.')
     }
@@ -404,6 +420,26 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPric
               </section>
             )) : <p role="status">Alle boodschappen afgevinkt voor deze week.</p>}
           </div>
+          {handwritten.length > 0 && <section className="unpriced-planner-checklist__recipe-group"
+            aria-label="Zelf toegevoegde ongeprijsde boodschappen">
+            <header className="unpriced-planner-checklist__group-title">
+              <h4>Ook meenemen · handmatig toegevoegd</h4>
+              <span>{visibleHandwritten.length} zichtbaar</span>
+            </header>
+            <p>Dit zijn aparte eigen notities zonder winkelprijs of verpakkingsmatch.
+              Ze tellen niet mee bij Planner-ingrediënten of de supermarktvergelijking.
+              Vink ze hier af, of bewerk ze onder Zelf toevoegen verderop in de Lijst.</p>
+            <div>{visibleHandwritten.map(note => <label key={note.id}
+              className="unpriced-planner-checklist__item">
+              <input type="checkbox" checked={note.done} disabled={!onToggleManualNote}
+                onChange={() => onToggleManualNote?.(note.id)} />
+              <span className="unpriced-planner-checklist__item-copy">
+                <strong>{safeHandwritten(note.label)}</strong>
+                <small>{note.store} · zelf toegevoegd, geen originele winkel-SKU</small>
+              </span>
+              <span className="unpriced-planner-checklist__price" aria-label="Prijs onbekend">—</span>
+            </label>)}</div>
+          </section>}
           {copy !== null && <div className="unpriced-planner-checklist__copy">
             <p>Deze kopie is alleen voor de huidige gekozen lijst. Selecteer en kopieer de tekst.</p>
             <textarea readOnly rows={Math.min(visible.length + 4, 15)}

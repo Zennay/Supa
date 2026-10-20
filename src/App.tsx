@@ -12,6 +12,11 @@ const BasketView = lazy(async () => {
   return { default: module.BasketView }
 })
 import { ShoppingListView } from './features/shopping-list/ShoppingListView'
+import type { UnpricedShoppingNote } from './features/shopping-list/ManualShoppingNotes.tsx'
+const ManualShoppingNotes = lazy(async () => {
+  const module = await import('./features/shopping-list/ManualShoppingNotes.tsx')
+  return { default: module.ManualShoppingNotes }
+})
 import { PrivateSourceShoppingList } from './features/shopping-list/PrivateSourceShoppingList.tsx'
 import './features/shopping-list/listSourceFilePicker.css'
 const PartialReviewedShoppingList = lazy(async () => {
@@ -158,6 +163,8 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [ownPriceImportSignal, setOwnPriceImportSignal] = useState(0)
   const [incomingPriceFiles, setIncomingPriceFiles] = useState<PrivateSourceFileHandoff | null>(null)
   const [listSourceFileWarning, setListSourceFileWarning] = useState('')
+  // Separate, explicitly unpriced human notes. Never counted in shop totals.
+  const [manualShoppingNotes, setManualShoppingNotes] = useState<UnpricedShoppingNote[]>([])
   const nextPriceFileSerial = useRef(0)
   const [privateReviewed, setPrivateReviewed] = useState<PrivateReviewedBaskets | null>(null)
   const [privateCaptureProgress, setPrivateCaptureProgress] = useState<PrivateCaptureProgress | null>(null)
@@ -865,6 +872,12 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         {tab === 'list' && (
           <nav className="screen" aria-label="Snelle acties voor je boodschappenlijst">
             <button type="button" className="ghost-button" onClick={() =>
+              document.getElementById('supa-manual-shopping-notes')?.scrollIntoView({
+                behavior: 'smooth', block: 'start',
+              })}>
+              Zelf losse boodschappen toevoegen ({manualShoppingNotes.length})
+            </button>
+            <button type="button" className="ghost-button" onClick={() =>
               document.getElementById('supa-own-extra-groceries')?.scrollIntoView({
                 behavior: 'smooth', block: 'start',
               })}>
@@ -893,6 +906,9 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
           <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
             <section className="screen" aria-label="Boodschappenlijst uit mijn eigen weekmenu">
               <UnpricedPlannerChecklist plan={plannedMeals} recipes={recipes} activeDays={activeDays}
+                manualNotes={manualShoppingNotes}
+                onToggleManualNote={id => setManualShoppingNotes(previous => previous.map(note =>
+                  note.id === id ? { ...note, done: !note.done } : note))}
                 onOpenPriceImport={openOwnPriceImport} onOpenRecipes={() => navigate('recipes')} />
               {tab === 'list' && (designProductIds.length > 0
                 ? <section aria-label="Mijn expliciet toegevoegde producten">
@@ -916,6 +932,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             <PrivateSourceShoppingList reviewed={livePrivateReviewed} budget={budget}
               checked={privateShoppingTicks} setChecked={setPrivateShoppingTicks}
               plan={plannedMeals} recipes={recipes} activeDays={activeDays}
+              manualNotes={manualShoppingNotes}
               preferred={preferredOwnStore} onChooseStore={setPreferredOwnStore}
               onOpenComparison={openOwnPriceImport} routeOpenSignal={mixedRouteOpenSignal}
               routeChoice={privateRouteChoice}
@@ -941,6 +958,16 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
                 }}
               />
             </Suspense>
+          </div>
+        )}
+        {visitedList && (
+          <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
+            <section id="supa-manual-shopping-notes" className="screen"
+              aria-label="Zelf toegevoegde artikelen zonder winkelprijs">
+              <Suspense fallback={<p role="status">Eigen ongeprijsde boodschappen laden…</p>}>
+                <ManualShoppingNotes notes={manualShoppingNotes} setNotes={setManualShoppingNotes} />
+              </Suspense>
+            </section>
           </div>
         )}
         {tab === 'list' && livePrivateReviewed && designProductIds.length > 0 && (
