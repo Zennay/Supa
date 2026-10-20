@@ -452,6 +452,18 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
               : summary.status === 'different-moments'
                 ? 'De originele winkelmomenten liggen meer dan 24 uur uiteen.'
                 : 'De fysieke mandjes zijn nog niet aantoonbaar gelijkwaardig.'}</p>
+          {summary.available.length > 0 && <div className="own-store-planner__overview-totals"
+            aria-label="Losse complete eigen winkelmandjes, geen prijsvergelijking">
+            {stores.map(store => {
+              const capture = currentSources?.stores[store]
+              return <div key={store}>
+                <span>{store} · {capture ? 'alleen dit eigen gecontroleerde mandje' : 'nog geen complete bron'}</span>
+                <strong>{capture ? exactEuro.formatCents(capture.basket.totalCents) : 'Prijs onbekend'}</strong>
+              </div>
+            })}
+            <small>Deze afzonderlijke bedragen mogen NIET van elkaar worden afgetrokken
+              zolang de huidige fysieke bronmandjes niet geldig vergelijkbaar zijn.</small>
+          </div>}
           <small>Ontbrekende of verlopen winkelprijzen worden nooit geschat of als € 0 ingevuld.
             Je kunt de rest van je planning en ongeprijsde boodschappenlijst wel blijven gebruiken.</small>
           <div className="own-store-planner__overview-actions">
@@ -459,6 +471,10 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
               {summary.status === 'different-moments'
                 ? 'Vernieuw originele winkelopname' : 'Ga naar bronimport en matching'}
             </button>
+            {summary.available.length > 0 && <button type="button" className="ghost-button"
+              onClick={() => openConfirmedStoreList(summary.available[0])}>
+              Open compleet {summary.available[0]}-boodschappenmandje
+            </button>}
             <button type="button" className="ghost-button" onClick={onOpenList}>
               Open mijn boodschappenlijst
             </button>
