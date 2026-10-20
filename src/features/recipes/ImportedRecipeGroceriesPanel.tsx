@@ -10,6 +10,11 @@ import { exportOwnRecipeChecklistCsv } from './recipeShoppingCsv.ts'
 import { exportCombinedRecipesPrivateWeek } from './exportCombinedRecipesPrivateWeek.ts'
 import { exportUnpricedProgress, importUnpricedProgress, unpricedProgressMaxBytes } from '../comparison/unpricedPlannerProgress.ts'
 
+// UI-only discovery, never a synonym mapping or verified retailer-product match.
+function searchableIngredient(value: string): string {
+  return value.normalize('NFKD').replace(/\p{M}/gu, '').toLocaleLowerCase('nl')
+}
+
 function savePrivateFile(filename: string, content: string, mime: string) {
   const url = URL.createObjectURL(new Blob([content], { type: mime }))
   try {
@@ -40,6 +45,7 @@ export function ImportedRecipeGroceriesPanel({
   const [selectedIds, setSelectedIds] = useState<string[]>(() =>
     (recentIds.length ? recentIds : recipes.slice(0, 3).map(recipe => recipe.id)).slice(0, 15))
   const [query, setQuery] = useState('')
+  const [reuseFirst, setReuseFirst] = useState(false)
   const [startDay, setStartDay] = useState(m2InitialPlan[0].day)
   const [dayOverrides, setDayOverrides] = useState<Record<string, string>>({})
   const [portionsById, setPortionsById] = useState<Record<string, number>>({})
@@ -135,9 +141,24 @@ export function ImportedRecipeGroceriesPanel({
     })
     setChecked({}); setFeedback('')
   }
-  const search = query.trim().normalize('NFKC').toLocaleLowerCase('nl')
-  const visibleRecipes = search ? recipes.filter(recipe =>
-    recipe.title.normalize('NFKC').toLocaleLowerCase('nl').includes(search)) : recipes
+  // Match only identical, personally reviewed physical ingredient identities
+  // from the existing recipe-to-Planner projector. No substitution, unit
+  // conversion, stock or saving amount is inferred from this display hint.
+  const selectedPhysicalKeys = new Set(selected.flatMap(recipe =>
+    (toPlannerRecipe(recipe, { usage: 'unpriced-demand' })?.ingredients ?? [])
+      .map(item => JSON.stringify([item.query, item.unit]))))
+  const reuseCount = (recipe: SavedRecipe): number => {
+    if (selectedIds.includes(recipe.id) || !selectedPhysicalKeys.size) return 0
+    const ingredientKeys = (toPlannerRecipe(recipe, { usage: 'unpriced-demand' })?.ingredients ?? [])
+      .map(item => JSON.stringify([item.query, item.unit]))
+    return new Set(ingredientKeys.filter(key => selectedPhysicalKeys.has(key))).size
+  }
+  const search = searchableIngredient(query.trim())
+  const visibleRecipes = recipes.filter(recipe => !search ||
+    [recipe.title, ...recipe.ingredients.flatMap(ingredient =>
+      [ingredient.label, ingredient.original, ingredient.query])]
+      .some(value => typeof value === 'string' && searchableIngredient(value).includes(search)))
+    .sort((a, b) => reuseFirst ? reuseCount(b) - reuseCount(a) : 0)
   const planSelected = (destination: 'planner' | 'list' | 'basket') => {
     setFeedback('')
     if (!plannerAssignments.length || !allPlannerReady || !plannerDaysDistinct) {
