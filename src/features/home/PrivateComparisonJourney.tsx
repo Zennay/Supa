@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
+import { privateProgressPricePairs, privateProgressProductRows } from '../products/privateProgressProductRows.ts'
 import { euro } from '../../lib/money.ts'
 import {
   privateReviewedPairWithin24Hours, freshReviewedBaskets,
@@ -52,7 +53,28 @@ export function PrivateComparisonJourney({
   const delta = ready
     ? Math.abs(plus!.basket.totalCents - deka!.basket.totalCents) : null
   const singleReady = !!plus || !!deka
-  const partialPairs = ready ? [] : partialReviewedLinePairs(plus, deka)
+  // The workbench emits partial source rows via captureProgress, never as a
+  // falsely complete reviewed basket. Reuse the same admission logic used by
+  // Planner and Producten for per-ingredient source prices.
+  const partialPairs = ready ? [] : [
+    ...privateProgressPricePairs(progress, nowMs).map(({ one, other }) => ({
+      id: one.ingredientId, name: one.ingredientLabel,
+      amount: one.requiredAmount, unit: one.requiredUnit,
+      plusPacks: one.packagesNeeded, dekaPacks: other.packagesNeeded,
+      plusCents: one.lineTotalCents, dekaCents: other.lineTotalCents,
+    })),
+  ]
+  // A complete reviewed basket may be available independently of the current
+  // progress snapshot (e.g. during a tab restoration), but do not double show.
+  if (!ready && partialPairs.length === 0) {
+    partialPairs.push(...partialReviewedLinePairs(plus, deka).map(({ plus: one, deka: other }) => ({
+      id: one.id, name: one.ingredientLabel, amount: one.requirement.amount,
+      unit: one.requirement.unit, plusPacks: one.packs, dekaPacks: other.packs,
+      plusCents: one.lineTotalCents, dekaCents: other.lineTotalCents,
+    })))
+  }
+  const availablePartialProducts = progress
+    ? privateProgressProductRows(progress, nowMs).length : 0
   const hasAnySource = singleReady || stores.some(store =>
     !!progress?.stores[store] || !!reviewed?.stores[store])
 
@@ -89,12 +111,13 @@ export function PrivateComparisonJourney({
           source.basket.unresolvedLineCount === 0 &&
           source.basket.matchedLineCount === source.basket.lines.length
         const partial = progress?.stores[store]
-        const fresh = !!source || (!!partial &&
+        const fresh = !!source || (!!partial && partial.fresh &&
           recentOwnCaptureInstant(partial.observedAt, nowMs))
         const outdated = (!!reviewed?.stores[store] && !source) ||
           (!!partial && !fresh)
         const total = source?.basket.lines.length ?? partial?.demandLineCount ?? 0
-        const confirmed = source?.basket.matchedLineCount ?? partial?.reviewedLineCount ?? 0
+        const confirmed = source?.basket.matchedLineCount ??
+          (fresh ? partial?.reviewedLineCount : 0) ?? 0
         const next = !complete && fresh ? partial?.nextIngredientId : null
         return <div key={store} className="private-comparison-journey__shop">
           <strong>{store}</strong>
@@ -148,15 +171,15 @@ export function PrivateComparisonJourney({
         onderstaande prijzen zijn per ingrediënt te vergelijken.
         <strong> Het volledige prijsverschil blijft onbekend.</strong>
         {' '}Geen winkelwinnaar of onafhankelijk bewezen besparing.</p>
-      <ul>{partialPairs.slice(0, 3).map(({ plus: a, deka: b }) =>
-        <li key={a.id}>
-          <strong>{a.ingredientLabel} · {a.requirement.amount} {a.requirement.unit}</strong>
-          <span>PLUS {a.packs} hele pakken: {euro.formatCents(a.lineTotalCents)}</span>
-          <span>DekaMarkt {b.packs} hele pakken: {euro.formatCents(b.lineTotalCents)}</span>
-          <small>Alleen dit ingrediënt: {a.lineTotalCents === b.lineTotalCents
+      <ul>{partialPairs.slice(0, 3).map(item =>
+        <li key={item.id}>
+          <strong>{item.name} · {item.amount} {item.unit}</strong>
+          <span>PLUS {item.plusPacks} hele pakken: {euro.formatCents(item.plusCents)}</span>
+          <span>DekaMarkt {item.dekaPacks} hele pakken: {euro.formatCents(item.dekaCents)}</span>
+          <small>Alleen dit ingrediënt: {item.plusCents === item.dekaCents
             ? 'zelfde hele-pakprijs'
-            : (a.lineTotalCents < b.lineTotalCents ? 'PLUS' : 'DekaMarkt') +
-              ' heeft ' + euro.formatCents(Math.abs(a.lineTotalCents - b.lineTotalCents)) +
+            : (item.plusCents < item.dekaCents ? 'PLUS' : 'DekaMarkt') +
+              ' heeft ' + euro.formatCents(Math.abs(item.plusCents - item.dekaCents)) +
               ' lagere hele-pakkosten'}.</small>
         </li>)}</ul>
       {partialPairs.length > 3 && <small>En nog {partialPairs.length - 3} andere
@@ -171,7 +194,11 @@ export function PrivateComparisonJourney({
       {hasAnySource && <button type="button" onClick={onOpenProducts}>
         Bekijk bronproducten en ontbrekende matches
       </button>}
-      {singleReady && <button type="button" onClick={onOpenList}>Bekijk mijn eigen winkellijst</button>}
+      {(singleReady || availablePartialProducts > 0 || hasAnySource) &&
+        <button type="button" onClick={onOpenList}>
+          {singleReady ? 'Bekijk mijn eigen winkellijst' :
+            'Bekijk mijn ongeprijsde weeklijst en bevestigde losse producten'}
+        </button>}
     </div>
     <small>Geen fictieve prijzen, automatische retaileropvraging of publieke besparingsclaim.
       Ontbrekende en verlopen bronprijzen blijven onbekend.</small>
