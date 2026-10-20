@@ -2578,7 +2578,11 @@ export function OfflineReviewedWorkbench({
                     : ' Dat bewaarde bronmoment is verlopen of toekomstig.'}
                   {currentPreview.retainedOther.within24h
                     ? ' De twee werkelijk ingevoerde bronmomenten liggen binnen 24 uur.'
-                    : ' De nieuwe bron en de bewaarde winkel liggen meer dan 24 uur uiteen.'}
+                    : ' De nieuwe bron en de bewaarde winkel liggen meer dan 24 uur uiteen. ' +
+                      (currentPreview.retainedOther.observedNs <
+                        (currentPreview.stores[0]?.observedNs ?? currentPreview.retainedOther.observedNs)
+                        ? 'Herobserveer de oudere bewaarde winkel, niet de nieuwere upload.'
+                        : 'Herobserveer de oudere winkel uit je nieuwe upload, niet de nieuwere bewaarde opname.')}
                   {' '}Een prijsverschil blijft onbekend totdat beide bronopnames
                   actueel zijn en alle fysieke productmatches afzonderlijk zijn bevestigd.
                 </p>
@@ -2662,12 +2666,28 @@ export function OfflineReviewedWorkbench({
                   of buiten 24 uur gepaarde bron is een volledige nieuwe opname nodig.</p>
                 {stores.map(store => {
                   const missing = missingPreviewCaptureNeeds(store).length
+                  const source = currentPreview.stores.find(item => item.retailer === store)
+                  const other = currentPreview.stores.find(item => item.retailer !== store)
                   const retained = currentPreview.retainedOther
-                  const recapture = retained?.retailer === store &&
-                    (!retained.within24h || !freshPreviewInstant(retained.observedNs))
+                  // This label must agree with missingPreviewCaptureNeeds:
+                  // a one-file comparison recaptures the OLDER capture only.
+                  const expiredSource = source ? !capturePreviewFresh(source) :
+                    retained?.retailer === store
+                      ? !freshPreviewInstant(retained.observedNs) : false
+                  const olderSource = source && source.observedNs !== undefined
+                    ? (other && !currentPreview.pairedWithin24h &&
+                        other.observedNs !== undefined && source.observedNs < other.observedNs) ||
+                      (retained && retained.retailer !== store && !retained.within24h &&
+                        source.observedNs < retained.observedNs)
+                    : retained?.retailer === store && !retained.within24h &&
+                      !!other?.observedNs && retained.observedNs < other.observedNs
+                  const recapture = expiredSource || olderSource
                   return <div key={'missing-' + store} className="offline-price-workbench__capture-followup-row">
-                    <span>{store}: {missing ? missing + (recapture ? ' opnieuw te observeren fysieke regels' : ' nog onbekende productregels') :
-                      'geen ontbrekende nieuwe bronregels vanuit deze preview'}</span>
+                    <span>{store}: {missing
+                      ? missing + (recapture
+                        ? ' volledige opnieuw te observeren fysieke regels (verlopen of oudste bron)'
+                        : ' nog onbekende productregels')
+                      : 'geen ontbrekende nieuwe bronregels vanuit deze preview'}</span>
                     <button type="button" className="ghost-button" disabled={busy || !missing}
                       onClick={() => { void downloadPreviewMissingCapture(store, 'csv') }}>
                       {store} opname-CSV
