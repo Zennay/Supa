@@ -2313,7 +2313,7 @@ export function OfflineReviewedWorkbench({
                         {' '}· {product.available && product.priceCents !== null
                           ? exactEuro.formatCents(product.priceCents) + ' per verpakking'
                           : 'pakprijs onbekend / niet beschikbaar'}
-                        {rate && <> · {exactEuro.formatCents(rate.centsPerUnit)} / {rate.unit}</>}
+                        {rate && <> · {exactEuro.formatCents(rate.roundedCentsPerUnit)} / {rate.unit}</>}
                       </li>
                     })}
                   </ul>
