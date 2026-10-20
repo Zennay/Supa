@@ -268,3 +268,9 @@
 .recipe-collection-groceries__reuse-filter { display: flex; align-items: center; gap: .6rem; margin: .45rem 0; line-height: 1.35; }
 .recipe-collection-groceries__reuse-filter input { width: 18px; height: 18px; flex: 0 0 auto; }
 .recipe-collection-groceries__shared { display: block; margin: .35rem .3rem .55rem; line-height: 1.5; overflow-wrap: anywhere; }
+
+.recipe-collection-groceries__capture { display: grid; gap: .65rem; padding: clamp(12px, 2vw, 18px); margin: 1rem 0; background: #f6faf7; border: 1px solid #cadfce; border-radius: 12px; }
+.recipe-collection-groceries__capture h4 { margin: .2rem 0; }
+.recipe-collection-groceries__capture p { line-height: 1.5; margin: 0; }
+.recipe-collection-groceries__capture label { display: grid; gap: .35rem; max-width: 360px; }
+.recipe-collection-groceries__capture select { min-height: 44px; padding: .45rem; font: inherit; border-radius: 8px; border: 1px solid #8ba893; }

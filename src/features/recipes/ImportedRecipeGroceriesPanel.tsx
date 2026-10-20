@@ -583,6 +583,37 @@ export function ImportedRecipeGroceriesPanel({
             onClick={() => planSelected('basket')}>Plan en vergelijk mijn winkelbronnen</button>
         </div>
       </section>
+      <section className="recipe-collection-groceries__capture" aria-label="Eigen fysieke receptenboodschappen in PLUS en DekaMarkt opnemen">
+        <h4>Zelf echte winkelprijzen opnemen voor dit receptenmandje</h4>
+        <p>Gebruik exact dezelfde gecontroleerde ingrediënten als in je privéwinkelmandje.
+          Download een leeg negenkoloms winkelblad én de bijbehorende rijgids. Vul uitsluitend
+          je werkelijk en rechtmatig verkregen PLUS/DekaMarkt-SKU’s, verpakkingen,
+          opnametijden en pakprijzen in. Importeer de ingevulde bron-CSV via de
+          bestaande privéwinkelvergelijker en bevestig iedere productmatch zelf.
+          Zonder twee volledige actuele opnames blijft een prijsverschil onbekend.</p>
+        <label>Winkel(s) voor de lege opname
+          <select value={captureTarget}
+            onChange={event => setCaptureTarget(event.currentTarget.value as typeof captureTarget)}>
+            <option value="both">PLUS en DekaMarkt</option>
+            <option value="PLUS">Alleen PLUS</option>
+            <option value="DekaMarkt">Alleen DekaMarkt</option>
+          </select>
+        </label>
+        <div className="recipe-backup-panel__actions">
+          <button type="button" disabled={!result!.complete || selected.length > 14}
+            onClick={() => void downloadCaptureKit('csv')}>
+            Download leeg winkelinvulblad (CSV)
+          </button>
+          <button type="button" disabled={!result!.complete || selected.length > 14}
+            onClick={() => void downloadCaptureKit('guide')}>
+            Download bijbehorende opnamegids (TXT)
+          </button>
+        </div>
+        {!result!.complete && <small>Controleer de ontbrekende hoeveelheden en recipe-bronnen
+          voordat je een fysiek opnamemandje aanmaakt.</small>}
+        <small>De twee bestandsnamen dragen dezelfde lokale bundelcode als je selectie gelijk is.
+          Deze code is geen retailerrecht, prijswaarneming of onderzoeksbewijs.</small>
+      </section>
       <div className="recipe-backup-panel__actions">
         <button type="button" onClick={() => void copyGroceries()}>
           {pendingOnly ? 'Kopieer alleen openstaande boodschappen (mobiel)' : 'Kopieer volledige lijst (mobiel)'}
