@@ -182,9 +182,15 @@ export function ManualShoppingNotes({ notes, setNotes }: {
     const exported = bulkDraft.trimStart().startsWith('SUPA · EIGEN ONGEPRIJSDE BOODSCHAPPEN · ')
     const parsed: { label: string; done: boolean; store: UnpricedShoppingNote['store'] }[] = []
     let invalid = false
+    let headingStore = store
     for (const source of bulkDraft.split(/\r?\n/u)) {
       const row = source.trim().replace(/^(?:[-*•]\s+|\d{1,3}[.)]\s+)/u, '')
       if (!row) continue
+      const groupHeading = /^(Algemeen|PLUS|DekaMarkt)\s*[:：]$/u.exec(row)
+      if (!exported && groupHeading) {
+        headingStore = groupHeading[1] as UnpricedShoppingNote['store']
+        continue
+      }
       if (exported && (row.startsWith('SUPA · EIGEN ONGEPRIJSDE BOODSCHAPPEN · ') ||
           row === 'Los van Planner, bronopnames, weekbudget en winkelmandtotalen.' ||
           row === 'Alleen nog open artikelen:' ||
@@ -196,7 +202,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
         invalid = true
         continue
       }
-      const targetStore = tagged ? tagged[1] as UnpricedShoppingNote['store'] : store
+      const targetStore = tagged ? tagged[1] as UnpricedShoppingNote['store'] : headingStore
       const rawLabel = tagged ? tagged[2] : content
       const label = safeLabel(exported ? rawLabel.slice(0, -' · prijs onbekend'.length) : rawLabel)
       if (!label || label.length > 140) invalid = true
@@ -607,6 +613,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
           (☐, ☑, [ ] of [x]) worden herkend; al afgevinkte artikelen blijven afgevinkt.
           Gewone regels gaan naar {store}; bij gekopieerde Supa-TXT met [PLUS],
           [DekaMarkt] of [Algemeen] blijven de oorspronkelijke winkels behouden.
+          Eigen tekstlijstjes met kopjes PLUS:, DekaMarkt: of Algemeen: worden ook per winkel ingelezen.
           Dubbele artikelen worden overgeslagen, zonder bestaande vinkjes of prijzen te wijzigen.</p>
         <label>Je ongeprijsde boodschappen
           <textarea rows={5} maxLength={15000} value={bulkDraft}
