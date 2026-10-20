@@ -85,6 +85,62 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       setReceiptMessage('Download van eigen ' + shop + '-mand mislukt. Herzie de bron.')
     }
   }
+  async function downloadMixedPrint() {
+    if (costInvalid) {
+      setReceiptMessage('Corrigeer je eigen extra tweede-stopkosten voor de afdruk.')
+      return
+    }
+    const original = freshReviewedBaskets(reviewedRef.current,
+      reviewedRef.current.planKey, Date.now())
+    const initialCost = costIntentRef.current
+    if (!original?.stores.PLUS || !original.stores.DekaMarkt) {
+      setReceiptMessage('Voor een gemengde route zijn twee actuele eigen winkelbronnen nodig.')
+      return
+    }
+    try {
+      const { printMixedStoreRouteHtml } =
+        await import('../comparison/mixedStorePrintHtml.ts')
+      const current = freshReviewedBaskets(reviewedRef.current,
+        reviewedRef.current.planKey, Date.now())
+      if (!current?.stores.PLUS || !current.stores.DekaMarkt ||
+          current.planKey !== original.planKey ||
+          current.stores.PLUS !== original.stores.PLUS ||
+          current.stores.DekaMarkt !== original.stores.DekaMarkt ||
+          costIntentRef.current !== initialCost ||
+          !privateReviewedPairWithin24Hours(current.stores.PLUS, current.stores.DekaMarkt)) {
+        throw Error('Bronnen of eigen kosten zijn tijdens voorbereiden veranderd.')
+      }
+      const route = createMixedStoreShoppingPlan(
+        current.stores.PLUS.basket, current.stores.DekaMarkt.basket)
+      if (!route) throw Error('Het originele fysieke mandje is niet vergelijkbaar.')
+      const done = new Set(route.lines.filter(item => {
+        const source = current.stores[item.store]!.basket
+        const line = source.lines.find(value => value.id === item.id)
+        return line?.status === 'matched' && checkedRef.current[
+          privatePhysicalShoppingTick(current.planKey, item.store, source.store.id, line)] === true
+      }).map(item => item.key))
+      const html = printMixedStoreRouteHtml({
+        plus: current.stores.PLUS.basket,
+        deka: current.stores.DekaMarkt.basket,
+        route,
+        captured: {
+          PLUS: current.stores.PLUS.observedAt,
+          DekaMarkt: current.stores.DekaMarkt.observedAt,
+        },
+        checked: done, extraVisitCostCents: costCents, strategy: 'mixed',
+      })
+      const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
+      try {
+        const a = document.createElement('a')
+        a.href = url; a.download = 'supa-eigen-twee-winkelroute.html'
+        document.body.append(a)
+        try { a.click() } finally { a.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setReceiptMessage('Afdrukbare offline route met jouw eigen prijzen, vinkjes en bekende kosten bewaard.')
+    } catch {
+      setReceiptMessage('Afdrukbare route niet beschikbaar. Controleer de originele winkelbronnen opnieuw.')
+    }
+  }
   async function downloadReceipt(kind: 'csv' | 'txt') {
     if (kind === 'txt' && costInvalid) {
       setReceiptMessage('Corrigeer eerst je zelf ingevulde extra winkelstopkosten.')
@@ -328,10 +384,14 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       <button type="button" onClick={() => { void downloadReceipt('txt') }}>
         Bewaar winkeloverzicht (TXT{splitTrip && costCents !== null ? ' met extra kosten' : ''})
       </button>
+      <button type="button" onClick={() => { void downloadMixedPrint() }}>
+        Bewaar afdrukbare complete winkelroute (HTML)
+      </button>
       <small>Beide downloads bevatten het originele complete weekmandje en
         bronmomenten, onafhankelijk van je zoekfilter. Alleen TXT neemt jouw zelf
         ingevoerde extra stopkosten mee; CSV blijft een bronprijsrapport zonder
-        ritkosten. Geen kassagarantie, openbare besparingsclaim of bronimport.</small>
+        ritkosten. HTML bewaart de originele winkelroute offline met je vinkjes
+        en eventuele eigen stopkosten. Geen kassagarantie, besparingsclaim of bronimport.</small>
       {receiptMessage && <p role="status">{receiptMessage}</p>}
     </div>
     <div className="private-reviewed-products__advantage-filter"
