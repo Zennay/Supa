@@ -48,6 +48,7 @@ import {
   serializePlannerPreferences,
   type PlannerPreferences,
 } from './domain/plannerPreferences'
+import { unavailablePlannerRecipes, previewAvailablePlannerMeals } from './domain/unavailablePlannerRecipes.ts'
 import { restorePlannerPreferencesWithCustomBudget } from './features/planner/customWeekBudget.ts'
 import { canReplacePlannerRecord, persistPlannerRecord } from './features/planner/plannerStorageGuard.ts'
 import {
@@ -316,14 +317,31 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
 
   const { budget, activeDays, recipeByDay } = preferences
 
-  const plannedMeals = useMemo(
-    () =>
-      m2InitialPlan.map((meal) => ({
-        ...meal,
-        recipeId: recipeByDay[meal.day] ?? meal.recipeId,
-      })),
-    [recipeByDay],
+  // A recipe edited or removed in another tab may no longer belong to the
+  // approved physical library. Render a safe built-in recipe for its own day
+  // immediately; never silently persist that fallback or carry forward the
+  // old source-price comparison. A deliberate user action can repair it.
+  const unavailableSelections = useMemo(
+    () => unavailablePlannerRecipes(preferences, m2InitialPlan, validRecipeIds),
+    [preferences, recipes],
   )
+  const plannedMeals = useMemo(
+    () => previewAvailablePlannerMeals(m2InitialPlan, unavailableSelections, recipeByDay),
+    [recipeByDay, unavailableSelections],
+  )
+  function acceptMissingRecipeReplacements() {
+    setPreferences(current => {
+      const remaining = unavailablePlannerRecipes(current, m2InitialPlan, recipes.map(recipe => recipe.id))
+      if (!remaining.length) return current
+      return {
+        ...current,
+        recipeByDay: {
+          ...current.recipeByDay,
+          ...Object.fromEntries(remaining.map(item => [item.day, item.fallbackRecipeId])),
+        },
+      }
+    })
+  }
 
   // Prices never leave React memory. A changed recipe, day or physical demand
   // immediately invalidates private source receipts in every other tab.
@@ -492,6 +510,23 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       </header>}
 
       <div className="content">
+        {(tab === 'planner' || tab === 'list') && unavailableSelections.length > 0 && (
+          <section className="attention-card" role="status" aria-live="polite">
+            <strong>{unavailableSelections.length} receptkeuze(s) niet meer beschikbaar</strong>
+            <p>
+              Een eigen recept is verwijderd of heeft nog onveilige hoeveelheden.
+              Het weekmenu toont tijdelijk het oorspronkelijke standaardrecept voor
+              {unavailableSelections.length === 1 ? ' deze dag' : ' deze dagen'}:
+              {' '}{unavailableSelections.map(item => item.day).join(', ')}.
+              Je eerdere keuze is niet stilzwijgend opgeslagen of vervangen.
+              Alle oude productmatches en eigen winkelprijzen voor een ander
+              weekmenu blijven buiten de huidige prijsberekening.
+            </p>
+            <button type="button" onClick={acceptMissingRecipeReplacements}>
+              Bewaar deze standaardrecepten in mijn weekmenu
+            </button>
+          </section>
+        )}
         {tab === 'products' && <Suspense fallback={<p role="status">Eigen bronproducten openen…</p>}>
           <PrivateReviewedProductCatalog reviewed={livePrivateReviewed} budget={budget}
             checked={privateShoppingTicks}
