@@ -107,8 +107,17 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
         // Diagnostic only: the same original retailer file can already
         // contain a likely SKU without a usable price/pack/availability.
         // NEVER promote this projection into a purchasable or reviewed match.
-        const incomplete = capture.products.filter(product =>
-          !product.available && family(product.packUnit) === family(need.unit))
+        const incomplete = capture.products.filter(product => {
+          const productFamily = family(product.packUnit)
+          // A known physically different unit must never look suitable;
+          // unknown packaging may be shown only as an unpriced identity hint.
+          if (productFamily !== null && productFamily !== family(need.unit)) return false
+          const priceValid = typeof product.sourcePriceCents === 'number' &&
+            Number.isSafeInteger(product.sourcePriceCents) && product.sourcePriceCents >= 0
+          const packValid = product.packAmount !== null && product.packAmount > 0 &&
+            productFamily === family(need.unit)
+          return !product.available || !priceValid || !packValid
+        })
         if (incomplete.length && choice.type !== 'match' &&
             !choice.reasons.includes('top candidates too close')) {
           const diagnostic = matchIngredient(requirement,
@@ -120,9 +129,13 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
             unpricedHints[store] = {
               name: found.name,
               sku: found.id,
-              reason: found.packAmount === null ? 'verpakking onbekend'
-                : found.sourcePriceCents === null ? 'pakprijs ontbreekt'
-                  : 'volgens de originele bron niet beschikbaar',
+              reason: found.available !== true ? 'volgens de originele bron niet beschikbaar'
+                : found.packAmount === null || found.packAmount <= 0 ||
+                    family(found.packUnit) === null ? 'verpakking of maateenheid ontbreekt'
+                  : typeof found.sourcePriceCents !== 'number' ||
+                      !Number.isSafeInteger(found.sourcePriceCents) ||
+                      found.sourcePriceCents < 0 ? 'pakprijs ontbreekt of is ongeldig'
+                    : 'brongegevens vragen persoonlijke controle',
             }
           }
         }
