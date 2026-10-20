@@ -3,6 +3,7 @@ import type { SavedRecipe } from './recipeLibrary.ts'
 import { combinedImportedRecipeGroceries } from './combinedImportedRecipeGroceries.ts'
 import { formatOwnRecipeChecklist } from './recipeShoppingChecklist.ts'
 import { exportOwnRecipeChecklistCsv } from './recipeShoppingCsv.ts'
+import { exportCombinedRecipesPrivateWeek } from './exportCombinedRecipesPrivateWeek.ts'
 
 function savePrivateFile(filename: string, content: string, mime: string) {
   const url = URL.createObjectURL(new Blob([content], { type: mime }))
@@ -79,6 +80,17 @@ export function ImportedRecipeGroceriesPanel({
       setFeedback(cause instanceof Error ? cause.message : 'De CSV kon niet worden opgeslagen.')
     }
   }
+  const exportForStores = () => {
+    if (!list?.canCopy) return
+    try {
+      const json = exportCombinedRecipesPrivateWeek(selected)
+      savePrivateFile('supa-meerdere-recepten-privewinkelmandje.json',
+        json, 'application/json;charset=utf-8')
+      setFeedback('Je fysieke receptenmandje is veilig geëxporteerd, zonder prijzen. Open de privévergelijker en koppel daar je eigen actuele winkelproducten en waarnemingen.')
+    } catch (cause) {
+      setFeedback(cause instanceof Error ? cause.message : 'Het fysieke mandje kon niet veilig worden overgedragen.')
+    }
+  }
   return <section className="recipe-collection-groceries" aria-label="Gecombineerde ongeprijsde boodschappenlijst">
     <h3>Één boodschappenlijst voor je nieuwe recepten</h3>
     <p>Kies welke recepten je samen wilt koken. Dezelfde duidelijke ingrediënten en
@@ -133,7 +145,20 @@ export function ImportedRecipeGroceriesPanel({
         <button type="button" onClick={exportText}>Download gezamenlijke lijst (TXT)</button>
         <button type="button" onClick={exportCsv}
           disabled={list.lines.length > 80}>Download gezamenlijke lijst (CSV)</button>
+        <button type="button" onClick={exportForStores}
+          disabled={!result!.complete || selected.length > 14}>
+          Gebruik deze recepten in de privéwinkelvergelijker (JSON)
+        </button>
       </div>
+      {selected.length > 14 && <small>De bestaande privévergelijker accepteert maximaal
+        14 recepten per mandje. Deselecteer één recept voor de overdracht.</small>}
+      {!result!.complete && <small>Corrigeer alle onzekere ingrediënten vóór je dit
+        mandje in de prijsvergelijker gebruikt. De ongeprijsde tekstlijst blijft beschikbaar.</small>}
+      {result!.complete && selected.length <= 14 && <a
+        href={import.meta.env.BASE_URL + 'private-basket-mapping.html#own-recipe-import'}
+        target="_blank" rel="noopener noreferrer">
+        Open de bestaande privévergelijker en importeer het JSON-mandje
+      </a>}
       {list.lines.length > 80 && <small>De veilige CSV-export ondersteunt maximaal
         80 regels. Gebruik de complete TXT-lijst, of selecteer minder recepten.</small>}
       {feedback && <p role="status">{feedback}</p>}
