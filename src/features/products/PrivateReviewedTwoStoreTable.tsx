@@ -27,6 +27,19 @@ function privateCheckedSignature(ticks: Readonly<Record<string, boolean>>): stri
     .map(([key]) => key).sort().join('\n')
 }
 
+/** Conservative identity gate for previewing individual lines in incomplete baskets. */
+function samePartialPhysicalDemand(left: OneStoreBasket, right: OneStoreBasket): boolean {
+  if (!left.lines.length || left.lines.length !== right.lines.length ||
+      left.selectedMealCount !== right.selectedMealCount) return false
+  const byId = new Map(right.lines.map(line => [line.id, line]))
+  return byId.size === right.lines.length && left.lines.every(line => {
+    const other = byId.get(line.id)
+    return !!other && line.ingredientLabel === other.ingredientLabel &&
+      line.requirement.amount === other.requirement.amount &&
+      line.requirement.unit === other.requirement.unit
+  })
+}
+
 /** Both sides are the exact SAME human-reviewed physical weekly demand.
  * No independent source authorization, live pricing or retail claim is implied.
  */
@@ -426,6 +439,17 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
     const dekaMoment = deka ? observedInstant(deka.observedAt) : null
     const older: OwnStore | null = gap && plusMoment && dekaMoment
       ? (plusMoment.ns < dekaMoment.ns ? 'PLUS' : 'DekaMarkt') : null
+    // A partial row is informational only: no whole-basket winner, savings
+    // or store route follows from it.
+    const partialPairs = plus && deka && !gap &&
+      samePartialPhysicalDemand(plus.basket, deka.basket)
+      ? plus.basket.lines.flatMap(line => {
+          const other = deka.basket.lines.find(candidate => candidate.id === line.id)
+          return line.status === 'matched' && other?.status === 'matched'
+            ? [{ plus: line, deka: other }] : []
+        }) : []
+    const missingPairedCount = plus && deka
+      ? Math.max(0, plus.basket.lines.length - partialPairs.length) : 0
     return <section className="private-reviewed-products__paired" aria-label="Winkelvergelijking van eigen artikelen">
       <h3>Vergelijk PLUS met DekaMarkt</h3>
       <div className="private-reviewed-products__source-coverage">
@@ -467,6 +491,38 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         : missing.length > 0
           ? missing.join(' en ') + ' heeft nog geen volledig bruikbare eigen prijsopname. Vul de brongegevens aan voordat Supa een prijsverschil toont.'
           : 'Het bestaande bronpaar is nog niet betrouwbaar vergelijkbaar voor hetzelfde fysieke weekmandje. Controleer de productkoppelingen opnieuw.'}</p>
+      {partialPairs.length > 0 && <details className="private-reviewed-products__missing">
+        <summary>{partialPairs.length} identieke fysieke behoeften met twee bronprijzen bekijken</summary>
+        <p><strong>Gedeeltelijk: totaal prijsverschil onbekend.</strong>
+          {' '}Deze afzonderlijke regels komen uit twee verse eigen bronnen binnen 24 uur
+          met identiek weekmenu en dezelfde benodigde hoeveelheden.
+          {missingPairedCount > 0 && ' Nog ' + missingPairedCount +
+            ' ingrediënten zijn niet aan beide kanten geprijsd.'}
+          {' '}Geen totale besparing, winkelwinnaar of kassagarantie.</p>
+        <div className="private-reviewed-products__paired-rows">
+          {partialPairs.map(({ plus: first, deka: second }) => <article key={first.id}>
+            <h4>{first.ingredientLabel} · {first.requirement.amount} {first.requirement.unit}</h4>
+            <div className="private-reviewed-products__paired-options">
+              {([['PLUS', first], ['DekaMarkt', second]] as const).map(([shop, line]) =>
+                <div className="private-reviewed-products__paired-option" key={shop}>
+                  <strong>{shop}: {line.productName}</strong>
+                  <small>Originele SKU: {line.productId}</small>
+                  <span>{line.packs} hele verpakking(en) van {line.pack.count} ×
+                    {' '}{line.pack.amount} {line.pack.unit}</span>
+                  <small>{money.format(line.pricePerPackCents / 100)} per pak ·
+                    {' '}{privateUnitPrice(line) ?? 'eenheidsprijs onbekend'}</small>
+                  <strong>{money.format(line.lineTotalCents / 100)} voor dit ingrediënt</strong>
+                </div>)}
+            </div>
+            <p>{first.lineTotalCents === second.lineTotalCents
+              ? 'Zelfde hele-pakprijs voor deze regel.'
+              : (first.lineTotalCents < second.lineTotalCents ? 'PLUS' : 'DekaMarkt') +
+                ' kost op deze ene fysieke vraagregel ' +
+                money.format(Math.abs(first.lineTotalCents - second.lineTotalCents) / 100) +
+                ' minder aan hele verpakkingen, niet aan het volledige mandje.'}</p>
+          </article>)}
+        </div>
+      </details>}
       {receiptMessage && <p role="status">{receiptMessage}</p>}
       {manualCopyVisible && <PrivateManualShareText key={manualCopyVisible.text}
         text={manualCopyVisible.text} label={manualCopyVisible.label}
