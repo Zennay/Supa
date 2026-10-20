@@ -345,3 +345,5 @@
   .own-store-planner__overview-totals { grid-template-columns: minmax(0, 1fr); }
   .own-store-planner__overview-actions button { flex: 1 1 100%; }
 }
+
+.own-store-planner__break-even { border-left: 3px solid #407958; padding: .65rem .8rem; background: #fff; overflow-wrap: anywhere; }

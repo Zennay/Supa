@@ -784,6 +784,19 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
               </label>
               <p>Jouw eigen omrij-/parkeerscenario. Zonder ingevulde kosten is het
                 netto voordeel onbekend. Dit is geen kassaprijs- of besparingsbewijs.</p>
+              <p className="own-store-planner__break-even">
+                <strong>Wanneer loont die tweede winkelstop?</strong>{' '}
+                {summary.mixedRoute.possibleProductDifferenceCents > 0
+                  ? <>De twee winkels zijn voor jouw gecontroleerde producten alleen voordeliger
+                      dan de goedkoopste complete winkel als jouw <em>extra</em> bezoekkosten
+                      lager zijn dan{' '}
+                      <strong>{exactEuro.formatCents(summary.mixedRoute.possibleProductDifferenceCents)}</strong>.
+                      {' '}Bij precies dat bedrag speel je quitte; hogere kosten maken één winkel
+                      voordeliger. Reistijd is niet in euro's omgerekend.</>
+                  : <>Deze combinatie bespaart vóór extra bezoekkosten niets ten opzichte
+                      van één complete winkel. Met positieve extra kosten is één winkel
+                      voor dit mandje voordeliger.</>}
+              </p>
               {shownCost.trim() && parsedSecondStopCents === null && <p role="alert">
                 Vul € 0,00 tot € 1.000,00 in, met maximaal twee decimalen.</p>}
               {parsedSecondStopCents !== null && mixedTripCents !== null &&
