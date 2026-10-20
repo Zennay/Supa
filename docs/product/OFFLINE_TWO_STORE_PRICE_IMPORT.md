@@ -60,6 +60,12 @@ Er wordt geen tweede winkelprijs of besparing verzonnen.
 
 ## Volledig prijsrapport bewaren, printen of mobiel meenemen
 
+Zowel bij één beschikbare winkel als bij twee volledig vergelijkbare winkels
+toont Producten nu per oorspronkelijke winkelbron het aantal afgevinkte
+producten en de *nog op de lijst* openstaande hele-pakkosten. De volledige
+mandtotalen blijven onveranderd: dit openstaande bedrag is geen kassabedrag
+en afvinken is geen prijs- of betalingsbewijs.
+
 Ook nadat beide volledige winkelbronnen vergelijkbaar zijn, blijft in
 **Producten → Zelfde weekmandje → Ik ga naar één winkel** de zelfstandige
 PLUS- of DekaMarkt-weeklijst bereikbaar. Je kunt elk winkelmandje afzonderlijk

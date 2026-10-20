@@ -77,8 +77,9 @@ export function privateOneStorePrintableHtml(input: {
     escape(euro.format(remaining / 100)) + ' aan eerder vastgelegde pakprijzen. ' +
     'Dit is geen betaalbewijs en geen actuele kassaprijs.</p>' +
     '<p><small>Eigen bronmoment: ' + escape(observedAt) + '. ' +
-    'Alleen persoonlijk gecontroleerde artikelen. De andere winkelprijs is ' +
-    'niet afgeleid; een prijsverschil of besparing is onbekend.</small></p>' +
+    'Alleen persoonlijk gecontroleerde artikelen. Dit ene winkelrapport toont ' +
+    'geen prijsverschil; gebruik de volledige vergelijking zodra beide bronnen ' +
+    'actueel en volledig gecontroleerd zijn.</small></p>' +
     budget + '<table><thead><tr><th>Status</th><th>Ingrediënt</th><th>Origineel product</th>' +
     '<th>Hele verpakkingsprijs</th></tr></thead><tbody>' + rows +
     '</tbody></table><p><small>Alleen lokaal geaccepteerde bronregels. ' +

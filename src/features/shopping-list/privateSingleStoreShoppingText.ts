@@ -21,7 +21,7 @@ export function privateSingleStoreShoppingText({ basket, observedAt, done = new 
     'Bronmoment: ' + literal(observedAt),
     'Complete pakprijzen: ' + exactEuro.formatCents(basket.totalCents),
     'Privégegevens, niet onafhankelijk geverifieerd. Geen kassagarantie of actuele beschikbaarheid.',
-    'Ontbrekende andere winkel = onbekende vergelijking, nooit € 0,00.',
+    'Dit rapport bevat één winkel: voor het echte prijsverschil open de volledige vergelijking.',
     '',
   ]
   for (const line of basket.lines) {

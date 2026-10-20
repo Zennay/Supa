@@ -3,7 +3,7 @@ import { ownStoreWeekComparison } from '../planner/ownStoreBudgetComparison.ts'
 import { printableOwnStoreComparison } from '../planner/downloadOwnStoreComparison.ts'
 import { privateSingleStoreShoppingText } from '../shopping-list/privateSingleStoreShoppingText.ts'
 import { observedInstant } from '../../domain/offlineReviewedImport.ts'
-import type { BasketTraceLine } from '../../domain/basket.ts'
+import type { BasketTraceLine, OneStoreBasket } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import { privatePackUnitRate, privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import { productSearchText } from './productSearchText.ts'
@@ -293,6 +293,22 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         }).claimable) { onOpenComparison(); return }
     onOpenMixedRoute()
   }
+  function shopProgress(shop: OwnStore, basket: OneStoreBasket) {
+    const lines = basket.lines.filter(line => line.status === 'matched')
+    const done = lines.filter(line => checked[privatePhysicalShoppingTick(
+      reviewed.planKey, shop, basket.store.id, line)]).length
+    const remainingCents = lines.reduce((total, line) =>
+      checked[privatePhysicalShoppingTick(reviewed.planKey, shop, basket.store.id, line)]
+        ? total : total + line.lineTotalCents, 0)
+    return <div className="private-reviewed-products__shop-progress">
+      <label>{done} van {lines.length} oorspronkelijke artikelen afgevinkt
+        <progress value={done} max={Math.max(1, lines.length)} />
+      </label>
+      <strong>Nog op jouw lijst: {money.format(remainingCents / 100)}</strong>
+      <small>Dit zijn oorspronkelijke hele-pakprijzen van open artikelen,
+        geen betaalde kassasom of actuele winkelprijs.</small>
+    </div>
+  }
   // Both a one-sided source and a fully paired comparison need an actionable
   // standalone shop trip. Never make the shopper undo a second-store import.
   function singleStoreTripActions(shop: OwnStore) {
@@ -337,6 +353,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
                 {budgetComparison(capture.basket.totalCents)}</small>}
               <small>{capture.basket.lines.length} oorspronkelijke, gecontroleerde SKU-regels</small>
               <time dateTime={capture.observedAt}>{capture.observedAt}</time>
+              {shopProgress(shop, capture.basket)}
               {singleStoreTripActions(shop)}
             </> : <>
               <strong>Prijs onbekend</strong>
@@ -465,13 +482,10 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       <div className="private-reviewed-products__source-coverage">
         {(['PLUS', 'DekaMarkt'] as const).map(shop => {
           const source = shop === 'PLUS' ? plus : deka
-          const complete = source.basket.lines.filter(line => line.status === 'matched')
-          const done = complete.filter(line => checked[privatePhysicalShoppingTick(
-            reviewed.planKey, shop, source.basket.store.id, line)]).length
           return <article key={shop}>
             <h4>{shop}</h4>
             <strong>{money.format(source.basket.totalCents / 100)}</strong>
-            <small>{done} van {complete.length} artikelen afgevinkt</small>
+            {shopProgress(shop, source.basket)}
             <time dateTime={source.observedAt}>Eigen bron: {source.observedAt}</time>
             {singleStoreTripActions(shop)}
           </article>
