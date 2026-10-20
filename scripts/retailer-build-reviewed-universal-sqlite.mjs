@@ -11,6 +11,8 @@ import { join, resolve, dirname } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { pathToFileURL, fileURLToPath } from 'node:url'
 import { loadReviewedRepositoryFixtures } from './retailer-reviewed-ingest-engine.mjs'
+import { snapshotBoundedPrivateCatalogInput } from './retailer-private-budgeted-catalog.mjs'
+import { assessHistoricalM3FullBasketReadiness } from './retailer-private-m3-full-basket-preflight.mjs'
 
 const IMPORTER = fileURLToPath(new URL('./retailer-import-universal-sqlite.py', import.meta.url))
 
@@ -18,8 +20,14 @@ function refuse() {
   throw new Error('Historical reviewed retailer import refused; no live prices or public claims generated')
 }
 async function verifyNewFileTarget(path) {
-  if (typeof path !== 'string' || !path.trim() || path.startsWith('-')) refuse()
-  const target = resolve(path)
+  // The exported JS API receives caller strings directly. Reject invalid
+  // filesystem characters before resolve/lstat: Node's native path errors
+  // can otherwise echo the attempted private destination in a TypeError.
+  // Fail closed on other OS errors too; never propagate their path detail.
+  if (typeof path !== 'string' || !path.trim() || path.startsWith('-') ||
+      path.length > 4096 || /[\u0000-\u001f\u007f]/u.test(path)) refuse()
+  let target
+  try { target = resolve(path) } catch { refuse() }
   let parent = target
   while (true) {
     try {
@@ -27,7 +35,7 @@ async function verifyNewFileTarget(path) {
       if (info.isSymbolicLink()) refuse()
       if (parent === target) refuse()
     } catch (error) {
-      if (error?.code !== 'ENOENT') throw error
+      if (error?.code !== 'ENOENT') refuse()
     }
     const next = dirname(parent)
     if (next === parent) break
@@ -43,6 +51,21 @@ export async function buildReviewedRetailerSqlite(outputPath) {
       batch?.summary?.permissionVerified !== false ||
       batch?.summary?.publicSavingsClaimEligible !== false ||
       batch?.summary?.sources !== 6 || batch?.summary?.rejectedSources !== 0) refuse()
+
+  // Check the *complete* historical six-adapter → catalog → exact 11×2
+  // full-basket review route before creating any private database files.
+  // This never verifies actual shop prices, basket equivalence or source
+  // rights and cannot promote any archived capture to a public product.
+  let preflight
+  try { preflight = assessHistoricalM3FullBasketReadiness(batch) }
+  catch { refuse() }
+  if (preflight.releaseDecision !== 'hold' ||
+      preflight.canonicalPlannerNeeds !== 11 ||
+      preflight.twoStoreReviewRows !== 22 ||
+      preflight.observationCount !== batch.summary.observations ||
+      preflight.retailerReuseRightsVerified !== false ||
+      preflight.fullBasketFieldComparisonVerified !== false ||
+      preflight.publicSavingsClaimEligible !== false) refuse()
   const temporary = await mkdtemp(join(tmpdir(), 'supa-offline-retailer-db-'))
   try {
     const input = join(temporary, 'reviewed-adapter-output.json')
@@ -62,6 +85,9 @@ export async function buildReviewedRetailerSqlite(outputPath) {
       products: stats.products, snapshots: stats.snapshots,
       databaseCreated: true, externalNetworkUsed: false,
       historicalOnly: true, productionEnabled: false,
+      canonicalPlannerNeeds: preflight.canonicalPlannerNeeds,
+      twoStoreReviewRows: preflight.twoStoreReviewRows,
+      fullBasketFieldComparisonVerified: false,
       publicSavingsClaimEligible: false,
     }
   } finally {
@@ -69,8 +95,13 @@ export async function buildReviewedRetailerSqlite(outputPath) {
   }
 }
 export async function main(argv = process.argv.slice(2)) {
-  if (argv.length !== 2 || argv[0] !== '--out') refuse()
-  const summary = await buildReviewedRetailerSqlite(argv[1])
+  // Direct in-process callers must not make us execute argv Proxy/getters
+  // before the offline path and source checks. No write on refused args.
+  let args
+  try { args = snapshotBoundedPrivateCatalogInput(argv) } catch { refuse() }
+  if (!Array.isArray(args) || args.length !== 2 ||
+      args[0] !== '--out' || typeof args[1] !== 'string') refuse()
+  const summary = await buildReviewedRetailerSqlite(args[1])
   console.log(JSON.stringify(summary))
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
