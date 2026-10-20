@@ -89,6 +89,33 @@ export function PrivateComparisonJourney({
       plusCents: one.lineTotalCents, dekaCents: other.lineTotalCents,
     })))
   }
+  async function downloadCompleteOwnComparison(format: 'csv' | 'txt') {
+    setExportMessage('')
+    try {
+      // Formatters are loaded only on demand. Re-check the exact personal
+      // capture instants AFTER loading, not just when Home was rendered.
+      const [{ ownStoreWeekComparison }, formatter] = await Promise.all([
+        import('../planner/ownStoreBudgetComparison.ts'),
+        import('../planner/downloadOwnStoreComparison.ts'),
+      ])
+      const current = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
+      const summary = ownStoreWeekComparison(current)
+      if (!current?.stores.PLUS || !current.stores.DekaMarkt ||
+          summary.status !== 'comparable') {
+        throw new Error('Deze winkelprijzen zijn verlopen of niet meer volledig vergelijkbaar.')
+      }
+      if (format === 'csv') formatter.downloadOwnStoreCsv(current, summary)
+      else formatter.downloadOwnStoreText(formatter.printableOwnStoreComparison(summary, {
+        PLUS: current.stores.PLUS.observedAt,
+        DekaMarkt: current.stores.DekaMarkt.observedAt,
+      }))
+      setExportMessage('Alleen je eigen volledig gecontroleerde, actuele mandje is als privé-' +
+        format.toUpperCase() + ' gedownload. Geen onafhankelijke besparingsclaim.')
+    } catch (error) {
+      setExportMessage((error instanceof Error ? error.message : 'Download geweigerd.') +
+        ' Controleer de echte bronprijzen opnieuw in Vergelijk.')
+    }
+  }
   const availablePartialProducts = admittedPartialRows.length
   const hasAnySource = singleReady || stores.some(store =>
     !!progress?.stores[store] || !!reviewed?.stores[store])
@@ -166,6 +193,21 @@ export function PrivateComparisonJourney({
         <p>PLUS: {euro.formatCents(plus!.basket.totalCents)} · DekaMarkt: {euro.formatCents(deka!.basket.totalCents)}.
           Alleen voor jouw geselecteerde, volledig gecontroleerde producten en bronmomenten.
           Dit is geen kassagarantie of onafhankelijk bewezen besparing.</p>
+        <p className="private-comparison-journey__capture-times">
+          Originele bronmomenten: PLUS <time dateTime={plus!.observedAt}>{plus!.observedAt}</time>
+          {' '}· DekaMarkt <time dateTime={deka!.observedAt}>{deka!.observedAt}</time>.
+          {' '}De prijzen zijn uitsluitend jouw eigen opnames, niet live opgehaald.
+        </p>
+        <div className="private-comparison-journey__actions">
+          <button type="button" onClick={() => void downloadCompleteOwnComparison('csv')}>
+            Download volledig vergelijkbaar mandje (CSV)
+          </button>
+          <button type="button" className="ghost-button"
+            onClick={() => void downloadCompleteOwnComparison('txt')}>
+            Bewaar persoonlijk prijs- en SKU-overzicht (TXT)
+          </button>
+        </div>
+        {exportMessage && <p role="status">{exportMessage}</p>}
       </> : <>
         <span>Werkelijke prijsvergelijking</span>
         <strong>Volledig prijsverschil nog onbekend</strong>
