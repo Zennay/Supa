@@ -8,6 +8,7 @@ import { productSearchText } from './productSearchText.ts'
 import { currentPrivateRouteChoice } from '../comparison/privateRouteChoice.ts'
 import { createMixedStoreShoppingPlan } from '../comparison/mixedStoreShoppingPlan.ts'
 import { validCustomWeekBudgetEuros } from '../planner/customWeekBudget.ts'
+import { parsePrivateExtraVisitCostCents } from '../comparison/privateExtraVisitCost.ts'
 import { privatePhysicalShoppingTick } from '../shopping-list/privatePhysicalShoppingTick.ts'
 import { freshReviewedBaskets, privateReviewedPairWithin24Hours, type PrivateReviewedBaskets, type PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
 
@@ -33,6 +34,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   const reviewedRef = useRef(reviewed)
   reviewedRef.current = reviewed
   const [receiptMessage, setReceiptMessage] = useState('')
+  const [extraStopCost, setExtraStopCost] = useState('')
   const [shopAdvantage, setShopAdvantage] = useState<'all' | 'plus' | 'deka' | 'equal'>('all')
   async function downloadSingle(shop: OwnStore, kind: 'csv' | 'txt') {
     const origin = freshReviewedBaskets(reviewedRef.current, reviewedRef.current.planKey, Date.now())
@@ -240,6 +242,11 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   const mix = createMixedStoreShoppingPlan(plus.basket, deka.basket)
   const splitTrip = !!mix && mix.lines.some(line => line.store === 'PLUS') &&
     mix.lines.some(line => line.store === 'DekaMarkt')
+  // Private user-entered scenario, not an observed retailer price.
+  const costCents = splitTrip ? parsePrivateExtraVisitCostCents(extraStopCost.trim()) : null
+  const costInvalid = splitTrip && extraStopCost.trim() !== '' && costCents === null
+  const tripTotalCents = splitTrip && costCents !== null && mix
+    ? mix.totalCents + costCents : null
   const wholeCheapestCents = Math.min(plus.basket.totalCents, deka.basket.totalCents)
   const delta = deka.basket.totalCents - plus.basket.totalCents
   const cheapest: OwnStore = delta >= 0 ? 'PLUS' : 'DekaMarkt'
@@ -328,9 +335,39 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       <small>{splitTrip
         ? 'Twee winkels nodig. Extra reis-, parkeer- en tijdkosten zijn onbekend totdat je ze zelf invult. Netto voordeel wordt hier niet geclaimd.'
         : 'Voor deze goedkoopste productroute is slechts één winkel nodig; er is geen tweede winkelstop.'}</small>
+      {splitTrip && <div className="private-reviewed-products__trip-calculator">
+        <label>Zelf opgegeven extra kosten van tweede winkelstop (€)
+          <input type="text" inputMode="decimal" maxLength={9}
+            placeholder="Bijv. 2,50 · leeg = onbekend" value={extraStopCost}
+            onChange={event => setExtraStopCost(event.currentTarget.value)} />
+        </label>
+        {costInvalid && <p role="alert">Voer € 0,00–€ 1.000,00 in, met maximaal twee decimalen.</p>}
+        {tripTotalCents === null
+          ? <p role="status">Netto kosten onbekend zonder jouw extra bezoekkosten.
+              Leeg betekent niet € 0,00.</p>
+          : <div role="status">
+              <p>Twee winkels inclusief jouw extra stopkosten: <strong>
+                {money.format(tripTotalCents / 100)}</strong>.</p>
+              <p>{tripTotalCents < wholeCheapestCents
+                ? 'Twee winkels zijn in dit scenario ' +
+                  money.format((wholeCheapestCents - tripTotalCents) / 100) + ' goedkoper.'
+                : tripTotalCents === wholeCheapestCents
+                  ? 'Beide routes kosten in dit scenario hetzelfde.'
+                  : 'Eén volledige winkel is in dit scenario ' +
+                    money.format((tripTotalCents - wholeCheapestCents) / 100) + ' goedkoper.'}</p>
+              {budgetCents !== null && <p>Deze bekende route is {' '}
+                <strong>{money.format(Math.abs(budgetCents - tripTotalCents) / 100)}
+                  {tripTotalCents > budgetCents ? ' boven' : ' binnen'} je Planner-weekbudget</strong>.
+              </p>}
+              <small>Alleen oorspronkelijke, gecontroleerde producten en jouw
+                eigen extra kosten; overige tijd, aankopen en ritkosten onbekend.</small>
+            </div>}
+      </div>}
       <button type="button" onClick={openCheckedMixedRoute}>
-        Open mijn gecombineerde route en eigen extra bezoekkosten
+        Open mijn gecombineerde route in Lijst
       </button>
+      {splitTrip && <small>Je voert deze tijdelijke eigen kosten opnieuw in bij Lijst.
+        Dit rekenvoorbeeld wijzigt geen winkelprijzen of opgeslagen route.</small>}
     </div>}
     <small>Jouw gecontroleerde PLUS-bron: {plus.observedAt}. DekaMarkt-bron: {deka.observedAt}.
       Geen kassagarantie of onafhankelijk bewezen besparing; oorspronkelijke producten en
