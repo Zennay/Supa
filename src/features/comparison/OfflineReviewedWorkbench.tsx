@@ -635,7 +635,8 @@ export function OfflineReviewedWorkbench({
         throw Error('Geen ontbrekende bronartikelen voor een nieuw invulblad.')
       // Canonical nine-column CSV producer: its SKU, amount, availability,
       // observedAt and price cells deliberately stay UNOBSERVED.
-      const { selectiveTwoStoreCaptureCsv } = await import('../planner/selectiveTwoStoreCapture.ts')
+      const { selectiveTwoStoreCaptureCsv, selectiveTwoStoreCaptureGuide } =
+        await import('../planner/selectiveTwoStoreCapture.ts')
       if (revision !== importRevision.current || week !== captureWeekRef.current ||
           latestCapturePreview.current !== preview ||
           JSON.stringify(needs) !== JSON.stringify({
@@ -643,6 +644,9 @@ export function OfflineReviewedWorkbench({
             DekaMarkt: missingPreviewCaptureNeeds('DekaMarkt', Date.now()),
           })) throw Error('De opnames of weekbehoeften zijn gewijzigd. Maak het actuele blad opnieuw.')
       const content = selectiveTwoStoreCaptureCsv(needs, delimiter)
+      // No tenth column is allowed in the strict source importer. Show the
+      // companion mapping of EXACT CSV line numbers -> original Planner needs.
+      const guide = selectiveTwoStoreCaptureGuide(needs)
       const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }))
       try {
         const link = document.createElement('a')
@@ -652,10 +656,12 @@ export function OfflineReviewedWorkbench({
         document.body.append(link)
         try { link.click() } finally { link.remove() }
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
-      setWeekExportMessage('Leeg origineel invulblad voor ' + needs.PLUS.length +
+      setPortableMissingGuide({ source: preview, week, text: guide })
+      setWeekExportMessage('Leeg broninvulblad voor ' + needs.PLUS.length +
         ' PLUS- en ' + needs.DekaMarkt.length +
-        ' DekaMarkt-artikelen opgeslagen. Vul uitsluitend echte SKU, verpakking, prijs, ' +
-        'beschikbaarheid en bronmoment in; importeer daarna opnieuw in Vergelijk.')
+        ' DekaMarkt-artikelen opgeslagen. De rijgids hieronder koppelt elke lege ' +
+        'CSV-regel aan de originele Planner-behoefte. Vul uitsluitend echte SKU, verpakking, ' +
+        'prijs, beschikbaarheid en bronmoment in; importeer daarna opnieuw in Vergelijk.')
     } catch (error) {
       setWeekExportMessage(error instanceof Error ? error.message :
         'Kon het ontbrekende invul-CSV niet veilig maken.')
@@ -2695,7 +2701,7 @@ export function OfflineReviewedWorkbench({
                   {portableMissingGuide?.source === currentPreview &&
                     portableMissingGuide.week === captureWeek && (
                     <div className="offline-price-workbench__missing-copy">
-                      <label htmlFor="supa-missing-source-copy">Zelf selecteerbare ontbrekende producten</label>
+                      <label htmlFor="supa-missing-source-copy">Ontbrekende producten / bijbehorende CSV-rijgids</label>
                       <textarea id="supa-missing-source-copy" rows={9} readOnly
                         value={portableMissingGuide.text}
                         onFocus={event => event.currentTarget.select()}
