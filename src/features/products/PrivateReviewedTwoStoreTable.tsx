@@ -488,6 +488,66 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       return physical.filter(line => !capture || line.status === 'unresolved')
         .map(line => ({ shop, line, absent: !capture }))
     })
+    // Reuse the already shipped nine-column private CSV and its row-numbered
+    // physical shopping guide: neither invents source SKUs, moments or prices.
+    async function downloadMissingCapture(kind: 'csv' | 'guide') {
+      const initial = freshReviewedBaskets(reviewedRef.current,
+        reviewedRef.current.planKey, Date.now())
+      if (!initial || initial.planKey !== reviewed.planKey ||
+          (initial.stores.PLUS ?? null) !== (plus ?? null) ||
+          (initial.stores.DekaMarkt ?? null) !== (deka ?? null)) {
+        setReceiptMessage('Het weekmenu of de winkelbron is veranderd. Open broninvoer opnieuw.')
+        return
+      }
+      if (plus && deka && !samePartialPhysicalDemand(plus.basket, deka.basket)) {
+        setReceiptMessage('Deze twee winkelmanden hebben een andere fysieke vraag. Maak eerst het weekmenu gelijk.')
+        return
+      }
+      const needs = {
+        PLUS: unresolvedByStore.filter(row => row.shop === 'PLUS').map(({ line }) => ({
+          id: line.id, label: line.ingredientLabel,
+          amount: line.requirement.amount, unit: line.requirement.unit,
+        })),
+        DekaMarkt: unresolvedByStore.filter(row => row.shop === 'DekaMarkt').map(({ line }) => ({
+          id: line.id, label: line.ingredientLabel,
+          amount: line.requirement.amount, unit: line.requirement.unit,
+        })),
+      }
+      if (!needs.PLUS.length && !needs.DekaMarkt.length) return
+      try {
+        const { selectiveTwoStoreCaptureCsv, selectiveTwoStoreCaptureGuide } =
+          await import('../planner/selectiveTwoStoreCapture.ts')
+        const content = kind === 'csv'
+          ? selectiveTwoStoreCaptureCsv(needs)
+          : selectiveTwoStoreCaptureGuide(needs)
+        const latest = freshReviewedBaskets(reviewedRef.current,
+          reviewedRef.current.planKey, Date.now())
+        if (!latest || latest.planKey !== initial.planKey ||
+            (latest.stores.PLUS ?? null) !== (plus ?? null) ||
+            (latest.stores.DekaMarkt ?? null) !== (deka ?? null)) {
+          setReceiptMessage('De oorspronkelijke bron is gewijzigd. Maak een nieuw invulblad.')
+          return
+        }
+        const url = URL.createObjectURL(new Blob([content], {
+          type: kind === 'csv' ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8',
+        }))
+        try {
+          const link = document.createElement('a')
+          link.href = url
+          link.download = kind === 'csv'
+            ? 'supa-alleen-ontbrekende-winkelproducten.csv'
+            : 'supa-alleen-ontbrekende-opnamegids.txt'
+          document.body.append(link)
+          try { link.click() } finally { link.remove() }
+        } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+        setReceiptMessage(kind === 'csv'
+          ? 'Leeg CSV-blad met alleen ontbrekende winkelregels opgeslagen. Voer later uitsluitend echte brongegevens in.'
+          : 'Bijbehorende gids met exacte CSV-regelnummers opgeslagen; geen prijs- of bronbewijs.')
+      } catch {
+        setReceiptMessage('Geen veilig invulblad beschikbaar. Open de Planner en controleer je fysieke hoeveelheden.')
+      }
+    }
+
     function preparePartialCopy() {
       const latest = freshReviewedBaskets(reviewedRef.current,
         reviewedRef.current.planKey, Date.now())
@@ -606,6 +666,14 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         <button type="button" onClick={onOpenComparison}>
           Vul ontbrekende bronproducten in en controleer productmatching
         </button>
+        <div className="private-reviewed-products__receipt-actions">
+          <button type="button" onClick={() => { void downloadMissingCapture('csv') }}>
+            Download alleen ontbrekende winkelregels (leeg CSV-invulblad)
+          </button>
+          <button type="button" onClick={() => { void downloadMissingCapture('guide') }}>
+            Download bijhorende CSV-regelgids (TXT)
+          </button>
+        </div>
         <small>Een ontbrekende winkelregel is nooit een prijs van € 0.
           Het volledige mandje blijft onbekend totdat beide winkels compleet zijn.</small>
       </details>}
