@@ -117,6 +117,21 @@ const units: Record<string, { unit: MetricUnit; factor: number }> = {
 }
 const pieceNouns = /^(?:(?:ui|uien)|eieren?|tenen?|knoflooktenen?|tomaten?|bananen?|wortels?|courgettes?|paprika.s?|bloemkolen?|komkommers?|aardappels?|citroenen?|limoenen?)\b/i
 
+/** Never let a second explicitly measured ingredient hide in a product label.
+ * The original line remains editable; no inferred splitting or pricing.
+ * This also protects multiplied pack syntax such as "2 x 250 g rijst en
+ * 100 g boter", not only ordinary "1 kg rijst en 100 g boter".
+ */
+function containsSecondPhysicalQuantity(label: string): boolean {
+  const pattern = /(?:^|[^\\p{L}\\p{N}])((?:\\d+\\s+)?\\d+\\/\\d+|\\d+\\s?[½¼¾⅓⅔⅛⅜⅝⅞]|\\d+(?:[.,]\\d+)?|[½¼¾⅓⅔⅛⅜⅝⅞])\\s*([a-z]+\\.?)(?=\\s|[,;]|$)/giu
+  let match: RegExpExecArray | null
+  while ((match = pattern.exec(label)) !== null) {
+    if (units[match[2].toLowerCase()]) return true
+  }
+  return false
+}
+
+
 export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
   const original = text(raw, 400)
   if (!original) throw new Error('Ingredientregel ontbreekt')
@@ -139,6 +154,11 @@ export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
         amount !== null && Number.isFinite(amount) && amount > 0 && amount <= 1_000_000 &&
         (physical.unit !== 'piece' || (Number.isSafeInteger(perPart) && Number.isSafeInteger(amount))) &&
         label && !/^\d+(?:[.,]\d+)?\s*(?:g|kg|ml|l|oz|lb|stuks?)\b/iu.test(label)) {
+      if (containsSecondPhysicalQuantity(label)) {
+        return { original, label: original, query: original.toLocaleLowerCase('nl'),
+          amount: null, unit: null,
+          reviewReason: 'Meerdere verschillende ingrediënten in één regel: splits ze voor een complete boodschappenlijst' }
+      }
       return { original, label, query: label.toLocaleLowerCase('nl'),
         amount, unit: physical.unit, reviewReason: null }
     }
@@ -215,14 +235,10 @@ export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
   // "rijst en 250 g boter". Those are two distinct physical shopping needs,
   // unlike "1 kg en 250 g rijst" which the same-family parser sums above.
   // Retain the original line for explicit ingredient splitting.
-  const secondIngredient = /(?:[,;]|\s+(?:en|and|met|with|plus)\s+)((?:\d+\s+)?\d+\/\d+|\d+\s?[½¼¾⅓⅔⅛⅜⅝⅞]|\d+(?:[.,]\d+)?|[½¼¾⅓⅔⅛⅜⅝⅞])\s*([^\s,;]+)(?:\s+|$)/giu
-  let extra: RegExpExecArray | null
-  while ((extra = secondIngredient.exec(label)) !== null) {
-    if (units[extra[2].toLowerCase()]) {
-      return { original, label: original, query: original.toLocaleLowerCase('nl'),
-        amount: null, unit: null,
-        reviewReason: 'Meerdere verschillende ingrediënten in één regel: splits ze voor een complete boodschappenlijst' }
-    }
+  if (containsSecondPhysicalQuantity(label)) {
+    return { original, label: original, query: original.toLocaleLowerCase('nl'),
+      amount: null, unit: null,
+      reviewReason: 'Meerdere verschillende ingrediënten in één regel: splits ze voor een complete boodschappenlijst' }
   }
   return { original, label, query: label.toLocaleLowerCase('nl'), amount: normalized, unit, reviewReason: null }
 }
