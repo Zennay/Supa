@@ -10,6 +10,7 @@ type ChecklistProps = {
   recipes: RecipeWithIngredients[]
   activeDays: string[]
   onOpenPriceImport?: () => void
+  onOpenRecipes?: () => void
 }
 type DemandRow = ReturnType<typeof aggregatePlanIngredients>[number]
 const unitLabels: Record<string, string> = {
@@ -32,7 +33,7 @@ const portableQuantity = (item: DemandRow) =>
  * The exact physical week demand, independent of either supermarket.
  * No sample product, inferred SKU, price, license or retailer observation.
  */
-export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPriceImport }: ChecklistProps) {
+export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPriceImport, onOpenRecipes }: ChecklistProps) {
   const [progress, setProgress] = useState<{ identity: string; checked: Record<string, boolean> }>({ identity: '', checked: {} })
   const [backupMessage, setBackupMessage] = useState('')
   const currentDemand = useRef('')
@@ -51,6 +52,7 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPric
   }, [plan, recipes, activeDays])
 
   const { items, error } = result
+  const unresolvedPieces = items.filter(item => item.unit === 'piece' && item.amount === null)
   const demandIdentity = JSON.stringify([activeDays, items.map(itemKey)])
   currentDemand.current = demandIdentity
   const keys = items.map(itemKey)
@@ -220,6 +222,16 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPric
           je kunt ze privé downloaden en op een ander apparaat voor exact hetzelfde weekmenu herstellen.
           Download ook de TXT-lijst om een eigen leesbaar overzicht handmatig in de privévergelijker te importeren.</p>
       </div>
+      {unresolvedPieces.length > 0 && <div className="attention-card" role="status">
+        <strong>{unresolvedPieces.length} stukhoeveelheid(en) vragen controle</strong>
+        <p>{unresolvedPieces.slice(0, 4).map(item => item.label).join(', ')}
+          {unresolvedPieces.length > 4 ? ' en andere ingrediënten' : ''}:
+          een gedeeltelijk of onbekend aantal stuks is niet automatisch als
+          gekocht winkelproduct bevestigd. De rest van je ongeprijsde lijst blijft bruikbaar.</p>
+        {onOpenRecipes && <button type="button" className="ghost-button" onClick={onOpenRecipes}>
+          Controleer in Recepten hoeveel hele stuks je nodig hebt
+        </button>}
+      </div>}
       {error ? <p role="status" className="unpriced-planner-checklist__note">{error}</p> : (
         <>
           <div className="unpriced-planner-checklist__actions">
