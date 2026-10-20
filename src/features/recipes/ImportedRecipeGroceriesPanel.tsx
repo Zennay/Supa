@@ -147,12 +147,17 @@ export function ImportedRecipeGroceriesPanel({
   const selectedPhysicalKeys = new Set(selected.flatMap(recipe =>
     (toPlannerRecipe(recipe, { usage: 'unpriced-demand' })?.ingredients ?? [])
       .map(item => JSON.stringify([item.query, item.unit]))))
-  const reuseCount = (recipe: SavedRecipe): number => {
-    if (selectedIds.includes(recipe.id) || !selectedPhysicalKeys.size) return 0
-    const ingredientKeys = (toPlannerRecipe(recipe, { usage: 'unpriced-demand' })?.ingredients ?? [])
-      .map(item => JSON.stringify([item.query, item.unit]))
-    return new Set(ingredientKeys.filter(key => selectedPhysicalKeys.has(key))).size
+  const sharedPhysicalIngredients = (recipe: SavedRecipe): string[] => {
+    if (selectedIds.includes(recipe.id) || !selectedPhysicalKeys.size) return []
+    const shared = new Map<string, string>()
+    for (const ingredient of toPlannerRecipe(recipe, { usage: 'unpriced-demand' })?.ingredients ?? []) {
+      const key = JSON.stringify([ingredient.query, ingredient.unit])
+      if (selectedPhysicalKeys.has(key) && !shared.has(key))
+        shared.set(key, ingredient.label + ' (' + ingredient.unit + ')')
+    }
+    return [...shared.values()]
   }
+  const reuseCount = (recipe: SavedRecipe) => sharedPhysicalIngredients(recipe).length
   const search = searchableIngredient(query.trim())
   const visibleRecipes = recipes.filter(recipe => !search ||
     [recipe.title, ...recipe.ingredients.flatMap(ingredient =>
@@ -402,7 +407,9 @@ export function ImportedRecipeGroceriesPanel({
         {reuseCount(recipe) > 0 &&
           <small className="recipe-collection-groceries__shared">Deelt {reuseCount(recipe)}
             {' '}gecontroleerde fysieke ingrediënt{reuseCount(recipe) === 1 ? '' : 'en'}
-            {' '}met je gekozen recepten; bekijk de originele hoeveelheden voordat je kookt.</small>}
+            {' '}met je gekozen recepten: {sharedPhysicalIngredients(recipe).slice(0, 3).join(', ')}
+            {reuseCount(recipe) > 3 ? ` en ${reuseCount(recipe) - 3} meer` : ''}.
+            {' '}Dit zegt niets over resterende voorraad of voldoende hoeveelheden.</small>}
         {selectedIds.includes(recipe.id) && <label>Gewenste porties
           <input type="number" min="1" max="100" step="1"
             aria-label={'Gewenste porties voor ' + recipe.title}
