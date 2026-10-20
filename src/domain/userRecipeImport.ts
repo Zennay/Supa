@@ -57,9 +57,13 @@ function recipeServings(value: unknown): number | null {
 
 function recipeMinutes(value: unknown): number | null {
   const input = text(value, 80)
-  const duration = input.match(/^P(?:\d+D)?T(?:(\d+)H)?(?:(\d+)M)?$/i)
-  if (!duration || (!duration[1] && !duration[2])) return null
-  return positiveNumber(Number(duration[1] || 0) * 60 + Number(duration[2] || 0), 1440)
+  // ISO-8601 durations may contain days. Dropping that component made
+  // P1DT2H look like two hours, so include the entire reported duration.
+  const duration = input.match(/^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?)?$/i)
+  if (!duration || (!duration[1] && !duration[2] && !duration[3])) return null
+  const minutes = Number(duration[1] || 0) * 1440 +
+    Number(duration[2] || 0) * 60 + Number(duration[3] || 0)
+  return positiveNumber(minutes, 1440)
 }
 
 function quantity(raw: string): number | null {
