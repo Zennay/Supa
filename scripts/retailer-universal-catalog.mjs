@@ -1,5 +1,75 @@
 import { validateRawProductObservation } from '../src/data/ingestion.ts'
 
+import { types as nodeTypes } from 'node:util'
+
+// Unlike JSON archives, exported JS callers may pass accessors, Proxies or
+// inherited facts. Pin one detached, bounded, inert tree BEFORE reading even
+// batch.summary.mode; do not run caller code to decide permission or prices.
+const CATALOG_MAX_DEPTH = 32
+const CATALOG_MAX_NODES = 50000
+const CATALOG_MAX_KEYS = 4096
+const CATALOG_MAX_ARRAY_LENGTH = 16384
+
+function refuseCatalogCaller() {
+  throw new Error('Refusing untrusted input: Untrusted retailer catalog caller input')
+}
+
+function pinCatalogValue(value, budget, ancestors, depth = 0) {
+  if (value === null || typeof value === 'string' ||
+      typeof value === 'boolean') return value
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value !== 'object' || nodeTypes.isProxy(value) ||
+      depth >= CATALOG_MAX_DEPTH || ++budget.nodes > CATALOG_MAX_NODES ||
+      ancestors.has(value)) refuseCatalogCaller()
+
+  const prototype = Object.getPrototypeOf(value)
+  const array = Array.isArray(value)
+  if (array ? prototype !== Array.prototype :
+      prototype !== Object.prototype && prototype !== null) refuseCatalogCaller()
+
+  const descriptors = Object.getOwnPropertyDescriptors(value)
+  const keys = Reflect.ownKeys(descriptors)
+  if (array) {
+    const count = descriptors.length?.value
+    if (!Number.isSafeInteger(count) || count > CATALOG_MAX_ARRAY_LENGTH ||
+        keys.length !== count + 1) refuseCatalogCaller()
+  } else if (keys.length > CATALOG_MAX_KEYS) refuseCatalogCaller()
+
+  ancestors.add(value)
+  try {
+    if (array) {
+      const copied = []
+      const count = descriptors.length.value
+      for (let index = 0; index < count; index++) {
+        const descriptor = descriptors[String(index)]
+        if (!descriptor || !Object.hasOwn(descriptor, 'value') ||
+            !descriptor.enumerable) refuseCatalogCaller()
+        copied.push(pinCatalogValue(descriptor.value, budget, ancestors, depth + 1))
+      }
+      return Object.freeze(copied)
+    }
+
+    // A null prototype also prevents accidentally consulting polluted
+    // Object.prototype fields during downstream validation.
+    const copied = Object.create(null)
+    for (const key of keys) {
+      const descriptor = descriptors[key]
+      if (typeof key !== 'string' || !Object.hasOwn(descriptor, 'value') ||
+          !descriptor.enumerable) refuseCatalogCaller()
+      Object.defineProperty(copied, key, {
+        value: pinCatalogValue(descriptor.value, budget, ancestors, depth + 1),
+        enumerable: true,
+        writable: false,
+        configurable: false,
+      })
+    }
+    return Object.freeze(copied)
+  } finally {
+    ancestors.delete(value)
+  }
+}
+
+
 // All source formats are normalized by the existing strict retailer adapters
 // BEFORE entering this unified internal schema. This registry NEVER claims a
 // licensed/public catalog, and never merges two retailers by a fuzzy name.
@@ -88,7 +158,8 @@ function truthSignature(record) {
   ])
 }
 
-export function buildUniversalRetailerCatalog(batch) {
+export function buildUniversalRetailerCatalog(callerBatch) {
+  const batch = pinCatalogValue(callerBatch, { nodes: 0 }, new WeakSet())
   if (!batch || typeof batch !== 'object' ||
       batch.summary?.mode !== 'reviewed-offline-only' ||
       !Array.isArray(batch.results) || batch.results.length > 32 ||
