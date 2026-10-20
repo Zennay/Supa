@@ -48,6 +48,14 @@ button:disabled{background:#b6c6bc;cursor:not-allowed}.secondary{background:#e5e
  #result #next-actions{break-inside:avoid}
 }
 
+.store-coverage{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:14px 0;padding:16px;background:#f7faf6;border:1px solid #d6e0d4;border-radius:12px}
+.coverage-shop{min-width:0;display:grid;gap:8px}
+.coverage-shop label{font-size:14px;line-height:1.4}
+.coverage-shop progress{width:100%;height:16px;accent-color:#17643e}
+.store-coverage>.muted,.coverage-actions{grid-column:1/-1;margin:0}
+.coverage-actions{display:flex;gap:10px 18px;flex-wrap:wrap}
+.coverage-actions a{display:inline-flex;align-items:center;min-height:40px;overflow-wrap:anywhere}
+@media(max-width:650px){.store-coverage{grid-template-columns:1fr}}
 @media(max-width:650px){.grid,.stores{grid-template-columns:1fr}section{padding:15px}.row-actions button{flex:1}}
 .observation-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px}
 .observed-product{padding:16px;border:1px solid #d6e0d4;border-radius:12px;margin:12px 0;background:#fcfefd}
@@ -217,6 +225,22 @@ Bewaar desgewenst je <strong>lokale bron- en mandinvoersessie</strong> inclusief
 <section id="result" hidden aria-label="Vergelijking van de eigen winkelmandjes">
 <h2>Jouw mandje · PLUS tegenover DekaMarkt</h2>
 <div id="summary" class="notice" role="status" aria-live="polite"></div>
+<div class="store-coverage" id="store-coverage" aria-label="Dekking van de werkelijke winkelprijsopnames">
+  <div class="coverage-shop">
+    <label for="coverage-plus"><strong>PLUS</strong> · <span id="coverage-plus-text">Nog geen complete eigen prijsregels</span></label>
+    <progress id="coverage-plus" value="0" max="1"></progress>
+  </div>
+  <div class="coverage-shop">
+    <label for="coverage-deka"><strong>DekaMarkt</strong> · <span id="coverage-deka-text">Nog geen complete eigen prijsregels</span></label>
+    <progress id="coverage-deka" value="0" max="1"></progress>
+  </div>
+  <p class="muted">Dit toont alleen hoeveel fysieke regels een recente en volledig bekende eigen prijs hebben. Een winkelwinnaar of besparing verschijnt pas bij twee complete, tijdig gekoppelde opnames.</p>
+  <nav class="coverage-actions" aria-label="Ontbrekende eigen winkelproducten aanvullen">
+    <a href="#source-title">Open eigen CSV/JSON-prijsbron</a>
+    <a href="#manual-observations">Voer echt waargenomen winkelprijzen in</a>
+    <a href="#next-actions">Bekijk ontbrekende prijsregels</a>
+  </nav>
+</div>
 <div id="budget-panel" style="padding:12px;margin-top:12px;border:1px solid #d6e0d4;border-radius:10px">
 <label id="budget-label" for="budget-euros">Optioneel: eigen budget voor dit hele mandje (€)</label>
 <input id="budget-euros" type="text" inputmode="decimal" placeholder="Bijv. 50,00" maxlength="12" style="width:160px;max-width:100%" autocomplete="off">

@@ -94,7 +94,7 @@ const handoffKey = 'supa:private-planner-week-handoff:v1'
 const acceptHandoff = document.querySelector<HTMLButtonElement>('#week-handoff-accept')!
 const cancelHandoff = document.querySelector<HTMLButtonElement>('#week-handoff-cancel')!
 const currentLines = document.querySelector<HTMLElement>('#lines')!
-const preview = document.querySelector<HTMLElement>('#week-import-preview')!
+const preview = document.querySelector<HTMLDetailsElement>('#week-import-preview')!
 const previewItems = document.querySelector<HTMLOListElement>('#week-import-preview-items')!
 let stagedHandoff: PrivateDemand | null = null
 function presentStagedWeek(demand: PrivateDemand, source: string) {
@@ -120,6 +120,10 @@ function presentStagedWeek(demand: PrivateDemand, source: string) {
     previewItems.append(remaining)
   }
   preview.hidden = false
+  // The physical review is the purpose of this handoff. A collapsed
+  // details widget made the original ingredient preview effectively invisible
+  // even after navigating to the acceptance area.
+  preview.open = true
   info.textContent = source + ' staat klaar: ' +
     demand.selectedMealCount + ' geselecteerde maaltijden en ' +
     demand.ingredients.length + ' originele fysieke ingrediënten. ' +
@@ -133,6 +137,7 @@ function discardStage() {
   cancelHandoff.hidden = true
   cancelHandoff.disabled = true
   preview.hidden = true
+  preview.open = false
   previewItems.replaceChildren()
 }
 try {

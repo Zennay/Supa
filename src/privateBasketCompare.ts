@@ -49,6 +49,14 @@ const compare = document.querySelector<HTMLButtonElement>('#compare')!
 const status = document.querySelector<HTMLDivElement>('#price-status')!
 const result = document.querySelector<HTMLElement>('#result')!
 const summary = document.querySelector<HTMLDivElement>('#summary')!
+const coverageMeters = {
+  PLUS: document.querySelector<HTMLProgressElement>('#coverage-plus')!,
+  DekaMarkt: document.querySelector<HTMLProgressElement>('#coverage-deka')!,
+}
+const coverageLabels = {
+  PLUS: document.querySelector<HTMLElement>('#coverage-plus-text')!,
+  DekaMarkt: document.querySelector<HTMLElement>('#coverage-deka-text')!,
+}
 const budgetInput = document.querySelector<HTMLInputElement>('#budget-euros')!
 const budgetStatus = document.querySelector<HTMLDivElement>('#budget-status')!
 let budgetTotals: Record<StoreName, number | null> | null = null
@@ -830,6 +838,28 @@ function show(source: Source, demand: Demand): void {
   comparisonValidThroughNs = complete && start !== null && end !== null
     ? (start <= end ? start : end) + weekNs : null
   result.hidden = false
+  // A native progress meter is honest only if the original store capture is
+  // itself recent and its individual SKUs have trusted whole-pack prices.
+  // In particular, a stale capture must show ZERO usable price coverage,
+  // not a visually convincing full green bar based on historical matches.
+  for (const [store, basket, age] of [
+    ['PLUS', left, firstAge], ['DekaMarkt', right, secondAge],
+  ] as const) {
+    const meter = coverageMeters[store]
+    const validAge = age >= 0n && age <= weekNs
+    const count = validAge ? basket.matchedLineCount : 0
+    meter.max = demand.ingredients.length
+    meter.value = count
+    const state = !captures[store]
+      ? 'Nog geen eigen winkelopname'
+      : !validAge
+        ? 'Opname is toekomstig of ouder dan 7 dagen; geen bruikbare prijzen'
+        : count === demand.ingredients.length
+          ? 'Alle ' + count + ' fysieke regels geprijsd uit eigen recente bron'
+          : count + ' van ' + demand.ingredients.length + ' fysieke regels geprijsd uit eigen recente bron'
+    coverageLabels[store].textContent = state
+    meter.setAttribute('aria-label', store + ': ' + state)
+  }
   renderBudget()
   loadTrip(left, right, demand,
     { PLUS: firstAge, DekaMarkt: secondAge },
