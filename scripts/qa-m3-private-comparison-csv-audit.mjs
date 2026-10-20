@@ -54,15 +54,23 @@ function quotedCells(line) {
 }
 
 function hasUnguardedFormulaText(value) {
-  if (value.startsWith("'")) return false
-  const normalized = value.normalize('NFKC')
-  // A leading Unicode formatting/combining character can make a formula
-  // visually start with "=" while bypassing an ASCII-only exporter check.
-  const visuallyLeading = normalized.replace(
-    /^[\p{White_Space}\p{Default_Ignorable_Code_Point}\p{Mn}\p{Me}]+/gu,
+  // An ASCII leading apostrophe is a supported literal marker for ordinary
+  // =/+/-/@ product names. It is NOT sufficient evidence that a Unicode
+  // invisible-prefix formula is safe to import into every spreadsheet.
+  const escaped = value.startsWith("'")
+  const normalized = (escaped ? value.slice(1) : value).normalize('NFKC')
+  const visiblyLeading = normalized.replace(
+    /^[\p{White_Space}\p{Default_Ignorable_Code_Point}\p{Mn}\p{Mc}\p{Me}]+/gu,
     '',
   )
-  return /^[=+\-@]/u.test(visuallyLeading)
+  if (!/^[=+\-@]/u.test(visiblyLeading)) return false
+  if (!escaped) return true
+  const hiddenPrefix = normalized.slice(0, normalized.length - visiblyLeading.length)
+  // Keep literal ASCII-formula cells accepted (including ordinary spaces),
+  // while refusing ambiguous invisible formatting/combining disguises even
+  // after CSV quoting + a leading apostrophe. This is a private preflight
+  // rejection, never an attempt to execute or infer a spreadsheet formula.
+  return /[\p{Default_Ignorable_Code_Point}\p{Mn}\p{Mc}\p{Me}]/u.test(hiddenPrefix)
 }
 
 export function auditPrivateM3ComparisonCsv(csv) {

@@ -3,6 +3,7 @@ import { dirname } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { buildPrivateM3ProductComparison } from './m3-private-product-comparison.mjs'
 import { privateM3PackUnitPrice } from './m3-private-pack-unit-price.mjs'
+import { snapshotPrivateM3Comparison } from './m3-private-comparison-snapshot.mjs'
 import {
   assertNoSymlinkedM3OutputParents,
   writeDerivedM3Output,
@@ -123,7 +124,10 @@ function checkedRows(report) {
   return rows
 }
 
-export function renderPrivateM3ProductComparisonHtml(report) {
+export function renderPrivateM3ProductComparisonHtml(untrustedReport) {
+  // One authoritative data snapshot for validation AND rendering. Never
+  // re-read an accessor-backed original after the monetary safety checks.
+  const report = snapshotPrivateM3Comparison(untrustedReport)
   const rows = checkedRows(report)
   const full = report.fullBasket
   const header = full.comparable

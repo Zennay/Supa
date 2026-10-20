@@ -28,6 +28,28 @@ node scripts/offline-two-store-csv-to-json.mjs eigen-waarnemingen.csv mijn-twee-
 
 Het programma doet **geen HTTP-verzoek**, logt geen productnamen of prijzen, en overschrijft nooit een bestaand JSON-uitvoerbestand. Onjuist CSV-formaat of ontbreken van een van beide winkels betekent een fout zonder stilzwijgende prijsaanvulling.
 
+## Twee losse, verschillend geëxporteerde winkelbestanden
+
+Bij twee afzonderlijke eigen bronopnames hoeft de PLUS-export niet dezelfde CSV-scheiding als DekaMarkt te gebruiken. **Ook een eerder door Supa opgeslagen éénwinkel-JSON** mag aan één kant worden ingevoerd; het wordt eerst door de bestaande strikte JSON→CSV-adapter en vervolgens door de gewone CSV-parser verwerkt. De bestaande strikte converter leest **ieder bestand afzonderlijk** en controleert daarna één echte opname per verschillende supermarkt. Bijvoorbeeld:
+
+```bash
+node scripts/offline-two-store-csv-to-json.mjs --pair plus.csv deka.json mijn-twee-winkels.json
+```
+
+Ook een Nederlandse puntkomma-CSV met een komma-CSV combineren werkt wanneer beide precies de negen Supa-kolommen bevatten. Onbekende prijzen blijven leeg; de tool voegt geen winkel, product of bronmoment toe. De samengestelde bron blijft maximaal 256 kB.
+
+## Eén echte winkelopname, zonder tweede winkel te verzinnen
+
+Voor een afzonderlijke, rechtmatig verkregen **PLUS óf DekaMarkt** CSV-opname kun je exact dezelfde strikte product- en prijscontrole gebruiken en rechtstreeks het bestaande Supa-eenwinkel-JSON-formaat aanmaken:
+
+```bash
+node scripts/offline-two-store-csv-to-json.mjs --single eigen-winkel.csv mijn-eerste-winkel.json
+```
+
+Ook een eerder opgeslagen eigen **éénwinkel-JSON** is bruikbaar met `--single`, naast de bestaande CSV/TSV-export. Het JSON-bestand wordt eerst opnieuw onderworpen aan dezelfde bestaande strikte broncontrole.
+
+Dit geeft `supa-private-single-store-prices-v1` met uitsluitend die ene echte winkel. Importeer het via **Supa → Vergelijk**; productreview, Planner en boodschappenlijst blijven bruikbaar. Een winnaar of financieel prijsverschil is pas mogelijk na een apart aangeleverde, werkelijk waargenomen tweede winkel binnen dezelfde tijdcontext. Bestaande tweewinkelconversie zonder `--single` blijft verplicht twee winkels vereisen.
+
 ## Betekenis van de kolommen
 
 | Kolom | Verplichte waarde |
@@ -52,6 +74,6 @@ Een rij uit het lege planner-invulblad mag **helemaal onbekend blijven**: laat `
 
 - Per winkel 1–1.000 records; maximaal 256 kB voor CSV en JSON.
 - Eén fysieke opnametijd per winkel. Geen ontbrekende tijden, geen verzonnen defaults, geen dubbele artikel-ID's, geen onbekende winkels of velden.
-- CSV met RFC-4180-gequote namen, komma's en regeleinden wordt ondersteund; bestanden uit Excel als **UTF-8 CSV met komma's** exporteren. Puntdecimalen voor `packAmount`; komma-decimalen en Excel-lokale puntkomma-CSV worden geweigerd om stille verkeerde bedragen te voorkomen.
+- CSV met RFC-4180-gequote namen, komma's en regeleinden wordt ondersteund; bestanden uit Excel als **UTF-8 CSV met komma's** exporteren. CSV met komma, puntkomma of tab als kolomscheiding wordt geaccepteerd als exact dezelfde negen kolomkoppen aanwezig zijn. Voor `packAmount` zijn punt- of komma-decimalen toegestaan; `priceCents` blijft altijd een geheel aantal centen.
 - Ongeldige datums, future jaar-/offsetcombinaties, controltekens, misvormde getallen en ongeldige statuswaarden worden afgewezen. Uitvoer wordt uitsluitend nieuw aangemaakt, met bestandsrechten voor de lokale eigenaar.
 - Import blijft privé/lokaal. De bestaande echte bronrechten [#74](https://github.com/Zennay/Supa/issues/74), onafhankelijke fysieke 11×2 PLUS/DekaMarkt-waarneming [#78](https://github.com/Zennay/Supa/issues/78), codepin [#205](https://github.com/Zennay/Supa/issues/205) en runner [#2833](https://github.com/Zennay/Supa/issues/2833) zijn aparte releasegates. Geen publieke prijs- of besparingsclaim.

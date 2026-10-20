@@ -70,16 +70,87 @@ function priceSpecificationCandidates(offer: JsonObject): JsonObject[] {
   return values.filter((value): value is JsonObject => isObject(value))
 }
 
+/**
+ * Schema.org JSON-LD may contain case-variant keys on the same typed Offer.
+ * Do not silently trust the first spelling when a second spelling asserts
+ * a different financial, currency or stock fact. This is still source
+ * evidence, never an independent retailer-price verification.
+ */
+/**
+ * Explicitly malformed prices are not absent prices. A second typed Offer
+ * or an auxiliary PriceSpecification cannot be silently discarded while a
+ * well-formed amount on the same product is still proposed to the user.
+ */
+function malformedDeclaredOfferPrice(offers: JsonObject[]): boolean {
+  for (const offer of offers) {
+    const specifications = priceSpecificationCandidates(offer)
+    const rawSpecification = offer.priceSpecification
+    if (rawSpecification !== undefined && rawSpecification !== null &&
+        (Array.isArray(rawSpecification)
+          ? rawSpecification.some(value => !isObject(value))
+          : !isObject(rawSpecification))) return true
+    for (const source of [offer, ...specifications]) {
+      for (const [key, value] of Object.entries(source)) {
+        const field = key.toLocaleLowerCase('en')
+        if (field !== 'price' && field !== 'lowprice') continue
+        const amount = cents(value)
+        if (amount === null || !Number.isSafeInteger(amount) || amount < 0) return true
+      }
+    }
+  }
+  return false
+}
+
+function conflictingOfferEvidence(offers: JsonObject[]): boolean {
+  const facts = ['price', 'lowprice', 'pricecurrency', 'availability'] as const
+  for (const offer of offers) {
+    for (const fact of facts) {
+      const entries = Object.entries(offer)
+        .filter(([key]) => key.toLocaleLowerCase('en') === fact)
+      if (entries.length < 2) continue
+      const values = entries.map(([, raw]) => fact === 'price' || fact === 'lowprice'
+        ? cents(raw)
+        : asString(raw)?.toLocaleLowerCase('en') ?? null)
+      if (values.some(value => value === null) ||
+          new Set(values).size !== 1) return true
+    }
+
+    // Case variants of a lowPrice range remain evidence even though they can
+    // NEVER themselves serve as the pack price. They must not contradict the
+    // one concrete Offer.price or its parallel alias.
+    const prices = Object.entries(offer)
+      .filter(([key]) => key.toLocaleLowerCase('en') === 'price')
+      .map(([, value]) => cents(value))
+    const ranges = Object.entries(offer)
+      .filter(([key]) => key.toLocaleLowerCase('en') === 'lowprice')
+      .map(([, value]) => cents(value))
+    if (prices.length && ranges.length &&
+        [...prices, ...ranges].some(value => value === null ||
+          value !== prices[0])) return true
+
+    // Source currencies also have to agree with any explicit case-variant
+    // priceSpecification currency. Do not silently prefer the familiar key.
+    const currencyClaims = [
+      ...Object.entries(offer)
+        .filter(([key]) => key.toLocaleLowerCase('en') === 'pricecurrency'),
+      ...priceSpecificationCandidates(offer).flatMap(specification =>
+        Object.entries(specification).filter(([key]) =>
+          key.toLocaleLowerCase('en') === 'pricecurrency')),
+    ].map(([, value]) => asString(value)?.toUpperCase() ?? null)
+    if (currencyClaims.length && (currencyClaims.some(value => value === null) ||
+        new Set(currencyClaims).size > 1)) return true
+  }
+  return false
+}
+
 function extractPrice(offers: JsonObject[]): number | null {
-  const prices = offers
-    .flatMap((offer) => [
-      cents(offer.price ?? offer.lowPrice),
-      ...priceSpecificationCandidates(offer).map((specification) =>
-        cents(specification.price ?? specification.lowPrice),
-      ),
-    ])
-    .filter((value): value is number => value !== null)
-  return uniqueKnown(prices)
+  // AggregateOffer.lowPrice and ranges describe many offers, not the
+  // payable price of this exact SKU/pack. Multiple offers or a unit-price
+  // specification cannot independently prove a checkout package price.
+  // An unambiguous concrete typed Offer.price is the only price authority.
+  if (offers.length !== 1 || !hasType(offers[0], 'Offer') ||
+      hasType(offers[0], 'AggregateOffer')) return null
+  return cents(offers[0].price)
 }
 
 function extractCurrency(offers: JsonObject[]): string | null {
@@ -206,6 +277,12 @@ export function parseSchemaOrgProduct(
   }
 
   const offers = offerCandidates(product.offers)
+  if (malformedDeclaredOfferPrice(offers)) {
+    return { type: 'abstain', reason: 'malformed declared Offer or PriceSpecification amount' }
+  }
+  if (conflictingOfferEvidence(offers)) {
+    return { type: 'abstain', reason: 'contradictory price, currency or availability on the same Schema.org Offer' }
+  }
   const currency = extractCurrency(offers)
   if (currency !== null && currency !== 'EUR') {
     return {

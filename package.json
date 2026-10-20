@@ -4,10 +4,10 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "start": "node --experimental-strip-types server/app.mjs",
+    "start": "node dist/server.mjs",
     "dev": "vite",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && node scripts/build-production-server.mjs",
     "preview": "vite preview",
     "m1:matching-benchmark": "node --experimental-strip-types scripts/m1-run-matching-benchmark.mjs",
     "m1:inspect-captures": "node --experimental-strip-types scripts/m1-inspect-captures.mjs",
@@ -32,6 +32,7 @@
     "@types/react": "^19.1.12",
     "@types/react-dom": "^19.1.9",
     "@vitejs/plugin-react": "^5.0.2",
+    "esbuild": "^0.28.2",
     "typescript": "^5.9.2",
     "vite": "^7.1.7"
   }

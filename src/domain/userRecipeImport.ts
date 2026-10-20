@@ -1,3 +1,6 @@
+import { safeRecipeSourceUrl } from './recipeSourceUrl.ts'
+import { measuredRecipeAmount } from './metricRecipeQuantities.ts'
+
 /**
  * Private user-recipe intake, before any persistence, price calculation or fetch.
  * A caller must fetch HTML through a separately protected server boundary.
@@ -54,14 +57,30 @@ function recipeServings(value: unknown): number | null {
 
 function recipeMinutes(value: unknown): number | null {
   const input = text(value, 80)
-  const duration = input.match(/^P(?:\d+D)?T(?:(\d+)H)?(?:(\d+)M)?$/i)
-  if (!duration || (!duration[1] && !duration[2])) return null
-  return positiveNumber(Number(duration[1] || 0) * 60 + Number(duration[2] || 0), 1440)
+  // ISO-8601 durations may contain days. Dropping that component made
+  // P1DT2H look like two hours, so include the entire reported duration.
+  // JSON-LD duration can include seconds (PT20M30S); omitting seconds
+  // would understate the user's preparation time. Round seconds UP to a
+  // whole minute, never down, including the 24-hour maximum boundary.
+  const duration = input.match(/^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/i)
+  if (!duration || (!duration[1] && !duration[2] && !duration[3] && !duration[4])) return null
+  const minutes = Number(duration[1] || 0) * 1440 +
+    Number(duration[2] || 0) * 60 + Number(duration[3] || 0) +
+    Math.ceil(Number(duration[4] || 0) / 60)
+  return positiveNumber(minutes, 1440)
 }
 
 function quantity(raw: string): number | null {
-  const vulgar: Record<string, number> = { '½': 0.5, '¼': 0.25, '¾': 0.75 }
+  const vulgar: Record<string, number> = {
+    '½': 0.5, '¼': 0.25, '¾': 0.75, '⅓': 1 / 3, '⅔': 2 / 3,
+    '⅛': 1 / 8, '⅜': 3 / 8, '⅝': 5 / 8, '⅞': 7 / 8,
+  }
   if (Object.hasOwn(vulgar, raw)) return vulgar[raw]
+  const joined = /^(\d+)\s?([½¼¾⅓⅔⅛⅜⅝⅞])$/u.exec(raw)
+  if (joined) return Number(joined[1]) + vulgar[joined[2]]
+  // A dotted three-digit group (1.000 g) is ambiguous in Dutch recipes:
+  // it may mean 1000 g, so never silently treat it as 1 g.
+  if (/^[1-9]\d{0,2}\.\d{3}$/.test(raw)) return null
   if (raw.includes('/')) {
     const bits = raw.split(/\s+/)
     const fraction = bits.pop()!.split('/').map(Number)
@@ -71,59 +90,142 @@ function quantity(raw: string): number | null {
   return Number(raw.replace(',', '.'))
 }
 
-function rounded(value: number): number {
-  return Math.round((value + Number.EPSILON) * 1000) / 1000
-}
-
 const units: Record<string, { unit: MetricUnit; factor: number }> = {
-  'g': { unit: 'g', factor: 1 }, 'gram': { unit: 'g', factor: 1 }, 'grams': { unit: 'g', factor: 1 },
-  'kg': { unit: 'g', factor: 1000 }, 'kilogram': { unit: 'g', factor: 1000 }, 'kilograms': { unit: 'g', factor: 1000 },
-  'ml': { unit: 'ml', factor: 1 }, 'milliliter': { unit: 'ml', factor: 1 }, 'milliliters': { unit: 'ml', factor: 1 },
-  'l': { unit: 'ml', factor: 1000 }, 'liter': { unit: 'ml', factor: 1000 }, 'liters': { unit: 'ml', factor: 1000 },
+  // All conversions are exact physical SI units; never guess tablespoon,
+  // cup or other recipe-specific volumes. Those still require human review.
+  'mg': { unit: 'g', factor: 0.001 }, 'milligram': { unit: 'g', factor: 0.001 },
+  'milligrams': { unit: 'g', factor: 0.001 }, 'milligrammen': { unit: 'g', factor: 0.001 },
+  'g': { unit: 'g', factor: 1 }, 'gr': { unit: 'g', factor: 1 },
+  'gram': { unit: 'g', factor: 1 }, 'grams': { unit: 'g', factor: 1 },
+  'grammen': { unit: 'g', factor: 1 },
+  // Dutch metric 'ons' denotes exactly 100 g. Do not infer 'pond':
+  // English pounds and Dutch colloquial pounds are not interchangeable.
+  'ons': { unit: 'g', factor: 100 },
+  'kg': { unit: 'g', factor: 1000 }, 'kilogram': { unit: 'g', factor: 1000 },
+  'kilograms': { unit: 'g', factor: 1000 }, 'kilogrammen': { unit: 'g', factor: 1000 },
+  'ml': { unit: 'ml', factor: 1 }, 'milliliter': { unit: 'ml', factor: 1 },
+  'milliliters': { unit: 'ml', factor: 1 }, 'millilitre': { unit: 'ml', factor: 1 },
+  'cl': { unit: 'ml', factor: 10 }, 'centiliter': { unit: 'ml', factor: 10 },
+  'centiliters': { unit: 'ml', factor: 10 }, 'centilitre': { unit: 'ml', factor: 10 },
+  'dl': { unit: 'ml', factor: 100 }, 'deciliter': { unit: 'ml', factor: 100 },
+  'deciliters': { unit: 'ml', factor: 100 }, 'decilitre': { unit: 'ml', factor: 100 },
+  'l': { unit: 'ml', factor: 1000 }, 'liter': { unit: 'ml', factor: 1000 },
+  'liters': { unit: 'ml', factor: 1000 }, 'litre': { unit: 'ml', factor: 1000 },
   'stuks': { unit: 'piece', factor: 1 }, 'stuk': { unit: 'piece', factor: 1 }, 'piece': { unit: 'piece', factor: 1 },
   'pieces': { unit: 'piece', factor: 1 }, 'pcs': { unit: 'piece', factor: 1 },
+  'st': { unit: 'piece', factor: 1 }, 'st.': { unit: 'piece', factor: 1 },
+  'pc': { unit: 'piece', factor: 1 },
   'oz': { unit: 'g', factor: 28.349523125 }, 'ounce': { unit: 'g', factor: 28.349523125 },
   'ounces': { unit: 'g', factor: 28.349523125 }, 'lb': { unit: 'g', factor: 453.59237 },
   'lbs': { unit: 'g', factor: 453.59237 }, 'pound': { unit: 'g', factor: 453.59237 },
 }
 const pieceNouns = /^(?:(?:ui|uien)|eieren?|tenen?|knoflooktenen?|tomaten?|bananen?|wortels?|courgettes?|paprika.s?|bloemkolen?|komkommers?|aardappels?|citroenen?|limoenen?)\b/i
 
+/** Never let a second explicitly measured ingredient hide in a product label.
+ * The original line remains editable; no inferred splitting or pricing.
+ * This also protects multiplied pack syntax such as "2 x 250 g rijst en
+ * 100 g boter", not only ordinary "1 kg rijst en 100 g boter".
+ */
+function containsSecondPhysicalQuantity(label: string): boolean {
+  // An explicit second measured item cannot disappear into a food name,
+  // even if its unit is intentionally unsupported (e.g. tablespoons).
+  // Only a connector or separator introduces this broad check, so recipe
+  // labels with incidental numbers such as "vitamine B12" are unaffected.
+  const joined = /(?:[,;]|\s+(?:en|and|met|with|plus)\s+|\s*\+\s*)((?:\d+\s+)?\d+\/\d+|\d+\s?[½¼¾⅓⅔⅛⅜⅝⅞]|\d+(?:[.,]\d+)?|[½¼¾⅓⅔⅛⅜⅝⅞])\s*([^\s,;]+)/giu
+  if (joined.test(label)) return true
+  const pattern = /(?:^|[^\p{L}\p{N}])((?:\d+\s+)?\d+\/\d+|\d+\s?[½¼¾⅓⅔⅛⅜⅝⅞]|\d+(?:[.,]\d+)?|[½¼¾⅓⅔⅛⅜⅝⅞])\s*([a-z]+\.?)(?=\s|[,;]|$)/giu
+  let match: RegExpExecArray | null
+  while ((match = pattern.exec(label)) !== null) {
+    // A following quantity may be a unitless whole item: "250 g tomaten
+    // en 2 eieren" or "2 eieren met 3 tenen knoflook". The primary parser
+    // infers those produce counts, so they must also block unsafe combined
+    // lines rather than silently disappearing into the product name.
+    if (units[match[2].toLowerCase()] || pieceNouns.test(match[2])) return true
+  }
+  return false
+}
+
+
 export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
   const original = text(raw, 400)
   if (!original) throw new Error('Ingredientregel ontbreekt')
-  // A single-unit match must never consume only the first part of
-  // "1 kg 250 g bloem" and mistake "250 g" for a product name.
-  // Parse two physically stated measures BEFORE falling back to the single
-  // amount pattern: keeping only the first segment would undercount shopping.
-  const compound = original.match(/^((?:\d+\s+)?\d+\/\d+|\d+(?:[.,]\d+)?|[½¼¾])\s*([a-z]+)\s+((?:\d+\s+)?\d+\/\d+|\d+(?:[.,]\d+)?|[½¼¾])\s*([a-z]+)\s+(.+)$/iu)
-  if (compound) {
-    const first = quantity(compound[1])
-    const second = quantity(compound[3])
-    const firstUnit = units[compound[2].toLowerCase()]
-    const secondUnit = units[compound[4].toLowerCase()]
-    const label = compound[5].trim()
-    if (first !== null && second !== null &&
-        Number.isFinite(first) && Number.isFinite(second) &&
-        first > 0 && second > 0 && first <= 100_000 && second <= 100_000 &&
-        firstUnit && secondUnit && firstUnit.unit === secondUnit.unit &&
-        label && !/^\d+(?:[.,]\d+)?\s+(?:g|kg|ml|l|oz|lb)\b/i.test(label)) {
-      const normalized = rounded(first * firstUnit.factor + second * secondUnit.factor)
-      if (Number.isFinite(normalized) && normalized > 0 && normalized <= 1_000_000) {
-        return { original, label, query: label.toLocaleLowerCase('nl'),
-          amount: normalized, unit: firstUnit.unit, reviewReason: null }
+  // Common food labels such as "2 × 250 g rijst" represent two measured
+  // portions, not two grams or an unexplained "x" ingredient. The exact
+  // original stays attached to the draft for user review and provenance.
+  const multiplied = /^(\d{1,4})\s*[x×*]\s*((?:\d+\s+)?\d+\/\d+|\d+\s?[½¼¾⅓⅔⅛⅜⅝⅞]|\d+(?:[.,]\d+)?|[½¼¾⅓⅔⅛⅜⅝⅞])\s*([a-z]+)\s+(.+)$/iu.exec(original)
+  if (multiplied) {
+    const repetitions = Number(multiplied[1])
+    const perPart = quantity(multiplied[2])
+    const physical = units[multiplied[3].toLowerCase()]
+    const label = multiplied[4].trim()
+    const amount = physical ? measuredRecipeAmount([{
+      quantity: multiplied[2], factor: physical.factor, unit: physical.unit,
+      repeats: repetitions,
+    }]) : null
+    if (Number.isSafeInteger(repetitions) && repetitions >= 1 &&
+        repetitions <= 1000 && perPart !== null && Number.isFinite(perPart) &&
+        perPart > 0 && perPart <= 100_000 && physical &&
+        amount !== null && Number.isFinite(amount) && amount > 0 && amount <= 1_000_000 &&
+        (physical.unit !== 'piece' || (Number.isSafeInteger(perPart) && Number.isSafeInteger(amount))) &&
+        label && !/^\d+(?:[.,]\d+)?\s*(?:g|kg|ml|l|oz|lb|stuks?)\b/iu.test(label)) {
+      if (containsSecondPhysicalQuantity(label)) {
+        return { original, label: original, query: original.toLocaleLowerCase('nl'),
+          amount: null, unit: null,
+          reviewReason: 'Meerdere verschillende ingrediënten in één regel: splits ze voor een complete boodschappenlijst' }
       }
+      return { original, label, query: label.toLocaleLowerCase('nl'),
+        amount, unit: physical.unit, reviewReason: null }
     }
     return { original, label: original, query: original.toLocaleLowerCase('nl'),
-      amount: null, unit: null, reviewReason: 'Controleer de samengestelde hoeveelheden' }
+      amount: null, unit: null, reviewReason:
+        'Controleer het aantal maal de verpakking en voer het metrische totaal in' }
   }
-  const match = original.match(/^((?:\d+\s+)?\d+\/\d+|\d+(?:[.,]\d+)?|[½¼¾])\s*(.*)$/u)
+  const match = original.match(/^((?:\d+\s+)?\d+\/\d+|\d+\s?[½¼¾⅓⅔⅛⅜⅝⅞]|\d+(?:[.,]\d+)?|[½¼¾⅓⅔⅛⅜⅝⅞])\s*(.*)$/u)
   if (!match) return { original, label: original, query: original.toLocaleLowerCase('nl'), amount: null, unit: null, reviewReason: 'Hoeveelheid of eenheid ontbreekt' }
   const amount = quantity(match[1])
   const tail = match[2].trim()
   const wordMatch = tail.match(/^([^\s,]+)(?:\s+|,\s*)(.*)$/u)
   const word = (wordMatch ? wordMatch[1] : tail).toLowerCase()
   const metric = units[word]
-  const label = metric ? (wordMatch?.[2] || '').trim() : tail
+  let label = metric ? (wordMatch?.[2] || '').trim() : tail
+  const parts = metric ? [{ quantity: match[1], factor: metric.factor, unit: metric.unit }] : []
+  let componentCount = 0
+  // Each additional unit must belong to the same physical family. Never
+  // silently turn "1 kg 250 g 100 g" into a label or underbuy ingredients.
+  if (metric) {
+    // Both Dutch and English recipes use joined units: "1 kg en 250 g"
+    // or "1 lb and 4 oz". Recognize only explicit same-family additions.
+    // An unknown or incompatible extra measure must not disappear into a
+    // product label, causing the Planner to underbuy the requested amount.
+    const additional = /^(?:(?:en|and|plus|\+)\s*)?((?:\d+\s+)?\d+\/\d+|\d+\s?[½¼¾⅓⅔⅛⅜⅝⅞]|\d+(?:[.,]\d+)?|[½¼¾⅓⅔⅛⅜⅝⅞])\s*([^\s,]+)(?:\s+|,\s*)(.*)$/iu
+    for (; componentCount < 8; componentCount++) {
+      const next = additional.exec(label)
+      if (!next) break
+      const quantityValue = quantity(next[1])
+      const extraUnit = units[next[2].toLowerCase()]
+      if (quantityValue === null || !Number.isFinite(quantityValue) ||
+          quantityValue <= 0 || quantityValue > 100_000 ||
+          !extraUnit || extraUnit.unit !== metric.unit) {
+        return { original, label: original, query: original.toLocaleLowerCase('nl'),
+          amount: null, unit: null,
+          reviewReason: 'Controleer samengestelde hoeveelheden en voer het metrische totaal in' }
+      }
+      parts.push({ quantity: next[1], factor: extraUnit.factor, unit: extraUnit.unit })
+      label = next[3].trim()
+    }
+    if (componentCount === 8 && additional.test(label)) {
+      return { original, label: original, query: original.toLocaleLowerCase('nl'),
+        amount: null, unit: null, reviewReason: 'Te veel samengestelde hoeveelheden: controleer handmatig' }
+    }
+    // If another clearly written amount follows an unsupported separator,
+    // leave the full original editable rather than silently ignoring it.
+    // Do not reinterpret a product name containing a number as a measure.
+    const overlooked = /^(?:&|met|with|\+|en|and|plus)\s+((?:\d+\s+)?\d+\/\d+|\d+\s?[½¼¾⅓⅔⅛⅜⅝⅞]|\d+(?:[.,]\d+)?|[½¼¾⅓⅔⅛⅜⅝⅞])\s+([^\s,]+)/iu.exec(label)
+    if (overlooked && units[overlooked[2].toLowerCase()]) {
+      return { original, label: original, query: original.toLocaleLowerCase('nl'),
+        amount: null, unit: null, reviewReason: 'Controleer alle samengestelde hoeveelheden en de juiste ingrediënten' }
+    }
+  }
   const inferredPiece = !metric && pieceNouns.test(tail)
   if (!amount || !Number.isFinite(amount) || amount > 100_000 || !label) {
     return { original, label: label || original, query: (label || original).toLocaleLowerCase('nl'), amount: null, unit: null, reviewReason: 'Controleer de hoeveelheid en het ingrediënt' }
@@ -132,9 +234,25 @@ export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
     return { original, label, query: label.toLocaleLowerCase('nl'), amount: null, unit: null, reviewReason: 'Onbekende maat: voer een metrische hoeveelheid in' }
   }
   const unit = metric?.unit || 'piece'
-  const normalized = rounded(amount * (metric?.factor || 1))
-  if (!Number.isFinite(normalized) || normalized <= 0 || normalized > 1_000_000) {
+  const normalized = metric ? measuredRecipeAmount(parts) : amount
+  if (normalized === null || !Number.isFinite(normalized) || normalized <= 0 || normalized > 1_000_000) {
     return { original, label, query: label.toLocaleLowerCase('nl'), amount: null, unit: null, reviewReason: 'Hoeveelheid is buiten bereik' }
+  }
+  // Half an egg, onion or other physical item cannot be purchased as an
+  // automatically confirmed piece. Keep the literal recipe line editable
+  // instead of accidentally promoting it into the priced Planner basket.
+  if (unit === 'piece' && !Number.isSafeInteger(normalized)) {
+    return { original, label, query: label.toLocaleLowerCase('nl'), amount: null, unit: null,
+      reviewReason: 'Een deel van een stuk: kies bewust een heel aantal stuks' }
+  }
+  // Do not accidentally turn "1 kg rijst en 250 g boter" into 1 kg
+  // "rijst en 250 g boter". Those are two distinct physical shopping needs,
+  // unlike "1 kg en 250 g rijst" which the same-family parser sums above.
+  // Retain the original line for explicit ingredient splitting.
+  if (containsSecondPhysicalQuantity(label)) {
+    return { original, label: original, query: original.toLocaleLowerCase('nl'),
+      amount: null, unit: null,
+      reviewReason: 'Meerdere verschillende ingrediënten in één regel: splits ze voor een complete boodschappenlijst' }
   }
   return { original, label, query: label.toLocaleLowerCase('nl'), amount: normalized, unit, reviewReason: null }
 }
@@ -209,12 +327,17 @@ function locateRecipe(value: unknown, depth = 0): Record<string, unknown> | null
  * Parse already-retrieved HTML. This function performs NO network operations.
  * Its caller must enforce SSRF, redirect, private-IP, size and time limits.
  */
-export function importRecipeFromHtml(html: string, sourceUrl: string): UserRecipeDraft {
+export function importRecipeFromHtml(html: string, sourceUrl: string | null = null): UserRecipeDraft {
   if (typeof html !== 'string' || !html || html.length > MAX_HTML) throw new Error('HTML ontbreekt of is te groot')
-  let parsedUrl: URL
-  try { parsedUrl = new URL(sourceUrl) } catch { throw new Error('Ongeldige receptlink') }
-  if (parsedUrl.protocol !== 'https:' || !parsedUrl.hostname || parsedUrl.username || parsedUrl.password) {
-    throw new Error('Alleen publieke HTTPS-receptlinks zijn toegestaan')
+  // A local JSON-LD/HTML file does not need a fabricated public source URL.
+  // When a URL is supplied it must still meet the exact server/import contract.
+  let parsedUrl: URL | null = null
+  if (sourceUrl) {
+    try { parsedUrl = new URL(sourceUrl) } catch { throw new Error('Ongeldige receptlink') }
+    if (parsedUrl.protocol !== 'https:' || !parsedUrl.hostname ||
+        parsedUrl.username || parsedUrl.password) {
+      throw new Error('Alleen publieke HTTPS-receptlinks zijn toegestaan')
+    }
   }
   const script = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi
   let match: RegExpExecArray | null
@@ -228,11 +351,21 @@ export function importRecipeFromHtml(html: string, sourceUrl: string): UserRecip
     const ingredients = Array.isArray(recipe.recipeIngredient) ? recipe.recipeIngredient : []
     const lines = ingredients.map(item => typeof item === 'string' ? item : record(item) ? text(item.name) : '').filter(Boolean)
     if (!lines.length) throw new Error('Geen herkenbare ingrediënten; vul het recept handmatig in')
+    const declaredTotal = recipeMinutes(recipe.totalTime)
+    const prep = recipeMinutes(recipe.prepTime)
+    const cook = recipeMinutes(recipe.cookTime)
+    // Cooking alone is not the total preparation time. When schema.org omits
+    // totalTime, combine BOTH independently declared phases or ask for review.
+    // Incomplete or >24h durations must not become a confidently short meal.
+    const hasDeclaredTotal = recipe.totalTime !== undefined &&
+      recipe.totalTime !== null && recipe.totalTime !== ''
+    const minutes = hasDeclaredTotal ? declaredTotal :
+      (prep !== null && cook !== null ? positiveNumber(prep + cook, 1440) : null)
     return normalizedDraft({
-      source: 'url', sourceUrl: parsedUrl.toString(),
+      source: parsedUrl ? 'url' : 'manual', sourceUrl: parsedUrl ? safeRecipeSourceUrl(parsedUrl.toString()) : null,
       title: recipe.name,
       servings: recipeServings(recipe.recipeYield),
-      minutes: recipeMinutes(recipe.totalTime) ?? recipeMinutes(recipe.cookTime),
+      minutes,
       ingredients: lines,
       steps: stepsFrom(recipe.recipeInstructions),
     })

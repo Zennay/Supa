@@ -1,6 +1,14 @@
+import { lazy, Suspense, useEffect, useState } from 'react'
 import type { OneStoreBasket, RecipeWithIngredients } from '../../domain/basket'
 import type { PlannedMeal } from '../../domain/types.ts'
-import { ManualStoreComparison } from '../comparison/ManualStoreComparison'
+const ManualStoreComparison = lazy(async () => {
+  const module = await import('../comparison/ManualStoreComparison')
+  return { default: module.ManualStoreComparison }
+})
+import { OfflineReviewedWorkbench } from '../comparison/OfflineReviewedWorkbench'
+import type { PrivateReviewedBaskets, PrivateCaptureProgress, PrivateReviewFocus } from '../comparison/privateReviewedBasketBridge.ts'
+import type { PrivateSourceFileHandoff } from '../comparison/privateSourceFileHandoff.ts'
+import { ListingBasketPreview } from '../comparison/ListingBasketPreview'
 import type { BasketComparison } from '../../domain/basketComparison'
 import { euro } from '../../lib/money'
 import { quantityUnitLabelNl } from '../../lib/quantityPresentation'
@@ -29,6 +37,13 @@ export function BasketView({
   manualPlan,
   manualRecipes,
   manualActiveDays,
+  privatePlanKey,
+  incomingSources,
+  onSourceFilesConsumed,
+  onReviewedBaskets,
+  onCaptureProgress,
+  focusReview,
+  onPrivateImportReady,
 }: {
   basket: OneStoreBasket
   comparison: BasketComparison
@@ -37,7 +52,19 @@ export function BasketView({
   manualPlan?: PlannedMeal[]
   manualRecipes?: RecipeWithIngredients[]
   manualActiveDays?: string[]
+  privatePlanKey?: string
+  incomingSources?: PrivateSourceFileHandoff | null
+  onSourceFilesConsumed?: (serial: number) => void
+  onReviewedBaskets?: (value: PrivateReviewedBaskets | null) => void
+  onCaptureProgress?: (value: PrivateCaptureProgress | null) => void
+  focusReview?: PrivateReviewFocus | null
+  onPrivateImportReady?: () => void
 }) {
+  // Called once for the first lazy mount, when the import DOM is available.
+  // Subsequent tab switches are handled by App's existing navigation effect.
+  useEffect(() => { onPrivateImportReady?.() }, [])
+  const [openedManualFallback, setOpenedManualFallback] = useState(false)
+
   const basketCost = basketCostDisclosure(
     basket.totalCents,
     basket.unresolvedLineCount,
@@ -81,13 +108,32 @@ export function BasketView({
 
   return (
     <section className="screen">
+      <ListingBasketPreview />
       {manualPlan && manualRecipes && manualActiveDays && (
-        <ManualStoreComparison
-          key={JSON.stringify([manualPlan, manualActiveDays, manualRecipes.map(recipe => [recipe.id, recipe.ingredients])])}
-          plan={manualPlan}
-          recipes={manualRecipes}
-          activeDays={manualActiveDays}
-        />
+        <OfflineReviewedWorkbench plan={manualPlan} recipes={manualRecipes} activeDays={manualActiveDays}
+          planKey={privatePlanKey} incomingSources={incomingSources}
+          onSourceFilesConsumed={onSourceFilesConsumed} onReviewedBaskets={onReviewedBaskets}
+          onCaptureProgress={onCaptureProgress} focusReview={focusReview} />
+      )}
+      {manualPlan && manualRecipes && manualActiveDays && (
+        <details className="demo-comparison-disclosure" onToggle={event => {
+          if (event.currentTarget.open) setOpenedManualFallback(true)
+        }}>
+          <summary>Alternatieve handmatige rekenhulp (geen gecontroleerde bronimport)</summary>
+          <p className="disclaimer">Gebruik voor een volledige oorspronkelijke SKU-, verpakking-
+            en prijscontrole hierboven de persoonlijke PLUS/Deka-bronimport.
+            Deze oudere rekenhulp werkt uitsluitend met losse, door jou ingetypte bedragen;
+            er is geen bronmoment, SKU-bewijs of overgang naar geverifieerde winkelmandjes.</p>
+          {openedManualFallback && <Suspense fallback={<p role="status">Rekenhulp openen…</p>}>
+            <ManualStoreComparison
+              key={JSON.stringify([manualPlan, manualActiveDays,
+                manualRecipes.map(recipe => [recipe.id, recipe.ingredients])])}
+              plan={manualPlan}
+              recipes={manualRecipes}
+              activeDays={manualActiveDays}
+            />
+          </Suspense>}
+        </details>
       )}
       <details className="demo-comparison-disclosure" open={!manualPlan}>
         <summary>{manualPlan ? 'Toon oude voorbeeldberekening (geen actuele winkelprijzen)' : 'Voorbeeldmandje'}</summary>
