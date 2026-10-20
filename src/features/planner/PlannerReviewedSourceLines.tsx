@@ -123,7 +123,7 @@ export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient,
     } catch (error) {
       // Permission denied or browser clipboard unavailable: give a local
       // selectable fallback ONLY for this unchanged, still-fresh source.
-      if (portableCsv && latestEvidence.current === progress && bothFresh && pairs.length > 0 &&
+      if (portableCsv && progress && latestEvidence.current === progress && bothFresh && pairs.length > 0 &&
           plus && deka && recentOwnCaptureInstant(plus.observedAt, Date.now()) &&
           recentOwnCaptureInstant(deka.observedAt, Date.now())) {
         setPairCopyFallback({ source: progress, csv: portableCsv })
