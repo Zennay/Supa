@@ -7,6 +7,7 @@ import { RECIPE_LIBRARY_KEY, readRecipeLibrary, saveRecipeLibrary, reviewRecipe,
 import { importRecipeLink } from './importRecipeLink'
 import { importPlainTextRecipe } from './importPlainTextRecipe'
 import { importPlainTextRecipeCollection } from './importPlainTextRecipeCollection'
+import { importLocalJsonLdRecipeCollection } from './importLocalJsonLdRecipeCollection'
 import { ownRecipeAsMarkdown } from './ownRecipeMarkdown'
 import { prepareRecipeBackupImport, serializeRecipeBackup, type RecipeBackupPreview, RECIPE_BACKUP_MAX_BYTES } from './recipeBackup'
 import { curatedFigmaRecipes } from './curatedFigmaRecipes'
@@ -118,11 +119,12 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const [recipeFileMessage, setRecipeFileMessage] = useState('')
   const shoppingCopy = useRef<HTMLTextAreaElement>(null)
   const [collectionText, setCollectionText] = useState('')
+  const [collectionFormat, setCollectionFormat] = useState<'plain' | 'jsonld'>('plain')
   const [collectionExportBatch, setCollectionExportBatch] = useState(0)
   const [collectionSelected, setCollectionSelected] = useState<number[]>([])
   const [lastImportedIds, setLastImportedIds] = useState<string[]>([])
   const [collectionPreview, setCollectionPreview] = useState<{
-    source: string; libraryRaw: string | null; recipes: UserRecipeDraft[]; alreadyPresent: number
+    source: string; format: 'plain' | 'jsonld'; libraryRaw: string | null; recipes: UserRecipeDraft[]; alreadyPresent: number
   } | null>(null)
   const [collectionError, setCollectionError] = useState('')
   const [collectionMessage, setCollectionMessage] = useState('')
@@ -543,7 +545,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       setCollectionError(cause instanceof Error ? cause.message : 'Exporteren is niet gelukt.')
     }
   }
-  async function loadPlainRecipeCollection(files: File[]) {
+  async function loadPlainRecipeCollection(files: File[], format: 'plain' | 'jsonld') {
     if (!files.length) return
     const revision = ++collectionReadVersion.current
     setCollectionError(''); setCollectionMessage(''); setCollectionPreview(null)
@@ -555,18 +557,24 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       const sources: string[] = []
       for (const file of files) {
         if (revision !== collectionReadVersion.current) return
-        if (!/\.(?:txt|md)$/iu.test(file.name))
-          throw new Error('Alleen eigen .txt- en .md-receptbestanden kunnen lokaal worden geïmporteerd.')
+        if (!(format === 'plain' ? /\.(?:txt|md)$/iu : /\.(?:json|jsonld)$/iu).test(file.name))
+          throw new Error(format === 'plain' ? 'Kies alleen .txt- en .md-receptbestanden.' : 'Kies alleen .json- en .jsonld-receptbestanden.')
         const content = decoder.decode(await file.arrayBuffer()).replace(/^\uFEFF/u, '').trim()
         if (!content) throw new Error('Eén van de gekozen receptbestanden is leeg.')
         sources.push(content)
       }
       if (revision !== collectionReadVersion.current) return
-      const combined = sources.join('\n---\n')
+      const combined = format === 'plain'
+        ? sources.join('\n---\n')
+        : sources.length === 1 ? sources[0] : JSON.stringify(sources.map(source => {
+          try { return JSON.parse(source) }
+          catch { throw new Error('Een van de JSON-LD-bestanden bevat ongeldige JSON.') }
+        }))
       if (new TextEncoder().encode(combined).length > 500_000)
         throw new Error('De verzamelde recepten zijn groter dan 500 kB.')
+      setCollectionFormat(format)
       setCollectionText(combined)
-      setCollectionMessage(files.length + ' lokale tekstbestanden gelezen. Controleer de afzonderlijke recepten en originele hoeveelheden vóór import.')
+      setCollectionMessage(files.length + ' lokale ' + (format === 'jsonld' ? 'JSON-LD-' : 'tekst') + 'bestanden gelezen. Controleer de afzonderlijke recepten en originele hoeveelheden vóór import.')
     } catch (cause) {
       if (revision === collectionReadVersion.current)
         setCollectionError(cause instanceof Error ? cause.message : 'Kon deze receptbestanden niet lezen.')
@@ -576,7 +584,9 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     setCollectionError(''); setCollectionMessage(''); setCollectionPreview(null)
     try {
       if (library.error) throw new Error(library.error)
-      const parsed = importPlainTextRecipeCollection(collectionText)
+      const parsed = collectionFormat === 'jsonld'
+        ? importLocalJsonLdRecipeCollection(collectionText)
+        : importPlainTextRecipeCollection(collectionText)
       const identity = (item: UserRecipeDraft) => JSON.stringify([
         item.title, item.servings, item.minutes,
         item.ingredients.map(part => part.original), item.steps,
@@ -594,7 +604,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
         throw new Error('Je kunt maximaal 100 eigen recepten bewaren. Maak eerst ruimte in je receptenlijst.')
       setCollectionSelected(recipes.map((_, index) => index))
       setLastImportedIds([])
-      setCollectionPreview({ source: collectionText, libraryRaw: library.raw, recipes, alreadyPresent })
+      setCollectionPreview({ source: collectionText, format: collectionFormat, libraryRaw: library.raw, recipes, alreadyPresent })
       setCollectionMessage(recipes.length + ' nieuwe recepten lokaal herkend; ' + alreadyPresent + ' al aanwezig of dubbel. Controleer de hoeveelheden en bevestig zelf.')
     } catch (cause) {
       setCollectionError(cause instanceof Error ? cause.message : 'Kon de receptenverzameling niet lezen.')
@@ -604,6 +614,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     setCollectionError('')
     try {
       if (!collectionPreview || collectionPreview.source !== collectionText ||
+          collectionPreview.format !== collectionFormat ||
           collectionPreview.libraryRaw !== library.raw)
         throw new Error('De tekst of je opgeslagen recepten zijn veranderd. Controleer deze import opnieuw.')
       const savedAt = new Date().toISOString()
@@ -802,20 +813,39 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     </section>
     <div className="recipe-add-actions"><button onClick={() => openEditor('manual')}>＋ Eigen recept</button><button onClick={() => openEditor('url')}>Importeer via link</button><button onClick={() => openEditor('paste')}>Plak receptgegevens (JSON-LD)</button><button onClick={() => openEditor('plain')}>Plak gewone recepttekst</button></div>
     <section className="recipe-backup-panel" aria-label="Meerdere eigen recepten tegelijk toevoegen">
-      <h2>Meerdere recepten uit tekst</h2>
-      <p>Plak eigen recepten of een lokaal Markdownbestand. Scheid recepten met een regel
-        <code> --- </code>. De recepten blijven privé en ongeprijsd; onzekere
-        ingrediënten moeten vóór gebruik in Planner worden gecorrigeerd.</p>
-      <label className="recipe-collection-label">Importeer één of meerdere .txt/.md-bestanden (samen maximaal 500 kB)
-        <input type="file" multiple accept=".txt,.md,text/plain,text/markdown"
+      <h2>Meerdere eigen recepten importeren</h2>
+      <p>Gebruik eigen tekst, Markdown of lokale schema.org JSON-LD. Je browser haalt niets
+        op van externe websites. Onzekere hoeveelheden blijven expliciet ter controle.</p>
+      <label className="recipe-collection-label">Soort bestanden
+        <select value={collectionFormat} onChange={event => {
+          collectionReadVersion.current++
+          setCollectionFormat(event.currentTarget.value as 'plain' | 'jsonld')
+          setCollectionText(''); setCollectionPreview(null); setCollectionError(''); setCollectionMessage('')
+        }}>
+          <option value="plain">Gewone tekst / Markdown</option>
+          <option value="jsonld">JSON-LD met schema.org/Recipe</option>
+        </select>
+      </label>
+      <p>{collectionFormat === 'plain'
+        ? 'Scheid meerdere recepten met een eigen regel ---. Gebruik titel, Ingrediënten: en Bereiding:.'
+        : 'Kies 1–15 Recipe-objecten uit een JSON-LD-array of @graph. Bronlinks en winkelprijzen worden niet aangenomen.'}</p>
+      <label className="recipe-collection-label">{collectionFormat === 'plain'
+        ? 'Importeer .txt/.md-bestanden (samen maximaal 500 kB)'
+        : 'Importeer .json/.jsonld-bestanden (samen maximaal 500 kB)'}
+        <input type="file" multiple key={collectionFormat}
+          accept={collectionFormat === 'plain'
+            ? '.txt,.md,text/plain,text/markdown' : '.json,.jsonld,application/json'}
           onChange={event => {
             const files = Array.from(event.currentTarget.files ?? [])
-            void loadPlainRecipeCollection(files); event.currentTarget.value = ''
+            void loadPlainRecipeCollection(files, collectionFormat); event.currentTarget.value = ''
           }} />
       </label>
-      <label className="recipe-collection-label">Meerdere recepten (titel, Ingrediënten:, Bereiding:)
+      <label className="recipe-collection-label">{collectionFormat === 'plain'
+        ? 'Recepttekst (titel, Ingrediënten:, Bereiding:)' : 'JSON-LD receptverzameling'}
         <textarea rows={8} maxLength={500000} value={collectionText}
-          placeholder={'Tomatensoep\nIngrediënten:\n500 g tomaten\nBereiding:\nKook tomaten\n---\nPasta\nIngrediënten:\n200 g pasta\nBereiding:\nKook pasta'}
+          placeholder={collectionFormat === 'plain'
+            ? 'Tomatensoep\nIngrediënten:\n500 g tomaten\nBereiding:\nKook tomaten\n---\nPasta\nIngrediënten:\n200 g pasta\nBereiding:\nKook pasta'
+            : '{"@context":"https://schema.org","@graph":[{"@type":"Recipe","name":"...","recipeIngredient":["250 g ..."],"recipeInstructions":["..."]}]}'}
           onChange={event => {
             collectionReadVersion.current++; setCollectionText(event.currentTarget.value)
             setCollectionPreview(null); setCollectionError(''); setCollectionMessage('')
@@ -834,7 +864,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
         </label>}
       <div className="recipe-backup-panel__actions">
         <button type="button" onClick={previewPlainRecipeCollection}
-          disabled={!collectionText.trim() || !!library.error}>Controleer mijn recepten</button>
+          disabled={!collectionText.trim() || !!library.error}>Controleer {collectionFormat === 'jsonld' ? 'JSON-LD recepten' : 'mijn recepten'}</button>
         <button type="button" onClick={downloadPlainRecipeCollection}
           disabled={!!library.error || !markdownExportable.length}>Download mijn recepten (Markdown)</button>
         <button type="button" onClick={() => {
@@ -843,6 +873,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
         }}>Wis invoer</button>
       </div>
       {collectionPreview && collectionPreview.source === collectionText &&
+        collectionPreview.format === collectionFormat &&
         collectionPreview.libraryRaw === library.raw &&
         <div className="recipe-backup-panel__review" role="group" aria-label="Bevestig import van mijn recepten">
           <strong>{collectionPreview.recipes.length} nieuwe recepten gevonden</strong>
