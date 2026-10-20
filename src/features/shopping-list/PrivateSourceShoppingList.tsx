@@ -456,6 +456,12 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
         </p>}
         {unpricedExtras === null && <p role="status">De opgeslagen extra boodschappen
           zijn niet leesbaar; je uiteindelijke totale budgetruimte is onbekend.</p>}
+        {manualNotes.length > 0 && <p role="status">
+          Je hebt ook {manualNotes.length} handmatig toegevoegde ongeprijsde
+          {manualNotes.length === 1 ? ' boodschap' : ' boodschappen'} (Algemeen/PLUS/DekaMarkt).
+          De echte totale uitgaven en budgetruimte blijven <strong>onbekend</strong>.
+          De winkelmandbedragen tonen uitsluitend jouw bevestigde fysieke Planner-artikelen.
+        </p>}
         <small>Alleen hele verpakkingen in eigen bronopname. Geen actuele kassagarantie.</small>
       </div>
       {comparison?.claimable && comparison.deltaCents !== null &&
@@ -464,7 +470,9 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
             : (comparison.deltaCents > 0 ? 'PLUS' : 'DekaMarkt') + ' is ' +
               exactEuro.formatCents(Math.abs(comparison.deltaCents)) +
               ' goedkoper volgens jouw twee lokale, binnen 24 uur waargenomen bronnen.'}
-          <small>Geen onafhankelijk gecontroleerde besparing.</small>
+          <small>Geen onafhankelijk gecontroleerde besparing.
+            {manualNotes.length > 0 ? ' Je handmatig toegevoegde ongeprijsde boodschappen tellen niet mee in dit prijsverschil.' : ''}
+          </small>
         </p>}
       {comparison?.claimable && plus && deka && <div
         className="private-source-shopping__store-switch" aria-label="Vergelijk hele winkelmandjes">
@@ -605,10 +613,11 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
           }}
           aria-label="Kopieerbare eigen boodschappenlijst" />
       </details>
-      <p className="disclaimer">De gezamenlijke TXT-export bevat uitsluitend de
-        extra boodschappen die je apart hebt bewaard in dit browsertabblad. Niet bewaarde
-        wijzigingen zijn geen onderdeel van die export. Extras blijven ongeprijsd en
-        worden niet bij de gecontroleerde mandbedragen opgeteld.</p>
+      <p className="disclaimer">Je zelf ingevoerde handmatige artikelen verschijnen direct
+        in de TXT- en deeltekst voor de geselecteerde winkel, ook zonder een winkelprijs.
+        Voor afzonderlijke extra artikelen met een hoeveelheid geldt dat ze eerst expliciet
+        in dit browsertabblad bewaard moeten zijn voor de gecombineerde export.
+        Geen van deze ongeprijsde artikelen telt mee in mandbedragen of besparingen.</p>
       <p className="disclaimer">Het TXT-bestand en de kopieerbare lijst volgen de optie
         'Alleen nog te kopen'. CSV en printbare HTML bevatten bewust het volledige
         persoonlijk gecontroleerde mandje, met alle vinkjes en bronbedragen.</p>
