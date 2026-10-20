@@ -46,6 +46,7 @@ export function ImportedRecipeGroceriesPanel({
   const [checked, setChecked] = useState<Record<string, boolean>>({})
   const [pendingOnly, setPendingOnly] = useState(false)
   const [feedback, setFeedback] = useState('')
+  const [manualCopy, setManualCopy] = useState<{ key: string; text: string } | null>(null)
   const [variantPreview, setVariantPreview] = useState<null | {
     inputKey: string
     changes: { recipeId: string; sourceSnapshot: string; portions: number;
@@ -203,6 +204,9 @@ export function ImportedRecipeGroceriesPanel({
         'Varianten zijn niet opgeslagen. De originele recepten blijven behouden.')
     }
   }
+  const currentCopyKey = JSON.stringify([progressIdentity, checked])
+  const latestCopyKey = useRef(currentCopyKey)
+  latestCopyKey.current = currentCopyKey
   const readyLineKeys = list?.lines.filter(line => !line.needsReview)
     .map(line => line.key) ?? []
   async function restoreChecks(file: File | null) {
@@ -240,6 +244,34 @@ export function ImportedRecipeGroceriesPanel({
       setFeedback('Je afvinkingen zijn lokaal als privé-JSON opgeslagen, zonder prijzen of winkelgegevens.')
     } catch (cause) {
       setFeedback(cause instanceof Error ? cause.message : 'Vinkjes opslaan is niet gelukt.')
+    }
+  }
+  async function copyGroceries() {
+    setFeedback('')
+    setManualCopy(null)
+    if (!list?.canCopy) return
+    const key = currentCopyKey
+    try {
+      const text = formatOwnRecipeChecklist(list, checked)
+      if (new TextEncoder().encode(text).length > 256_000)
+        throw new Error('De gecombineerde lijst is te groot om veilig mobiel te kopiëren.')
+      if (navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(text)
+          if (latestCopyKey.current !== key) {
+            setFeedback('De recepten of afvinkingen veranderden tijdens het kopiëren. Kopieer opnieuw voor de actuele lijst.')
+          } else {
+            setFeedback('De complete ongeprijsde receptenboodschappenlijst is gekopieerd.')
+          }
+          return
+        } catch { /* The same private text can be selected manually below. */ }
+      }
+      if (latestCopyKey.current !== key)
+        throw new Error('De recepten of afvinkingen zijn veranderd. Probeer de actuele lijst opnieuw.')
+      setManualCopy({ key, text })
+      setFeedback('Klembord niet beschikbaar: selecteer de volledige ongeprijsde lijst hieronder.')
+    } catch (cause) {
+      setFeedback(cause instanceof Error ? cause.message : 'De lijst kon niet worden gekopieerd.')
     }
   }
   const exportText = () => {
