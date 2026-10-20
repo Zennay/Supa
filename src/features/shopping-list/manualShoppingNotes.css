@@ -76,3 +76,6 @@
 .manual-shopping-notes__ordering button { min-width:44px; padding:8px; font-size:1.12rem; }
 .manual-shopping-notes__ordering button:disabled { opacity:.45; cursor:not-allowed; }
 .manual-shopping-notes__order-hint { font-size:.91rem; color:#405c4e; }
+
+.manual-shopping-notes__undo-move { display:flex; flex-wrap:wrap; gap:.65rem; align-items:center;
+  background:#f5fbf6; border:1px solid #b9d5be; border-radius:12px; padding:.7rem; }

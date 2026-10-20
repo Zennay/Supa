@@ -31,6 +31,10 @@ export function ManualShoppingNotes({ notes, setNotes }: {
   const [message, setMessage] = useState('')
   const [lastRemoved, setLastRemoved] = useState<{ note: UnpricedShoppingNote; index: number } | null>(null)
   const [pendingCleared, setPendingCleared] = useState<UnpricedShoppingNote[] | null>(null)
+  const [lastGroupMove, setLastGroupMove] = useState<{
+    from: UnpricedShoppingNote['store']; to: UnpricedShoppingNote['store'];
+    items: Array<Pick<UnpricedShoppingNote, 'id' | 'label' | 'done'>>
+  } | null>(null)
   const [lastCleared, setLastCleared] = useState<Array<{ note: UnpricedShoppingNote; index: number }> | null>(null)
   const [editing, setEditing] = useState<{ id: string; initialLabel: string;
     initialStore: UnpricedShoppingNote['store']; label: string;
@@ -420,8 +424,38 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       })) return current
       return current.map(item => byId.has(item.id) ? { ...item, store: target } : item)
     })
+    setLastGroupMove({ from, to: target, items: candidates.map(({ id, label, done }) => ({ id, label, done })) })
     setMessage(candidates.length + ' eigen boodschappen van ' + from + ' naar ' + target +
       ' verplaatst met behoud van de vinkjes. Prijzen en artikelmatching blijven onaangeroerd.')
+  }
+  function undoGroupMove() {
+    if (!lastGroupMove) return
+    const { from, to, items } = lastGroupMove
+    const expected = new Map(items.map(item => [item.id, item]))
+    const sourceKeys = new Set(notes.filter(item => item.store === from)
+      .map(item => duplicateKey(from, item.label)))
+    if (items.some(item => {
+      const actual = notes.find(candidate => candidate.id === item.id)
+      return !actual || actual.store !== to || actual.label !== item.label ||
+        actual.done !== item.done || sourceKeys.has(duplicateKey(from, item.label))
+    })) {
+      setLastGroupMove(null)
+      setMessage('De verplaatste lijst is intussen gewijzigd of bevat nu dubbelen. Herstellen is veilig geweigerd.')
+      return
+    }
+    setNotes(current => {
+      const sourceNow = new Set(current.filter(item => item.store === from)
+        .map(item => duplicateKey(from, item.label)))
+      if (items.some(item => {
+        const actual = current.find(candidate => candidate.id === item.id)
+        return !actual || actual.store !== to || actual.label !== item.label ||
+          actual.done !== item.done || sourceNow.has(duplicateKey(from, item.label))
+      })) return current
+      return current.map(item => expected.has(item.id) ? { ...item, store: from } : item)
+    })
+    setLastGroupMove(null)
+    setMessage(items.length + ' persoonlijke artikelen teruggezet van ' + to + ' naar ' + from +
+      '. De originele vinkjes blijven behouden; winkelprijzen en SKU’s zijn niet gewijzigd.')
   }
   const routeItems = grouped.flatMap(group => group.items)
   const exportText = [
@@ -579,6 +613,10 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       </button>
     </nav>
     <p className="manual-shopping-notes__order-hint">Orden je eigen artikelen binnen een winkel met ↑ en ↓. Zet zoeken en 'Alleen open' uit om de hele volgorde te bewerken; kopie, TXT en print nemen jouw volgorde over.</p>
+    {lastGroupMove && <div className="manual-shopping-notes__undo-move">
+      <span>{lastGroupMove.items.length} eigen artikelen verplaatst: {lastGroupMove.from} → {lastGroupMove.to}.</span>
+      <button type="button" onClick={undoGroupMove}>Herstel laatste groepsverplaatsing</button>
+    </div>}
     <div className="manual-shopping-notes__groups" aria-label="Boodschappen per winkel">
       {grouped.map(group => <section className="manual-shopping-notes__group" key={group.store}
         id={'supa-own-trip-' + group.store} tabIndex={-1}
