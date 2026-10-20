@@ -29,6 +29,8 @@ export function PartialReviewedShoppingList({
 }) {
   const [preferred, setPreferred] = useState<OwnStore>('PLUS')
   const [message, setMessage] = useState('')
+  const [showAllMissing, setShowAllMissing] = useState(false)
+  const [missingQuery, setMissingQuery] = useState('')
   const [copyFallback, setCopyFallback] = useState<{ key: string; text: string } | null>(null)
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -79,6 +81,11 @@ export function PartialReviewedShoppingList({
     ...capture.missingIngredients,
     ...capture.awaitingReviewIngredients,
   ]
+  const search = missingQuery.trim().normalize('NFKC').toLocaleLowerCase('nl-NL')
+  const filteredNeeds = incompleteNeeds.filter(item => !search ||
+    [item.label, item.id].some(value =>
+      value.normalize('NFKC').toLocaleLowerCase('nl-NL').includes(search)))
+  const shownNeeds = showAllMissing ? filteredNeeds : filteredNeeds.slice(0, 8)
   function setTick(line: (typeof rows)[number]) {
     if (!confirmedPartialBasket(progress, store, Date.now()) ||
         !recentOwnCaptureInstant(capture!.observedAt, Date.now())) {
@@ -246,7 +253,15 @@ export function PartialReviewedShoppingList({
       <p>Hier staan de nog ongeprijsde ingrediënten van hetzelfde fysieke weekmenu.
         Ook als de andere winkel al compleet is, blijven deze hoeveelheden
         onafhankelijk zichtbaar. Ze tellen niet mee in het deelbedrag hierboven.</p>
-      {incompleteNeeds.slice(0, 8).map(item =>
+      <label className="supa-partial-shop__missing-search">
+        Zoek ontbrekend ingrediënt
+        <input type="search" maxLength={120} value={missingQuery}
+          onChange={event => setMissingQuery(event.currentTarget.value)}
+          placeholder="Bijvoorbeeld melk of rijst" />
+      </label>
+      <small>{filteredNeeds.length} van {incompleteNeeds.length} nog te beoordelen
+        of ongeprijsde ingrediënten in deze winkel.</small>
+      {shownNeeds.map(item =>
         <button type="button" key={item.id} className="ghost-button"
           onClick={() => onReviewIngredient(store, item.id)}>
           {item.label} · {typeof item.amount === 'number' &&
@@ -255,8 +270,14 @@ export function PartialReviewedShoppingList({
               : 'hoeveelheid nog controleren'} ·
           {' '}bronproduct controleren
         </button>)}
-      {incompleteNeeds.length > 8 &&
-        <small>En nog {incompleteNeeds.length - 8} andere ingrediënten.</small>}
+      {filteredNeeds.length > 8 && <button type="button" className="ghost-button"
+        aria-expanded={showAllMissing}
+        onClick={() => setShowAllMissing(previous => !previous)}>
+        {showAllMissing ? 'Toon de eerste acht producten' :
+          'Bekijk alle ' + filteredNeeds.length + ' ontbrekende producten'}
+      </button>}
+      {!filteredNeeds.length && <p role="status">Geen openstaand ingrediënt
+        gevonden met deze zoekterm. Wis het zoekveld om alle te tonen.</p>}
     </div>}
     <div className="supa-partial-shop__actions">
       <button type="button" onClick={() => void produce('copy')}>Kopieer gecontroleerde deellijst</button>

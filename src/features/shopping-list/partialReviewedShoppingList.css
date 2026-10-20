@@ -76,3 +76,6 @@
 }
 .supa-partial-shop__individual-delta strong { color: #214d32; line-height: 1.35; }
 .supa-partial-shop__individual-delta small { color: #425948; }
+.supa-partial-shop__missing-search { display:grid;gap:.3rem;font-weight:650; }
+.supa-partial-shop__missing-search input { width:100%;box-sizing:border-box;
+  font:inherit;min-height:44px;padding:.65rem;border:1px solid #91aa95;border-radius:8px; }
