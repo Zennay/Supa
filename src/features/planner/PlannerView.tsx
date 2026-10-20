@@ -31,6 +31,7 @@ type PlannerViewProps = {
   captureProgress?: PrivateCaptureProgress | null
   preferredOwnStore: OwnStore
   onOpenShoppingList: () => void
+  onOpenRecipes: () => void
   onOpenMixedRoute: (extraCostRaw?: string) => void
   onChooseRouteLine: (choice: Omit<PrivateRouteChoice, 'serial'>) => void
   basketTotalCents: number | null
@@ -56,6 +57,7 @@ export function PlannerView({
   captureProgress,
   preferredOwnStore,
   onOpenShoppingList,
+  onOpenRecipes,
   onOpenMixedRoute,
   onChooseRouteLine,
   basketTotalCents,
@@ -137,6 +139,22 @@ export function PlannerView({
     try { return aggregatePlanIngredients(plannedMeals, ingredientRecipes, activeDays) }
     catch { return [] }
   }, [hasIngredientData, plannedMeals, ingredientRecipes, activeDays])
+  const pieceReviewLabels = useMemo(() => {
+    const byId = new Map(ingredientRecipes.map(recipe => [recipe.id, recipe]))
+    const active = new Set(activeDays)
+    const labels = new Map<string, string>()
+    for (const meal of plannedMeals) {
+      if (!active.has(meal.day)) continue
+      for (const item of byId.get(meal.recipeId)?.ingredients ?? []) {
+        if (item.unit !== 'piece' || item.amount === null ||
+            typeof item.amount !== 'number' ||
+            (Number.isSafeInteger(item.amount) && item.amount > 0)) continue
+        if (typeof item.id === 'string' && typeof item.label === 'string')
+          labels.set(item.id, item.label)
+      }
+    }
+    return [...labels.values()].slice(0, 20)
+  }, [ingredientRecipes, plannedMeals, activeDays])
   const reuseInsight = useMemo(() => hasIngredientData
     ? buildIngredientReuseInsight({ plan: plannedMeals, recipes: ingredientRecipes, activeDays })
     : null, [hasIngredientData, plannedMeals, ingredientRecipes, activeDays])
@@ -349,6 +367,16 @@ export function PlannerView({
               </>}
         </p>}
       </section>
+
+      {pieceReviewLabels.length > 0 && <div className="attention-card" role="status">
+        <strong>{pieceReviewLabels.length} ingrediënt(en) hebben een gedeeltelijk of ongeldig aantal stuks</strong>
+        <p>Voor {pieceReviewLabels.join(', ')} kan Supa nog geen betrouwbaar
+          winkelproduct of volledig mandtotaal kiezen. Controleer eerst in Recepten
+          hoeveel hele stuks je wilt kopen; de rest van je boodschappenlijst blijft bruikbaar.</p>
+        <button type="button" className="ghost-button" onClick={onOpenRecipes}>
+          Open Recepten om aantallen te controleren
+        </button>
+      </div>}
 
       <Suspense fallback={<p role="status" aria-live="polite">Eigen PLUS/Deka-winkelvergelijking laden…</p>}>
       <PlannerOwnStoreComparison reviewed={ownReviewed ?? null} captureProgress={captureProgress ?? null}
