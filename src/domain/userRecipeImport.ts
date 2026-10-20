@@ -59,10 +59,14 @@ function recipeMinutes(value: unknown): number | null {
   const input = text(value, 80)
   // ISO-8601 durations may contain days. Dropping that component made
   // P1DT2H look like two hours, so include the entire reported duration.
-  const duration = input.match(/^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?)?$/i)
-  if (!duration || (!duration[1] && !duration[2] && !duration[3])) return null
+  // JSON-LD duration can include seconds (PT20M30S); omitting seconds
+  // would understate the user's preparation time. Round seconds UP to a
+  // whole minute, never down, including the 24-hour maximum boundary.
+  const duration = input.match(/^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/i)
+  if (!duration || (!duration[1] && !duration[2] && !duration[3] && !duration[4])) return null
   const minutes = Number(duration[1] || 0) * 1440 +
-    Number(duration[2] || 0) * 60 + Number(duration[3] || 0)
+    Number(duration[2] || 0) * 60 + Number(duration[3] || 0) +
+    Math.ceil(Number(duration[4] || 0) / 60)
   return positiveNumber(minutes, 1440)
 }
 
