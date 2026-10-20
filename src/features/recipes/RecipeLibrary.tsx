@@ -123,6 +123,8 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const [collectionExportBatch, setCollectionExportBatch] = useState(0)
   const [collectionSelected, setCollectionSelected] = useState<number[]>([])
   const [lastImportedIds, setLastImportedIds] = useState<string[]>([])
+  const [lastBulkImport, setLastBulkImport] = useState<{ afterRaw: string; ids: string[] } | null>(null)
+  const [confirmBulkUndo, setConfirmBulkUndo] = useState(false)
   const [collectionPreview, setCollectionPreview] = useState<{
     source: string; format: 'plain' | 'jsonld'; libraryRaw: string | null; recipes: UserRecipeDraft[]; alreadyPresent: number
   } | null>(null)
@@ -163,6 +165,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       setBackupPreview(null)
       setCollectionPreview(null)
       setLastImportedIds([])
+      setLastBulkImport(null); setConfirmBulkUndo(false)
       setLibrary(next)
       const editing = editingBaseline.current
       if (editing && JSON.stringify(next.recipes.find(recipe => recipe.id === editing.id) ?? null) !== editing.raw) {
@@ -629,12 +632,39 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
         [...additions, ...library.recipes])
       setLibrary(next)
       setLastImportedIds(additions.map(recipe => recipe.id))
+      if (next.raw !== null) setLastBulkImport({ afterRaw: next.raw, ids: additions.map(recipe => recipe.id) })
+      setConfirmBulkUndo(false)
       setCollectionPreview(null); setCollectionText('')
       setFilter('own'); setQuery('')
       window.dispatchEvent(new Event('supa-recipes-changed'))
       setCollectionMessage(additions.length + ' eigen recepten bewaard op dit apparaat. Recepten met onzekere hoeveelheden vereisen nog controle vóór Planner. Winkelprijzen blijven onbekend.')
     } catch (cause) {
       setCollectionError(cause instanceof Error ? cause.message : 'Er is niets opgeslagen. Probeer opnieuw.')
+    }
+  }
+  function undoLastBulkRecipeImport() {
+    setCollectionError('')
+    try {
+      if (!confirmBulkUndo || !lastBulkImport || !library.raw ||
+          library.raw !== lastBulkImport.afterRaw || library.error) {
+        throw new Error('De recepten zijn intussen gewijzigd. De bulkimport kan niet veilig worden teruggedraaid.')
+      }
+      if (!lastBulkImport.ids.length ||
+          lastBulkImport.ids.some(id => !library.recipes.some(recipe => recipe.id === id))) {
+        throw new Error('De eerdere import is veranderd. Verwijderen is geannuleerd.')
+      }
+      // The existing Planner ownership guard is mandatory for EACH recipe.
+      // Do not orphan physical week demand or price-linked checkmarks.
+      for (const id of lastBulkImport.ids) assertRecipeNotUsedByPlanner(window.localStorage, id)
+      const removed = new Set(lastBulkImport.ids)
+      const next = saveRecipeLibrary(window.localStorage, library,
+        library.recipes.filter(recipe => !removed.has(recipe.id)))
+      setLibrary(next); setLastImportedIds([]); setLastBulkImport(null); setConfirmBulkUndo(false)
+      window.dispatchEvent(new Event('supa-recipes-changed'))
+      setCollectionMessage('De laatste bulkimport is in één keer teruggedraaid. Eerdere eigen recepten zijn behouden.')
+    } catch (cause) {
+      setCollectionError(cause instanceof Error ? cause.message : 'De import kon niet worden teruggedraaid.')
+      setConfirmBulkUndo(false)
     }
   }
   function openEditor(next: 'manual' | 'url' | 'paste' | 'plain') {
@@ -956,6 +986,20 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
             </div>
           })}
         </section>}
+      {lastBulkImport && library.raw === lastBulkImport.afterRaw &&
+        <div className="recipe-collection-undo" aria-label="Laatste bulkimport terugdraaien">
+          {confirmBulkUndo ? <>
+            <strong>Alle {lastBulkImport.ids.length} zojuist geïmporteerde recepten verwijderen?</strong>
+            <p>Bestaande recepten blijven bewaard. Is één van deze recepten gepland,
+              dan weigert Supa de verwijdering en blijft je volledige import staan.</p>
+            <div className="recipe-backup-panel__actions">
+              <button type="button" onClick={undoLastBulkRecipeImport}>Bevestig: draai import terug</button>
+              <button type="button" onClick={() => setConfirmBulkUndo(false)}>Annuleer</button>
+            </div>
+          </> : <button type="button" className="ghost-button" onClick={() => setConfirmBulkUndo(true)}>
+            Maak de laatste import van {lastBulkImport.ids.length} recepten ongedaan
+          </button>}
+        </div>}
       <small>Download maximaal 15 al gecontroleerde recepten per Markdownbestand. Grotere
         verzamelingen kun je in opeenvolgende batches exporteren. Recepten met openstaande
         bron- of hoeveelheidswaarschuwingen of oorspronkelijke bronlinks neem je veilig mee via

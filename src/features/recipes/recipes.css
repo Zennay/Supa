@@ -182,3 +182,7 @@
 @media (max-width: 360px) {
   .recipe-add-actions { grid-template-columns: 1fr; }
 }
+.recipe-collection-undo { display: grid; gap: 10px; padding: 12px;
+  border: 1px solid #e0caa9; border-radius: 12px; background: #fffaf2; }
+.recipe-collection-undo p { margin: 0; }
+.recipe-collection-undo > button { justify-self: start; min-height: 44px; }
