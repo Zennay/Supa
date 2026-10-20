@@ -1,0 +1,21 @@
+.private-comparison-journey{max-width:1100px;margin:1rem auto 2rem;padding:clamp(1rem,3vw,1.75rem);background:#fff;border:1px solid #dce7de;border-radius:22px;box-shadow:0 12px 30px rgba(25,60,40,.07);color:#233c2a}
+.private-comparison-journey__heading{display:flex;gap:1.25rem;justify-content:space-between;align-items:center;flex-wrap:wrap}
+.private-comparison-journey__heading h2{margin:.2rem 0 .45rem;font-size:clamp(1.3rem,2.7vw,1.7rem);line-height:1.2}
+.private-comparison-journey__heading p{max-width:65ch;margin:.35rem 0;color:#415746;line-height:1.5}
+.private-comparison-journey__eyebrow{font-size:.72rem;letter-spacing:.1em;font-weight:800;color:#426548}
+.private-comparison-journey button{border:0;border-radius:12px;padding:.7rem 1rem;min-height:44px;cursor:pointer;background:#244d31;color:#fff;font:inherit;font-weight:700}
+.private-comparison-journey button:focus-visible{outline:3px solid #cf9738;outline-offset:3px}
+.private-comparison-journey__shops{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin:1.25rem 0}
+.private-comparison-journey__shop{border:1px solid #d7e5d9;border-radius:14px;padding:1rem;display:flex;flex-direction:column;align-items:flex-start;gap:.45rem;min-width:0}
+.private-comparison-journey__shop strong{font-size:1.15rem}
+.private-comparison-journey__shop span,.private-comparison-journey__shop small{color:#4c6251;line-height:1.4}
+.private-comparison-journey__shop progress{width:100%;height:10px;accent-color:#357e46}
+.private-comparison-journey button.private-comparison-journey__link{background:#e8f1e9;color:#204a30;padding:.6rem .8rem;margin-top:auto}
+.private-comparison-journey__result{padding:1rem 1.1rem;background:#f4f8f3;border-radius:14px;display:flex;flex-direction:column;gap:.3rem}
+.private-comparison-journey__result span{font-size:.84rem;color:#415e49}
+.private-comparison-journey__result strong{font-size:1.2rem;overflow-wrap:anywhere}
+.private-comparison-journey__result p{margin:.2rem 0;color:#405846;line-height:1.5}
+.private-comparison-journey__actions{display:flex;flex-wrap:wrap;gap:.65rem;margin:1.1rem 0}
+.private-comparison-journey__actions button:not(:first-child){background:#e8f1e9;color:#204a30}
+.private-comparison-journey>small{color:#54685a;line-height:1.5}
+@media(max-width:630px){.private-comparison-journey{margin:1rem .25rem 2rem;border-radius:16px}.private-comparison-journey__shops{grid-template-columns:1fr}.private-comparison-journey__heading>button,.private-comparison-journey__actions button{width:100%}}

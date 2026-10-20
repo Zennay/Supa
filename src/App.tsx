@@ -42,6 +42,11 @@ import { freshReviewedBaskets, type PrivateReviewedBaskets, type PrivateCaptureP
 import { ObservationView } from './features/observation/ObservationView'
 import { IdentityAvatar } from './components/IdentityAvatar.tsx'
 import { HiFiHome, HiFiDemoList } from './features/home/HiFiHome'
+// Actual-source comparison is a separate, lazy Home route, never historical demo pricing.
+const PrivateComparisonJourney = lazy(async () => {
+  const module = await import('./features/home/PrivateComparisonJourney.tsx')
+  return { default: module.PrivateComparisonJourney }
+})
 import { readRecipeLibrary } from './features/recipes/recipeLibrary'
 import { toPlannerRecipe } from './features/recipes/plannerRecipes'
 import { curatedFigmaRecipes } from './features/recipes/curatedFigmaRecipes'
@@ -690,6 +695,23 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         {(tab === 'home' || tab === 'recipes') && <HiFiHome view={tab}
           onNavigate={navigate} activeDays={activeDays}
           addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />}
+        {tab === 'home' && <Suspense fallback={<p role="status">Mijn winkelvergelijking laden…</p>}>
+          <PrivateComparisonJourney
+            reviewed={livePrivateReviewed}
+            progress={privateCaptureProgress?.planKey === privatePlanKey
+              ? privateCaptureProgress : null}
+            onOpenPlanner={() => navigate('planner')}
+            onOpenImport={openOwnPriceImport}
+            onOpenList={() => navigate('list')}
+            onReview={(store, ingredientId) => {
+              setPrivateReviewFocus(previous => ({
+                planKey: privatePlanKey, store, ingredientId,
+                serial: (previous?.serial ?? 0) + 1,
+              }))
+              navigate('basket')
+            }}
+          />
+        </Suspense>}
         {tab === 'products' && <details className="supa-product-archive">
           <summary>Oude ontwerpvoorbeelden en historische bronkaarten tonen (geen actuele prijzen)</summary>
           <p>Alleen de persoonlijk bevestigde bronartikelen hierboven tellen mee in
