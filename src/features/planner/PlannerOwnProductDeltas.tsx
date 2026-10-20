@@ -64,6 +64,7 @@ export function PlannerOwnProductDeltas({ lines, onChooseLine }: {
   onChooseLine: (ingredientId: string, store: OwnStore) => void
 }) {
   const [filter, setFilter] = useState<DifferenceFilter>('all')
+  const [unitFamily, setUnitFamily] = useState<'all' | 'kg' | 'liter' | 'stuk'>('all')
   const [sort, setSort] = useState<DifferenceSort>('impact')
   const [query, setQuery] = useState('')
   // A typical eleven-ingredient field basket should show its real product
@@ -77,7 +78,13 @@ export function PlannerOwnProductDeltas({ lines, onChooseLine }: {
   const unitPlusLower = lines.filter(line => unitPriceGap(line)?.cheaper === 'PLUS').length
   const unitDekaLower = lines.filter(line => unitPriceGap(line)?.cheaper === 'DekaMarkt').length
   const normalizedQuery = query.normalize('NFKC').trim().toLocaleLowerCase('nl')
+  const unitCounts = { kg: 0, liter: 0, stuk: 0 }
+  for (const line of lines) {
+    const rate = unitPriceGap(line)
+    if (rate) unitCounts[rate.unit]++
+  }
   const visibleLines = lines.filter(line => {
+    if (unitFamily !== 'all' && unitPriceGap(line)?.unit !== unitFamily) return false
     if (filter === 'PLUS' && line.deltaCents <= 0) return false
     if (filter === 'DekaMarkt' && line.deltaCents >= 0) return false
     if (filter === 'equal' && line.deltaCents !== 0) return false
@@ -91,6 +98,10 @@ export function PlannerOwnProductDeltas({ lines, onChooseLine }: {
     if (sort === 'unit-gap') {
       const left = unitPriceGap(a)
       const right = unitPriceGap(b)
+      // €/kg, €/liter and €/stuk measure different things: never rank
+      // an unrelated family as if it were the same physical measure.
+      if (unitFamily === 'all' && left && right && left.unit !== right.unit)
+        return left.unit.localeCompare(right.unit, 'nl')
       if (left && right && left.differenceMilliCents !== right.differenceMilliCents)
         return right.differenceMilliCents - left.differenceMilliCents
       if (!left && right) return 1
@@ -107,6 +118,7 @@ export function PlannerOwnProductDeltas({ lines, onChooseLine }: {
 
   function resetView() {
     setFilter('all')
+    setUnitFamily('all')
     setQuery('')
     setSort('impact')
   }
@@ -117,7 +129,8 @@ export function PlannerOwnProductDeltas({ lines, onChooseLine }: {
       zijn indicatief per kg, liter of stuk; de vergelijking rekent met hele verpakkingen.
       Je kunt zowel op hele-verpakkingenregelprijs als op indicatieve eenheidsprijs zoeken,
       filteren en sorteren. Alleen hele verpakkingen tellen mee voor de werkelijke manduitkomst;
-      filters en volgorde wijzigen de mand niet.</p>
+      filters en volgorde wijzigen de mand niet. Bij sortering op eenheidsverschil
+      worden kg, liter en stuks apart gegroepeerd; je kunt één fysieke eenheid kiezen.</p>
     <div className="own-store-breakdown__overview" aria-label="Prijsverschillen per product">
       <span><strong>{plusLower}</strong> ingrediënten goedkoper bij PLUS</span>
       <span><strong>{dekaLower}</strong> ingrediënten goedkoper bij DekaMarkt</span>
@@ -137,6 +150,14 @@ export function PlannerOwnProductDeltas({ lines, onChooseLine }: {
           <option value="equal">Gelijke regelprijs ({tied})</option>
           <option value="unit-PLUS">Lagere eenheidsprijs bij PLUS ({unitPlusLower})</option>
           <option value="unit-DekaMarkt">Lagere eenheidsprijs bij DekaMarkt ({unitDekaLower})</option>
+        </select>
+      </label>
+      <label>Eenheid vergelijken
+        <select value={unitFamily} onChange={event => setUnitFamily(event.currentTarget.value as typeof unitFamily)}>
+          <option value="all">Alle eenheden (apart gegroepeerd)</option>
+          <option value="kg">Alleen per kg ({unitCounts.kg})</option>
+          <option value="liter">Alleen per liter ({unitCounts.liter})</option>
+          <option value="stuk">Alleen per stuk ({unitCounts.stuk})</option>
         </select>
       </label>
       <label>Sorteer
