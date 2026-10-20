@@ -246,21 +246,43 @@ function hasCanonicalRequirements(
   value: unknown,
   canonical: ObservationRequirement[],
 ): boolean {
-  return (
-    Array.isArray(value) &&
-    value.length === canonical.length &&
-    value.every((item, index) => {
-      if (!isRecord(item)) return false
-      const expected = canonical[index]
-      return (
-        item.id === expected.id &&
-        item.label === expected.label &&
-        item.query === expected.query &&
-        item.amount === expected.amount &&
-        item.unit === expected.unit
-      )
-    })
-  )
+  if (!Array.isArray(value) || value.length !== canonical.length) return false
+  try {
+    for (let index = 0; index < canonical.length; index += 1) {
+      if (!Object.hasOwn(value, index) ||
+          !isRecord(value[index]) ||
+          JSON.stringify(value[index]) !== JSON.stringify(canonical[index])) {
+        return false
+      }
+    }
+    return true
+  } catch {
+    return false
+  }
+}
+
+// Match the original 11+11 physical demand exactly. A reordered, added,
+// omitted or renamed ingredient is a different basket, not ready evidence.
+function hasCanonicalObservationLines(value: unknown, canonical: StoreObservation): boolean {
+  if (!Array.isArray(value) || value.length !== canonical.lines.length) return false
+  try {
+    for (let index = 0; index < canonical.lines.length; index += 1) {
+      if (!Object.hasOwn(value, index)) return false
+      const line = value[index]
+      const expected = canonical.lines[index]
+      if (
+        !isRecord(line) ||
+        !isRecord(line.requirement) ||
+        !isRecord(line.observedProduct) ||
+        line.ingredientId !== expected.ingredientId ||
+        line.ingredientLabel !== expected.ingredientLabel ||
+        JSON.stringify(line.requirement) !== JSON.stringify(expected.requirement)
+      ) return false
+    }
+    return true
+  } catch {
+    return false
+  }
 }
 
 function restoreStoreObservation(
@@ -281,8 +303,7 @@ function restoreStoreObservation(
     if (
       line.ingredientId !== expectedLine.ingredientId ||
       line.ingredientLabel !== expectedLine.ingredientLabel ||
-      line.requirement.amount !== expectedLine.requirement.amount ||
-      line.requirement.unit !== expectedLine.requirement.unit
+      JSON.stringify(line.requirement) !== JSON.stringify(expectedLine.requirement)
     ) {
       return null
     }
@@ -354,6 +375,7 @@ export function restoreObservationSheetDraft(
       value.evidenceStatus !== canonical.evidenceStatus ||
       value.plannerFixture !== canonical.plannerFixture ||
       value.selectedMealCount !== canonical.selectedMealCount ||
+      value.study.maxObservationWindowHours !== 24 ||
       !hasCanonicalRequirements(value.requirements, canonical.requirements)
     ) {
       return null
@@ -600,6 +622,34 @@ export function observationSheetReadiness(
   referenceNowMs = Number.POSITIVE_INFINITY,
 ): ObservationSheetReadiness {
   const issues: string[] = []
+  if (
+    !isRecord(sheet) || !isRecord(sheet.study) ||
+    !isRecord(sheet.baseline) || !isRecord(sheet.candidate) ||
+    !isRecord(sheet.baseline.store) || !isRecord(sheet.candidate.store)
+  ) {
+    return { ready: false, issues: ['Meetblad: basis- of winkelgegevens zijn ongeldig.'] }
+  }
+
+  const canonical = buildObservationSheet()
+  if (
+    sheet.schemaVersion !== canonical.schemaVersion ||
+    sheet.sheetType !== canonical.sheetType ||
+    sheet.evidenceStatus !== canonical.evidenceStatus ||
+    sheet.plannerFixture !== canonical.plannerFixture ||
+    sheet.selectedMealCount !== canonical.selectedMealCount ||
+    !hasCanonicalRequirements(sheet.requirements, canonical.requirements)
+  ) {
+    issues.push('Meetblad: ingrediëntenlijst wijkt af van de vaste weekplanning.')
+  }
+  if (sheet.study.maxObservationWindowHours !== 24) {
+    issues.push('Meetblad: beide winkelmetingen moeten binnen maximaal 24 uur vallen.')
+  }
+  for (const side of ['baseline', 'candidate'] as const) {
+    if (!hasCanonicalObservationLines(sheet[side].lines, canonical[side])) {
+      issues.push(`${side === 'baseline' ? 'Winkel A' : 'Winkel B'}: ingrediëntenlijst wijkt af van de vaste weekplanning.`)
+      return { ready: false, issues }
+    }
+  }
 
   const studyFields: Array<[string, string]> = [
     ['Study ID', sheet.study.studyId],
