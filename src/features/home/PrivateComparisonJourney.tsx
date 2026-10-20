@@ -45,6 +45,8 @@ export function PrivateComparisonJourney({
   const [exportMessage, setExportMessage] = useState('')
   const [showPasteSource, setShowPasteSource] = useState(false)
   const [captureMessage, setCaptureMessage] = useState('')
+  const [partialQuery, setPartialQuery] = useState('')
+  const [showAllPartial, setShowAllPartial] = useState(false)
   const captureKey = JSON.stringify(captureNeeds.map(need =>
     [need.id, need.label, need.amount, need.unit, need.query]))
   const liveCaptureKey = useRef(captureKey)
@@ -96,6 +98,7 @@ export function PrivateComparisonJourney({
     id: string; name: string; amount: number; unit: string;
     plusPacks: number; dekaPacks: number; plusCents: number; dekaCents: number;
     plusProduct?: PrivateKnownProduct; dekaProduct?: PrivateKnownProduct;
+    plusObservedAt?: string; dekaObservedAt?: string;
     unitGap?: PrivateKnownUnitGap | null;
   }> = ready ? [] : privateKnownPricePairs(progress, reviewed, nowMs)
     .flatMap(pair => {
@@ -107,6 +110,7 @@ export function PrivateComparisonJourney({
         plusPacks: pair.plusPacks, dekaPacks: pair.dekaPacks,
         plusCents: pair.plusCents, dekaCents: pair.dekaCents,
         plusProduct: pair.plusProduct, dekaProduct: pair.dekaProduct,
+        plusObservedAt: pair.plusObservedAt, dekaObservedAt: pair.dekaObservedAt,
         unitGap: pair.unitGap,
       }]
     })
@@ -117,8 +121,25 @@ export function PrivateComparisonJourney({
       id: one.id, name: one.ingredientLabel, amount: one.requirement.amount,
       unit: one.requirement.unit, plusPacks: one.packs, dekaPacks: other.packs,
       plusCents: one.lineTotalCents, dekaCents: other.lineTotalCents,
+      plusObservedAt: plus?.observedAt, dekaObservedAt: deka?.observedAt,
     })))
   }
+  // Only preexisting source pairs qualify. Search/filter never changes the
+  // canonical basket or promotes a partial sum into a whole-week estimate.
+  const foldPartial = (value: string) => value.normalize('NFKC')
+    .toLocaleLowerCase('nl-NL')
+  const normalizedPartialQuery = foldPartial(partialQuery.trim())
+  const filteredPartialPairs = partialPairs.filter(row =>
+    !normalizedPartialQuery || [row.name, row.id, row.plusProduct?.productName ?? '',
+      row.plusProduct?.productId ?? '', row.dekaProduct?.productName ?? '',
+      row.dekaProduct?.productId ?? ''].some(value =>
+      foldPartial(value).includes(normalizedPartialQuery)))
+  const orderedPartialPairs = [...filteredPartialPairs].sort((a, b) =>
+    Math.abs(b.dekaCents - b.plusCents) - Math.abs(a.dekaCents - a.plusCents) ||
+    a.name.localeCompare(b.name, 'nl-NL'))
+  const shownPartialPairs = showAllPartial ? orderedPartialPairs
+    : orderedPartialPairs.slice(0, 3)
+
   async function downloadBlankHomeCapture(format: 'csv' | 'html' | 'txt') {
     const selectedWeek = captureKey
     setCaptureMessage('')
@@ -504,7 +525,18 @@ export function PrivateComparisonJourney({
         onderstaande prijzen zijn per ingrediënt te vergelijken.
         <strong> Het volledige prijsverschil blijft onbekend.</strong>
         {' '}Geen winkelwinnaar of onafhankelijk bewezen besparing.</p>
-      <ul>{partialPairs.slice(0, 3).map(item =>
+      <label className="private-comparison-journey__partial-search">
+        <span>Zoek in de vergelijkbare originele productregels</span>
+        <input type="search" value={partialQuery}
+          onChange={event => { setPartialQuery(event.target.value); setShowAllPartial(true) }}
+          placeholder="Ingrediënt, PLUS/Deka productnaam of SKU" />
+      </label>
+      <small role="status">{filteredPartialPairs.length} van {partialPairs.length}
+        {' '}persoonlijk vergelijkbare ingrediëntregels · grootste hele-pakverschil eerst.
+        Geen optelling tot weektotaal.</small>
+      {shownPartialPairs.length === 0 && <p>Geen prijsregels gevonden. Wis de zoekterm
+        om alle bekende oorspronkelijke winkelproducten te zien.</p>}
+      <ul>{shownPartialPairs.map(item =>
         <li key={item.id}>
           <strong>{item.name} · {item.amount} {item.unit}</strong>
           {item.plusProduct && <small>
@@ -523,9 +555,27 @@ export function PrivateComparisonJourney({
               ' heeft ' + euro.formatCents(Math.abs(item.plusCents - item.dekaCents)) +
               ' lagere hele-pakkosten'}.</small>
           {item.unitGap !== undefined && <small>{formatKnownUnitGap(item.unitGap)}</small>}
+          {(item.plusObservedAt || item.dekaObservedAt) && <small>
+            Originele opnametijden: PLUS {item.plusObservedAt ?? 'onbekend'} ·
+            {' '}DekaMarkt {item.dekaObservedAt ?? 'onbekend'}.
+          </small>}
+          <div className="private-comparison-journey__partial-review">
+            <button type="button" onClick={() => onReview('PLUS', item.id)}>
+              Controleer PLUS-bronartikel
+            </button>
+            <button type="button" onClick={() => onReview('DekaMarkt', item.id)}>
+              Controleer Deka-bronartikel
+            </button>
+          </div>
         </li>)}</ul>
-      {partialPairs.length > 3 && <small>En nog {partialPairs.length - 3} andere
-        gedeeltelijk vergelijkbare ingrediënten in Producten.</small>}
+      {!showAllPartial && filteredPartialPairs.length > 3 &&
+        <button type="button" onClick={() => setShowAllPartial(true)}>
+          Bekijk alle {filteredPartialPairs.length} vergelijkbare ingrediënten
+        </button>}
+      {showAllPartial && filteredPartialPairs.length > 3 &&
+        <button type="button" onClick={() => setShowAllPartial(false)}>
+          Toon alleen de eerste drie prijsverschillen
+        </button>}
       <button type="button" onClick={onOpenProducts}>
         Bekijk alle gecontroleerde regels en ontbrekende bronprijzen in Producten
       </button>
