@@ -83,3 +83,19 @@
 .supa-planner-source-paste__source-filter :is(input,button):focus-visible {
   outline: 3px solid #297252; outline-offset: 2px;
 }
+
+/* Exact full-store recapture is always visually separated from the old source. */
+.supa-planner-source-paste__recapture {
+  margin: 1rem 0;
+  padding: clamp(.7rem, 2vw, 1rem);
+  border: 1px solid #99b6a1;
+  border-radius: 10px;
+  background: #f4f8f3;
+}
+.supa-planner-source-paste__recapture > strong { display: block; line-height: 1.4; }
+.supa-planner-source-paste__recapture p {
+  max-width: 70ch;
+  overflow-wrap: anywhere;
+  line-height: 1.55;
+}
+.supa-planner-source-paste__recapture button { white-space: normal; }
