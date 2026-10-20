@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
-import type { OneStoreBasket } from '../../domain/basket'
+import { Fragment, useEffect, useMemo, useState } from 'react'
+import type { OneStoreBasket, RecipeWithIngredients } from '../../domain/basket'
+import type { PlannedMeal } from '../../domain/types'
 import { quantityUnitLabelNl } from '../../lib/quantityPresentation'
+import { euro } from '../../lib/money'
 import { ShoppingListCompletionBanner } from './ShoppingListCompletionBanner'
 import { ShoppingListCopyButton } from './ShoppingListCopyButton'
 import { PrintableShoppingChecklist } from './PrintableShoppingChecklist'
@@ -12,6 +14,7 @@ import {
   shoppingListPhysicalProgressStorageKey,
   shoppingListProgressStorageKey,
 } from './shoppingListProgress'
+import { groupShoppingByRecipe } from './shoppingRecipeGroups'
 
 // An empty checklist is trustworthy only when its store identity is readable.
 // This guards the empty-state message, not ordinary populated product rows.
@@ -99,7 +102,12 @@ function canOverwriteStoredProgress(raw: string | null): boolean {
   }
 }
 
-export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
+export function ShoppingListView({ basket, plan, recipes, activeDays }: {
+  basket: OneStoreBasket
+  plan?: PlannedMeal[]
+  recipes?: RecipeWithIngredients[]
+  activeDays?: string[]
+}) {
   const basketKey = useMemo(() => {
     try {
       return shoppingListPhysicalBasketKey(basket)
@@ -124,6 +132,10 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
   const visibleLines = basketKey === null
     ? []
     : shoppingVisibleLines(basket.lines, done, openOnly)
+
+  const recipeGroups = groupShoppingByRecipe(visibleLines, plan, recipes, activeDays)
+  const groupedLines = recipeGroups.flatMap(group => group.lines)
+  const firstLineGroups = new Map(recipeGroups.filter(group => group.lines.length > 0).map(group => [group.lines[0].id, group] as const))
 
   // A genuinely empty plan has no shopping tasks. An empty row array with
   // inconsistent counters is not proof that the customer needs nothing.
@@ -249,12 +261,13 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
         </p>
       )}
 
-      {basket.lines.length > 0 && (
-        <ShoppingListCompletionBanner basket={basket} doneLineIds={done} />
-      )}
-
-      <ShoppingListCopyButton basket={basket} doneLineIds={done} />
-      <PrintableShoppingChecklist basket={basket} doneLineIds={done} />
+      <details className="hifi-shoplist-tools">
+        <summary>Deel of print je lijst</summary>
+        <div className="hifi-shoplist-tool-actions">
+          <ShoppingListCopyButton basket={basket} doneLineIds={done} />
+          <PrintableShoppingChecklist basket={basket} doneLineIds={done} />
+        </div>
+      </details>
 
       {basket.lines.length > 0 && (
         <div className="section-heading" data-shopping-filter={openOnly ? 'open' : 'all'}>
@@ -272,12 +285,6 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
         </div>
       )}
 
-      {basket.lines.length > 0 && (
-        <div className="hifi-shoplist-category" data-figma-node="3342:4838">
-          <h3>Jouw boodschappen</h3>
-          <span>{visibleLines.length} items</span>
-        </div>
-      )}
       <div className="list-card">
         {basket.lines.length === 0 ? (
           <p className="disclaimer" role="status">
@@ -289,12 +296,19 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
           <p className="disclaimer" role="status">
             Alle regels zijn afgevinkt. Onzekere productkeuzes blijven een handmatige controle.
           </p>
-        ) : visibleLines.map((line) => {
+        ) : groupedLines.map((line) => {
           const checked = done.includes(line.id)
           const label =
             line.status === 'matched' ? line.productName : line.ingredientLabel
 
           return (
+            <Fragment key={line.id}>
+              {firstLineGroups.get(line.id) && (
+                <div className="hifi-shoplist-category" data-figma-node="3342:4838">
+                  <h3>{firstLineGroups.get(line.id)!.title}</h3>
+                  <span>{firstLineGroups.get(line.id)!.lines.length} items</span>
+                </div>
+              )}
             <button
               type="button"
               aria-pressed={checked}
@@ -307,7 +321,6 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
                     ? 'shopping-row checked'
                     : 'shopping-row'
               }
-              key={line.id}
               onClick={() =>
                 setProgress((current) => {
                   const currentDone =
@@ -324,14 +337,32 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
               }
             >
               <span className="check" aria-hidden="true">{checked ? '✓' : ''}</span>
-              <span>
+              <span className="hifi-shopping-thumb" aria-hidden="true">{label.trim().slice(0, 1).toLocaleUpperCase('nl-NL')}</span>
+              <span className="hifi-shopping-detail">
                 <strong>{label}</strong>
                 <small>{shoppingQuantity(line)}</small>
               </span>
+              <span className="hifi-shopping-price" aria-label={line.status === 'matched' ? `Voorbeeldprijs ${euro.formatCents(line.lineTotalCents)}` : 'Prijs nog onbekend'}>
+                {line.status === 'matched' ? euro.formatCents(line.lineTotalCents) : '—'}
+              </span>
             </button>
+            </Fragment>
           )
         })}
       </div>
+      {basket.lines.length > 0 && (
+        <section className="hifi-shoplist-total" aria-label="Overzicht boodschappen">
+          <div className="hifi-shoplist-total__line">
+            <span>{basket.unresolvedLineCount > 0 ? 'Bekend minimum' : 'Totaal'}</span>
+            <strong>{euro.formatCents(basket.totalCents)}</strong>
+          </div>
+          {basket.unresolvedLineCount > 0 && (
+            <p>{basket.unresolvedLineCount} productkeuzes zijn nog niet meegeteld.</p>
+          )}
+          <p>Voorbeeldprijzen uit de lokale planning; geen actuele kassaprijzen.</p>
+          <ShoppingListCompletionBanner basket={basket} doneLineIds={done} />
+        </section>
+      )}
     </section>
   )
 }

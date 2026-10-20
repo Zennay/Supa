@@ -8,6 +8,7 @@ const ManualStoreComparison = lazy(async () => {
 import { OfflineReviewedWorkbench } from '../comparison/OfflineReviewedWorkbench'
 import type { PrivateReviewedBaskets, PrivateCaptureProgress, PrivateReviewFocus } from '../comparison/privateReviewedBasketBridge.ts'
 import type { PrivateSourceFileHandoff } from '../comparison/privateSourceFileHandoff.ts'
+import { ListingBasketPreview } from '../comparison/ListingBasketPreview'
 import type { BasketComparison } from '../../domain/basketComparison'
 import { euro } from '../../lib/money'
 import { quantityUnitLabelNl } from '../../lib/quantityPresentation'
@@ -107,6 +108,7 @@ export function BasketView({
 
   return (
     <section className="screen">
+      <ListingBasketPreview />
       {manualPlan && manualRecipes && manualActiveDays && (
         <OfflineReviewedWorkbench plan={manualPlan} recipes={manualRecipes} activeDays={manualActiveDays}
           planKey={privatePlanKey} incomingSources={incomingSources}

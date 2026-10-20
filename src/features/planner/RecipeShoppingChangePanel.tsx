@@ -101,7 +101,7 @@ export function RecipeShoppingChangePanel({ preview, day }: {
       // be ingested later by the existing source converter after actual facts
       // have been filled in. No product identity or price is inserted by Supa.
       const kit = proposedWeekCaptureKit(preview, stores)
-      const table = makeBlankPlannerCaptureCsv(preview.nextNeeds, kit.stores, '\t')
+      const table = makeBlankPlannerCaptureCsv(nextNeeds, kit.stores, '\t')
       if (typeof navigator.clipboard?.writeText !== 'function')
         throw new Error('Klembord niet beschikbaar')
       await navigator.clipboard.writeText(table)
@@ -112,7 +112,7 @@ export function RecipeShoppingChangePanel({ preview, day }: {
         const kit = proposedWeekCaptureKit(preview, stores)
         setCaptureTableCopy({
           stores: stores.join(' + '),
-          text: makeBlankPlannerCaptureCsv(preview.nextNeeds, kit.stores, '\t'),
+          text: makeBlankPlannerCaptureCsv(nextNeeds, kit.stores, '\t'),
           identity: previewIdentity,
         })
         setNotice('Klembord niet beschikbaar. Selecteer de tabgescheiden tabel hieronder.')

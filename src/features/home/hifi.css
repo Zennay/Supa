@@ -181,6 +181,128 @@ body { background: #e9eeec; }
 .hifi-source-link { border-radius: 20px; background: #e2f5ed; color: #005135; padding: 10px 12px; min-height: 44px; display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; text-decoration: none; }
 .hifi-products .hifi-product-source-tabs button { white-space: normal; }
 
+/* Figma Products 3064:3125 — screen-first layout, source controls secondary. */
+.hifi-products { gap: 16px; }
+.hifi-products .hifi-products-heading { min-height: 50px; }
+.hifi-products .hifi-products-heading .hifi-page-title {
+  font-family: Poppins, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 18px; font-weight: 600; color: #333; letter-spacing: -.216px;
+}
+.hifi-products .hifi-products-heading .hifi-icon-button {
+  display: grid; place-items: center; border-radius: 50px;
+}
+.hifi-products .hifi-products-heading .hifi-icon-button[aria-expanded=true] {
+  background: white;
+}
+.hifi-products .hifi-search-row { min-height: 50px; align-items: stretch; }
+.hifi-products .hifi-search {
+  min-height: 50px; border-radius: 61px; padding: 16px;
+  gap: 24px; background: #fff; border-color: #f5f6f9;
+}
+.hifi-products .hifi-search input { font-size: 14px; }
+.hifi-weekly-link {
+  width: 50px; height: 50px; flex: 0 0 50px; border: 0; border-radius: 50%;
+  background: white; display: grid; place-items: center; cursor: pointer;
+}
+.hifi-weekly-link img { display: block; }
+.hifi-products .hifi-section { gap: 16px; }
+.hifi-products .hifi-section-heading { min-height: 38px; align-items: start; }
+.hifi-products .hifi-section-heading h2 { font-size: 16px; }
+.hifi-products .hifi-section-heading .recipe-count { color: #848484; font-size: 14px; margin-top: 2px; }
+.hifi-products .hifi-product-grid { gap: 12px; }
+.hifi-products .hifi-product-card { min-height: 260px; }
+.hifi-products .hifi-filter-panel {
+  align-items: stretch; gap: 12px; padding: 16px; flex-direction: column;
+  border: 1px solid #f1f3f5; border-radius: 16px;
+}
+.hifi-products .hifi-filter-panel label { justify-content: space-between; min-height: 38px; }
+.hifi-products .hifi-product-source-tabs { width: 100%; order: -1; }
+.hifi-products .hifi-product-source-tabs button { min-height: 44px; }
+.hifi-products .hifi-historical-warning { margin: 0; }
+
+/* Figma Shoplist 3342:4815 — card stack, product slot, right-hand price,
+   and bottom total, preserving real checklist IDs and storage semantics. */
+.hifi-shopping-screen .shopping-row {
+  display: grid; grid-template-columns: 16px 50px minmax(0,1fr) minmax(44px,auto);
+  gap: 8px; align-items: center; min-height: 74px;
+  padding: 12px 16px 12px 12px; border-radius: 20px;
+  background: white; border: 0; text-align: left;
+}
+.hifi-shopping-screen .shopping-row.unresolved-shopping { background: #fff9ef; }
+.hifi-shopping-screen .shopping-row.checked { opacity: .76; }
+.hifi-shopping-screen .shopping-row .check {
+  width: 16px; height: 16px; border: 1.5px solid #848484; border-radius: 50%;
+}
+.hifi-shopping-thumb {
+  flex: none; width: 50px; height: 50px; display: grid; place-items: center;
+  border-radius: 12px; background: #edf1ed; color: #547363;
+  font-size: 20px; font-weight: 600;
+}
+.hifi-shopping-detail { display: grid; gap: 4px; min-width: 0; }
+.hifi-shopping-screen .hifi-shopping-detail strong {
+  font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+  font-size: 14px; line-height: 1.25; color: #111; font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.hifi-shopping-screen .hifi-shopping-detail small {
+  font-size: 14px; line-height: 1.3; color: #4c4c4c;
+}
+.hifi-shopping-price {
+  justify-self: end; font-size: 14px; color: #333;
+  white-space: nowrap; font-weight: 500; font-variant-numeric: tabular-nums;
+}
+.hifi-shopping-screen .hifi-shoplist-category { margin-top: 2px; }
+.hifi-shoplist-total {
+  display: grid; gap: 12px; background: #fff;
+  border-radius: 20px; padding: 24px; margin-bottom: 12px;
+}
+.hifi-shoplist-total__line {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  color: #111; font-size: 16px;
+}
+.hifi-shoplist-total__line strong {
+  color: #333; font-size: 20px; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.hifi-shoplist-total>p { color: #848484; font-size: 12px; line-height: 1.45; }
+.hifi-shoplist-tools { border: 0; background: transparent; min-width: 0; }
+.hifi-shoplist-tools summary {
+  cursor: pointer; color: #3b6651; font-size: 13px; font-weight: 600;
+  min-height: 44px; display: flex; align-items: center;
+}
+.hifi-shoplist-tool-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.hifi-shoplist-tool-actions button { min-height: 44px; }
+@media (max-width: 359px) {
+  .hifi-shopping-screen .shopping-row {
+    grid-template-columns: 16px 42px minmax(0,1fr);
+  }
+  .hifi-shopping-thumb { width: 42px; height: 42px; }
+  .hifi-shopping-price { grid-column: 3; justify-self: start; font-size: 12px; }
+}
+
+/* Keep secondary prototype selections out of the primary Figma shoplist frame. */
+.hifi-demo-details { margin: 4px 0 26px; }
+.hifi-demo-details > summary {
+  display: flex; align-items: center; min-height: 44px; cursor: pointer;
+  font-size: 13px; font-weight: 600; color: #4f7262;
+}
+.hifi-demo-details .hifi-demo-list { margin: 0 0 12px; }
+@media (max-width: 390px) {
+  .hifi-products .hifi-search { gap: 12px; }
+  .hifi-products .hifi-search input { font-size: 14px; }
+  .hifi-products .hifi-product-grid { margin: 0 -4px; }
+}
+
+/* Producten 3064:3125 — exact Figma-export imagery at its original 68×72 card slot. */
+.hifi-products .hifi-product-photo { width: 68px; height: 72px; object-fit: contain; }
+.hifi-products .hifi-unpriced { display: inline-block; font-size: 11px; line-height: 1.3; color: #848484; text-align: right; }
+
+/* Figma Shoplist 3342:4815 — recipe-based section headers, displayed once. */
+.hifi-shopping-screen .list-card > .hifi-shoplist-category { margin: 14px 2px 0; min-height: 30px; }
+.hifi-shopping-screen .list-card > .hifi-shoplist-category:first-child { margin-top: 0; }
+.hifi-shopping-screen .list-card > .hifi-shoplist-category h3 { font-size: 16px; line-height: 1.3; }
+.hifi-shopping-screen .list-card > .hifi-shoplist-category span { font-size: 12px; }
+
 /* P0 product selection: historical observations are explicitly unpriced and
    visually separated from Figma-only mock-product cards. */
 .hifi-history-add {
