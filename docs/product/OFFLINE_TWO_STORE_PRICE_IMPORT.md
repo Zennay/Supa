@@ -60,6 +60,13 @@ Er wordt geen tweede winkelprijs of besparing verzonnen.
 
 ## Volledig prijsrapport bewaren, printen of mobiel meenemen
 
+Ook nadat beide volledige winkelbronnen vergelijkbaar zijn, blijft in
+**Producten → Zelfde weekmandje → Ik ga naar één winkel** de zelfstandige
+PLUS- of DekaMarkt-weeklijst bereikbaar. Je kunt elk winkelmandje afzonderlijk
+afdrukken, als CSV/TXT bewaren, kopiëren of met het apparaat delen.
+Dit is handig als je voor één winkel kiest in plaats van een gecombineerde route.
+De bestaande twee-winkelprijzen en andere winkelbron worden niet gewijzigd.
+
 Wanneer alle oorspronkelijke SKU's voor **exact hetzelfde fysieke weekmandje** in
 beide winkels zijn gecontroleerd, beide opnames hoogstens zeven dagen oud zijn en
 hun bronmomenten maximaal 24 uur uiteen liggen, verschijnen in **Producten**

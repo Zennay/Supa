@@ -67,3 +67,15 @@ background:#f3f8f3;border:1px solid #c0d3c2;border-radius:10px}
 background:#e7f4eb;color:#255336;font-weight:650}
 
 .private-reviewed-products__unit-caveat{padding:.65rem .8rem;border-left:3px solid #a47638;background:#faf5ea;color:#624c2c;line-height:1.45}
+
+/* Keep standalone trip tools reachable after both sources are matched, without
+   making the paired price difference or primary shopping route disappear. */
+.private-reviewed-products__single-shop-panel{padding:.85rem;border:1px solid #cbdccb;
+  border-radius:12px;background:#f8faf8}
+.private-reviewed-products__single-shop-panel>summary{cursor:pointer;font-weight:650;
+  padding:.45rem;min-height:44px;display:list-item}
+.private-reviewed-products__single-shop-panel .private-reviewed-products__source-coverage{
+  margin:.65rem 0}
+.private-reviewed-products__single-shop-panel>small{display:block;line-height:1.5}
+.private-reviewed-products__single-trip-actions{display:grid;gap:.5rem;min-width:0}
+.private-reviewed-products__single-trip-actions button{width:100%;text-align:left}

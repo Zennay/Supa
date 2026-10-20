@@ -293,6 +293,30 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         }).claimable) { onOpenComparison(); return }
     onOpenMixedRoute()
   }
+  // Both a one-sided source and a fully paired comparison need an actionable
+  // standalone shop trip. Never make the shopper undo a second-store import.
+  function singleStoreTripActions(shop: OwnStore) {
+    return <div className="private-reviewed-products__single-trip-actions">
+              <button type="button" onClick={() => openCheckedStoreList(shop)}>
+                Bekijk mijn {shop}-boodschappenlijst
+              </button>
+              <button type="button" onClick={() => { void downloadSingle(shop, 'csv') }}>
+                Bewaar mijn {shop}-weekmand (CSV)
+              </button>
+              <button type="button" onClick={() => { void downloadSingle(shop, 'txt') }}>
+                Bewaar mijn {shop}-lijst (TXT)
+              </button>
+              <button type="button" onClick={() => { void downloadSingle(shop, 'html') }}>
+                Print mijn {shop}-weekmand (HTML)
+              </button>
+              <button type="button" onClick={() => { void handoffSingle(shop, 'copy') }}>
+                Kopieer mijn {shop}-lijst inclusief afvinkingen
+              </button>
+              <button type="button" onClick={() => { void handoffSingle(shop, 'share') }}>
+                Deel mijn {shop}-lijst via apparaat
+              </button>
+    </div>
+  }
   if (!comparable || !plus || !deka) {
     const missing = (['PLUS', 'DekaMarkt'] as const).filter(store => !fresh?.stores[store])
     const gap = !!plus && !!deka && !privateReviewedPairWithin24Hours(plus, deka)
@@ -313,24 +337,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
                 {budgetComparison(capture.basket.totalCents)}</small>}
               <small>{capture.basket.lines.length} oorspronkelijke, gecontroleerde SKU-regels</small>
               <time dateTime={capture.observedAt}>{capture.observedAt}</time>
-              <button type="button" onClick={() => openCheckedStoreList(shop)}>
-                Bekijk mijn {shop}-boodschappenlijst
-              </button>
-              <button type="button" onClick={() => { void downloadSingle(shop, 'csv') }}>
-                Bewaar mijn {shop}-weekmand (CSV)
-              </button>
-              <button type="button" onClick={() => { void downloadSingle(shop, 'txt') }}>
-                Bewaar mijn {shop}-lijst (TXT)
-              </button>
-              <button type="button" onClick={() => { void downloadSingle(shop, 'html') }}>
-                Print mijn {shop}-weekmand (HTML)
-              </button>
-              <button type="button" onClick={() => { void handoffSingle(shop, 'copy') }}>
-                Kopieer mijn {shop}-lijst inclusief afvinkingen
-              </button>
-              <button type="button" onClick={() => { void handoffSingle(shop, 'share') }}>
-                Deel mijn {shop}-lijst via apparaat
-              </button>
+              {singleStoreTripActions(shop)}
             </> : <>
               <strong>Prijs onbekend</strong>
               <small>{reviewed.stores[shop]
@@ -453,6 +460,26 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         of een berekening van werkelijk afgerekende producten.</small>
     </div>}
     <strong role="status">{leader}</strong>
+    <details className="private-reviewed-products__single-shop-panel">
+      <summary>Ik ga naar één winkel · aparte lijst en printbare bron</summary>
+      <div className="private-reviewed-products__source-coverage">
+        {(['PLUS', 'DekaMarkt'] as const).map(shop => {
+          const source = shop === 'PLUS' ? plus : deka
+          const complete = source.basket.lines.filter(line => line.status === 'matched')
+          const done = complete.filter(line => checked[privatePhysicalShoppingTick(
+            reviewed.planKey, shop, source.basket.store.id, line)]).length
+          return <article key={shop}>
+            <h4>{shop}</h4>
+            <strong>{money.format(source.basket.totalCents / 100)}</strong>
+            <small>{done} van {complete.length} artikelen afgevinkt</small>
+            <time dateTime={source.observedAt}>Eigen bron: {source.observedAt}</time>
+            {singleStoreTripActions(shop)}
+          </article>
+        })}
+      </div>
+      <small>De persoonlijke lijst per winkel bevat altijd het originele complete mandje
+        en jouw afvinkingen; de andere winkel verandert niet door downloaden of delen.</small>
+    </details>
     <div className="private-reviewed-products__receipt-actions">
       <button type="button" onClick={() => { void downloadReceipt('csv') }}>
         Download volledige PLUS/Deka-prijsvergelijking (CSV)
