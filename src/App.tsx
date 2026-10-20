@@ -964,6 +964,27 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               <p role="alert" className="supa-list-source-upload__error">{listSourceFileWarning}</p>}
           </nav>
         )}
+        {visitedList && (
+          <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
+            <Suspense fallback={<p role="status">Eigen gedeeltelijke bronproducten laden…</p>}>
+              <PartialReviewedShoppingList
+                progress={privateCaptureProgress?.planKey === privatePlanKey
+                  ? privateCaptureProgress : null}
+                complete={livePrivateReviewed}
+                checked={privateShoppingTicks}
+                setChecked={setPrivateShoppingTicks}
+                onOpenComparison={openOwnPriceImport}
+                onReviewIngredient={(store, ingredientId) => {
+                  setPrivateReviewFocus(previous => ({
+                    planKey: privatePlanKey, store, ingredientId,
+                    serial: (previous?.serial ?? 0) + 1,
+                  }))
+                  navigate('basket')
+                }}
+              />
+            </Suspense>
+          </div>
+        )}
         {visitedList && !livePrivateReviewed && (
           <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
             <section className="screen" aria-label="Boodschappenlijst uit mijn eigen weekmenu">
@@ -1002,27 +1023,6 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               onOpenComparison={openOwnPriceImport} routeOpenSignal={mixedRouteOpenSignal}
               routeChoice={privateRouteChoice}
               routeCostIntent={mixedCostIntent} />
-            </Suspense>
-          </div>
-        )}
-        {visitedList && (
-          <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
-            <Suspense fallback={<p role="status">Eigen gedeeltelijke bronproducten laden…</p>}>
-              <PartialReviewedShoppingList
-                progress={privateCaptureProgress?.planKey === privatePlanKey
-                  ? privateCaptureProgress : null}
-                complete={livePrivateReviewed}
-                checked={privateShoppingTicks}
-                setChecked={setPrivateShoppingTicks}
-                onOpenComparison={openOwnPriceImport}
-                onReviewIngredient={(store, ingredientId) => {
-                  setPrivateReviewFocus(previous => ({
-                    planKey: privatePlanKey, store, ingredientId,
-                    serial: (previous?.serial ?? 0) + 1,
-                  }))
-                  navigate('basket')
-                }}
-              />
             </Suspense>
           </div>
         )}
