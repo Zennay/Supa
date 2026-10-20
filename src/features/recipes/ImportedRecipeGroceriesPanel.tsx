@@ -109,6 +109,21 @@ export function ImportedRecipeGroceriesPanel({
   const result = selected.length
     ? combinedImportedRecipeGroceries(selected, portionsById) : null
   const list = result?.checklist ?? null
+  // A fully checked *display list* is not necessarily a valid portable basket:
+  // the canonical private-week exporter enforces combined whole-piece, source
+  // identity and maximum physical-demand limits too. Admit the exact same
+  // demand here BEFORE enabling any source handoff or field CSV actions.
+  const privateTransfer = (() => {
+    if (!result?.complete || selected.length > 14) return { ready: false, reason: '' }
+    try {
+      exportCombinedRecipesPrivateWeek(selected, portionsById)
+      return { ready: true, reason: '' }
+    } catch (cause) {
+      return { ready: false, reason: cause instanceof Error ? cause.message :
+        'De volledige fysieke weekvraag kan nog niet veilig worden overgedragen.' }
+    }
+  })()
+  const plannerReadyForSelection = allPlannerReady && !(result?.identityConflicts.length ?? 0)
   // Persist ONLY explicit downloaded checkmarks. Bind them to selected recipe
   // identities, exact current physical amounts and original review warnings.
   // Positional numeric line keys alone are never enough to restore ticks.
@@ -171,7 +186,7 @@ export function ImportedRecipeGroceriesPanel({
     .sort((a, b) => reuseFirst ? reuseCount(b) - reuseCount(a) : 0)
   const planSelected = (destination: 'planner' | 'list' | 'basket') => {
     setFeedback('')
-    if (!plannerAssignments.length || !allPlannerReady || !plannerDaysDistinct) {
+    if (!plannerAssignments.length || !plannerReadyForSelection || !plannerDaysDistinct) {
       setFeedback('Kies maximaal zeven recepten met gecontroleerde ingrediënten, originele porties en ieder een andere weekdag. Bewaar afwijkende porties eerst als eigen receptvariant.')
       return
     }
@@ -329,7 +344,7 @@ export function ImportedRecipeGroceriesPanel({
     }
   }
   async function copyCaptureGuide() {
-    if (!result?.complete || selected.length > 14) return
+    if (!privateTransfer.ready) return
     setFeedback('')
     setCopyableCaptureGuide(null)
     const identity = progressIdentity
@@ -362,7 +377,7 @@ export function ImportedRecipeGroceriesPanel({
     }
   }
   async function downloadCaptureKit(kind: 'csv' | 'guide') {
-    if (!result?.complete || selected.length > 14) return
+    if (!privateTransfer.ready) return
     setFeedback('')
     const identity = progressIdentity
     try {
@@ -627,16 +642,16 @@ export function ImportedRecipeGroceriesPanel({
           <p role="status">Je kunt maximaal {plannerDays.length} recepten tegelijk
             over verschillende dagen in de gewone Planner zetten. De privévergelijker
             kan apart maximaal 14 recepten in één fysiek mandje verwerken.</p>}
-        {!allPlannerReady && !!selected.length &&
+        {!plannerReadyForSelection && !!selected.length &&
           <p role="status">Eén of meer recepten zijn nog niet klaar voor Planner
             of hebben hier aangepaste porties. Controleer het recept en bewaar
             gewenste andere porties eerst als eigen variant.</p>}
         <div className="recipe-backup-panel__actions">
-          <button type="button" disabled={!allPlannerReady || !plannerAssignments.length || !plannerDaysDistinct}
+          <button type="button" disabled={!plannerReadyForSelection || !plannerAssignments.length || !plannerDaysDistinct}
             onClick={() => planSelected('planner')}>Plan alle gekozen recepten</button>
-          <button type="button" disabled={!allPlannerReady || !plannerAssignments.length || !plannerDaysDistinct}
+          <button type="button" disabled={!plannerReadyForSelection || !plannerAssignments.length || !plannerDaysDistinct}
             onClick={() => planSelected('list')}>Plan en open de boodschappenlijst</button>
-          <button type="button" disabled={!allPlannerReady || !plannerAssignments.length || !plannerDaysDistinct}
+          <button type="button" disabled={!plannerReadyForSelection || !plannerAssignments.length || !plannerDaysDistinct}
             onClick={() => planSelected('basket')}>Plan en vergelijk mijn winkelbronnen</button>
         </div>
       </section>
@@ -657,15 +672,15 @@ export function ImportedRecipeGroceriesPanel({
           </select>
         </label>
         <div className="recipe-backup-panel__actions">
-          <button type="button" disabled={!result!.complete || selected.length > 14}
+          <button type="button" disabled={!privateTransfer.ready}
             onClick={() => void downloadCaptureKit('csv')}>
             Download leeg winkelinvulblad (CSV)
           </button>
-          <button type="button" disabled={!result!.complete || selected.length > 14}
+          <button type="button" disabled={!privateTransfer.ready}
             onClick={() => void downloadCaptureKit('guide')}>
             Download bijbehorende opnamegids (TXT)
           </button>
-          <button type="button" disabled={!result!.complete || selected.length > 14}
+          <button type="button" disabled={!privateTransfer.ready}
             onClick={() => void copyCaptureGuide()}>
             Kopieer opnamegids (mobiel)
           </button>
@@ -679,6 +694,8 @@ export function ImportedRecipeGroceriesPanel({
                 if (latestCaptureKey.current === captureKey) event.currentTarget.select()
               }} />
           </label>}
+        {privateTransfer.reason && <small role="alert">Het bronopnameblad wacht op een geldig
+          volledig fysiek mandje: {privateTransfer.reason}</small>}
         {!result!.complete && <small>Controleer de ontbrekende hoeveelheden en recipe-bronnen
           voordat je een fysiek opnamemandje aanmaakt.</small>}
         <small>De twee bestandsnamen dragen dezelfde lokale bundelcode als je selectie gelijk is.
@@ -702,19 +719,23 @@ export function ImportedRecipeGroceriesPanel({
         <button type="button" onClick={exportCsv}
           disabled={list.lines.length > 80}>Download gezamenlijke lijst (CSV)</button>
         <button type="button" onClick={openInPrivateMatcher}
-          disabled={!result!.complete || selected.length > 14}>
+          disabled={!privateTransfer.ready}>
           Vergelijk dit mandje met mijn eigen winkelproducten
         </button>
         <button type="button" onClick={exportForStores}
-          disabled={!result!.complete || selected.length > 14}>
+          disabled={!privateTransfer.ready}>
           Gebruik deze recepten in de privéwinkelvergelijker (JSON)
         </button>
       </div>
+      {privateTransfer.reason && <p role="alert" className="recipe-collection-groceries__transfer-error">
+        Deze receptenlijst blijft ongeprijsd bruikbaar, maar de officiële fysieke mand-overdracht
+        is nog niet mogelijk: {privateTransfer.reason} Controleer de ingrediënten en gekozen porties.
+      </p>}
       {selected.length > 14 && <small>De bestaande privévergelijker accepteert maximaal
         14 recepten per mandje. Deselecteer één recept voor de overdracht.</small>}
       {!result!.complete && <small>Corrigeer alle onzekere ingrediënten vóór je dit
         mandje in de prijsvergelijker gebruikt. De ongeprijsde tekstlijst blijft beschikbaar.</small>}
-      {result!.complete && selected.length <= 14 && <a
+      {privateTransfer.ready && <a
         href={import.meta.env.BASE_URL + 'private-basket-mapping.html#own-recipe-import'}
         target="_blank" rel="noopener noreferrer">
         Of open de bestaande privévergelijker voor handmatige JSON-import
