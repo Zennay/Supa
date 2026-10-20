@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { matchIngredient, type MatchUnit } from '../../domain/matching.ts'
+import { productSearchText } from '../products/productSearchText.ts'
 import { calculateDecimalPackCount } from '../../domain/decimalPackArithmetic.ts'
 import type { OfflinePriceSnapshots, OfflineRetailer, OfflineStoreProduct } from '../../domain/offlineReviewedImport.ts'
 import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
@@ -107,8 +108,17 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
         // Diagnostic only: the same original retailer file can already
         // contain a likely SKU without a usable price/pack/availability.
         // NEVER promote this projection into a purchasable or reviewed match.
-        const incomplete = capture.products.filter(product =>
-          !product.available && family(product.packUnit) === family(need.unit))
+        const incomplete = capture.products.filter(product => {
+          const productFamily = family(product.packUnit)
+          // A known physically different unit must never look suitable;
+          // unknown packaging may be shown only as an unpriced identity hint.
+          if (productFamily !== null && productFamily !== family(need.unit)) return false
+          const priceValid = typeof product.sourcePriceCents === 'number' &&
+            Number.isSafeInteger(product.sourcePriceCents) && product.sourcePriceCents >= 0
+          const packValid = product.packAmount !== null && product.packAmount > 0 &&
+            productFamily === family(need.unit)
+          return !product.available || !priceValid || !packValid
+        })
         if (incomplete.length && choice.type !== 'match' &&
             !choice.reasons.includes('top candidates too close')) {
           const diagnostic = matchIngredient(requirement,
@@ -117,12 +127,24 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
           const found = diagnostic.type === 'match'
             ? incomplete.find(product => product.id === diagnostic.productId) : null
           if (found) {
+            // 'available' is the derived purchasable flag and is false when
+            // an original product is in stock but lacks its captured price.
+            // Show the user's ACTUAL distinct original source facts, including
+            // more than one missing field. Never infer out-of-stock from a
+            // missing monetary value.
+            const blockers = [
+              found.sourceAvailable === false ? 'niet beschikbaar volgens de originele bron' :
+                found.sourceAvailable !== true ? 'beschikbaarheid niet vastgesteld' : null,
+              found.packAmount === null || found.packAmount <= 0 ||
+                family(found.packUnit) === null ? 'verpakking of maateenheid ontbreekt' : null,
+              typeof found.sourcePriceCents !== 'number' ||
+                !Number.isSafeInteger(found.sourcePriceCents) || found.sourcePriceCents < 0
+                ? 'pakprijs ontbreekt of is ongeldig' : null,
+            ].filter((reason): reason is string => !!reason)
             unpricedHints[store] = {
               name: found.name,
               sku: found.id,
-              reason: found.packAmount === null ? 'verpakking onbekend'
-                : found.sourcePriceCents === null ? 'pakprijs ontbreekt'
-                  : 'volgens de originele bron niet beschikbaar',
+              reason: blockers.join(' · ') || 'brongegevens vragen persoonlijke controle',
             }
           }
         }
@@ -215,13 +237,13 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
   const largestPairedReview = [...previewRows].sort((a, b) =>
     Math.abs(candidateLineGap(b)!) - Math.abs(candidateLineGap(a)!))[0]
   const selectedStores = storeFilter === 'both' ? stores : [storeFilter]
-  const term = search.trim().normalize('NFKC').toLocaleLowerCase('nl')
+  const term = productSearchText(search.trim())
   const filtered = (onlyMissing ? missing : coverage).filter(line => {
     if (term && ![
       line.need.label, line.need.id,
       ...stores.flatMap(store => [line.suggestions[store]?.name, line.suggestions[store]?.sku,
         line.unpricedHints[store]?.name, line.unpricedHints[store]?.sku]),
-    ].some(value => value?.normalize('NFKC').toLocaleLowerCase('nl').includes(term))) return false
+    ].some(value => value && productSearchText(value).includes(term))) return false
     if (actionFilter === 'choose-sku') return selectedStores.some(store => line.manualReview[store])
     if (actionFilter === 'fix-source') return selectedStores.some(store =>
       !!line.unpricedHints[store])
@@ -350,6 +372,19 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
     line.suggestions[store] ? [{ store, need: line.need, ambiguous: false, incomplete: false }] : [],
   ))[0]
   const nextCapture = pendingPlus ? 'PLUS' : pendingDeka ? 'DekaMarkt' : null
+  const firstIncompleteStore = (stores as readonly ('PLUS' | 'DekaMarkt')[])
+    .find(store => sourceKnownButUnpriced[stores.indexOf(store)] > 0)
+  const firstAmbiguousStore = (stores as readonly ('PLUS' | 'DekaMarkt')[])
+    .find(store => requiringChoice[stores.indexOf(store)] > 0)
+  function focusOriginalSourceAction(store: 'PLUS' | 'DekaMarkt',
+    action: 'choose-sku' | 'fix-source') {
+    // Only filters the actual imported source. Never confirms or changes an SKU.
+    setStoreFilter(store)
+    setActionFilter(action)
+    setSearch('')
+    setOnlyMissing(true)
+    setShowAll(true)
+  }
   function mobileGuideText(): string {
     try {
       return selectiveTwoStoreCaptureGuide({
@@ -446,6 +481,16 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
         {' '}PLUS {sourceKnownButUnpriced[0]}, DekaMarkt {sourceKnownButUnpriced[1]}.
         {' '}Kandidaten zijn nog niet definitief gecontroleerd.</p>
       <div className="supa-planner-source-matches__next-actions">
+        {firstIncompleteStore && <button type="button" className="ghost-button"
+          onClick={() => focusOriginalSourceAction(firstIncompleteStore, 'fix-source')}>
+          Bekijk eerst {sourceKnownButUnpriced[stores.indexOf(firstIncompleteStore)]}
+          {' '}bestaande {firstIncompleteStore}-artikelen waarvan prijs, pak of beschikbaarheid ontbreekt
+        </button>}
+        {firstAmbiguousStore && <button type="button" className="ghost-button"
+          onClick={() => focusOriginalSourceAction(firstAmbiguousStore, 'choose-sku')}>
+          Toon {requiringChoice[stores.indexOf(firstAmbiguousStore)]}
+          {' '}onzekere {firstAmbiguousStore}-SKU-keuzes voor menselijke controle
+        </button>}
         {nextCapture && onRecapture && <button type="button" className="ghost-button"
           onClick={() => onRecapture(nextCapture)}>
           1. Open {nextCapture}-opnameblad voor werkelijke ontbrekende brondata

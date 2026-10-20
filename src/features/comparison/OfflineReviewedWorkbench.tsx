@@ -10,6 +10,10 @@ import { ownPriceCapturesToCsv } from './ownPriceCsvExport.ts'
 import { exportPrivatePlannerWeek } from './exportPrivatePlannerWeek.ts'
 import { exportPrivateBasketSession } from './exportPrivateBasketSession.ts'
 import { makePrivateRecaptureCsv } from './privateRecaptureCsv.ts'
+import {
+  privateFullStoreRecaptureCsv, privatePairedStoreRecaptureCsv,
+  privateFullStoreRecaptureGuide, privatePairedStoreRecaptureGuide,
+} from '../planner/privateFullStoreRecapture.ts'
 import type { CaptureStore } from './plannerPriceCaptureSheet.ts'
 import type { PrivateSourceFileHandoff } from './privateSourceFileHandoff.ts'
 import { PrivateBasketComparisonExport } from './PrivateBasketComparisonExport.tsx'
@@ -612,6 +616,49 @@ export function OfflineReviewedWorkbench({
         setMessage(error instanceof Error ? error.message : 'Privésessie niet geldig; bestaande invoer behouden.')
     } finally {
       if (version === importRevision.current) setBusy(false)
+    }
+  }
+
+  function downloadFreshProductReobservation(
+    retailer: 'PLUS' | 'DekaMarkt' | 'both',
+    format: 'csv' | 'csv-excel' | 'guide' = 'csv',
+  ) {
+    if (!imported) return
+    try {
+      // Read the canonical original data again at the actual click. Historical
+      // SKU names are lookup aids, not a new observed price/pack/time.
+      const current = parseOfflinePriceSnapshots(text, Date.now())
+      const plus = current.captures.PLUS
+      const deka = current.captures.DekaMarkt
+      const capture = retailer === 'both' ? null : current.captures[retailer]
+      if (retailer === 'both' && (!plus || !deka))
+        throw new Error('Voor beide winkels zijn twee oorspronkelijke winkelbronnen nodig.')
+      if (retailer !== 'both' && !capture)
+        throw new Error('Selecteer eerst een oorspronkelijke ' + retailer + '-winkelbron.')
+      const csvDelimiter = format === 'csv-excel' ? ';' : ','
+      const content = retailer === 'both'
+        ? format === 'guide'
+          ? privatePairedStoreRecaptureGuide(plus!, deka!)
+          : privatePairedStoreRecaptureCsv(plus!, deka!, csvDelimiter)
+        : format === 'guide'
+          ? privateFullStoreRecaptureGuide(capture!)
+          : privateFullStoreRecaptureCsv(capture!, csvDelimiter)
+      const url = URL.createObjectURL(new Blob([content], {
+        type: format === 'guide' ? 'text/plain;charset=utf-8' : 'text/csv;charset=utf-8',
+      }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-' + (retailer === 'both' ? 'plus-deka' : retailer.toLowerCase()) +
+          (format === 'guide' ? '-hele-bronopname-handleiding.txt' : '-complete-nieuwe-bronopname.csv')
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setMessage((retailer === 'both' ? 'PLUS en DekaMarkt' : retailer) +
+        ': nieuwe broninvoer voorbereid. Alleen originele SKU en naam zijn zoekhulp; oude tijden, pakgegevens, voorraad en prijzen zijn LEEG. Gebruik uitsluitend werkelijk opnieuw geobserveerde gegevens en controleer ze hier.')
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message :
+        'Een volledig lege bronopname kon niet uit de oorspronkelijke artikelen worden gemaakt.')
     }
   }
 
@@ -2122,6 +2169,26 @@ export function OfflineReviewedWorkbench({
       {imported && (
         <div className="offline-price-workbench__results">
           <h3>Winkelvergelijking voor jouw huidige weekmenu</h3>
+          {imported.captures.PLUS && imported.captures.DekaMarkt && <div
+            className="offline-price-workbench__recapture-both" aria-label="Beide originele winkelbronnen opnieuw opnemen">
+            <strong>PLUS en DekaMarkt opnieuw opnemen voor hetzelfde weekmandje</strong>
+            <p>Maak één nieuw winkelbronblad op basis van je oorspronkelijke SKU's.
+              De oude winkelprijzen, pakgroottes, voorraad en opnametijden zijn leeg.
+              Vul beide winkels werkelijk opnieuw in en controleer de hele vergelijking.
+              Deze actie vervangt of bevestigt nog niets in Supa.</p>
+            <button type="button" className="ghost-button"
+              onClick={() => downloadFreshProductReobservation('both', 'csv')}>
+              Maak nieuw twee-winkelbronblad (CSV)
+            </button>
+            <button type="button" className="ghost-button"
+              onClick={() => downloadFreshProductReobservation('both', 'csv-excel')}>
+              Beide winkels als spreadsheet-CSV (puntkomma)
+            </button>
+            <button type="button" className="ghost-button"
+              onClick={() => downloadFreshProductReobservation('both', 'guide')}>
+              Nieuwe echte bronopname: stappen (TXT)
+            </button>
+          </div>}
           <div className="offline-price-workbench__dates">
             {stores.map(store => {
               const capture = imported.captures[store]
@@ -2130,7 +2197,19 @@ export function OfflineReviewedWorkbench({
                     <p><strong>{store}</strong> · waargenomen {captureDate(capture.observedMs)}
                       {' '}· {capture.products.length} eigen bronproducten</p>
                     <button className="ghost-button" type="button" onClick={() => downloadPrivateRecaptureCsv(store)}>
-                      Maak nieuw prijsinvulblad voor {store} (CSV)
+                      Alleen nieuwe prijsopname: oude verpakking als invulhulp behouden (CSV)
+                    </button>
+                    <button className="ghost-button" type="button"
+                      onClick={() => downloadFreshProductReobservation(store, 'csv')}>
+                      Nieuwe volledige {store}-meting: ook verpakking en opnametijd leeg (CSV)
+                    </button>
+                    <button className="ghost-button" type="button"
+                      onClick={() => downloadFreshProductReobservation(store, 'csv-excel')}>
+                      Hele {store}-opname in spreadsheet-CSV (puntkomma)
+                    </button>
+                    <button className="ghost-button" type="button"
+                      onClick={() => downloadFreshProductReobservation(store, 'guide')}>
+                      Uitleg voor nieuwe {store}-opname (TXT)
                     </button>
                     <label>Voeg originele nog ontbrekende {store}-producten toe uit dezelfde opname (CSV/JSON)
                       <input type="file" accept=".csv,.tsv,.json,.txt,text/csv,text/plain,text/tab-separated-values,application/json" disabled={busy}
