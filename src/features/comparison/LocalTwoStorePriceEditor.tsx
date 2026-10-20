@@ -1055,11 +1055,18 @@ export function LocalTwoStorePriceEditor({
                         store + '-product of bon hoort. Prijs, verpakking, voorraadstatus en opnamemoment ' +
                         'moet je nog zelf vastleggen; er is geen automatische winkelmatch.')
                       setScanTarget(null)
+                      // After accepting the original barcode, continue with
+                      // the still-required name, actual pack, price and time.
+                      // Never auto-mark the scanned product as reviewed.
+                      window.requestAnimationFrame(() =>
+                        document.getElementById(`own-price-name-${store}-${index}`)
+                          ?.focus({ preventScroll: false }))
                     }}
                     onClose={() => setScanTarget(null)} />
                 </Suspense>}
               <label>Werkelijke productnaam (laat leeg als onbekend)
-                <input value={row.name} maxLength={160} autoComplete="off"
+                <input id={`own-price-name-${store}-${index}`}
+                  value={row.name} maxLength={160} autoComplete="off"
                   list={`historical-products-${store}`}
                   placeholder="Naam op product of bon"
                   onChange={e => changeRow(store, need.id, { name: e.target.value }, need.unit)} />
