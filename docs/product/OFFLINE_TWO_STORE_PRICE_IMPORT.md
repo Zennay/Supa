@@ -43,6 +43,33 @@ Dezelfde bestaande, strikte negenkoloms-CSV-converter is nu ook rechtstreeks via
 5. Klik pas na eigen controle op **Neem eigen brondata over**. Voor een ontbrekende tweede winkel wordt dezelfde bestaande veilige toevoegroute gebruikt; voor een al geladen winkel de **bronverschillen-preview** vóór vervanging. Wanneer je één CSV met uitsluitend **nieuwe** oorspronkelijke artikelcodes en exact hetzelfde eerdere waarnemingstijdstip aanlevert, sluit de preview nu direct aan op de bestaande **veilig aanvullen**-route: de eerdere productregels, echte prijzen en het onveranderde bronmoment blijven intact. De matching-preview gebruikt bij deze aanvulroute de gecombineerde lijst van bestaande én nieuwe originele bronproducten, zodat eerdere productmatches niet ten onrechte als ontbrekend worden weergegeven. Bij een andere opnametijd of reeds bestaande broncode gebruikt Supa uitsluitend de bestaande expliciete **winkelvervanging** met bronverschillencontrole; er worden geen oude prijzen doorgeschoven naar een nieuwer moment. Als er al bronnen en controles zijn, vraagt het tegelijk inladen van twee vervangende winkelbestanden expliciet om bevestiging, nadat beide bestanden geldig zijn verklaard. Annuleren behoudt de bestaande brongegevens en vinkjes. Geaccepteerde productcodes zijn niet automatisch met Planner-ingrediënten gematcht: elk fysieke match en de oorspronkelijke prijs moeten apart worden beoordeeld.
 6. Verlopen, ontbrekende of niet-geprijsde winkelobservaties blijven **onbekend**. Een volledig prijsverschil verschijnt alleen als beide complete, brongebonden mandjes aan bestaande voorwaarden voldoen. Dit werkblad is geen toestemming van retailers en geen onafhankelijk veldbewijs.
 
+## Volledig prijsrapport bewaren, printen of mobiel meenemen
+
+Wanneer alle oorspronkelijke SKU's voor **exact hetzelfde fysieke weekmandje** in
+beide winkels zijn gecontroleerd, beide opnames hoogstens zeven dagen oud zijn en
+hun bronmomenten maximaal 24 uur uiteen liggen, verschijnen in **Producten**
+de complete PLUS/DekaMarkt-weekmandjes. Dezelfde canonieke hele-pakkenvergelijking
+levert de bedragen, de goedkopere winkel en de verschillen per ingrediënt.
+
+Via **Bewaar printbaar volledig weekmandje (HTML)** krijg je een lokaal,
+scriptvrij document met de twee bronmomenten, oorspronkelijke SKU's,
+pakinhoud, pakprijzen, eenheidsprijzen, daadwerkelijke hele-pakkentotalen en
+vergelijkingsregels. Open het bestand op je toestel om af te drukken; het
+bestand vraagt geen internetverbinding en bevat een beperkend CSP.
+**Kopieer mijn volledige privéweekmand** gebruikt uitsluitend na jouw klik
+het systeemklembord. **Deel privéweekmand via mijn apparaat** opent uitsluitend
+na jouw klik het standaard deelvenster; je kiest zelf waar de tekst heengaat.
+Als een browser klembord of delen niet ondersteunt, kun je de bestaande
+TXT-/CSV-download gebruiken.
+
+De downloads gebruiken altijd het **oorspronkelijke complete weekmandje**,
+niet alleen de huidige zoek- of winkelprijsfilter. Bij ontbrekende, gewijzigde,
+verlopen of niet volledig gekoppelde bronnen ontbreekt de complete export.
+Een eigen twee-winkelroute toont uitsluitend een *productverschil*: extra
+reis-, parkeer- en tijdkosten blijven onbekend totdat je ze zelf invult.
+Dit is een persoonlijk bewaard rapport, geen onafhankelijk veldonderzoek,
+retailertoestemming, actuele kassagarantie of publiek besparingsbewijs.
+
 ## Importeren
 
 1. Maak lokaal een JSON-bestand met **één** PLUS- en **één** DekaMarkt-opname. Beide opnames beschrijven de daadwerkelijk waargenomen prijscontext, met een ISO-tijd en een expliciete UTC-offset.
