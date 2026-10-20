@@ -1,6 +1,7 @@
 import type { BasketTraceLine } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import { privatePackUnitRate, privateUnitPrice } from '../comparison/privateUnitPrice.ts'
+import { productSearchText } from './productSearchText.ts'
 import { currentPrivateRouteChoice } from '../comparison/privateRouteChoice.ts'
 import { createMixedStoreShoppingPlan } from '../comparison/mixedStoreShoppingPlan.ts'
 import { validCustomWeekBudgetEuros } from '../planner/customWeekBudget.ts'
@@ -109,7 +110,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
     if (unitFilter !== 'all' && family(line, alternate) !== unitFilter) return []
     if (search && ![line.ingredientLabel, line.productId, line.productName,
       alternate.productId, alternate.productName].some(value =>
-        value.toLocaleLowerCase('nl').includes(search))) return []
+        productSearchText(value).includes(search))) return []
     return [{ plus: line, deka: alternate }]
   })
   if (order !== 'source') rows.sort((a, b) => {
