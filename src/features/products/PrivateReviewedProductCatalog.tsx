@@ -8,6 +8,7 @@ import { currentPrivateRouteChoice } from '../comparison/privateRouteChoice.ts'
 import { productSearchText } from './productSearchText.ts'
 import { privatePriceAgeNotice } from '../comparison/privatePriceAgeNotice.ts'
 import { privatePhysicalShoppingTick } from '../shopping-list/privatePhysicalShoppingTick.ts'
+import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
 import { freshReviewedBaskets, recentOwnCaptureInstant, privateReviewedPairWithin24Hours, partialReviewedLinePairs } from '../comparison/privateReviewedBasketBridge.ts'
 import type { OwnStore, PrivateCaptureProgress, PrivateReviewedBaskets, PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
 import './privateReviewedProductCatalog.css'
@@ -22,6 +23,12 @@ const PrivatePartialProductCards = lazy(async () => {
   const module = await import('./PrivatePartialProductCards.tsx')
   return { default: module.PrivatePartialProductCards }
 })
+// Reuse exactly the Planner's current-physical-week missing-capture kit,
+// including the offline CSV spreadsheet formats and matching row guide.
+const PlannerMissingCapturePanel = lazy(async () => {
+  const module = await import('../planner/PlannerMissingCapturePanel.tsx')
+  return { default: module.PlannerMissingCapturePanel }
+})
 // Reuse the Planner's exact admitted offline CSV/TSV/JSON paste workflow.
 // It previews original SKU and capture facts, then hands off to Vergelijk;
 // no independent Products parser, price claim or permission is introduced.
@@ -31,9 +38,10 @@ const PlannerQuickSourcePaste = lazy(async () => {
 })
 
 /** Read-only personally reviewed basket sources, never an inferred live catalog. */
-export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOpenComparison, onOpenList, onOpenMixedRoute, onChooseRouteLine, onReviewIngredient, onAddMissingToOwnList, onImportSourceFiles, fileWarning, checked, onToggleChecked }: {
+export function PrivateReviewedProductCatalog({ reviewed, progress, captureNeeds, budget, onOpenComparison, onOpenList, onOpenMixedRoute, onChooseRouteLine, onReviewIngredient, onAddMissingToOwnList, onImportSourceFiles, fileWarning, checked, onToggleChecked }: {
   reviewed: PrivateReviewedBaskets | null
   progress: PrivateCaptureProgress | null
+  captureNeeds: readonly PlannerCaptureGuideNeed[]
   budget: number
   onOpenComparison: () => void
   onReviewIngredient: (store: OwnStore, ingredientId: string) => void
@@ -307,6 +315,12 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOp
         </article>
       })}
     </div>
+    {captureNeeds.length > 0 && !fullPairReady && <Suspense fallback={
+      <p role="status">Gerichte opnamebladen voor ontbrekende winkelproducten laden…</p>}>
+      <PlannerMissingCapturePanel captureNeeds={captureNeeds}
+        captureProgress={currentProgress} reviewed={currentReviewed} now={nowMs}
+        onOpenComparison={onOpenComparison} />
+    </Suspense>}
     {currentProgress && !fullPairReady && <Suspense fallback={<p role="status">
       Bevestigde losse bronartikelen laden…</p>}>
       <PrivatePartialProductCards progress={currentProgress} reviewed={currentReviewed}

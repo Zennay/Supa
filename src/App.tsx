@@ -63,7 +63,7 @@ import { readRecipeLibrary } from './features/recipes/recipeLibrary'
 import { toPlannerRecipe } from './features/recipes/plannerRecipes'
 import { curatedFigmaRecipes } from './features/recipes/curatedFigmaRecipes'
 import { figmaAssets } from './features/home/figmaAssets'
-import { buildOneStoreBasket } from './domain/basket'
+import { aggregatePlanIngredients, buildOneStoreBasket, type RecipeWithIngredients } from './domain/basket'
 import { compareFullBaskets } from './domain/basketComparison'
 import {
   defaultPlannerPreferences,
@@ -494,6 +494,21 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   // merely adds an unrelated recipe or edits an inactive day. Only changing
   // the ACTUAL selected physical week can invalidate these private receipts.
   const privatePlanKey = privatePhysicalPlanIdentity(plannedMeals, recipes, activeDays)
+  // Share the canonical aggregated physical week with Producten, rather than
+  // inferring missing ingredients from whichever retailer happened to import.
+  const productCaptureNeeds = useMemo(() => {
+    if (tab !== 'products') return []
+    const physical = recipes.filter((recipe): recipe is RecipeWithIngredients =>
+      Array.isArray((recipe as RecipeWithIngredients).ingredients))
+    if (physical.length !== recipes.length) return []
+    try {
+      return aggregatePlanIngredients(plannedMeals, physical, activeDays)
+        .map(need => ({
+          id: need.id, label: need.label, unit: need.unit,
+          amount: need.amount, query: need.query,
+        }))
+    } catch { return [] }
+  }, [tab, plannedMeals, recipes, activeDays])
   // Planner and Lijst share the exact same real-source File handoff. Files
   // stay in this tab until the canonical Vergelijk importer consumes them.
   // No alternate CSV parser or implicit retailer approval is introduced.
@@ -683,6 +698,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         )}
         {tab === 'products' && <Suspense fallback={<p role="status">Eigen bronproducten openen…</p>}>
           <PrivateReviewedProductCatalog reviewed={livePrivateReviewed} budget={budget}
+            captureNeeds={productCaptureNeeds}
             onAddMissingToOwnList={(shop, ingredients) => {
               const progress = privateCaptureProgress?.planKey === privatePlanKey
                 ? privateCaptureProgress.stores[shop] : null
