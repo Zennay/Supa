@@ -87,3 +87,6 @@ background:#fff;border:1px solid #c0d3c2;border-radius:11px}
 .private-reviewed-products__trip-calculator div{display:grid;gap:.4rem}
 .private-reviewed-products__trip-calculator :is(p,small){margin:0;line-height:1.45}
 .private-reviewed-products__trip-calculator [role=alert]{color:#922b2b;font-weight:700}
+
+.private-reviewed-products__paste-access{display:grid;gap:.35rem}
+.private-reviewed-products__paste-access small{line-height:1.45}

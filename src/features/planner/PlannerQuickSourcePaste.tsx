@@ -36,14 +36,15 @@ async function normalizedOwnSource(raw: string): Promise<string> {
 }
 
 /** Local preview using the same converter and source contract as Vergelijk. */
-export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredient, hasDemand, needs }: {
+export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredient, hasDemand, needs, initiallyOpen = false }: {
+  initiallyOpen?: boolean
   onImport: (files: File[]) => void
   onRecapture: (store: 'PLUS' | 'DekaMarkt') => void
   onReviewIngredient?: (store: 'PLUS' | 'DekaMarkt', ingredientId: string) => void
   hasDemand: boolean
   needs: readonly PlannerCaptureGuideNeed[]
 }) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(initiallyOpen)
   const [draft, setDraft] = useState('')
   const [sourceSearch, setSourceSearch] = useState('')
   const [incompleteOnly, setIncompleteOnly] = useState(false)

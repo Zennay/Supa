@@ -49,6 +49,7 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOp
   const [unitFilter, setUnitFilter] = useState<'all' | 'kg' | 'liter' | 'stuk'>('all')
   const [order, setOrder] = useState<'source' | 'unitPrice' | 'lineTotal' | 'priceGap'>('source')
   const [checkMessage, setCheckMessage] = useState('')
+  const [showPasteSource, setShowPasteSource] = useState(false)
   const [nowMs, setNowMs] = useState(() => Date.now())
   useEffect(() => {
     const refresh = () => setNowMs(Date.now())
@@ -154,14 +155,24 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOp
         }} />
     </label>
     {fileWarning && <p role="alert" className="private-reviewed-products__upload-error">{fileWarning}</p>}
-    <Suspense fallback={<p role="status">Lokale broninvoer openen…</p>}>
+    <div className="private-reviewed-products__paste-access">
+      <button type="button" aria-expanded={showPasteSource}
+        onClick={() => setShowPasteSource(open => !open)}>
+        {showPasteSource ? 'Sluit eigen spreadsheet-plakimport' :
+          'Plak PLUS/Deka-winkelprijzen uit een spreadsheet of JSON'}
+      </button>
+      <small>Eigen bronproducten worden eerst lokaal gecontroleerd. De bestaande
+        Vergelijk-import vraagt daarna om echte productmatching en bevestiging.</small>
+    </div>
+    {showPasteSource && <Suspense fallback={<p role="status">Lokale broninvoer openen…</p>}>
       <PlannerQuickSourcePaste
+        initiallyOpen
         onImport={onImportSourceFiles}
         onRecapture={() => onOpenComparison()}
         onReviewIngredient={onReviewIngredient}
         hasDemand={true}
         needs={[]} />
-    </Suspense>
+    </Suspense>}
     <div className="private-reviewed-products__pending" aria-label="Brondekking en openstaande productmatches">
       {shops.map(shop => {
         const full = currentReviewed?.stores[shop]
