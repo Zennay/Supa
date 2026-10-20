@@ -398,6 +398,7 @@ export function PlannerView({
           activeDays={activeDays}
           recipes={ingredientRecipes}
           onChooseRecipe={onRecipeChange}
+          onImportSourceFiles={onImportSourceFiles}
           onOpenComparison={onOpenComparison}
           onOpenList={onOpenShoppingList}
         />
