@@ -4,6 +4,9 @@ import { privatePriceAgeNotice } from '../comparison/privatePriceAgeNotice.ts'
 import { currentPrivateRouteChoice } from '../comparison/privateRouteChoice.ts'
 import { parsePrivateExtraVisitCostCents } from '../comparison/privateExtraVisitCost.ts'
 import { ownStoreWeekComparison } from './ownStoreBudgetComparison.ts'
+// Native share requires transient user activation, so its existing trusted
+// formatter must be ready synchronously before opening the OS share sheet.
+import { printableOwnStoreComparison } from './downloadOwnStoreComparison.ts'
 // Price deltas only exist after both sources are fully reviewed; defer these
 // heavier presentational modules so the everyday Planner loads sooner.
 const PlannerOwnProductDeltas = lazy(() => import('./PlannerOwnProductDeltas.tsx')
@@ -277,9 +280,8 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       return
     }
     try {
-      // Lazy formatter load happens BEFORE admitting prices. A sleeping tab
-      // must not send source data that became stale while the chunk loaded.
-      const { printableOwnStoreComparison } = await import('./downloadOwnStoreComparison.ts')
+      // Browser share needs a synchronous click-to-chooser path: re-admit
+      // original timestamps and complete same-demand baskets immediately.
       const current = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
       const exact = ownStoreWeekComparison(current)
       if (exact.status !== 'comparable' || !current?.stores.PLUS || !current.stores.DekaMarkt)
