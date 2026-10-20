@@ -29,15 +29,22 @@ export type OwnRecipeChecklist = {
 export function formatOwnRecipeChecklist(
   checklist: OwnRecipeChecklist,
   checked: Readonly<Record<string, boolean>>,
+  onlyOutstanding = false,
 ): string {
+  const remaining = onlyOutstanding
+    ? checklist.lines.filter(line => line.needsReview || checked[line.key] !== true)
+    : checklist.lines
   return [
     checklist.recipeCount
       ? `Mijn receptenbundel: ${checklist.recipeCount} eigen recepten`
       : `Mijn recept: ${checklist.title} — ${checklist.portions} porties`,
-    'Eigen ongeprijsde boodschappenlijst · controleer hoeveelheden en verpakking zelf.',
-    ...checklist.lines.map(line => line.needsReview
+    onlyOutstanding
+      ? 'Alleen nog te kopen of controleren · DIT IS NIET het volledige fysieke mandje.'
+      : 'Eigen ongeprijsde boodschappenlijst · controleer hoeveelheden en verpakking zelf.',
+    ...(remaining.length ? remaining.map(line => line.needsReview
       ? `[?] ${line.original} — hoeveelheid handmatig controleren`
-      : `${checked[line.key] ? '[x]' : '[ ]'} ${compactAmount(line.amount!)} ${line.unit === 'piece' ? 'stuks' : line.unit} ${line.label}`),
+      : `${checked[line.key] ? '[x]' : '[ ]'} ${compactAmount(line.amount!)} ${line.unit === 'piece' ? 'stuks' : line.unit} ${line.label}`)
+      : ['Alle controleerbare boodschappen zijn afgevinkt.']),
     'Prijzen, winkelvoorraad en besparingen zijn onbekend.',
   ].join('\n')
 }
