@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { BasketTraceLine } from '../../domain/basket.ts'
 import { privatePackUnitRate, privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import { PrivateReviewedTwoStoreTable } from './PrivateReviewedTwoStoreTable.tsx'
+import { ownStoreWeekComparison } from '../planner/ownStoreBudgetComparison.ts'
 import { productSearchText } from './productSearchText.ts'
 import { privatePriceAgeNotice } from '../comparison/privatePriceAgeNotice.ts'
 import { privatePhysicalShoppingTick } from '../shopping-list/privatePhysicalShoppingTick.ts'
@@ -50,6 +51,12 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
     return capture ? capture.basket.lines.filter((line): line is Matched => line.status === 'matched')
       .map(line => ({ shop, line, observedAt: capture.observedAt })) : []
   })
+  // One canonical physical basket comparison for the two-store cards too:
+  // never rank a missing or unpaired price as if it were a valid difference.
+  const paired = ownStoreWeekComparison(currentReviewed)
+  const gapById = new Map<string, number>(paired.status === 'comparable'
+    ? paired.lines.map(line => [line.id, Math.abs(line.deltaCents)])
+    : [])
   const search = productSearchText(query.trim())
   const rate = (line: Matched) => privatePackUnitRate({
     amount: line.pack.amount, unit: line.pack.unit, count: line.pack.count,
@@ -65,9 +72,12 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
   // while weekly whole-pack costs remain the authoritative budget calculation.
   const group = (line: Matched) =>
     ({ kg: 0, liter: 1, stuk: 2 } as Record<string, number>)[rate(line)?.unit ?? ''] ?? 3
-  const ordered = order === 'source' || order === 'priceGap' ? visible : [...visible].sort((a, b) =>
-    order === 'lineTotal'
-      ? a.line.lineTotalCents - b.line.lineTotalCents
+  const ordered = order === 'source' || (order === 'priceGap' && paired.status !== 'comparable')
+    ? visible : [...visible].sort((a, b) =>
+    order === 'priceGap'
+      ? (gapById.get(b.line.id) ?? -1) - (gapById.get(a.line.id) ?? -1)
+      : order === 'lineTotal'
+        ? a.line.lineTotalCents - b.line.lineTotalCents
       : group(a.line) - group(b.line) ||
         (rate(a.line)?.centsPerUnit ?? Infinity) - (rate(b.line)?.centsPerUnit ?? Infinity))
   const isChecked = (shop: OwnStore, line: Matched) => {
@@ -130,7 +140,8 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
           <option value="source">Oorspronkelijke bronvolgorde</option>
           <option value="unitPrice">Eenheidsprijs laag naar hoog</option>
           <option value="lineTotal">Weekregelbedrag laag naar hoog</option>
-          {store === 'all' && <option value="priceGap">Grootste prijsverschil per ingrediënt</option>}
+          {store === 'all' && <option value="priceGap"
+            disabled={paired.status !== 'comparable'}>Grootste prijsverschil per ingrediënt</option>}
         </select></label>
         <label>Zoek eigen product <input type="search" value={query}
           onChange={event => setQuery(event.target.value)} maxLength={120} placeholder="Product, SKU of ingrediënt" /></label>
