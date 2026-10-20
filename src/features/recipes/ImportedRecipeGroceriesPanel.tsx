@@ -242,6 +242,39 @@ export function ImportedRecipeGroceriesPanel({
     }))
     if (!accepted) setFeedback('Het recept of de beveiligde Planner-opslag is veranderd of niet beschikbaar. De hele batch is geweigerd en het bestaande weekmenu is behouden.')
   }
+  function downloadPlanWithGroceries() {
+    setFeedback('')
+    try {
+      if (!plannerReadyForSelection || !plannerDaysDistinct ||
+        plannerAssignments.length === 0 || !list?.canCopy)
+        throw new Error('Controleer alle ingrediënten, porties en unieke dagen voordat je het weekmenu exporteert.')
+      requireLatestOwnedRecipes()
+      const byDay = new Map(plannerAssignments.map(row => [row.day, row]))
+      const lines = plannerDays.map(day => {
+        const assigned = byDay.get(day)
+        return day + ': ' + (assigned
+          ? assigned.title + ' (' + assigned.servings + ' porties)'
+          : 'geen recept gekozen')
+      })
+      const groceryText = formatOwnRecipeChecklist(list, {}, false)
+      const text = ['SUPA · CONCEPTWEEKMENU (NIET OPGESLAGEN)',
+        'Gebaseerd op eigen gecontroleerde recepten en gekozen dagen.',
+        ...lines, '', 'VOLLEDIGE ONGEPRIJSDE BOODSCHAPPEN',
+        groceryText, '',
+        'Dit is een concept, geen opgeslagen Planner en geen winkelprijsvergelijking.',
+        'Alle SKU’s, winkelprijzen, beschikbaarheid en besparing zijn onbekend.',
+      ].join('\n')
+      if (new TextEncoder().encode(text).length > 256_000)
+        throw new Error('Het complete weekmenu is te groot om als één bestand te downloaden.')
+      savePrivateFile('supa-conceptweekmenu-met-boodschappen.txt', text,
+        'text/plain;charset=utf-8')
+      setFeedback('Het volledige conceptweekmenu en de ongeprijsde boodschappen zijn als één privé-TXT gedownload. ' +
+        'Plan de recepten apart met de knop hierboven om je Planner echt te bewaren.')
+    } catch (cause) {
+      setFeedback(cause instanceof Error ? cause.message :
+        'Het complete weekmenu kon niet veilig worden geëxporteerd.')
+    }
+  }
   const changedPortions = selected.filter(recipe =>
     Object.hasOwn(portionsById, recipe.id) &&
     portionsById[recipe.id] !== recipe.servings)
@@ -830,6 +863,11 @@ export function ImportedRecipeGroceriesPanel({
             onClick={() => planSelected('list')}>Plan en open de boodschappenlijst</button>
           <button type="button" disabled={!plannerReadyForSelection || !plannerAssignments.length || !plannerDaysDistinct}
             onClick={() => planSelected('basket')}>Plan en vergelijk mijn winkelbronnen</button>
+          <button type="button" className="ghost-button"
+            disabled={!plannerReadyForSelection || !plannerAssignments.length || !plannerDaysDistinct}
+            onClick={downloadPlanWithGroceries}>
+            Download conceptweekmenu + volledige boodschappen (TXT)
+          </button>
         </div>
       </section>
       <section className="recipe-collection-groceries__week"
