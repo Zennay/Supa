@@ -268,21 +268,35 @@ export function RecipeShoppingChangePanel({ preview, day }: {
       de volledige fysieke mandjes en oorspronkelijke PLUS/Deka-SKU’s opnieuw
       worden gecontroleerd. Oude productmatches zijn geen geldige nieuwe vergelijking.</p>
     <div className="recipe-reuse-preview-shopping__actions">
-      <button type="button" className="ghost-button" onClick={downloadFullWeek}>Download volledige weeklijst (TXT)</button>
-      <button type="button" className="ghost-button" onClick={downloadFullWeekCsv}>Download volledige weeklijst (CSV)</button>
-      <button type="button" className="ghost-button" onClick={() => void shareFullWeek()}>Deel volledige weeklijst (mobiel)</button>
-      <button type="button" className="ghost-button" onClick={() => void shareFullWeekCsv()}>Deel weeklijst als CSV-bestand</button>
-      <button type="button" className="ghost-button" onClick={() => void copyFullWeek()}>Kopieer volledige weeklijst</button>
-      <button type="button" className="ghost-button" onClick={download}>Download wijziging (TXT)</button>
-      <button type="button" className="ghost-button" onClick={() => void copy()}>Kopieer wijziging</button>
-      <button type="button" className="ghost-button" onClick={() => downloadCapture('csv')}>
-        Leeg PLUS/Deka-prijsinvulblad voor nieuw weekmandje (CSV)
+      <button type="button" className="ghost-button" onClick={() => void copyFullWeek()}>
+        Kopieer voorgestelde weekboodschappen
       </button>
-      <button type="button" className="ghost-button" onClick={() => downloadCapture('guide')}>
-        Bijpassende fysieke opnamegids (TXT)
+      <button type="button" className="ghost-button" onClick={() => void shareFullWeek()}>
+        Deel voorgestelde weekboodschappen
       </button>
-      <details className="recipe-reuse-preview-shopping__capture">
-        <summary>Maak losse winkelopnames voor PLUS of DekaMarkt (leeg en herimporteerbaar)</summary>
+      <details className="recipe-reuse-preview-shopping__full">
+        <summary>Downloaden en uitgebreide export (TXT / CSV)</summary>
+        <div className="recipe-reuse-preview-shopping__actions">
+          <button type="button" className="ghost-button" onClick={downloadFullWeek}>Volledige weeklijst als TXT</button>
+          <button type="button" className="ghost-button" onClick={downloadFullWeekCsv}>Volledige weeklijst als CSV</button>
+          <button type="button" className="ghost-button" onClick={() => void shareFullWeekCsv()}>Deel CSV-bestand</button>
+          <button type="button" className="ghost-button" onClick={download}>Alleen de boodschappenwijzigingen als TXT</button>
+          <button type="button" className="ghost-button" onClick={() => void copy()}>Kopieer alleen wijzigingen</button>
+        </div>
+      </details>
+      <details className="recipe-reuse-preview-shopping__full">
+        <summary>Winkelopname voorbereiden · PLUS / DekaMarkt</summary>
+        <p>Je voorgestelde recept moet eerst worden gekozen om de eigen
+          winkelbronbestanden daarna via Vergelijk te importeren. Oude
+          bronmomenten of SKU-matches worden niet als nieuw bewijs hergebruikt.</p>
+        <div className="recipe-reuse-preview-shopping__actions">
+          <button type="button" className="ghost-button" onClick={() => downloadCapture('csv')}>
+            Leeg gecombineerd PLUS/Deka-broninvulblad
+          </button>
+          <button type="button" className="ghost-button" onClick={() => downloadCapture('guide')}>
+            Bijpassende gecombineerde opnamegids
+          </button>
+        </div>
         <p>Vul alleen de echte winkelproductgegevens in de bijpassende CSV in.
           De gids vermeldt per rij welk fysiek ingrediënt je zoekt.
           Elke winkel kan afzonderlijk via de bestaande Vergelijk-import worden verwerkt.</p>
