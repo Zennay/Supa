@@ -22,6 +22,8 @@ export function ManualShoppingNotes({ notes, setNotes }: {
   const [store, setStore] = useState<UnpricedShoppingNote['store']>('Algemeen')
   const [onlyOpen, setOnlyOpen] = useState(false)
   const [search, setSearch] = useState('')
+  const [firstShop, setFirstShop] = useState<'PLUS' | 'DekaMarkt'>('PLUS')
+  const [assignStore, setAssignStore] = useState<'PLUS' | 'DekaMarkt'>('PLUS')
   const [filterStore, setFilterStore] = useState<'Alle winkels' | UnpricedShoppingNote['store']>('Alle winkels')
   const [exportVisible, setExportVisible] = useState(false)
   const [message, setMessage] = useState('')
@@ -290,7 +292,10 @@ export function ManualShoppingNotes({ notes, setNotes }: {
   const visible = selected.filter(note => (!onlyOpen || !note.done) &&
     (!needle || note.label.normalize('NFKD').replace(/\p{M}/gu, '')
       .toLocaleLowerCase('nl').includes(needle)))
-  const grouped = stores.map(groupStore => ({
+  const shopRoute: readonly UnpricedShoppingNote['store'][] = [
+    firstShop, firstShop === 'PLUS' ? 'DekaMarkt' : 'PLUS', 'Algemeen',
+  ]
+  const grouped = shopRoute.map(groupStore => ({
     store: groupStore, items: visible.filter(note => note.store === groupStore),
   })).filter(group => group.items.length > 0)
   const visibleIds = new Set(visible.map(note => note.id))
@@ -311,11 +316,32 @@ export function ManualShoppingNotes({ notes, setNotes }: {
     setMessage(groupStore + ': alleen de zichtbare persoonlijke boodschappen ' +
       (checked ? 'afgevinkt.' : 'weer opengezet.') + ' Geen prijzen veranderd.')
   }
+  function assignVisibleUnpriced() {
+    const candidates = visible.filter(item => item.store === 'Algemeen')
+    if (!candidates.length) return
+    const existing = new Set(notes.filter(item => item.store === assignStore)
+      .map(item => duplicateKey(item.store, item.label)))
+    if (candidates.some(item => existing.has(duplicateKey(assignStore, item.label)))) {
+      setMessage('Een boodschap bestaat al bij ' + assignStore + '. Niets verplaatst; bekijk eerst dubbele artikelen.')
+      return
+    }
+    const ids = new Set(candidates.map(item => item.id))
+    setNotes(current => {
+      const already = new Set(current.filter(item => item.store === assignStore)
+        .map(item => duplicateKey(item.store, item.label)))
+      if (current.filter(item => ids.has(item.id)).some(item => item.store !== 'Algemeen' ||
+          already.has(duplicateKey(assignStore, item.label)))) return current
+      return current.map(item => ids.has(item.id) ? { ...item, store: assignStore } : item)
+    })
+    setMessage(candidates.length + ' zichtbare algemene boodschappen naar ' + assignStore +
+      ' verplaatst met behoud van vinkjes. Geen prijs of winkelproduct toegekend.')
+  }
+  const routeItems = grouped.flatMap(group => group.items)
   const exportText = [
     'SUPA · EIGEN ONGEPRIJSDE BOODSCHAPPEN · ' + filterStore,
     'Los van Planner, bronopnames, weekbudget en winkelmandtotalen.', '',
     ...(onlyOpen ? ['Alleen nog open artikelen:'] : []),
-    ...visible.map(note => (note.done ? '☑ ' : '☐ ') + `[${note.store}] ${safeLabel(note.label)} · prijs onbekend`),
+    ...routeItems.map(note => (note.done ? '☑ ' : '☐ ') + `[${note.store}] ${safeLabel(note.label)} · prijs onbekend`),
     '', 'Geen winkelprijs, bronrecht of besparingsclaim.',
   ].join('\n') + '\n'
   function downloadPrintableList() {
@@ -324,7 +350,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
     const escapeHtml = (text: string) => text.replace(/&/gu, '&amp;')
       .replace(/</gu, '&lt;').replace(/>/gu, '&gt;')
       .replace(/"/gu, '&quot;').replace(/'/gu, '&#39;')
-    const groups = stores.flatMap(shop => {
+    const groups = shopRoute.flatMap(shop => {
       const items = visible.filter(note => note.store === shop)
       if (!items.length) return []
       return ['<section><h2>' + shop + '</h2><p>' +
@@ -408,6 +434,12 @@ export function ManualShoppingNotes({ notes, setNotes }: {
           {stores.map(item => <option key={item} value={item}>{item}</option>)}
         </select>
       </label>
+      <label>Eerste winkel in mijn route
+        <select value={firstShop} onChange={event => setFirstShop(event.currentTarget.value as typeof firstShop)}>
+          <option value="PLUS">Eerst PLUS</option>
+          <option value="DekaMarkt">Eerst DekaMarkt</option>
+        </select>
+      </label>
       <label>Zoek mijn eigen boodschappen
         <input type="search" maxLength={120} value={search} placeholder="Zoek zonder accent"
           onChange={event => setSearch(event.target.value)} />
@@ -435,6 +467,15 @@ export function ManualShoppingNotes({ notes, setNotes }: {
             <button type="button" disabled={!group.items.some(item => item.done)}
               onClick={() => markGroup(group.store, false)}>Heropen deze winkel</button>
           </div>
+          {group.store === 'Algemeen' && <div className="manual-shopping-notes__assign">
+            <label>Verplaats zichtbare algemene artikelen naar winkel
+              <select value={assignStore} onChange={event => setAssignStore(event.currentTarget.value as typeof assignStore)}>
+                <option value="PLUS">PLUS</option><option value="DekaMarkt">DekaMarkt</option>
+              </select>
+            </label>
+            <button type="button" onClick={assignVisibleUnpriced}>Verplaats {group.items.length} items</button>
+            <small>Alleen persoonlijke lijst: bestaande dubbelen blokkeren verplaatsing, vinkjes blijven.</small>
+          </div>}
         </header>
         <ul>{group.items.map(note => <li key={note.id}>
       {editing?.id === note.id ? <form className="manual-shopping-notes__edit" onSubmit={saveEditedNote}>
