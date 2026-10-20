@@ -2194,8 +2194,17 @@ export function OfflineReviewedWorkbench({
 
   async function downloadReviewedIngredientLedger() {
     if (!imported || !basketPair || !coverageRows.length) return
+    const sourceRevision = importRevision.current
+    const originalSource = text
+    const originalPlan = captureWeek
     try {
       const { literalCsv } = await import('../../privateBasketComparisonCsv.ts')
+      // An async module load must not export a previous week or withdrawn
+      // source receipt after the user edits/replaces the local capture.
+      if (sourceRevision !== importRevision.current ||
+          originalSource !== currentActiveSource.current ||
+          originalPlan !== captureWeekRef.current)
+        throw Error('Source or week changed while preparing private export')
       const nowNs = BigInt(Date.now()) * 1_000_000n
       const exactLine = (store: typeof stores[number], id: string) => {
         const source = imported.captures[store]
@@ -2203,20 +2212,22 @@ export function OfflineReviewedWorkbench({
         const line = basket?.lines.find(item => item.id === id)
         const fresh = !!source && nowNs >= source.observedNs - 300_000_000_000n &&
           nowNs - source.observedNs <= 604_800_000_000_000n
-        const empty = (status: string) => ({ values: [status, source?.observedAt ?? '', '', '', '', '', '', ''], line: null as Matched | null })
+        const empty = (status: string) => ({ values: [status, source?.observedAt ?? '', ...new Array<string>(9).fill('')], line: null as Matched | null })
         if (!source) return empty('Geen bron')
         if (!fresh) return empty('Bron verlopen of toekomstig')
         if (!line || line.status !== 'matched' ||
             !isAcceptedKey(reviewedLineKey(store, source.observedAt, line)))
           return empty('Niet persoonlijk bevestigd')
         return { values: ['Bevestigde eigen bron', source.observedAt, line.productId,
-          line.productName, String(line.packs), String(line.pricePerPackCents),
+          line.productName, String(line.packs), String(line.pack.amount),
+          line.pack.unit, String(line.pack.count), String(line.pricePerPackCents),
           String(line.lineTotalCents), privateUnitPrice(line) ?? ''], line }
       }
       const rows = [[
         'ingredient_id', 'ingredient', 'benodigd', 'eenheid',
         ...stores.flatMap(store => ['status', 'bronmoment', 'productcode', 'product',
-          'hele_pakken', 'pakprijs_cent', 'regel_cent', 'eenheidsprijs'].map(field => store + '_' + field)),
+          'hele_pakken', 'pakinhoud', 'pakeenheid', 'stuks_per_verpakking',
+          'pakprijs_cent', 'regel_cent', 'eenheidsprijs'].map(field => store + '_' + field)),
         'Deka_minus_PLUS_cent', 'betekenis',
       ]]
       for (const need of coverageRows) {
