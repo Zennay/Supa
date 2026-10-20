@@ -166,7 +166,7 @@ function observedPackDescription(product) {
 // Read-only preview for an explicitly chosen OWN observed SKU. The source
 // must be recent; only the canonical TS calculator may decide whole packs.
 function ownPhysicalPricePreview(row, store, product) {
-  if (!product || !captures?.[store] || !product.available) return null
+  if (pendingManualEdit || !product || !captures?.[store] || !product.available) return null
   const age = ageNs(captures[store].observedAt, Date.now())
   if (age === null || needsRecapture(age)) return null
   const raw = row.querySelector('.amount').value.trim()
@@ -178,6 +178,7 @@ function ownPhysicalPricePreview(row, store, product) {
   return request.outcome
 }
 function chosenWholePackPreview(row, store, product) {
+  if (pendingManualEdit) return 'Eerst de handmatige bronwijziging accepteren of annuleren.'
   if (!product || !captures?.[store] || !product.available) return ''
   const age = ageNs(captures[store].observedAt, Date.now())
   if (age === null || needsRecapture(age))
@@ -220,6 +221,13 @@ function updateCoverage() {
     coverage.textContent = rows.length + ' fysieke ingrediëntregels zonder toegelaten eigen winkelopnames. ' +
       'De ongeprijsde lijst blijft beschikbaar; geen supermarktbedragen bekend.'
     coverage.className = 'notice warning'
+    return
+  }
+  if (pendingManualEdit) {
+    coverage.className = 'notice warning'
+    coverage.textContent = 'Er staat een onbevestigde handmatige winkelbronwijziging open. ' +
+      'De vorige opname blijft veilig bewaard, maar huidige dekking en prijzen staan op HOLD ' +
+      'tot je de echte bronwijziging accepteert of annuleert. De ongeprijsde lijst blijft bruikbaar.'
     return
   }
   const messages = stores.map(store => {
@@ -302,7 +310,7 @@ function updateSelect(select, store, unit) {
   const query = search.value.trim().toLocaleLowerCase('nl')
   const chosen = select.value
   const age = captures?.[store] ? ageNs(captures[store].observedAt, Date.now()) : null
-  const priceCurrent = age !== null && !needsRecapture(age)
+  const priceCurrent = !pendingManualEdit && age !== null && !needsRecapture(age)
   const all = observedProducts(store, unit)
   const kept = all.find(product => product.id === chosen)
   const filtered = all.filter(product => !query ||
@@ -323,7 +331,8 @@ function updateSelect(select, store, unit) {
   for (const product of shown) {
     const pack = product.packAmount === null ? 'verpakking onbekend'
       : String(product.packAmount).replace('.', ',') + ' ' + product.packUnit
-    const state = !priceCurrent ? ' · oude/toekomstige opname: huidige prijs onbekend'
+    const state = pendingManualEdit ? ' · handmatig concept open: prijs tijdelijk onbekend'
+      : !priceCurrent ? ' · oude/toekomstige opname: huidige prijs onbekend'
       : !product.available ? ' · niet leverbaar'
         : product.priceCents === null || product.packAmount === null
           ? ' · prijs/verpakking onbekend' :
@@ -344,7 +353,8 @@ function updateSelect(select, store, unit) {
       '), bewust niet automatisch gekozen. ' : '') +
     (chosenProduct
       ? 'Gekozen SKU ' + chosenProduct.id + ': ' +
-        (!priceCurrent ? 'oorspronkelijke opname verlopen/toekomstig; huidige prijs onbekend' :
+        (pendingManualEdit ? 'handmatig bronconcept open; prijs tijdelijk onbekend' :
+          !priceCurrent ? 'oorspronkelijke opname verlopen/toekomstig; huidige prijs onbekend' :
           !chosenProduct.available ? 'niet leverbaar; niet in winkelmandprijs' :
             chosenProduct.priceCents === null || chosenProduct.packAmount === null
               ? 'prijs of verpakking ontbreekt; blijft onbekend'
