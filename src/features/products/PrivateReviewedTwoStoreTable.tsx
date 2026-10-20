@@ -346,8 +346,12 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         <strong>{money.format(wholeCheapestCents - mix.totalCents >= 0
           ? (wholeCheapestCents - mix.totalCents) / 100 : 0)}</strong></p>
       <small>{splitTrip
-        ? 'Twee winkels nodig. Extra reis-, parkeer- en tijdkosten zijn onbekend totdat je ze zelf invult. Netto voordeel wordt hier niet geclaimd.'
+        ? 'Deze goedkoopste artikelroute vraagt twee winkelstops. Niet ingevulde reis-, parkeer- en tijdkosten blijven onbekend.'
         : 'Voor deze goedkoopste productroute is slechts één winkel nodig; er is geen tweede winkelstop.'}</small>
+      {splitTrip && <p>Omslagpunt voor een tweede winkelstop: <strong>
+        {money.format(Math.max(0, wholeCheapestCents - mix.totalCents) / 100)}</strong>.
+        Vanaf dit bedrag aan extra stopkosten is de goedkoopste complete winkel
+        minstens zo voordelig voor de bekende artikelen.</p>}
       {splitTrip && <div className="private-reviewed-products__trip-calculator">
         <label>Zelf opgegeven extra kosten van tweede winkelstop (€)
           <input type="text" inputMode="decimal" maxLength={9}
@@ -376,6 +380,10 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
                 eigen extra kosten; overige tijd, aankopen en ritkosten onbekend.</small>
             </div>}
       </div>}
+      {splitTrip && tripTotalCents !== null && tripTotalCents >= wholeCheapestCents &&
+        <button type="button" onClick={() => openCheckedStoreList(cheapest)}>
+          Open het voordeligste complete mandje bij {cheapest}
+        </button>}
       <button type="button" onClick={openCheckedMixedRoute}>
         Open mijn gecombineerde route in Lijst
       </button>
