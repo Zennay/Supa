@@ -1,8 +1,9 @@
 import { euro as exactEuro } from '../../lib/money.ts'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots } from '../../domain/offlineReviewedImport.ts'
+import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots, type OfflineStoreProduct } from '../../domain/offlineReviewedImport.ts'
 import { recentOwnCaptureInstant } from '../comparison/privateReviewedBasketBridge.ts'
 import { privatePackUnitRate, formatPrivateUnitRate } from '../comparison/privateUnitPrice.ts'
+import { productSearchText } from '../products/productSearchText.ts'
 import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
 import { PlannerSourceMatchPreview } from './PlannerSourceMatchPreview.tsx'
 import { replaceOwnStoreCapture, type CaptureRefreshChanges } from './combineOwnSourceCapture.ts'
@@ -10,6 +11,20 @@ import { privateSourceChangeCsv } from './privateSourceChangeCsv.ts'
 import './plannerQuickSourcePaste.css'
 
 type Preview = { raw: string; normalized: string; data: OfflinePriceSnapshots }
+/** Presentation-only eligibility, not authority to approve a product or price. */
+function completeOwnSourceProduct(product: OfflineStoreProduct): boolean {
+  if (product.sourceAvailable !== true ||
+      typeof product.sourcePriceCents !== 'number' ||
+      !Number.isSafeInteger(product.sourcePriceCents) || product.sourcePriceCents < 0 ||
+      product.packAmount === null || product.packAmount <= 0 ||
+      product.packUnit === 'unknown' ||
+      !Number.isSafeInteger(product.packCount ?? 1) || (product.packCount ?? 1) <= 0)
+    return false
+  return privatePackUnitRate({
+    amount: product.packAmount, unit: product.packUnit,
+    count: product.packCount ?? 1, priceCents: product.sourcePriceCents,
+  }) !== null
+}
 const limit = 256000
 const dateText = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -39,6 +54,8 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
 }) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState('')
+  const [sourceSearch, setSourceSearch] = useState('')
+  const [incompleteOnly, setIncompleteOnly] = useState(false)
   const [separateDrafts, setSeparateDrafts] = useState({ PLUS: '', DekaMarkt: '' })
   const [updateDraft, setUpdateDraft] = useState('')
   const [preview, setPreview] = useState<Preview | null>(null)
@@ -446,11 +463,33 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
       {message && <p role="status" aria-live="polite">{message}</p>}
       {preview && <div className="supa-planner-source-paste__preview">
         <strong>{Object.keys(preview.data.captures).length} eigen winkelopname(s) gevonden</strong>
+        <div className="supa-planner-source-paste__source-filter">
+          <label>Zoek in originele bronproducten of SKU's
+            <input type="search" maxLength={120} value={sourceSearch}
+              placeholder="Bijvoorbeeld crème, creme of originele artikelcode"
+              onChange={event => setSourceSearch(event.currentTarget.value)} />
+          </label>
+          <label className="supa-planner-source-paste__filter-checkbox">
+            <input type="checkbox" checked={incompleteOnly}
+              onChange={event => setIncompleteOnly(event.currentTarget.checked)} />
+            Alleen artikelen met ontbrekende of onbruikbare brondata
+          </label>
+          {(sourceSearch || incompleteOnly) && <button type="button" className="ghost-button"
+            onClick={() => { setSourceSearch(''); setIncompleteOnly(false) }}>
+            Wis bronproductfilters
+          </button>}
+        </div>
         {(['PLUS', 'DekaMarkt'] as const).map(store => {
           const capture = preview.data.captures[store]
           if (!capture) return <p key={store}>{store}: geen bron; geen prijs beschikbaar.</p>
-          const priced = capture.products.filter(p => p.sourceAvailable === true &&
-            p.sourcePriceCents !== null && p.packAmount !== null).length
+          const priced = capture.products.filter(completeOwnSourceProduct).length
+          const query = productSearchText(sourceSearch.trim())
+          const visibleProducts = capture.products.filter(product =>
+            (!query || [product.name, product.id].some(value =>
+              productSearchText(value).includes(query))) &&
+            (!incompleteOnly || !completeOwnSourceProduct(product)))
+            .sort((a, b) => Number(completeOwnSourceProduct(a)) -
+              Number(completeOwnSourceProduct(b)))
           return <section key={store}>
             <h4>{store}</h4>
             <p>{capture.products.length} originele SKU's;
@@ -459,17 +498,12 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
             <small>Oorspronkelijk bronmoment: {dateText.format(new Date(capture.observedMs))}</small>
             <details className="supa-planner-source-paste__products">
               <summary>Bekijk originele SKU’s, verpakkingen en ontbrekende prijzen</summary>
-              <p>Bronpreview, geen geaccepteerde matching of actueel winkelmandtotaal.
-                De maximaal twaalf weergegeven producten komen uit je eigen opname.</p>
+              <p role="status">Bronpreview: {visibleProducts.length} van {capture.products.length}
+                {' '}originele SKU's voldoen aan je filters; maximaal 24 regels in beeld.
+                Niet gekoppeld, geen actueel winkelmandtotaal of geaccepteerde matching.</p>
               <ul>
-                {[...capture.products].sort((a, b) => {
-                  const missing = (item: typeof a) =>
-                    item.sourcePriceCents === null || !item.sourceAvailable ||
-                    item.packAmount === null ? 0 : 1
-                  return missing(a) - missing(b)
-                }).slice(0, 12).map(product => {
-                  const priced = product.sourcePriceCents !== null &&
-                    product.sourceAvailable === true && product.packAmount !== null
+                {visibleProducts.slice(0, 24).map(product => {
+                  const priced = completeOwnSourceProduct(product)
                   const rate = priced ? privatePackUnitRate({
                     amount: product.packAmount, unit: product.packUnit,
                     count: product.packCount ?? 1, priceCents: product.sourcePriceCents ?? null,
@@ -488,8 +522,11 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
                   </li>
                 })}
               </ul>
-              {capture.products.length > 12 &&
-                <small>Overige {capture.products.length - 12} originele SKU’s bekijk je in Vergelijk.</small>}
+              {visibleProducts.length === 0 && <li>Geen originele SKU's bij deze filters.
+                Wis de filters of zoek op een andere productnaam of artikelcode.</li>}
+              {visibleProducts.length > 24 &&
+                <small>Toon hier de eerste 24 gevonden SKU's. Verfijn je zoekterm
+                  of bekijk alle oorspronkelijke producten in Vergelijk.</small>}
             </details>
           </section>
         })}
