@@ -421,3 +421,15 @@ border-radius:10px;padding:.65rem;scroll-margin-top:1.25rem}
   outline: 3px solid #226f52;
   outline-offset: 3px;
 }
+
+.offline-price-workbench__capture-followup {
+  display:grid; gap:.7rem; padding:.9rem; min-width:0;
+  border:1px solid #c5d9c9; border-radius:10px; background:#f6faf7;
+}
+.offline-price-workbench__capture-followup p { margin:0; line-height:1.5; }
+.offline-price-workbench__capture-followup-row {
+  display:flex; flex-wrap:wrap; gap:.55rem; align-items:center;
+  border-top:1px solid #dce7dc; padding-top:.6rem;
+}
+.offline-price-workbench__capture-followup-row > span { flex:1 1 100%; overflow-wrap:anywhere; }
+.offline-price-workbench__capture-followup-row button { min-height:44px; }

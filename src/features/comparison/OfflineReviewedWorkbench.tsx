@@ -556,12 +556,14 @@ export function OfflineReviewedWorkbench({
       let missing = 0
       for (const store of stores) {
         const observation = currentPreview.stores.find(entry => entry.retailer === store)
+        if (!observation && imported?.captures[store]) {
+          lines.push(store + ' · andere eigen bronopname bestaat al; geen ontbrekende winkel gefingeerd.')
+          lines.push('Gebruik na acceptatie de volledige winkeldekking om bestaande SKU’s en open controles te bekijken.', '')
+          continue
+        }
         lines.push(store + (observation ? ' · opname aanwezig, openstaande productmatches:' :
-          ' · GEEN eigen winkelopname; al deze behoeften zijn ongeprijsd:'))
-        const needs = observation?.matching?.lines.filter(line => line.status === 'unresolved') ??
-          plannerCaptureNeeds.map(need => ({
-            label: need.label, amount: need.amount, unit: need.unit,
-          }))
+          ' · nog geen eigen winkelopname:'))
+        const needs = missingPreviewCaptureNeeds(store)
         if (!needs.length) lines.push('Geen openstaande matchingvoorstellen op basis van dit eigen bronblad.')
         for (const need of needs) {
           missing++
@@ -590,6 +592,51 @@ export function OfflineReviewedWorkbench({
       setWeekExportMessage(missing + ' nog openstaande fysieke winkelbehoeften lokaal opgeslagen; geen producten of prijzen verzonnen.')
     } catch {
       setWeekExportMessage('Onbekende producten konden niet veilig lokaal worden gedownload. Je originele bronopnames zijn behouden.')
+    }
+  }
+
+  // Use physical Planner needs only; a match hint never becomes a retailer SKU.
+  function missingPreviewCaptureNeeds(store: CaptureStore) {
+    if (!currentPreview) return []
+    const source = currentPreview.stores.find(item => item.retailer === store)
+    if (source) {
+      const unresolved = new Set(source.matching?.lines.filter(line =>
+        line.status === 'unresolved').map(line => line.id) ?? [])
+      return plannerCaptureNeeds.filter(need => unresolved.has(need.id))
+    }
+    // A retained other-store observation is not an absent retailer capture.
+    return imported?.captures[store] ? [] : plannerCaptureNeeds
+  }
+
+  async function downloadPreviewMissingCapture(store: CaptureStore, kind: 'csv' | 'guide') {
+    if (!currentPreview || busy) return
+    const needs = missingPreviewCaptureNeeds(store)
+    if (!needs.length) return
+    const revision = importRevision.current
+    const selectedPlan = planKey
+    try {
+      const content = kind === 'csv'
+        ? (await import('./plannerPriceCaptureSheet.ts')).makeBlankPlannerCaptureCsv(needs, [store])
+        : (await import('./plannerPriceCaptureGuide.ts')).makePlannerCaptureGuide(needs, [store])
+      if (revision !== importRevision.current || selectedPlan !== currentlySelectedPlan.current) {
+        setWeekExportMessage('Weekmenu of bronimport is veranderd. Bekijk eerst de actuele ontbrekende regels.')
+        return
+      }
+      const url = URL.createObjectURL(new Blob([content], { type:
+        kind === 'csv' ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-' + store.toLowerCase() + '-ontbrekend-' + needs.length +
+          (kind === 'csv' ? '.csv' : '-gids.txt')
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setWeekExportMessage(store + ': ' + needs.length + ' fysieke bronregels als ' +
+        (kind === 'csv' ? 'leeg CSV' : 'opnamegids') +
+        ' gedownload. Er zijn geen originele SKU’s, observatietijden of prijzen ingevuld.')
+    } catch {
+      setWeekExportMessage('Kort opnameblad niet beschikbaar; gebruik het volledige lege Planner-blad.')
     }
   }
 
@@ -2317,6 +2364,27 @@ export function OfflineReviewedWorkbench({
                   {' '}niet geobserveerde regels bij de andere winkel;
                   geen tweede winkelprijs.</p>
               )}
+              <div className="offline-price-workbench__capture-followup">
+                <strong>Vul alleen de nog ontbrekende winkelproducten aan</strong>
+                <p>Per winkel kun je een kort leeg CSV-opnameblad plus de bijhorende
+                  ingrediëntenrijgids downloaden. Er wordt geen winkelprijs,
+                  productcode of bronmoment voor je ingevuld.</p>
+                {stores.map(store => {
+                  const missing = missingPreviewCaptureNeeds(store).length
+                  return <div key={'missing-' + store} className="offline-price-workbench__capture-followup-row">
+                    <span>{store}: {missing ? missing + ' nog onbekende productregels' :
+                      'geen ontbrekende nieuwe bronregels vanuit deze preview'}</span>
+                    <button type="button" className="ghost-button" disabled={busy || !missing}
+                      onClick={() => { void downloadPreviewMissingCapture(store, 'csv') }}>
+                      {store} opname-CSV
+                    </button>
+                    <button type="button" className="ghost-button" disabled={busy || !missing}
+                      onClick={() => { void downloadPreviewMissingCapture(store, 'guide') }}>
+                      {store} rijgids (TXT)
+                    </button>
+                  </div>
+                })}
+              </div>
               <p className="disclaimer">Deze lokale CSV-controle geeft geen
                 retailerrechten, bronverificatie of besparingsbewijs.
                 Controleer na overname zelf ieder oorspronkelijk artikel,
