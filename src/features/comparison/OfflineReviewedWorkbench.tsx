@@ -2664,6 +2664,12 @@ export function OfflineReviewedWorkbench({
                   ingrediëntenrijgids downloaden. Er wordt geen winkelprijs,
                   productcode of bronmoment voor je ingevuld. Bij een verlopen
                   of buiten 24 uur gepaarde bron is een volledige nieuwe opname nodig.</p>
+                <p className="disclaimer">Vul een nieuwe opname met het echte waarnemingsmoment in.
+                  Een losse aanvulling kan alleen bij exact dezelfde oorspronkelijk
+                  waargenomen opname worden gevoegd. Heb je ontbrekende producten later
+                  pas gecontroleerd? Neem dan de hele winkel opnieuw op: geef nieuwe
+                  prijzen nooit kunstmatig het oudere bronmoment om de import te laten passen.
+                  Supa controleert vóór vervangen welke oorspronkelijke SKU’s verdwijnen.</p>
                 {stores.map(store => {
                   const missing = missingPreviewCaptureNeeds(store).length
                   const source = currentPreview.stores.find(item => item.retailer === store)
