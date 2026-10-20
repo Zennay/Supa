@@ -291,11 +291,19 @@ export function importRecipeFromHtml(html: string, sourceUrl: string | null = nu
     const ingredients = Array.isArray(recipe.recipeIngredient) ? recipe.recipeIngredient : []
     const lines = ingredients.map(item => typeof item === 'string' ? item : record(item) ? text(item.name) : '').filter(Boolean)
     if (!lines.length) throw new Error('Geen herkenbare ingrediënten; vul het recept handmatig in')
+    const declaredTotal = recipeMinutes(recipe.totalTime)
+    const prep = recipeMinutes(recipe.prepTime)
+    const cook = recipeMinutes(recipe.cookTime)
+    // Cooking alone is not the total preparation time. When schema.org omits
+    // totalTime, combine BOTH independently declared phases or ask for review.
+    // Incomplete or >24h durations must not become a confidently short meal.
+    const minutes = declaredTotal ??
+      (prep !== null && cook !== null ? positiveNumber(prep + cook, 1440) : null)
     return normalizedDraft({
       source: parsedUrl ? 'url' : 'manual', sourceUrl: parsedUrl ? safeRecipeSourceUrl(parsedUrl.toString()) : null,
       title: recipe.name,
       servings: recipeServings(recipe.recipeYield),
-      minutes: recipeMinutes(recipe.totalTime) ?? recipeMinutes(recipe.cookTime),
+      minutes,
       ingredients: lines,
       steps: stepsFrom(recipe.recipeInstructions),
     })
