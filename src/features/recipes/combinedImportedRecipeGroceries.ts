@@ -18,6 +18,8 @@ export type CombinedImportedGroceries = {
   checklist: OwnRecipeChecklist
   recipes: number
   heldRecipes: string[]
+  /** The same canonical SKU-facing identity cannot carry different source names. */
+  identityConflicts: { query: string; unit: string; entries: { recipeId: string; recipeTitle: string; label: string }[] }[]
   /** This is always unpriced. Only exact matching names + physical units merge. */
   complete: boolean
 }
@@ -40,6 +42,28 @@ export function combinedImportedRecipeGroceries(
   const groups = new Map<string, OwnRecipeChecklistLine>()
   const contributorsByLine: Record<string, GroceryContribution[]> = Object.create(null)
   const heldRecipes: string[] = []
+  // Planner's aggregatePlanIngredients keys own recipes by query + unit and
+  // REJECTS different labels for one identity. Detect this at the unpriced
+  // list stage so a seemingly complete combined list never masks that drift.
+  const labelsByIdentity = new Map<string, {
+    query: string; unit: string
+    entries: { recipeId: string; recipeTitle: string; label: string }[]
+  }>()
+  for (const recipe of recipes) {
+    const projected = toPlannerRecipe(recipe, { usage: 'unpriced-demand' })
+    for (const ingredient of projected?.ingredients ?? []) {
+      const key = JSON.stringify([ingredient.query, ingredient.unit])
+      const current = labelsByIdentity.get(key)
+      const entry = { recipeId: recipe.id, recipeTitle: recipe.title, label: ingredient.label }
+      if (current) {
+        if (!current.entries.some(item => item.recipeId === entry.recipeId && item.label === entry.label))
+          current.entries.push(entry)
+      } else labelsByIdentity.set(key, { query: ingredient.query, unit: ingredient.unit, entries: [entry] })
+    }
+  }
+  const identityConflicts = [...labelsByIdentity.values()].filter(row =>
+    new Set(row.entries.map(item => item.label)).size > 1)
+  const conflictingKeys = new Set(identityConflicts.map(row => JSON.stringify([row.query, row.unit])))
   for (const recipe of recipes) {
     if (!recipe || typeof recipe.title !== 'string' ||
         !Array.isArray(recipe.ingredients) || !recipe.ingredients.length) {
@@ -64,6 +88,10 @@ export function combinedImportedRecipeGroceries(
       // label that may be spelled the same for physically different items.
       const groupKey = complete && typeof item.query === 'string' && item.query.trim()
         ? JSON.stringify([item.query, item.unit]) : null
+      const conflictingIdentity = groupKey !== null && conflictingKeys.has(groupKey)
+      // Keep each original source visible and unresolved instead of combining
+      // different labels behind the same matching identity.
+      const safeGroupKey = conflictingIdentity ? null : groupKey
       const contribution: GroceryContribution = {
         recipeId: recipe.id, recipeTitle: recipe.title,
         ingredientLabel: label || item.original,
@@ -71,7 +99,7 @@ export function combinedImportedRecipeGroceries(
         original: item.original,
         amount: complete ? item.amount : null, unit: complete ? item.unit : null,
       }
-      const prior = groupKey ? groups.get(groupKey) : null
+      const prior = safeGroupKey ? groups.get(safeGroupKey) : null
       if (prior) contributorsByLine[prior.key].push(contribution)
       if (prior) {
         const total = sumDecimalAmounts([prior.amount!, item.amount!])
@@ -84,21 +112,21 @@ export function combinedImportedRecipeGroceries(
         // Hold the whole grouped quantity for human review instead.
         prior.original += ' + ' + item.original
         prior.amount = null; prior.unit = null; prior.needsReview = true
-        groups.delete(groupKey!)
+        groups.delete(safeGroupKey!)
         continue
       }
       const line: OwnRecipeChecklistLine = {
         key: String(lines.length),
         label: label || recipe.title,
-        query: groupKey ? item.query : undefined,
-        amount: complete ? item.amount : null,
-        unit: complete ? item.unit : null,
-        needsReview: !complete,
+        query: safeGroupKey ? item.query : undefined,
+        amount: complete && !conflictingIdentity ? item.amount : null,
+        unit: complete && !conflictingIdentity ? item.unit : null,
+        needsReview: !complete || conflictingIdentity,
         original: item.original,
       }
       lines.push(line)
       contributorsByLine[line.key] = [contribution]
-      if (groupKey) groups.set(groupKey, line)
+      if (safeGroupKey) groups.set(safeGroupKey, line)
     }
   }
   const checklist: OwnRecipeChecklist = {
@@ -109,7 +137,7 @@ export function combinedImportedRecipeGroceries(
   }
   checklist.copyText = formatOwnRecipeChecklist(checklist, {})
   return {
-    checklist, contributorsByLine, recipes: recipes.length, heldRecipes,
-    complete: !heldRecipes.length && lines.every(line => !line.needsReview),
+    checklist, contributorsByLine, recipes: recipes.length, heldRecipes, identityConflicts,
+    complete: !heldRecipes.length && !identityConflicts.length && lines.every(line => !line.needsReview),
   }
 }
