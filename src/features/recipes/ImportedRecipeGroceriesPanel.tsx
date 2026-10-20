@@ -8,7 +8,7 @@ import { combinedImportedRecipeGroceries } from './combinedImportedRecipeGroceri
 import { formatOwnRecipeChecklist } from './recipeShoppingChecklist.ts'
 import { exportOwnRecipeChecklistCsv } from './recipeShoppingCsv.ts'
 import { exportCombinedRecipesPrivateWeek } from './exportCombinedRecipesPrivateWeek.ts'
-import { exportUnpricedProgress, importUnpricedProgress, unpricedProgressMaxBytes } from '../comparison/unpricedPlannerProgress.ts'
+import { exportUnpricedProgress, importUnpricedProgress, unpricedProgressMaxBytes, unpricedProgressStorageKey } from '../comparison/unpricedPlannerProgress.ts'
 
 // UI-only discovery, never a synonym mapping or verified retailer-product match.
 function searchableIngredient(value: string): string {
@@ -47,6 +47,7 @@ export function ImportedRecipeGroceriesPanel({
   const [query, setQuery] = useState('')
   const [reuseFirst, setReuseFirst] = useState(false)
   const [startDay, setStartDay] = useState(m2InitialPlan[0].day)
+  const [captureTarget, setCaptureTarget] = useState<'both' | 'PLUS' | 'DekaMarkt'>('both')
   const [dayOverrides, setDayOverrides] = useState<Record<string, string>>({})
   const [portionsById, setPortionsById] = useState<Record<string, number>>({})
   const [checked, setChecked] = useState<Record<string, boolean>>({})
@@ -321,6 +322,32 @@ export function ImportedRecipeGroceriesPanel({
       setFeedback('CSV met fysieke hoeveelheden, controlepunten en onbekende prijzen lokaal opgeslagen.')
     } catch (cause) {
       setFeedback(cause instanceof Error ? cause.message : 'De CSV kon niet worden opgeslagen.')
+    }
+  }
+  async function downloadCaptureKit(kind: 'csv' | 'guide') {
+    if (!result?.complete || selected.length > 14) return
+    setFeedback('')
+    const identity = progressIdentity
+    try {
+      const { combinedRecipesCaptureKit } = await import('./combinedRecipesCaptureKit.ts')
+      if (latestProgressIdentity.current !== identity)
+        throw new Error('De receptenbundel is gewijzigd. Maak de winkelopname opnieuw.')
+      const stores = captureTarget === 'both' ? ['PLUS', 'DekaMarkt'] as const : [captureTarget]
+      const kit = combinedRecipesCaptureKit(selected, portionsById, stores)
+      if (latestProgressIdentity.current !== identity)
+        throw new Error('De fysieke ingrediënten zijn veranderd. Maak het opnameblad opnieuw.')
+      // One stable filename stem pairs the blank CSV with its exact row guide.
+      // This is only a local document identifier, not source-evidence metadata.
+      const fingerprint = unpricedProgressStorageKey(identity).split(':').pop()!
+      const stem = 'supa-recepten-' + fingerprint + '-' + kit.storeLabel
+      savePrivateFile(stem + (kind === 'csv' ? '-lege-winkelopname.csv' : '-opnamegids.txt'),
+        kind === 'csv' ? kit.csv : kit.guide,
+        kind === 'csv' ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8')
+      setFeedback(kind === 'csv'
+        ? 'Leeg importeerbaar winkelblad opgeslagen, zonder bronartikelen, tijd of prijzen. Download de bijbehorende rijgids.'
+        : 'De bijbehorende rijgids is opgeslagen. Vul alleen werkelijk toegestane en gecontroleerde bronproducten in.')
+    } catch (cause) {
+      setFeedback(cause instanceof Error ? cause.message : 'Het lege winkelopnameblad is niet beschikbaar.')
     }
   }
   const exportForStores = () => {
