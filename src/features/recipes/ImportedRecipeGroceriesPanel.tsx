@@ -415,6 +415,7 @@ export function ImportedRecipeGroceriesPanel({
       }
       if (latestCaptureKey.current !== key)
         throw new Error('De recepten zijn veranderd. Maak de gids opnieuw.')
+      requireLatestOwnedRecipes()
       setCopyableCaptureGuide({ identity, target, text: content })
       setFeedback('Klembordtoegang ontbreekt. Selecteer en kopieer je ongeprijsde rijgids hieronder.')
     } catch (cause) {
@@ -425,21 +426,24 @@ export function ImportedRecipeGroceriesPanel({
     if (!privateTransfer.ready) return
     setFeedback('')
     const identity = progressIdentity
+    const key = captureKey
     try {
       requireLatestOwnedRecipes()
       const { combinedRecipesCaptureKit } = await import('./combinedRecipesCaptureKit.ts')
       requireLatestOwnedRecipes()
-      if (latestProgressIdentity.current !== identity)
+      if (latestCaptureKey.current !== key)
         throw new Error('De receptenbundel is gewijzigd. Maak de winkelopname opnieuw.')
       const stores = captureTarget === 'both' ? ['PLUS', 'DekaMarkt'] as const : [captureTarget]
       const kit = combinedRecipesCaptureKit(selected, portionsById, stores)
-      if (latestProgressIdentity.current !== identity)
+      if (latestCaptureKey.current !== key)
         throw new Error('De fysieke ingrediënten zijn veranderd. Maak het opnameblad opnieuw.')
       // One stable filename stem pairs the blank CSV with its exact row guide.
       // This is only a local document identifier, not source-evidence metadata.
       const fingerprint = unpricedProgressStorageKey(identity).split(':').pop()!
       const stem = 'supa-recepten-' + fingerprint + '-' + kit.storeLabel
       requireLatestOwnedRecipes()
+      if (latestCaptureKey.current !== key)
+        throw new Error('De winkelkeuze is gewijzigd. Maak het actuele bronblad opnieuw.')
       savePrivateFile(stem + (kind === 'csv' ? '-lege-winkelopname.csv' : '-opnamegids.txt'),
         kind === 'csv' ? kit.csv : kit.guide,
         kind === 'csv' ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8')
@@ -482,6 +486,7 @@ export function ImportedRecipeGroceriesPanel({
         if (window.sessionStorage.getItem(handoffKey) !== previous)
           throw new Error('De vorige weekmenu-overdracht is gewijzigd. Controleer opnieuw voordat je overschrijft.')
       }
+      requireLatestOwnedRecipes()
       window.sessionStorage.setItem(handoffKey, json)
       window.location.assign(import.meta.env.BASE_URL + 'private-basket-mapping.html')
     } catch (cause) {
