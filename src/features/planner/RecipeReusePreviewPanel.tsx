@@ -20,12 +20,14 @@ export function RecipeReusePreviewPanel({
   recipes,
   onChooseRecipe,
   onOpenComparison,
+  onOpenList,
 }: {
   plannedMeals: PlannedMeal[]
   activeDays: string[]
   recipes: RecipeWithIngredients[]
   onChooseRecipe: (day: string, recipeId: string) => void
   onOpenComparison: () => void
+  onOpenList: () => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const [requestedDay, setRequestedDay] = useState<string | null>(null)
@@ -69,13 +71,14 @@ export function RecipeReusePreviewPanel({
     plan: plannedMeals, recipes, activeDays, day, recipeId,
   }) : null
   const canApply = preview !== null && shoppingPreview?.status === 'ready'
-  function apply(continueToComparison: boolean) {
+  function apply(nextScreen: 'planner' | 'compare' | 'list') {
     // Both previews are derived from this render's actual active Planner
     // state. Do not apply a candidate with unknown quantities or identities.
     if (!canApply) return
     onChooseRecipe(day, recipeId)
     setExpanded(false)
-    if (continueToComparison) onOpenComparison()
+    if (nextScreen === 'compare') onOpenComparison()
+    if (nextScreen === 'list') onOpenList()
   }
 
   return (
@@ -126,12 +129,16 @@ export function RecipeReusePreviewPanel({
           {shoppingPreview && <RecipeShoppingChangePanel preview={shoppingPreview} day={day} />}
           {canApply && <div className="recipe-reuse-preview-shopping__actions">
             <button type="button" className="recipe-reuse-preview-apply"
-              onClick={() => apply(false)}>
+              onClick={() => apply('planner')}>
               Kies {alternatives.find((recipe) => recipe.id === recipeId)?.title} voor {day}
             </button>
             <button type="button" className="recipe-reuse-preview-apply"
-              onClick={() => apply(true)}>
+              onClick={() => apply('compare')}>
               Kies recept en controleer PLUS/Deka-prijzen
+            </button>
+            <button type="button" className="recipe-reuse-preview-apply"
+              onClick={() => apply('list')}>
+              Kies recept en open Boodschappenlijst
             </button>
           </div>}
         </div>
