@@ -43,6 +43,28 @@ export function combinedRecipesCaptureKit(
         combined.contributorsByLine[line.key] ?? [],
       )
   }
+  // The downloadable TXT guide must remain usable when the person filling
+  // in a lawful offline CSV is not looking at the React preview. List each
+  // canonical demand just once, refer to its exact CSV row(s), and clearly
+  // signal when a very long ingredient provenance is abbreviated.
+  const short = (value: string, max: number) =>
+    value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim().slice(0, max)
+  const provenanceGuide = needs.map((need, index) => {
+    const sources = sourcesByNeedId.get(need.id) ?? []
+    const csvRows = stores.map((_, storeIndex) =>
+      2 + storeIndex * needs.length + index).join(' / ')
+    const lines = sources.slice(0, 4).map(source =>
+      '  - ' + short(source.recipeTitle, 60) + ': ' +
+      (source.amount === null ? 'hoeveelheid controleren'
+        : source.amount + ' ' + (source.unit === 'piece' ? 'stuks' : source.unit)) +
+      ' · oorspronkelijk: ' + short(source.original, 90))
+    return 'CSV-rij(en) ' + csvRows + ' · ' + short(need.label, 90) +
+      ' · ' + sources.length + ' oorspronkelijke ingrediëntregels\n' +
+      (lines.length ? lines.join('\n') : '  - Herkomst niet gekoppeld; controleer in Recepten.') +
+      (sources.length > 4
+        ? '\n  - +' + (sources.length - 4) + ' andere regels; bekijk de volledige herkomst in de app.'
+        : '')
+  }).join('\n')
   // Both formats MUST receive the same canonical demand and store order.
   return {
     csv: makeBlankPlannerCaptureCsv(needs, stores, ';'),
@@ -50,7 +72,9 @@ export function combinedRecipesCaptureKit(
       'LET OP: de lege bron-CSV bevat standaard beschikbaar=false. Zet dit alleen op true ' +
       'als het originele winkelproduct werkelijk beschikbaar is én je de verpakking, prijs en ' +
       'het echte observatiemoment hebt opgenomen. Een leeg product is NOOIT een gratis product.\n\n' +
-      makePlannerCaptureGuide(needs, stores),
+      makePlannerCaptureGuide(needs, stores) +
+      '\nHERKOMST VAN DE FYSIEKE VRAAG (geen winkelartikel, geen prijs):\n' +
+      provenanceGuide + '\n',
     storeLabel: stores.join('-').toLowerCase(),
     // The existing CSV emits one row per store × original canonical need,
     // store-major starting after the nine-column header. Reuse EXACTLY that
