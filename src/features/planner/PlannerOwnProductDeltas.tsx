@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import type { ComparedOwnLine } from './ownStoreBudgetComparison.ts'
 import type { OwnStore } from '../comparison/privateReviewedBasketBridge.ts'
-import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
+import { privatePackUnitRate, privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import './plannerPriceBreakdown.css'
 
 import { euro as exactEuro } from '../../lib/money.ts'
 type DifferenceFilter = 'all' | 'PLUS' | 'DekaMarkt' | 'equal'
-type DifferenceSort = 'impact' | 'ingredient' | 'plus-price' | 'deka-price'
+type DifferenceSort = 'impact' | 'unit-gap' | 'ingredient' | 'plus-price' | 'deka-price'
 
 function PriceEvidence({ line }: { line: ComparedOwnLine['plus'] }) {
   return <>
@@ -15,6 +15,41 @@ function PriceEvidence({ line }: { line: ComparedOwnLine['plus'] }) {
     <small>{line.pack.amount} {line.pack.unit} × {line.pack.count} per pak · {exactEuro.formatCents(line.pricePerPackCents)} per pak</small>
     <small>{privateUnitPrice(line) ?? 'Eenheidsprijs onbekend'}</small>
   </>
+}
+
+function unitPriceGap(item: ComparedOwnLine): {
+  unit: 'kg' | 'liter' | 'stuk'
+  differenceMilliCents: number
+  roundedDifferenceCents: number
+  cheaper: 'PLUS' | 'DekaMarkt' | null
+} | null {
+  const makeRate = (line: ComparedOwnLine['plus']) => privatePackUnitRate({
+    amount: line.pack.amount, unit: line.pack.unit,
+    count: line.pack.count, priceCents: line.pricePerPackCents,
+  })
+  const plus = makeRate(item.plus)
+  const deka = makeRate(item.deka)
+  if (!plus || !deka || plus.unit !== deka.unit) return null
+  const difference = deka.milliCentsPerUnit - plus.milliCentsPerUnit
+  return {
+    unit: plus.unit,
+    differenceMilliCents: Math.abs(difference),
+    roundedDifferenceCents: Math.abs(deka.roundedCentsPerUnit - plus.roundedCentsPerUnit),
+    cheaper: difference > 0 ? 'PLUS' : difference < 0 ? 'DekaMarkt' : null,
+  }
+}
+
+function UnitPriceGap({ item }: { item: ComparedOwnLine }) {
+  const gap = unitPriceGap(item)
+  if (!gap) return <small>Eenheidsprijsverschil onbekend</small>
+  return <small>{gap.cheaper === null
+    ? 'Gelijke eenheidsprijs'
+    : gap.roundedDifferenceCents === 0
+      ? 'Eenheidsprijzen afgerond gelijk; klein verschil bij ' + gap.cheaper
+      : exactEuro.formatCents(gap.roundedDifferenceCents) + ' / ' + gap.unit +
+        ' lagere eenheidsprijs bij ' + gap.cheaper}
+    {' '}· alleen productadvies, geen mandbesparing
+  </small>
 }
 
 /**
@@ -47,6 +82,14 @@ export function PlannerOwnProductDeltas({ lines, onChooseLine }: {
       line.plus.productId, line.deka.productId]
       .some(value => value.normalize('NFKC').toLocaleLowerCase('nl').includes(normalizedQuery))
   }).sort((a, b) => {
+    if (sort === 'unit-gap') {
+      const left = unitPriceGap(a)
+      const right = unitPriceGap(b)
+      if (left && right && left.differenceMilliCents !== right.differenceMilliCents)
+        return right.differenceMilliCents - left.differenceMilliCents
+      if (!left && right) return 1
+      if (left && !right) return -1
+    }
     if (sort === 'ingredient') return a.ingredientLabel.localeCompare(b.ingredientLabel, 'nl')
     if (sort === 'plus-price') return b.plus.lineTotalCents - a.plus.lineTotalCents ||
       a.ingredientLabel.localeCompare(b.ingredientLabel, 'nl')
@@ -89,6 +132,7 @@ export function PlannerOwnProductDeltas({ lines, onChooseLine }: {
       <label>Sorteer
         <select value={sort} onChange={event => setSort(event.currentTarget.value as DifferenceSort)}>
           <option value="impact">Grootste absolute prijsverschil</option>
+          <option value="unit-gap">Grootste verschil per kg, liter of stuk</option>
           <option value="ingredient">Ingrediënt A–Z</option>
           <option value="plus-price">Hoogste PLUS-regelprijs</option>
           <option value="deka-price">Hoogste DekaMarkt-regelprijs</option>
@@ -112,6 +156,7 @@ export function PlannerOwnProductDeltas({ lines, onChooseLine }: {
                 <td key={index}><PriceEvidence line={line} /></td>)}
               <td><strong>{item.deltaCents === 0 ? 'Gelijk' : exactEuro.formatCents(Math.abs(item.deltaCents))}</strong>
                 <small>{item.deltaCents > 0 ? 'PLUS lager' : item.deltaCents < 0 ? 'DekaMarkt lager' : 'Geen verschil'}</small>
+                <UnitPriceGap item={item} />
                 <div className="own-store-planner__line-actions" aria-label={'Kies winkel voor ' + item.ingredientLabel}>
                   <button type="button" onClick={() => onChooseLine(item.id, 'PLUS')}>Kies PLUS</button>
                   <button type="button" onClick={() => onChooseLine(item.id, 'DekaMarkt')}>Kies DekaMarkt</button>
@@ -136,6 +181,7 @@ export function PlannerOwnProductDeltas({ lines, onChooseLine }: {
                 exactEuro.formatCents(Math.abs(item.deltaCents)) + ' lager bij ' +
                 (item.deltaCents > 0 ? 'PLUS' : 'DekaMarkt')}</strong>
               {' '}voor dezelfde gecontroleerde fysieke behoefte.
+              <UnitPriceGap item={item} />
             </p>
             <div className="own-store-planner__line-actions" aria-label={'Kies winkel voor ' + item.ingredientLabel}>
               <button type="button" onClick={() => onChooseLine(item.id, 'PLUS')}>Kies PLUS</button>
