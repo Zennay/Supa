@@ -620,7 +620,7 @@ export function ImportedRecipeGroceriesPanel({
           </span>
         </label>
         {(result!.contributorsByLine[line.key]?.length ?? 0) > 1 && <details className="recipe-collection-groceries__sources">
-          <summary>Bekijk de hoeveelheden per recept ({result!.contributorsByLine[line.key].length})</summary>
+          <summary>Bekijk de oorspronkelijke ingrediëntbijdragen ({result!.contributorsByLine[line.key].length})</summary>
           <ul>{result!.contributorsByLine[line.key].map((source, index) =>
             <li key={index}>
               <strong>{source.recipeTitle}</strong>{' — '}

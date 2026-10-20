@@ -75,11 +75,22 @@ export function combinedImportedRecipeGroceries(
       Number.isSafeInteger(portions) && portions >= 1 && portions <= 100
     const ready = validPortions && !!toPlannerRecipe(recipe, { usage: 'unpriced-demand' })
     if (!ready) heldRecipes.push(recipe.title)
-    const single = ready ? ownRecipeShoppingChecklist(recipe, portions) : null
-    const sourceLines = single?.canCopy ? single.lines : recipe.ingredients.map((ingredient: SavedRecipe['ingredients'][number], index: number) => ({
+    // The ordinary single-recipe checklist deliberately coalesces duplicate
+    // product identities. Here, retain EACH original ingredient as a separate
+    // contribution first: otherwise a recipe containing two flour rows would
+    // show their combined 300 g as if it came from only the first 100 g row.
+    // The canonical per-ingredient scaler/guards still come from the existing
+    // checklist; cross-recipe physical aggregation happens below.
+    const unresolved = (ingredient: SavedRecipe['ingredients'][number], index: number): OwnRecipeChecklistLine => ({
       key: String(index), label: ingredient.label || ingredient.original,
       amount: null, unit: null, original: ingredient.original, needsReview: true,
-    } as OwnRecipeChecklistLine))
+    })
+    const sourceLines = recipe.ingredients.map((ingredient: SavedRecipe['ingredients'][number], index: number) => {
+      if (!ready) return unresolved(ingredient, index)
+      const isolated = ownRecipeShoppingChecklist(
+        { ...recipe, ingredients: [ingredient] }, portions)
+      return isolated.lines[0] ?? unresolved(ingredient, index)
+    })
     for (const item of sourceLines) {
       const complete = ready && !item.needsReview && item.amount !== null &&
         item.unit !== null && Number.isFinite(item.amount) && item.amount > 0
