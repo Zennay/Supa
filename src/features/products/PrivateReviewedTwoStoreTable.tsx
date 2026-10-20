@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { ownStoreWeekComparison } from '../planner/ownStoreBudgetComparison.ts'
+import { printableOwnStoreComparison } from '../planner/downloadOwnStoreComparison.ts'
 import { observedInstant } from '../../domain/offlineReviewedImport.ts'
 import type { BasketTraceLine } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
@@ -66,7 +67,12 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         document.body.append(a)
         try { a.click() } finally { a.remove() }
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
-      setReceiptMessage(shop + ': eigen volledig weekmandje bewaard. Andere winkelprijs blijft onbekend.')
+      const paired = !!latest?.stores.PLUS && !!latest.stores.DekaMarkt &&
+        privateReviewedPairWithin24Hours(latest.stores.PLUS, latest.stores.DekaMarkt) &&
+        ownStoreWeekComparison(latest).status === 'comparable'
+      setReceiptMessage(shop + ': eigen volledig weekmandje bewaard. ' +
+        (paired ? 'Ook de tweede winkel heeft een afzonderlijke, complete bron.' :
+          'Een compleet prijsverschil met de andere winkel is nog niet beschikbaar.'))
     } catch {
       setReceiptMessage('Download van eigen ' + shop + '-mand mislukt. Herzie de bron.')
     }
@@ -146,7 +152,8 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       return
     }
     try {
-      const exports = await import('../planner/downloadOwnStoreComparison.ts')
+      // Share APIs require a transient direct user gesture: never await a
+      // dynamic import before invoking navigator.share or clipboard.
       const current = freshReviewedBaskets(reviewedRef.current,
         reviewedRef.current.planKey, Date.now())
       if (!current || current.planKey !== initial.planKey ||
@@ -159,7 +166,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
           !current.stores.PLUS || !current.stores.DekaMarkt) {
         throw Error('Geen vergelijkbare mandjes.')
       }
-      const text = exports.printableOwnStoreComparison(comparison, {
+      const text = printableOwnStoreComparison(comparison, {
         PLUS: current.stores.PLUS.observedAt,
         DekaMarkt: current.stores.DekaMarkt.observedAt,
       })
