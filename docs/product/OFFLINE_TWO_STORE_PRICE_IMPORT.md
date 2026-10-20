@@ -48,11 +48,13 @@ Dezelfde bestaande, strikte negenkoloms-CSV-converter is nu ook rechtstreeks via
 Wanneer je wel een volledig eigen PLUS- **of** DekaMarkt-mandje
 hebt gecontroleerd maar een vergelijkbare tweede bron nog ontbreekt,
 biedt **Producten → Vergelijk PLUS met DekaMarkt** per beschikbare
-winkel de afzonderlijke **CSV-/TXT-download**, **kopieer**- en
+winkel de afzonderlijke **CSV-/TXT-download**, **offline HTML-afdruk**, **kopieer**- en
 **deel**-acties aan. De export gebruikt dezelfde oorspronkelijke
 SKU's, echte bronmomenten, hele verpakkingsprijzen en de actuele
 vinkjes van die winkel. De winkeltekst toont de afvinkingen; ook de
-CSV bevat afzonderlijke velden voor afgevinkt. Het systeemklembord en
+CSV bevat afzonderlijke velden voor afgevinkt. De scriptvrije offline HTML-afdruk toont
+het originele complete mandje, de afzonderlijke nog te kopen regels, hun
+originele eenheids- en pakprijzen en de geregistreerde brontijd. Het systeemklembord en
 de native deelactie worden uitsluitend bij je eigen klik aangeroepen.
 Er wordt geen tweede winkelprijs of besparing verzonnen.
 

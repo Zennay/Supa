@@ -36,7 +36,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   reviewedRef.current = reviewed
   const [receiptMessage, setReceiptMessage] = useState('')
   const [shopAdvantage, setShopAdvantage] = useState<'all' | 'plus' | 'deka' | 'equal'>('all')
-  async function downloadSingle(shop: OwnStore, kind: 'csv' | 'txt') {
+  async function downloadSingle(shop: OwnStore, kind: 'csv' | 'txt' | 'html') {
     const origin = freshReviewedBaskets(reviewedRef.current, reviewedRef.current.planKey, Date.now())
     const receipt = origin?.stores[shop]
     if (!receipt || !origin) {
@@ -53,13 +53,21 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
             basket: receipt.basket, observedAt: receipt.observedAt,
             done,
           })
-        : privateSingleStoreShoppingText({ basket: receipt.basket, observedAt: receipt.observedAt, done })
+         : kind === 'txt'
+          ? privateSingleStoreShoppingText({
+              basket: receipt.basket, observedAt: receipt.observedAt, done,
+            })
+          : (await import('./privateOneStorePrintableHtml.ts'))
+            .privateOneStorePrintableHtml({
+              basket: receipt.basket, observedAt: receipt.observedAt,
+              planKey: origin.planKey, checked,
+            })
       const latest = freshReviewedBaskets(reviewedRef.current,
         reviewedRef.current.planKey, Date.now())
       if (latest?.planKey !== origin.planKey || latest?.stores[shop] !== receipt)
         throw Error('De bron is tijdens voorbereiden veranderd.')
       const url = URL.createObjectURL(new Blob([content], {
-        type: kind === 'csv' ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8',
+        type: kind === 'csv' ? 'text/csv;charset=utf-8' : kind === 'html' ? 'text/html;charset=utf-8' : 'text/plain;charset=utf-8',
       }))
       try {
         const a = document.createElement('a')
@@ -310,6 +318,9 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
               </button>
               <button type="button" onClick={() => { void downloadSingle(shop, 'txt') }}>
                 Bewaar mijn {shop}-lijst (TXT)
+              </button>
+              <button type="button" onClick={() => { void downloadSingle(shop, 'html') }}>
+                Print mijn {shop}-weekmand (HTML)
               </button>
               <button type="button" onClick={() => { void handoffSingle(shop, 'copy') }}>
                 Kopieer mijn {shop}-lijst inclusief afvinkingen
