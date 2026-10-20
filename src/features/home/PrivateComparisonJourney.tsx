@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import { privateKnownPricePairs, privateProgressProductRows, formatKnownUnitGap, type PrivateKnownProduct, type PrivateKnownUnitGap } from '../products/privateProgressProductRows.ts'
@@ -42,6 +42,12 @@ export function PrivateComparisonJourney({
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [exportMessage, setExportMessage] = useState('')
   const [showPasteSource, setShowPasteSource] = useState(false)
+  const [captureMessage, setCaptureMessage] = useState('')
+  const captureKey = JSON.stringify(captureNeeds.map(need =>
+    [need.id, need.label, need.amount, need.unit, need.query]))
+  const liveCaptureKey = useRef(captureKey)
+  liveCaptureKey.current = captureKey
+
   useEffect(() => {
     const refresh = () => setNowMs(Date.now())
     const timer = window.setInterval(refresh, 60_000)
@@ -111,6 +117,38 @@ export function PrivateComparisonJourney({
       plusCents: one.lineTotalCents, dekaCents: other.lineTotalCents,
     })))
   }
+  async function downloadBlankHomeCapture(format: 'csv' | 'html') {
+    const selectedWeek = captureKey
+    setCaptureMessage('')
+    try {
+      if (!captureNeeds.length || captureNeeds.length > 200)
+        throw new Error('Kies eerst een weekmenu met 1–200 fysieke ingrediënten.')
+      const text = format === 'csv'
+        ? (await import('../comparison/plannerPriceCaptureSheet.ts'))
+            .makeBlankPlannerCaptureCsv(captureNeeds, stores, ';')
+        : (await import('../comparison/plannerPriceCapturePrint.ts'))
+            .makePrintablePlannerCaptureHtml(captureNeeds, stores)
+      if (selectedWeek !== liveCaptureKey.current)
+        throw new Error('Je weekmenu is veranderd; maak het opnameblad opnieuw.')
+      if (new TextEncoder().encode(text).length > 800000)
+        throw new Error('Het opnameblad is te groot; kies minder ingrediënten.')
+      const url = URL.createObjectURL(new Blob([text], {
+        type: format === 'csv' ? 'text/csv;charset=utf-8' : 'text/html;charset=utf-8',
+      }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = format === 'csv' ?
+          'supa-leeg-eigen-plus-deka-prijsblad.csv' : 'supa-eigen-plus-deka-opnameformulier.html'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setCaptureMessage('Leeg, lokaal opnameformulier bewaard. Vul uitsluitend werkelijk gecontroleerde ' +
+        'productcodes, verpakkingen, echte bronmomenten en prijzen in. Dit is geen bronbewijs.')
+    } catch (error) {
+      setCaptureMessage(error instanceof Error ? error.message : 'Kon het opnameblad niet downloaden.')
+    }
+  }
   async function downloadCompleteOwnComparison(format: 'csv' | 'txt') {
     setExportMessage('')
     try {
@@ -168,6 +206,18 @@ export function PrivateComparisonJourney({
     </label>
     {fileWarning && <p role="alert" className="private-comparison-journey__error">{fileWarning}</p>}
     <section className="private-comparison-journey__paste">
+      <strong>Begin met hetzelfde winkelmandje bij PLUS en DekaMarkt</strong>
+      <div className="private-comparison-journey__capture-buttons">
+        <button type="button" disabled={!captureNeeds.length}
+          onClick={() => void downloadBlankHomeCapture('csv')}>
+          Download leeg prijsinvulblad voor beide winkels (CSV)
+        </button>
+        <button type="button" disabled={!captureNeeds.length}
+          onClick={() => void downloadBlankHomeCapture('html')}>
+          Print winkelopnameformulier (HTML)
+        </button>
+      </div>
+      {captureMessage && <p role="status">{captureMessage}</p>}
       <button type="button" aria-expanded={showPasteSource}
         onClick={() => setShowPasteSource(open => !open)}>
         {showPasteSource ? 'Sluit spreadsheet-invoer' : 'Plak mijn eigen winkelprijzen uit CSV of JSON'}

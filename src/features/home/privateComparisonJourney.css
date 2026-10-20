@@ -82,3 +82,7 @@
 .private-comparison-journey__paste>small{line-height:1.45;color:#435b49}
 .private-comparison-journey__paste>section{min-width:0}
 @media(max-width:630px){.private-comparison-journey__paste>button{width:100%}}
+.private-comparison-journey__capture-buttons{display:flex;flex-wrap:wrap;gap:.65rem}
+.private-comparison-journey__capture-buttons button{flex:1 1 210px}
+.private-comparison-journey__capture-buttons button:disabled{opacity:.55;cursor:not-allowed}
+.private-comparison-journey__paste p[role=status]{margin:.25rem 0;line-height:1.5;color:#385a3c}
