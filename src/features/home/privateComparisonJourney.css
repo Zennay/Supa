@@ -24,3 +24,17 @@
 .private-comparison-journey__upload span{font-size:.92rem;line-height:1.45;color:#48614d}
 .private-comparison-journey__upload input{width:100%;max-width:100%;min-height:44px;font:inherit}
 .private-comparison-journey__error{color:#8a2525;font-weight:600}
+
+/* Visible partial source rows never become a total-savings authority. */
+.private-comparison-journey__partial{display:grid;gap:.75rem;margin:1rem 0;
+  padding:1rem;border:1px solid #d7e5d9;border-radius:14px;background:#f9fbf8}
+.private-comparison-journey__partial h3{font-size:1.08rem;margin:0}
+.private-comparison-journey__partial p{margin:0;line-height:1.5}
+.private-comparison-journey__partial ul{display:grid;gap:.65rem;list-style:none;
+  margin:0;padding:0;grid-template-columns:repeat(auto-fit,minmax(min(100%,245px),1fr))}
+.private-comparison-journey__partial li{display:grid;gap:.35rem;padding:.75rem;
+  background:#fff;border:1px solid #dce9de;border-radius:10px;overflow-wrap:anywhere}
+.private-comparison-journey__partial li span,.private-comparison-journey__partial small{
+  color:#425a47;line-height:1.4}
+.private-comparison-journey__partial button{justify-self:start}
+@media(max-width:630px){.private-comparison-journey__partial button{width:100%}}

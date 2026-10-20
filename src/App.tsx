@@ -777,6 +777,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               ? privateCaptureProgress : null}
             onOpenPlanner={() => navigate('planner')}
             onOpenImport={openOwnPriceImport}
+            onOpenProducts={() => navigate('products')}
             onOpenList={() => navigate('list')}
             onImportFiles={handoffOwnPriceFiles}
             fileWarning={listSourceFileWarning}

@@ -14,7 +14,7 @@ import { validCustomWeekBudgetEuros } from '../planner/customWeekBudget.ts'
 import { parsePrivateExtraVisitCostCents } from '../comparison/privateExtraVisitCost.ts'
 import { euro as exactEuro } from '../../lib/money.ts'
 import { privatePhysicalShoppingTick } from '../shopping-list/privatePhysicalShoppingTick.ts'
-import { freshReviewedBaskets, privateReviewedPairWithin24Hours, type PrivateReviewedBasket, type PrivateReviewedBaskets, type PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
+import { freshReviewedBaskets, samePartialPhysicalDemand, partialReviewedLinePairs, privateReviewedPairWithin24Hours, type PrivateReviewedBasket, type PrivateReviewedBaskets, type PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
 
 type Matched = Extract<BasketTraceLine, { status: 'matched' }>
 type OwnStore = 'PLUS' | 'DekaMarkt'
@@ -25,19 +25,6 @@ function privateCheckedSignature(ticks: Readonly<Record<string, boolean>>): stri
   // identity regardless of object construction or unrelated false entries.
   return Object.entries(ticks).filter(([, marked]) => marked === true)
     .map(([key]) => key).sort().join('\n')
-}
-
-/** Conservative identity gate for previewing individual lines in incomplete baskets. */
-function samePartialPhysicalDemand(left: OneStoreBasket, right: OneStoreBasket): boolean {
-  if (!left.lines.length || left.lines.length !== right.lines.length ||
-      left.selectedMealCount !== right.selectedMealCount) return false
-  const byId = new Map(right.lines.map(line => [line.id, line]))
-  return byId.size === right.lines.length && left.lines.every(line => {
-    const other = byId.get(line.id)
-    return !!other && line.ingredientLabel === other.ingredientLabel &&
-      line.requirement.amount === other.requirement.amount &&
-      line.requirement.unit === other.requirement.unit
-  })
 }
 
 /** Both sides are the exact SAME human-reviewed physical weekly demand.
@@ -509,13 +496,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       ? (plusMoment.ns < dekaMoment.ns ? 'PLUS' : 'DekaMarkt') : null
     // A partial row is informational only: no whole-basket winner, savings
     // or store route follows from it.
-    const partialPairs = plus && deka && !gap &&
-      samePartialPhysicalDemand(plus.basket, deka.basket)
-      ? plus.basket.lines.flatMap(line => {
-          const other = deka.basket.lines.find(candidate => candidate.id === line.id)
-          return line.status === 'matched' && other?.status === 'matched'
-            ? [{ plus: line, deka: other }] : []
-        }) : []
+    const partialPairs = partialReviewedLinePairs(plus, deka)
     const partialShown = partialPairs.filter(({ plus: first, deka: second }) => {
       if (search && ![first.ingredientLabel, first.productName, first.productId,
         second.productName, second.productId].some(value =>
