@@ -38,3 +38,33 @@
   color:#425a47;line-height:1.4}
 .private-comparison-journey__partial button{justify-self:start}
 @media(max-width:630px){.private-comparison-journey__partial button{width:100%}}
+
+/* The canonical full-basket breakdown is collapsed until explicitly opened. */
+.private-comparison-journey__complete-lines{margin:1rem 0;padding:1rem;
+  background:#f8fbf7;border:1px solid #d6e5d7;border-radius:14px;min-width:0}
+.private-comparison-journey__complete-head{display:flex;align-items:center;
+  justify-content:space-between;gap:.85rem;flex-wrap:wrap}
+.private-comparison-journey__complete-head h3{margin:0;font-size:1.1rem}
+.private-comparison-journey__complete-head p{margin:.35rem 0;line-height:1.5;color:#455f4c}
+.private-comparison-journey__complete-lines details{margin-top:.75rem}
+.private-comparison-journey__complete-lines summary{cursor:pointer;padding:.75rem;
+  font-weight:700;border-radius:10px;background:#eaf3eb;min-height:44px}
+.private-comparison-journey__complete-lines ul{list-style:none;padding:0;display:grid;
+  gap:.75rem;margin:.8rem 0;max-height:620px;overflow-y:auto}
+.private-comparison-journey__complete-lines li{padding:.8rem;background:#fff;
+  border:1px solid #dce7de;border-radius:12px;min-width:0;overflow-wrap:anywhere}
+.private-comparison-journey__complete-ingredient{display:grid;gap:.35rem;margin-bottom:.65rem}
+.private-comparison-journey__complete-ingredient strong{font-size:1.05rem}
+.private-comparison-journey__complete-ingredient span{font-weight:700;color:#244d31}
+.private-comparison-journey__complete-stores{display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem}
+.private-comparison-journey__complete-stores>div{display:grid;gap:.35rem;min-width:0;
+  background:#f5f9f5;padding:.65rem;border-radius:9px}
+.private-comparison-journey__complete-stores span{font-weight:700}
+.private-comparison-journey__complete-lines small{line-height:1.4;color:#455f4c}
+.private-comparison-journey__complete-lines details>p{line-height:1.5}
+@media(max-width:630px){
+ .private-comparison-journey__complete-stores{grid-template-columns:1fr}
+ .private-comparison-journey__complete-head button,
+ .private-comparison-journey__complete-lines details>button{width:100%}
+}

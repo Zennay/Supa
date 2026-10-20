@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
+import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import { privateKnownPricePairs, privateProgressProductRows, formatKnownUnitGap, type PrivateKnownProduct, type PrivateKnownUnitGap } from '../products/privateProgressProductRows.ts'
 import { euro } from '../../lib/money.ts'
 import { downloadPrivateKnownLinePriceCsv } from '../products/privateKnownLinePriceCsv.ts'
@@ -55,6 +56,19 @@ export function PrivateComparisonJourney({
     : null
   const delta = ready
     ? Math.abs(plus!.basket.totalCents - deka!.basket.totalCents) : null
+  // The validated complete basket is the sole source of detailed prices.
+  // Never infer an extra price from a demo listing or unfinished match.
+  const fullLinePairs = ready && comparison && plus && deka
+    ? comparison.lineDeltas.flatMap(row => {
+        const one = plus.basket.lines.find(line =>
+          line.status === 'matched' && line.id === row.id)
+        const other = deka.basket.lines.find(line =>
+          line.status === 'matched' && line.id === row.id)
+        return one?.status === 'matched' && other?.status === 'matched'
+          ? [{ ...row, plusLine: one, dekaLine: other }] : []
+      }).sort((a, b) => Math.abs(b.deltaCents) - Math.abs(a.deltaCents) ||
+        a.ingredientLabel.localeCompare(b.ingredientLabel, 'nl-NL'))
+    : []
   const singleReady = !!plus || !!deka
   // The workbench emits partial source rows via captureProgress, never as a
   // falsely complete reviewed basket. Reuse the same admission logic used by
@@ -220,6 +234,46 @@ export function PrivateComparisonJourney({
               : 'Nog geen eigen actuele PLUS- en DekaMarkt-prijzen gekoppeld. Voorbeeldprijzen tellen niet mee.'}</p>
       </>}
     </div>
+    {ready && fullLinePairs.length > 0 && <section
+      className="private-comparison-journey__complete-lines"
+      aria-label="Prijsverschil per ingrediënt in het eigen weekmandje">
+      <div className="private-comparison-journey__complete-head">
+        <div><h3>Prijsverschillen per ingrediënt</h3>
+          <p>{fullLinePairs.length} gecontroleerde fysieke ingrediënten uit beide winkels.</p>
+        </div>
+        <button type="button" onClick={onOpenList}>Open winkellijst</button>
+      </div>
+      <details>
+        <summary>Bekijk alle {fullLinePairs.length} oorspronkelijke prijsregels</summary>
+        <ul>{fullLinePairs.map(row => <li key={row.id}>
+          <div className="private-comparison-journey__complete-ingredient">
+            <strong>{row.ingredientLabel}</strong>
+            <small>Nodig: {row.plusLine.requirement.amount} {row.plusLine.requirement.unit}</small>
+            <span>{row.deltaCents === 0 ? 'Zelfde hele-pakbedrag' :
+              euro.formatCents(Math.abs(row.deltaCents)) + ' lagere hele-pakkosten bij ' +
+              (row.deltaCents > 0 ? 'PLUS' : 'DekaMarkt')}</span>
+          </div>
+          <div className="private-comparison-journey__complete-stores">
+            {(['PLUS', 'DekaMarkt'] as const).map(shop => {
+              const line = shop === 'PLUS' ? row.plusLine : row.dekaLine
+              return <div key={shop}>
+                <strong>{shop}</strong>
+                <small>{line.productName} · SKU {line.productId}</small>
+                <small>{line.packs} hele verpakking(en) × {euro.formatCents(line.pricePerPackCents)}
+                  {' '}· {line.pack.amount} {line.pack.unit} × {line.pack.count}</small>
+                <span>{euro.formatCents(line.lineTotalCents)} voor deze hoeveelheid</span>
+                <small>{privateUnitPrice(line) ?? 'Eenheidsprijs onbekend'}</small>
+              </div>
+            })}
+          </div>
+        </li>)}</ul>
+        <p>Bedragen uit je eigen volledige bronmandje; eenheidsprijzen zijn indicatief.
+          Geen kassagarantie of onafhankelijk aangetoonde besparing.</p>
+        <button type="button" onClick={onOpenProducts}>
+          Controleer originele SKU’s en winkelkeuzes in Producten
+        </button>
+      </details>
+    </section>}
     {!ready && partialPairs.length > 0 && <section
       className="private-comparison-journey__partial"
       aria-label="Gedeeltelijk vergelijkbare eigen bronproducten">
