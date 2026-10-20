@@ -82,14 +82,20 @@ const parseInteger = (text, min, max) =>
   Number(text) >= min && Number(text) <= max ? Number(text) : null
 
 function validObservedAt(raw) {
-  const match = /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)(?:\.(\d{1,9}))?([+-])(\d\d):(\d\d)$/.exec(raw)
+  // The authorized source capture adapter emits RFC3339 UTC "Z". Accept
+  // that exact real timestamp as well as a lawful ±HH:MM local offset.
+  // Never synthesize an observation moment or guess the user's timezone.
+  const match = /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)(?:\.(\d{1,9}))?(Z|([+-])(\d\d):(\d\d))$/.exec(raw)
   if (!match) return false
-  const [, y, m, d, h, minute, second, , sign, tzHour, tzMinute] = match
-  const [year, month, day, hour, min, sec, zoneH, zoneM] =
-    [y, m, d, h, minute, second, tzHour, tzMinute].map(Number)
-  if (year < 2000 || year > 2100 || zoneM > 59 ||
-      (sign === '+' ? zoneH > 14 || (zoneH === 14 && zoneM !== 0)
-        : zoneH > 12 || (zoneH === 12 && zoneM !== 0))) return false
+  const [, y, m, d, h, minute, second] = match
+  const [year, month, day, hour, min, sec] =
+    [y, m, d, h, minute, second].map(Number)
+  const zoneH = Number(match[10] ?? 0)
+  const zoneM = Number(match[11] ?? 0)
+  if (year < 2000 || year > 2100 || (match[8] !== 'Z' &&
+      (zoneM > 59 ||
+        (match[9] === '+' ? zoneH > 14 || (zoneH === 14 && zoneM !== 0)
+          : zoneH > 12 || (zoneH === 12 && zoneM !== 0))))) return false
   const civil = new Date(0)
   civil.setUTCFullYear(year, month - 1, day)
   civil.setUTCHours(hour, min, sec, 0)
@@ -151,7 +157,7 @@ function convertStoreCsv(text, allowOne) {
     // A row containing ANY original SKU, observation time or product fact is
     // not an untouched Planner placeholder. It must pass full admission, or
     // its omission would silently hide an incomplete observation from the user.
-    if (!validObservedAt(observedAt)) error(location + ': werkelijke ISO-tijd met UTC-offset vereist.')
+    if (!validObservedAt(observedAt)) error(location + ': werkelijke ISO-tijd met UTC-Z of een numerieke tijdzone-offset vereist.')
     if (!validLabel(name, 160)) error(location + ': productnaam ongeldig of ontbreekt.')
     if (seen.get(retailer).has(id)) error(location + ': dubbele product-ID.')
     seen.get(retailer).add(id)
