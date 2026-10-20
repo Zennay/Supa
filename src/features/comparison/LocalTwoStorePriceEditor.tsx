@@ -861,6 +861,58 @@ export function LocalTwoStorePriceEditor({
     }
   }
 
+  // The exact selected Planner demand can be taken into a shop without
+  // granting any retailer-source identity to an unobserved ingredient.
+  // Reuse the established capture-sheet and inert HTML format, rather than
+  // creating another import protocol or storing provisional prices.
+  async function downloadPersonalCaptureKit(kind: 'csv' | 'paper') {
+    const fingerprint = selectedPlanFingerprint
+    const chosenStores = [...selectedStores]
+    const selectedNeeds = activeNeeds.map(need => ({
+      id: need.id, label: need.label, amount: need.amount,
+      unit: need.unit, query: need.query,
+    }))
+    try {
+      if (selectedNeeds.length === 0 || selectedNeeds.length > 200) {
+        throw new Error('Kies een weekmenu met maximaal 200 verschillende ingrediënten.')
+      }
+      const content = kind === 'csv'
+        ? (await import('./plannerPriceCaptureSheet.ts'))
+            .makeBlankPlannerCaptureCsv(selectedNeeds, chosenStores, ';')
+        : (await import('./plannerPriceCapturePrint.ts'))
+            .makePrintablePlannerCaptureHtml(selectedNeeds, chosenStores)
+      if (currentPlanFingerprint.current !== fingerprint) {
+        setDraftStatus('Het weekmenu veranderde. Download het actuele invulblad opnieuw.')
+        return
+      }
+      if (new TextEncoder().encode(content).length > 800000) {
+        throw new Error('Het persoonlijke formulier is te groot. Kies minder ingrediënten.')
+      }
+      const url = URL.createObjectURL(new Blob([content], {
+        type: kind === 'csv' ? 'text/csv;charset=utf-8' : 'text/html;charset=utf-8',
+      }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = kind === 'csv'
+          ? 'supa-eigen-plus-deka-leeg-prijsopnameblad.csv'
+          : 'supa-eigen-plus-deka-printbaar-veldformulier.html'
+        link.style.display = 'none'
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        setDraftStatus(kind === 'csv'
+          ? 'Leeg persoonlijk winkel-CSV gedownload. Originele productcodes, bronmomenten en prijzen moet je zelf werkelijk vastleggen.'
+          : 'Printbaar persoonlijk veldformulier gedownload. Open dit lokaal en druk af; het is geen winkelprijsbron.')
+      } finally {
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+      }
+    } catch (error) {
+      setDraftStatus(error instanceof Error ? error.message
+        : 'Kon het persoonlijke invulblad niet lokaal maken.')
+    }
+  }
+
   // Portable *unfinished form*, not an admitted retailer price snapshot.
   // The two formats intentionally cannot be mistaken for one another.
   function downloadUnfinishedDraft() {
@@ -1001,6 +1053,14 @@ export function LocalTwoStorePriceEditor({
           </button>
           <button type="button" className="ghost-button" onClick={downloadUnfinishedDraft}>
             Download onvoltooid invulconcept (JSON)
+          </button>
+          <button type="button" className="ghost-button" disabled={!activeNeeds.length}
+            onClick={() => void downloadPersonalCaptureKit('csv')}>
+            Download leeg winkelprijsblad (CSV)
+          </button>
+          <button type="button" className="ghost-button" disabled={!activeNeeds.length}
+            onClick={() => void downloadPersonalCaptureKit('paper')}>
+            Download printbaar PLUS/Deka-veldformulier (HTML)
           </button>
           {sourceSelection !== 'both' && activeNeeds.length > 0 && pendingCaptureTimes.length > 0 &&
             <button type="button" className="ghost-button" onClick={downloadOpenCaptureTasks}>
