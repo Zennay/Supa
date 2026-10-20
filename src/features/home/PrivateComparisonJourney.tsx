@@ -27,7 +27,7 @@ export function PrivateComparisonJourney({
   onOpenPlanner: () => void
   onOpenImport: () => void
   onOpenProducts: () => void
-  onOpenList: () => void
+  onOpenList: (store?: OwnStore) => void
   onReview: (store: OwnStore, ingredientId: string) => void
   onImportFiles: (files: File[]) => void
   fileWarning: string
@@ -221,6 +221,13 @@ export function PrivateComparisonJourney({
             Bewaar persoonlijk prijs- en SKU-overzicht (TXT)
           </button>
         </div>
+        <div className="private-comparison-journey__store-route-actions"
+          role="group" aria-label="Kies een gecontroleerde winkel voor je fysieke boodschappenlijst">
+          {stores.map(shop => <button key={shop} type="button"
+            onClick={() => onOpenList(shop)}>
+            Open {shop}-boodschappenlijst
+          </button>)}
+        </div>
         {exportMessage && <p role="status">{exportMessage}</p>}
       </> : <>
         <span>Werkelijke prijsvergelijking</span>
@@ -241,7 +248,7 @@ export function PrivateComparisonJourney({
         <div><h3>Prijsverschillen per ingrediënt</h3>
           <p>{fullLinePairs.length} gecontroleerde fysieke ingrediënten uit beide winkels.</p>
         </div>
-        <button type="button" onClick={onOpenList}>Open winkellijst</button>
+        <button type="button" onClick={() => onOpenList(cheaper ?? undefined)}>Open winkellijst</button>
       </div>
       <details>
         <summary>Bekijk alle {fullLinePairs.length} oorspronkelijke prijsregels</summary>
@@ -332,7 +339,7 @@ export function PrivateComparisonJourney({
         Bekijk bronproducten en ontbrekende matches
       </button>}
       {(singleReady || availablePartialProducts > 0 || hasAnySource) &&
-        <button type="button" onClick={onOpenList}>
+        <button type="button" onClick={() => onOpenList(ready && cheaper ? cheaper : undefined)}>
           {singleReady ? 'Bekijk mijn eigen winkellijst' :
             'Bekijk mijn ongeprijsde weeklijst en bevestigde losse producten'}
         </button>}

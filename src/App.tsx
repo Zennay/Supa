@@ -794,7 +794,19 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             onOpenPlanner={() => navigate('planner')}
             onOpenImport={openOwnPriceImport}
             onOpenProducts={() => navigate('products')}
-            onOpenList={() => navigate('list')}
+            onOpenList={shop => {
+              if (shop) {
+                // Home's cheapest-store hint may have expired since render.
+                // Only a still-current own source can select a priced list.
+                const current = freshReviewedBaskets(livePrivateReviewed, privatePlanKey, Date.now())
+                if (!current?.stores[shop]) {
+                  openOwnPriceImport()
+                  return
+                }
+                setPreferredOwnStore(shop)
+              }
+              navigate('list')
+            }}
             onImportFiles={handoffOwnPriceFiles}
             fileWarning={listSourceFileWarning}
             onReview={(store, ingredientId) => {

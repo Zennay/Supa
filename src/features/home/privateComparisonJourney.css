@@ -68,3 +68,10 @@
  .private-comparison-journey__complete-head button,
  .private-comparison-journey__complete-lines details>button{width:100%}
 }
+/* Explicit per-store route avoids opening a stale preferred shop when Home
+   has just compared two original, fully reviewed physical baskets. */
+.private-comparison-journey__store-route-actions{display:flex;flex-wrap:wrap;
+  gap:.6rem;margin-top:.5rem}
+.private-comparison-journey__store-route-actions button{flex:1 1 190px;
+  color:#204a30;background:#e8f1e9}
+@media(max-width:630px){.private-comparison-journey__store-route-actions button{width:100%}}
