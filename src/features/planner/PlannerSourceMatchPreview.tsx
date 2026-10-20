@@ -364,6 +364,19 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
     line.suggestions[store] ? [{ store, need: line.need, ambiguous: false, incomplete: false }] : [],
   ))[0]
   const nextCapture = pendingPlus ? 'PLUS' : pendingDeka ? 'DekaMarkt' : null
+  const firstIncompleteStore = (stores as readonly ('PLUS' | 'DekaMarkt')[])
+    .find(store => sourceKnownButUnpriced[stores.indexOf(store)] > 0)
+  const firstAmbiguousStore = (stores as readonly ('PLUS' | 'DekaMarkt')[])
+    .find(store => requiringChoice[stores.indexOf(store)] > 0)
+  function focusOriginalSourceAction(store: 'PLUS' | 'DekaMarkt',
+    action: 'choose-sku' | 'fix-source') {
+    // Only filters the actual imported source. Never confirms or changes an SKU.
+    setStoreFilter(store)
+    setActionFilter(action)
+    setSearch('')
+    setOnlyMissing(true)
+    setShowAll(true)
+  }
   function mobileGuideText(): string {
     try {
       return selectiveTwoStoreCaptureGuide({
@@ -460,6 +473,16 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
         {' '}PLUS {sourceKnownButUnpriced[0]}, DekaMarkt {sourceKnownButUnpriced[1]}.
         {' '}Kandidaten zijn nog niet definitief gecontroleerd.</p>
       <div className="supa-planner-source-matches__next-actions">
+        {firstIncompleteStore && <button type="button" className="ghost-button"
+          onClick={() => focusOriginalSourceAction(firstIncompleteStore, 'fix-source')}>
+          Bekijk eerst {sourceKnownButUnpriced[stores.indexOf(firstIncompleteStore)]}
+          {' '}bestaande {firstIncompleteStore}-artikelen waarvan prijs, pak of beschikbaarheid ontbreekt
+        </button>}
+        {firstAmbiguousStore && <button type="button" className="ghost-button"
+          onClick={() => focusOriginalSourceAction(firstAmbiguousStore, 'choose-sku')}>
+          Toon {requiringChoice[stores.indexOf(firstAmbiguousStore)]}
+          {' '}onzekere {firstAmbiguousStore}-SKU-keuzes voor menselijke controle
+        </button>}
         {nextCapture && onRecapture && <button type="button" className="ghost-button"
           onClick={() => onRecapture(nextCapture)}>
           1. Open {nextCapture}-opnameblad voor werkelijke ontbrekende brondata
