@@ -344,29 +344,77 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         geen betaalde kassasom of actuele winkelprijs.</small>
     </div>
   }
+  // A physically incomplete one-store basket cannot be exported as a
+  // complete receipt. Offer an unpriced missing-ingredient checklist instead.
+  function downloadMissingOwnIngredients(shop: OwnStore) {
+    const latest = freshReviewedBaskets(reviewedRef.current,
+      reviewedRef.current.planKey, Date.now())
+    const source = latest?.stores[shop]
+    const missing = source?.basket.lines.filter(line => line.status === 'unresolved') ?? []
+    if (!source || !missing.length) {
+      setReceiptMessage('Geen geldige ontbrekende ingrediënten om te bewaren. Open de broninvoer.')
+      return
+    }
+    const clean = (value: string) => value.replace(/[\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]/gu, ' ').trim()
+    const content = [
+      'SUPA · onvolledige eigen winkelbron · ' + shop,
+      'Bronmoment: ' + clean(source.observedAt),
+      'Alleen ontbrekende fysieke ingrediënten, geen SKU of prijsclaim.',
+      'De originele volledige mandprijs is onbekend.',
+      '',
+      ...missing.map(line => '☐ ' + clean(line.ingredientLabel) + ' · ' +
+        (line.requirement.amount === null ? 'hoeveelheid nog te controleren' :
+          line.requirement.amount + ' ' + line.requirement.unit) + ' · prijs onbekend'),
+      '',
+      'Eigen zoeklijst, geen actuele winkelprijs of bronautorisatie.',
+    ].join('\\n') + '\\n'
+    if (new TextEncoder().encode(content).length > 256_000) {
+      setReceiptMessage('De zoeklijst is te groot voor een veilige lokale download.')
+      return
+    }
+    const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }))
+    try {
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'supa-' + shop.toLowerCase() + '-ontbrekende-ingredienten.txt'
+      document.body.append(link)
+      try { link.click() } finally { link.remove() }
+    } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+    setReceiptMessage(shop + ': eigen ongeprijsde zoeklijst gedownload. ' +
+      'Vul betrouwbare bronproducten in vóór een volledig prijsrapport.')
+  }
   // Both a one-sided source and a fully paired comparison need an actionable
   // standalone shop trip. Never make the shopper undo a second-store import.
   function singleStoreTripActions(shop: OwnStore) {
+    const basket = fresh?.stores[shop]?.basket
+    const complete = !!basket && basket.lines.length > 0 &&
+      basket.unresolvedLineCount === 0 && basket.matchedLineCount === basket.lines.length
     return <div className="private-reviewed-products__single-trip-actions">
+              {!complete && <p role="status">Volledige winkelbonnen zijn pas beschikbaar
+                wanneer ieder fysiek ingrediënt betrouwbaar gematcht en geprijsd is.</p>}
+              {!complete && <button type="button"
+                onClick={() => downloadMissingOwnIngredients(shop)}>
+                Bewaar ontbrekende {shop}-ingrediënten (ongeprijsd TXT)
+              </button>}
               <button type="button" onClick={() => openCheckedStoreList(shop)}>
                 Bekijk mijn {shop}-boodschappenlijst
               </button>
-              <button type="button" onClick={() => { void downloadSingle(shop, 'csv') }}>
+              <button type="button" disabled={!complete} onClick={() => { void downloadSingle(shop, 'csv') }}>
                 Bewaar mijn {shop}-weekmand (CSV)
               </button>
-              <button type="button" onClick={() => { void downloadSingle(shop, 'txt') }}>
+              <button type="button" disabled={!complete} onClick={() => { void downloadSingle(shop, 'txt') }}>
                 Bewaar mijn {shop}-lijst (TXT)
               </button>
-              <button type="button" onClick={() => { void downloadSingle(shop, 'open-txt') }}>
+              <button type="button" disabled={!complete} onClick={() => { void downloadSingle(shop, 'open-txt') }}>
                 Bewaar alleen nog te kopen bij {shop} (TXT)
               </button>
-              <button type="button" onClick={() => { void downloadSingle(shop, 'html') }}>
+              <button type="button" disabled={!complete} onClick={() => { void downloadSingle(shop, 'html') }}>
                 Print mijn {shop}-weekmand (HTML)
               </button>
-              <button type="button" onClick={() => prepareSingleText(shop, false)}>
+              <button type="button" disabled={!complete} onClick={() => prepareSingleText(shop, false)}>
                 Toon mijn {shop}-lijst om zelf te kopiëren of delen
               </button>
-              <button type="button" onClick={() => prepareSingleText(shop, true)}>
+              <button type="button" disabled={!complete} onClick={() => prepareSingleText(shop, true)}>
                 Toon alleen nog te kopen bij {shop} om te kopiëren
               </button>
     </div>
