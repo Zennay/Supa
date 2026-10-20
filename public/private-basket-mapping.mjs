@@ -593,6 +593,44 @@ function parseSingleSource(text) {
     captures: [verified[Object.keys(verified)[0]]] }
 }
 
+// Expose only known static converter diagnostics and the CSV row number.
+// Never display raw JSON parser exceptions, file contents, paths or arbitrary
+// source text as an error; users still need a concrete row to repair.
+function readableSourceImportFailure(cause) {
+  const message = cause instanceof Error ? cause.message : ''
+  const row = /^CSV-regel ([1-9]\d{0,5}): (.+)$/.exec(message)
+  const allowed = new Set([
+    'verwacht negen kolommen.', 'onbekende winkel.', 'product-ID ongeldig.',
+    'eenheid moet g/kg/ml/l/piece zijn.',
+    'beschikbaarheid moet true/false of ja/nee zijn.',
+    'werkelijke ISO-tijd met UTC-Z of een numerieke tijdzone-offset vereist.',
+    'productnaam ongeldig of ontbreekt.', 'dubbele product-ID.',
+    'verpakkingsinhoud ongeldig.',
+    'een verpakking met losse stuks vereist een heel aantal stuks.',
+    'prijs in hele eurocenten vereist.', 'multipack-aantal ongeldig.',
+    'beschikbaar product vereist gemeten verpakking, multipack en prijs.',
+    'een winkelopname mag maar één waarnemingstijd hebben.',
+    'maximaal 1.000 producten per winkel.',
+  ])
+  if (row && allowed.has(row[2])) return 'Corrigeer CSV-regel ' + row[1] +
+    ': ' + row[2] + ' Bewaar daarna de volledige originele winkelopname opnieuw.'
+  if (message.startsWith('Kolomkop moet exact zijn: '))
+    return 'De CSV mist de oorspronkelijke negen kolommen in de juiste volgorde: ' +
+      'retailer, observedAt, id, name, packAmount, packUnit, packCount, priceCents, available. ' +
+      'Exporteer een nieuw Supa-invulblad of behoud de originele kolomkop.'
+  if (message === 'CSV vereist expliciet de echte waarnemingen van de geselecteerde winkel(s).')
+    return 'Het bestand bevat nog geen volledige echte winkelproductwaarneming. ' +
+      'Vul uitsluitend zelf gecontroleerde SKU, tijd, pakinhoud, beschikbaarheid en prijs in.'
+  if (/256 kB|256 KB/.test(message))
+    return 'De eigen broninvoer overschrijdt de lokale limiet van 256 kB. ' +
+      'Gebruik een kleiner oorspronkelijk winkelbestand.'
+  if (message.includes('het originele bestand') || message.includes('het originele bestand.'))
+    return 'Het bestandsvak komt niet overeen met de originele winkelcode. ' +
+      'Plaats PLUS uitsluitend bij PLUS en DekaMarkt uitsluitend bij DekaMarkt.'
+  return 'Het bestand voldoet niet aan het toegestane originele CSV-/JSON-formaat. ' +
+    'Controleer de echte brongegevens en gebruik de originele negenkoloms CSV.'
+}
+
 async function loadSources() {
   const revision = ++sourceRevision
   // Keep the last admitted source and manual choices during a new file read;
@@ -704,13 +742,14 @@ async function loadSources() {
       return needsRecapture(age)
     })
     notice(sourceStatus, descriptions.join('\n'), gap === null || gap > DAY_NS || expired ? 'warning' : '')
-  } catch {
+  } catch (error) {
     if (revision !== sourceRevision) return
     sourceInput.value = ''
     plusInput.value = ''
     dekaInput.value = ''
-    notice(sourceStatus, 'Nieuw bestand geweigerd. Controleer de strikte CSV-koppen, winkelopnames en echte brondata. ' +
-      (captures ? 'De vorige geldige bron en je SKU-keuzes blijven beschikbaar.' : 'Nog geen geldige bron aanwezig.'), 'error')
+    notice(sourceStatus, readableSourceImportFailure(error) + ' ' +
+      (captures ? 'De vorige geldige bron en jouw SKU-keuzes blijven beschikbaar.' :
+        'Er is nog geen geldige winkelbron overgenomen.'), 'error')
   }
   refresh()
 }
