@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { recipeShoppingChangeText, type RecipeShoppingChange } from './recipeShoppingChange.ts'
 import { makeBlankPlannerCaptureCsv } from '../comparison/plannerPriceCaptureSheet.ts'
 import { makePlannerCaptureGuide } from '../comparison/plannerPriceCaptureGuide.ts'
-import { nextWeekPhysicalItems, nextWeekPhysicalListText } from './recipeNextWeekList.ts'
+import { nextWeekPhysicalItems, nextWeekPhysicalListText, nextWeekPhysicalListCsv } from './recipeNextWeekList.ts'
 
 /** Source-free physical shopping preview; no SKU or stored retailer price. */
 export function RecipeShoppingChangePanel({ preview, day }: {
@@ -81,6 +81,45 @@ export function RecipeShoppingChangePanel({ preview, day }: {
       setShowFullCopy(true)
     }
   }
+  function downloadFullWeekCsv() {
+    try {
+      const csv = nextWeekPhysicalListCsv(preview, day)
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-voorstel-volledige-weekboodschappen.csv'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setNotice('Ongeprijsde volledige voorgestelde weeklijst als spreadsheet opgeslagen.')
+    } catch {
+      setNotice('Spreadsheet downloaden mislukt. Gebruik de tekstlijst of kopieeroptie.')
+      setShowFullCopy(true)
+    }
+  }
+  async function shareFullWeek() {
+    try {
+      const output = getFullText()
+      if (typeof navigator.share !== 'function') {
+        await copyFullWeek()
+        return
+      }
+      await navigator.share({
+        title: 'Supa · voorgestelde ongeprijsde weekboodschappen',
+        text: output,
+      })
+      setNotice('Voorgestelde weeklijst gedeeld, zonder winkelprijzen.')
+    } catch (error) {
+      // Cancelling the native share sheet must not trigger an unexpected copy.
+      if (error instanceof Error && error.name === 'AbortError') {
+        setNotice('Delen geannuleerd. Je weekplanning is niet aangepast.')
+      } else {
+        setNotice('Delen niet beschikbaar. Gebruik de kopieeroptie of selecteer de lijst hieronder.')
+        setShowFullCopy(true)
+      }
+    }
+  }
   async function copyFullWeek() {
     try {
       const output = getFullText()
@@ -136,6 +175,8 @@ export function RecipeShoppingChangePanel({ preview, day }: {
       worden gecontroleerd. Oude productmatches zijn geen geldige nieuwe vergelijking.</p>
     <div className="recipe-reuse-preview-shopping__actions">
       <button type="button" className="ghost-button" onClick={downloadFullWeek}>Download volledige weeklijst (TXT)</button>
+      <button type="button" className="ghost-button" onClick={downloadFullWeekCsv}>Download volledige weeklijst (CSV)</button>
+      <button type="button" className="ghost-button" onClick={() => void shareFullWeek()}>Deel volledige weeklijst (mobiel)</button>
       <button type="button" className="ghost-button" onClick={() => void copyFullWeek()}>Kopieer volledige weeklijst</button>
       <button type="button" className="ghost-button" onClick={download}>Download wijziging (TXT)</button>
       <button type="button" className="ghost-button" onClick={() => void copy()}>Kopieer wijziging</button>
