@@ -29,6 +29,10 @@ export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient,
   if (entries.length === 0) return null
   const plus = progress.stores.PLUS
   const deka = progress.stores.DekaMarkt
+  const expiredStoreNames = shops.filter(store => {
+    const capture = progress.stores[store]
+    return capture && (!capture.fresh || !recentOwnCaptureInstant(capture.observedAt, now))
+  })
   const first = plus && observedInstant(plus.observedAt)
   const second = deka && observedInstant(deka.observedAt)
   const gap = first && second
@@ -144,6 +148,12 @@ export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient,
   }
 
   return <div className="supa-reviewed-source-lines__wrapper">
+    {expiredStoreNames.length > 0 && <p className="supa-reviewed-source-lines__age" role="status">
+      {expiredStoreNames.join(' en ')}: de eerdere eigen bronopname is verlopen of
+      niet meer bruikbaar. De voorlopige twee-winkelregelverschillen zijn verborgen;
+      vernieuw eerst de oorspronkelijke winkelbron in Vergelijk. Onbekende
+      prijzen blijven onbekend.
+    </p>}
     {pairs.length > 0 && <section className="supa-reviewed-source-lines__peek"
       aria-label="Voorlopige prijsverschillen op bevestigde productregels">
       <header>
