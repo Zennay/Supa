@@ -118,6 +118,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const [recipeFileMessage, setRecipeFileMessage] = useState('')
   const shoppingCopy = useRef<HTMLTextAreaElement>(null)
   const [collectionText, setCollectionText] = useState('')
+  const [collectionExportBatch, setCollectionExportBatch] = useState(0)
   const [collectionPreview, setCollectionPreview] = useState<{
     source: string; libraryRaw: string | null; recipes: UserRecipeDraft[]; alreadyPresent: number
   } | null>(null)
@@ -513,20 +514,25 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     try {
       if (library.error) throw new Error(library.error)
       if (!library.recipes.length) throw new Error('Voeg eerst eigen recepten toe.')
-      if (library.recipes.length > 15) throw new Error('De tekstimport ondersteunt maximaal 15 recepten per bestand. Gebruik de volledige JSON-back-up voor grotere verzamelingen.')
+      // Large libraries can be transferred in explicit 15-recipe batches.
+      // One user click only starts one local download.
+      const batchCount = Math.ceil(library.recipes.length / 15)
+      const batch = Math.min(Math.max(0, collectionExportBatch), batchCount - 1)
+      const from = batch * 15
+      const selected = library.recipes.slice(from, from + 15)
       // Readable Markdown cannot retain source-review holds. Each unreviewed
       // recipe must travel in the existing lossless JSON backup instead.
-      const markdown = library.recipes.map(ownRecipeAsMarkdown).join('\n---\n')
+      const markdown = selected.map(ownRecipeAsMarkdown).join('\n---\n')
       if (new TextEncoder().encode(markdown).length > 500_000)
         throw new Error('Het Markdownbestand is groter dan 500 kB. Gebruik de JSON-back-up.')
       const url = URL.createObjectURL(new Blob([markdown], { type: 'text/markdown;charset=utf-8' }))
       try {
         const link = document.createElement('a')
-        link.href = url; link.download = 'supa-mijn-recepten.md'
+        link.href = url; link.download = 'supa-recepten-' + (from + 1) + '-tm-' + (from + selected.length) + '.md'
         document.body.append(link)
         try { link.click() } finally { link.remove() }
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
-      setCollectionMessage('De gecontroleerde eigen recepten zijn als één Markdownbestand opgeslagen. Je kunt dit via Meerdere recepten uit tekst opnieuw importeren.')
+      setCollectionMessage('Recepten ' + (from + 1) + ' t/m ' + (from + selected.length) + ' staan in je Markdownbestand. Importeer ze via Meerdere recepten uit tekst.')
     } catch (cause) {
       setCollectionError(cause instanceof Error ? cause.message : 'Exporteren is niet gelukt.')
     }
@@ -787,6 +793,14 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
             setCollectionPreview(null); setCollectionError(''); setCollectionMessage('')
           }} />
       </label>
+      {library.recipes.length > 15 &&
+        <label className="recipe-collection-label">Kies welke 15 recepten je als Markdown meeneemt
+          <select value={Math.min(collectionExportBatch, Math.ceil(library.recipes.length / 15) - 1)}
+            onChange={event => { setCollectionExportBatch(Number(event.currentTarget.value)); setCollectionError(''); setCollectionMessage('') }}>
+            {Array.from({ length: Math.ceil(library.recipes.length / 15) }, (_, index) => <option
+              value={index} key={index}>Recepten {index * 15 + 1} t/m {Math.min(library.recipes.length, (index + 1) * 15)}</option>)}
+          </select>
+        </label>}
       <div className="recipe-backup-panel__actions">
         <button type="button" onClick={previewPlainRecipeCollection}
           disabled={!collectionText.trim() || !!library.error}>Controleer mijn recepten</button>
@@ -812,8 +826,9 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
             <button type="button" onClick={() => setCollectionPreview(null)}>Annuleer</button>
           </div>
         </div>}
-      <small>Een Markdownexport is beschikbaar voor maximaal 15 al gecontroleerde recepten.
-        Recepten met openstaande bron- of hoeveelheidswaarschuwingen neem je veilig mee via
+      <small>Download maximaal 15 al gecontroleerde recepten per Markdownbestand. Grotere
+        verzamelingen kun je in opeenvolgende batches exporteren. Recepten met openstaande
+        bron- of hoeveelheidswaarschuwingen neem je veilig mee via
         de volledige JSON-back-up hieronder; zo verdwijnen controlepunten niet ongemerkt.</small>
       {collectionError && <p role="alert" className="recipe-error">{collectionError}</p>}
       {collectionMessage && <p role="status">{collectionMessage}</p>}
