@@ -53,6 +53,13 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
     return capture ? capture.basket.lines.filter((line): line is Matched => line.status === 'matched')
       .map(line => ({ shop, line, observedAt: capture.observedAt })) : []
   })
+  // Keep unpriced ingredient identities visible even if neither shop has a
+  // single matched SKU: otherwise the user cannot tell which input is missing.
+  const unmatchedWithoutPricedRows = shops.flatMap(shop => {
+    const capture = currentReviewed?.stores[shop]
+    return capture ? capture.basket.lines.filter(line => line.status === 'unresolved')
+      .map(line => ({ shop, line })) : []
+  })
   // One canonical physical basket comparison for the two-store cards too:
   // never rank a missing or unpaired price as if it were a valid difference.
   const paired = ownStoreWeekComparison(currentReviewed)
@@ -139,8 +146,19 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
       De bijbehorende prijzen zijn verborgen. Herzie de originele bron in Vergelijk;
       je eerdere lijstvinkjes blijven bewaard.
     </p>}
-    {!sources.length ? <p role="status">Nog geen complete en actuele eigen bronproducten beschikbaar.
-      Kies een weekmenu, importeer je eigen winkelbron en controleer iedere SKU en verpakking.</p> : <>
+    {!sources.length ? <div className="private-reviewed-products__missing-empty" role="status">
+      <p>Nog geen complete en actuele eigen bronproducten beschikbaar.
+        Kies een weekmenu, importeer je eigen winkelbron en controleer iedere SKU en verpakking.</p>
+      {unmatchedWithoutPricedRows.length > 0 && <details className="private-reviewed-products__missing">
+        <summary>{unmatchedWithoutPricedRows.length} ingrediënten wachten nog op een betrouwbare productmatch of prijs</summary>
+        <ul>{unmatchedWithoutPricedRows.map(({ shop, line }) => <li key={JSON.stringify([shop, line.id])}>
+          <strong>{shop}: {line.ingredientLabel}</strong>
+          <span> — {line.requirement.amount === null ? 'hoeveelheid onbekend'
+            : line.requirement.amount + ' ' + line.requirement.unit} · bronprijs onbekend</span>
+        </li>)}</ul>
+        <button type="button" onClick={onOpenComparison}>Open mijn broninvoer en productmatching</button>
+      </details>}
+    </div> : <>
       <div className="private-reviewed-products__controls">
         <label>Winkel <select value={store} onChange={event => {
           const next = event.target.value as 'all' | OwnStore
