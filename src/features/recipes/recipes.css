@@ -186,3 +186,25 @@
   border: 1px solid #e0caa9; border-radius: 12px; background: #fffaf2; }
 .recipe-collection-undo p { margin: 0; }
 .recipe-collection-undo > button { justify-self: start; min-height: 44px; }
+
+/* Selective local recipe bundle → one unpriced grocery checklist. */
+.recipe-collection-groceries { display: grid; gap: 12px; margin-top: 16px;
+  padding: 16px; border-radius: 16px; background: #eff7f2; }
+.recipe-collection-groceries h3, .recipe-collection-groceries p { margin: 0; }
+.recipe-collection-groceries__recipes { display: grid; gap: 8px; }
+.recipe-collection-groceries__recipes label,
+.recipe-collection-groceries__controls label { display: flex; align-items: center; gap: 9px; }
+.recipe-collection-groceries input[type=checkbox] { width: 20px; height: 20px; flex-shrink: 0;
+  accent-color: #005135; }
+.recipe-collection-groceries__controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.recipe-collection-groceries__lines { list-style: none; padding: 0; margin: 0; display: grid; gap: 7px;
+  max-height: 350px; overflow-y: auto; }
+.recipe-collection-groceries__lines li { padding: 10px; background: white; border-radius: 10px; }
+.recipe-collection-groceries__lines label { display: flex; align-items: flex-start; gap: 9px; }
+.recipe-collection-groceries__lines span { overflow-wrap: anywhere; }
+.recipe-collection-groceries__lines label:has(input:checked) span { text-decoration: line-through; }
+.recipe-collection-groceries__hold { display: grid; gap: 8px; padding: 12px;
+  background: #fff6e8; border-radius: 12px; }
+.recipe-collection-groceries__hold > div { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+@media(max-width:600px) { .recipe-collection-groceries { padding: 12px; }
+  .recipe-collection-groceries__controls { flex-direction: column; align-items: stretch; } }

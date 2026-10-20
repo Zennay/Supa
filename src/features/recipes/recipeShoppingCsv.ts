@@ -10,11 +10,11 @@ export function exportOwnRecipeChecklistCsv(
   }
   const encode = (fields: readonly unknown[]) => fields.map(value => literalCsv(value)).join(';')
   const rows = [
-    encode(['Recept', 'Porties', 'Origineel ingrediënt', 'Naam', 'Hoeveelheid', 'Eenheid',
+    encode(['Recept', checklist.recipeCount ? 'Aantal recepten' : 'Porties', 'Origineel ingrediënt', 'Naam', 'Hoeveelheid', 'Eenheid',
       'Controle', 'Afgevinkt', 'Prijs']),
     ...checklist.lines.map(line => encode([
       checklist.title,
-      String(checklist.portions),
+      String(checklist.recipeCount ?? checklist.portions),
       line.original,
       line.label,
       line.needsReview || line.amount === null ? '' : String(line.amount),

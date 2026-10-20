@@ -14,6 +14,8 @@ export type OwnRecipeChecklistLine = {
 export type OwnRecipeChecklist = {
   title: string
   portions: number
+  /** Set only for an explicitly combined user-owned recipe collection. */
+  recipeCount?: number
   lines: OwnRecipeChecklistLine[]
   canCopy: boolean
   copyText: string
@@ -27,7 +29,9 @@ export function formatOwnRecipeChecklist(
   checked: Readonly<Record<string, boolean>>,
 ): string {
   return [
-    `Mijn recept: ${checklist.title} — ${checklist.portions} porties`,
+    checklist.recipeCount
+      ? `Mijn receptenbundel: ${checklist.recipeCount} eigen recepten`
+      : `Mijn recept: ${checklist.title} — ${checklist.portions} porties`,
     'Eigen ongeprijsde boodschappenlijst · controleer hoeveelheden en verpakking zelf.',
     ...checklist.lines.map(line => line.needsReview
       ? `[?] ${line.original} — hoeveelheid handmatig controleren`

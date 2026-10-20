@@ -13,6 +13,7 @@ import { prepareRecipeBackupImport, serializeRecipeBackup, type RecipeBackupPrev
 import { curatedFigmaRecipes } from './curatedFigmaRecipes'
 import { m2InitialPlan } from '../../data/m2Fixture'
 import { ownRecipeShoppingChecklist, formatOwnRecipeChecklist } from './recipeShoppingChecklist'
+import { ImportedRecipeGroceriesPanel } from './ImportedRecipeGroceriesPanel'
 import { exportOwnRecipeChecklistCsv } from './recipeShoppingCsv'
 import { toPlannerRecipe } from './plannerRecipes.ts'
 import { scaleOwnRecipe, ownRecipeId } from './scaleOwnRecipe.ts'
@@ -659,7 +660,8 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       const removed = new Set(lastBulkImport.ids)
       const next = saveRecipeLibrary(window.localStorage, library,
         library.recipes.filter(recipe => !removed.has(recipe.id)))
-      setLibrary(next); setLastImportedIds([]); setLastBulkImport(null); setConfirmBulkUndo(false)
+      setLibrary(next); setLastImportedIds([])
+      setLastBulkImport(null); setConfirmBulkUndo(false)
       window.dispatchEvent(new Event('supa-recipes-changed'))
       setCollectionMessage('De laatste bulkimport is in één keer teruggedraaid. Eerdere eigen recepten zijn behouden.')
     } catch (cause) {
@@ -985,6 +987,9 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
               </div>}
             </div>
           })}
+          <ImportedRecipeGroceriesPanel key={lastImportedIds.join(':')}
+            recipes={library.recipes.filter(recipe => lastImportedIds.includes(recipe.id))}
+            onEdit={recipe => openSavedRecipeEditor(recipe)} />
         </section>}
       {lastBulkImport && library.raw === lastBulkImport.afterRaw &&
         <div className="recipe-collection-undo" aria-label="Laatste bulkimport terugdraaien">
