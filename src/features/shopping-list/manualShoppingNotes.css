@@ -70,3 +70,9 @@
 .manual-shopping-notes__clear-confirm { display:flex; flex-wrap:wrap; gap:.65rem; align-items:center; padding:1rem; border:1px solid #e0c89c; border-radius:10px; background:#fff8e8; }
 .manual-shopping-notes__clear-confirm p { flex-basis:100%; }
 .manual-shopping-notes__finish-trip button:disabled { opacity:.55; cursor:not-allowed; }
+
+/* Shopper-controlled aisle order; full-group order only to avoid moving hidden rows. */
+.manual-shopping-notes__ordering { display:flex; gap:4px; flex-shrink:0; }
+.manual-shopping-notes__ordering button { min-width:44px; padding:8px; font-size:1.12rem; }
+.manual-shopping-notes__ordering button:disabled { opacity:.45; cursor:not-allowed; }
+.manual-shopping-notes__order-hint { font-size:.91rem; color:#405c4e; }
