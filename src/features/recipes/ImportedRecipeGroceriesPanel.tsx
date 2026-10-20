@@ -492,6 +492,26 @@ export function ImportedRecipeGroceriesPanel({
         {' '}{checkedCount} afgevinkt. {outstanding > 0
           ? outstanding + ' regels vereisen handmatige controle; ze krijgen geen verzonnen hoeveelheid.'
           : 'Alle fysieke hoeveelheden zijn klaar voor een ongeprijsde lijst.'}</p>
+      {result!.identityConflicts.length > 0 && <section
+        className="recipe-collection-groceries__hold" role="alert"
+        aria-label="Dezelfde ingrediëntmatch heeft verschillende originele namen">
+        <strong>Herstel eerst deze tegenstrijdige ingrediëntnamen voordat je winkels vergelijkt:</strong>
+        <p>Twee recepten gebruiken precies dezelfde fysieke zoekidentiteit en eenheid,
+          maar geven het product verschillende namen. De gewone Planner-/prijsengine
+          weigert terecht deze onduidelijke samenvoeging. De ongeprijsde lijst
+          toont de originele regels ter controle; er wordt niets samengevoegd,
+          gekocht of ingeprijsd.</p>
+        {result!.identityConflicts.map(conflict => <div key={JSON.stringify([conflict.query, conflict.unit])}>
+          <strong>{conflict.query} ({conflict.unit})</strong>
+          {conflict.entries.map(entry => <div key={JSON.stringify([entry.recipeId, entry.label])}>
+            <span>{entry.recipeTitle}: {entry.label}</span>
+            <button type="button" onClick={() => {
+              const source = recipes.find(recipe => recipe.id === entry.recipeId)
+              if (source) onEdit(source)
+            }}>Bewerk dit recept</button>
+          </div>)}
+        </div>)}
+      </section>}
       {result!.heldRecipes.length > 0 && <section className="recipe-collection-groceries__hold">
         <strong>Corrigeer eerst deze recepten voor betrouwbare fysieke hoeveelheden:</strong>
         {selected.filter(recipe => result!.heldRecipes.includes(recipe.title)).map(recipe =>
