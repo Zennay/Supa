@@ -133,6 +133,30 @@ function observedPackDescription(product) {
       ' · indicatief ' + ownEuro.format(advisory) + '/' + family : '')
 }
 
+// Only a read-only estimate for an explicitly chosen OWN observed SKU.
+ // Canonical TS pack arithmetic does the calculation; this plain browser
+ // shell does not duplicate unit conversion or invent purchase prices.
+function chosenWholePackPreview(row, store, product) {
+  if (!product || !captures?.[store] || !product.available) return ''
+  const original = captures[store].observedAt
+  const age = ageNs(original, Date.now())
+  if (needsRecapture(age)) return 'Oorspronkelijke opname is niet actueel; geen bruikbaar prijsadvies.'
+  const raw = row.querySelector('.amount').value.trim()
+  const amount = raw ? numeric(raw) : null
+  const request = {
+    amount, unit: row.querySelector('.unit').value, product, outcome: null,
+  }
+  document.dispatchEvent(new CustomEvent('supa:private-pack-preview', { detail: request }))
+  const chosen = request.outcome
+  if (!chosen) return 'Geen geldig aantal hele verpakkingen voor deze fysieke behoefte.'
+  const duplicate = Array.from(lines.querySelectorAll('.ingredient'))
+    .filter(other => other.querySelector('[data-store="' + store + '"]').value === product.id).length > 1
+  if (duplicate) return 'Deze SKU is ook aan een ander ingrediënt gekoppeld; eerst fysieke behoeften samenvoegen.'
+  return 'Alleen deze fysieke regel: ' + chosen.packs + ' hele verpakking(en) × ' +
+    ownEuro.format(product.priceCents / 100) + ' = ' +
+    ownEuro.format(chosen.cents / 100) + ' (eigen bron, indicatief; geen volledig mandje).'
+}
+
 // Selection records a human-confirmed product identity, not its purchasability.
 function observedProducts(store, unit) {
   const capture = captures?.[store]
@@ -276,7 +300,8 @@ function updateSelect(select, store, unit) {
           chosenProduct.priceCents === null || chosenProduct.packAmount === null
             ? 'prijs of verpakking ontbreekt; blijft onbekend'
             : observedPackDescription(chosenProduct)) +
-        '. Controleer zelf de echte productnaam, voorraad en verpakking.'
+        '. Controleer zelf de echte productnaam, voorraad en verpakking. ' +
+        chosenWholePackPreview(row, store, chosenProduct)
       : 'Kies expliciet de juiste winkel-SKU; geen automatische productmatch.')
 }
 function invalidateUnpricedDemand() {
@@ -336,6 +361,14 @@ function addIngredient(restored = null) {
   amount.maxLength = 24
   amount.className = 'amount'
   if (restored !== null && restored.amount !== null) amount.value = String(restored.amount)
+  // Refresh the physical pack-price indication when a human finishes
+  // changing demand. The full basket totals remain gated by Compare.
+  for (const input of [label, amount]) input.addEventListener('change', () => {
+    for (const store of stores) {
+      updateSelect(row.querySelector('[data-store="' + store + '"]'), store,
+        row.querySelector('.unit').value)
+    }
+  })
   const unit = node('select')
   unit.className = 'unit'
   for (const item of units) unit.add(new Option(item === 'piece' ? 'stuk (piece)' : item, item))
