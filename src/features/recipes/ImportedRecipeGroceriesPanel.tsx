@@ -4,7 +4,7 @@ import { toPlannerRecipe } from './plannerRecipes.ts'
 import { scaleOwnRecipe } from './scaleOwnRecipe.ts'
 import type { UserRecipeDraft } from '../../domain/userRecipeImport.ts'
 import { m2InitialPlan } from '../../data/m2Fixture.ts'
-import { combinedImportedRecipeGroceries } from './combinedImportedRecipeGroceries.ts'
+import { combinedImportedRecipeGroceries, type GroceryContribution } from './combinedImportedRecipeGroceries.ts'
 import { formatOwnRecipeChecklist } from './recipeShoppingChecklist.ts'
 import { exportOwnRecipeChecklistCsv } from './recipeShoppingCsv.ts'
 import { exportCombinedRecipesPrivateWeek } from './exportCombinedRecipesPrivateWeek.ts'
@@ -51,7 +51,7 @@ export function ImportedRecipeGroceriesPanel({
   const [copyableCaptureGuide, setCopyableCaptureGuide] = useState<{ identity: string; target: string; text: string } | null>(null)
   const [capturePreview, setCapturePreview] = useState<{
     key: string; rows: { csvRow: number; store: string; id: string;
-      label: string; amount: number; unit: string }[]
+      label: string; amount: number; unit: string; sources: GroceryContribution[] }[]
   } | null>(null)
   const [dayOverrides, setDayOverrides] = useState<Record<string, string>>({})
   const [portionsById, setPortionsById] = useState<Record<string, number>>({})
@@ -764,10 +764,22 @@ export function ImportedRecipeGroceriesPanel({
           <div className="recipe-collection-groceries__capture-scroll">
             <table>
               <thead><tr><th scope="col">CSV-rij</th><th scope="col">Winkel</th>
-                <th scope="col">Originele fysieke vraag</th><th scope="col">Bronproduct en prijs</th></tr></thead>
+                <th scope="col">Originele fysieke vraag</th><th scope="col">Herkomst receptregels</th>
+                <th scope="col">Bronproduct en prijs</th></tr></thead>
               <tbody>{capturePreview.rows.map(row => <tr key={JSON.stringify([row.csvRow, row.id])}>
                 <td>{row.csvRow}</td><td>{row.store}</td>
                 <td>{row.amount} {row.unit === 'piece' ? 'stuks' : row.unit} {row.label}</td>
+                <td>{row.sources.length > 0
+                  ? <details>
+                      <summary>{row.sources.length} oorspronkelijke ingrediëntregel(len)</summary>
+                      <ul>{row.sources.map((source, index) => <li key={source.recipeId + ':' + index}>
+                        <strong>{source.recipeTitle}</strong>: {source.amount === null
+                          ? 'hoeveelheid controleren'
+                          : source.amount + ' ' + (source.unit === 'piece' ? 'stuks' : source.unit)}
+                        {' · '}{source.original}
+                      </li>)}</ul>
+                    </details>
+                  : 'Geen herkomst gekoppeld; controleer het recept'}</td>
                 <td>Niet opgenomen</td>
               </tr>)}</tbody>
             </table>
