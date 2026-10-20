@@ -27,6 +27,23 @@ export function printableOwnStoreComparison(
       comparison.cheapest + ' is ' + exactEuro.formatCents(comparison.differenceCents) + ' voordeliger voor dit mandje.',
     '', 'Vergelijking per ingredient (zelfde fysieke vraag):',
   ]
+  // Portable TXT and mobile clipboard contain the same conditional
+  // two-stop economics as the Planner. Visit expenses remain the shopper's
+  // own scenario and are deliberately NOT silently assumed to be zero.
+  if (comparison.mixedRoute?.requiresTwoStops) {
+    const route = comparison.mixedRoute
+    lines.push('', 'Optionele combinatie van twee winkels:',
+      'Goedkoopste gecontroleerde hele-verpakkingenregel per ingrediënt: ' +
+        exactEuro.formatCents(route.totalCents),
+      'Productverschil tegenover goedkoopste volledige winkel (voor extra bezoekkosten): ' +
+        exactEuro.formatCents(route.possibleProductDifferenceCents),
+      route.possibleProductDifferenceCents > 0
+        ? 'Alleen voordeliger als jouw extra winkelstopkosten lager zijn dan ' +
+          exactEuro.formatCents(route.possibleProductDifferenceCents) + '.'
+        : 'Geen productvoordeel tegenover een volledige winkel; extra bezoekkosten maken dit duurder.',
+      'Netto voordeel onbekend: eigen extra reistijd en winkelstopkosten niet ingevuld.',
+      '', 'Vergelijking per ingredient (zelfde fysieke vraag):')
+  }
   for (const row of comparison.lines) {
     const label = readable(row.ingredientLabel)
     const entry = (store: string, line: typeof row.plus) => [
