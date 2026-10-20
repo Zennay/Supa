@@ -165,6 +165,26 @@ export function PrivateReviewedProductCatalog({ reviewed, captureProgress, budge
               <small role="status">{freshSource
                 ? 'Bronmoment binnen zeven dagen, nog geen bewijs van actuele kassaprijs.'
                 : 'Bronmoment verlopen of niet bruikbaar: prijzen tellen niet als actueel.'}</small>
+              {freshSource && !!source.confirmedSourceLines?.length && <details
+                className="private-reviewed-products__confirmed-lines">
+                <summary>{source.confirmedSourceLines.length} eigen beoordeelde bronregels met
+                  oorspronkelijke verpakkingsprijzen bekijken</summary>
+                <ul>{source.confirmedSourceLines.map(line => <li
+                  key={line.ingredientId + ':' + line.productId}>
+                  <strong>{line.ingredientLabel} → {line.productName}</strong>
+                  <small>Originele SKU: {line.productId} · {line.packagesNeeded} hele
+                    verpakking(en) van {line.packCount} × {line.packAmount} {line.packUnit}</small>
+                  <small>Oorspronkelijke pakprijs: {money.format(line.pricePerPackCents / 100)}
+                    {' '}· regelbedrag: {money.format(line.lineTotalCents / 100)}
+                    {line.unitPrice ? ' · ' + line.unitPrice : ' · eenheidsprijs onbekend'}</small>
+                  <small>{line.review === 'manual' ? 'Handmatig bevestigd' : 'Automatisch gekoppeld'};
+                    geen volledig winkeltotaal of kassagarantie.</small>
+                  <button type="button" disabled={!onReviewIngredient}
+                    onClick={() => onReviewIngredient?.(shop, line.ingredientId)}>
+                    Controleer originele SKU
+                  </button>
+                </li>)}</ul>
+              </details>}
               {(source.missingIngredients.length > 0 || source.awaitingReviewIngredients.length > 0) &&
                 <details className="private-reviewed-products__missing">
                   <summary>{source.missingIngredients.length} zonder betrouwbare match · {
