@@ -6,6 +6,7 @@ import {
   type OwnStore, type PrivateCaptureProgress, type PrivateReviewedBaskets,
 } from '../comparison/privateReviewedBasketBridge.ts'
 import { confirmedPartialBasket } from '../planner/confirmedPartialBasket.ts'
+import { privateProgressPricePairs } from '../products/privateProgressProductRows.ts'
 import { privatePartialShoppingExport } from './privatePartialShoppingExport.ts'
 import { privatePartialPhysicalShoppingTick } from './privatePhysicalShoppingTick.ts'
 import './partialReviewedShoppingList.css'
@@ -16,13 +17,14 @@ const STORES: readonly OwnStore[] = ['PLUS', 'DekaMarkt']
  * the exact source SKU/pack identity with a later complete basket, but never
  * grant product approval or act as a price or savings authority. */
 export function PartialReviewedShoppingList({
-  progress, complete, checked, setChecked, onOpenComparison, onReviewIngredient,
+  progress, complete, checked, setChecked, onOpenComparison, onOpenProducts, onReviewIngredient,
 }: {
   progress: PrivateCaptureProgress | null
   complete: PrivateReviewedBaskets | null
   checked: Record<string, boolean>
   setChecked: Dispatch<SetStateAction<Record<string, boolean>>>
   onOpenComparison: () => void
+  onOpenProducts: () => void
   onReviewIngredient: (store: OwnStore, ingredientId: string) => void
 }) {
   const [preferred, setPreferred] = useState<OwnStore>('PLUS')
@@ -49,6 +51,11 @@ export function PartialReviewedShoppingList({
   const capture = store && progress?.stores[store]
   const summary = store ? confirmedPartialBasket(progress, store, now) : null
   const rows = capture?.confirmedSourceLines ?? []
+  // Information only: compare identical physical demand at TWO current,
+  // individually admitted original capture instants. A delta never changes
+  // this store's checked shopping task or creates a whole-basket winner.
+  const pairByIngredient = new Map(privateProgressPricePairs(progress, now).map(
+    pair => [pair.one.ingredientId, pair]))
   const identity = capture && progress ? JSON.stringify([
     progress.planKey, store, capture.observedAt,
     rows.map(row => [
@@ -169,9 +176,14 @@ export function PartialReviewedShoppingList({
         <span className="eyebrow">Eigen bronproducten · nog niet compleet</span>
         <h3>Neem al bevestigde winkelproducten mee</h3>
       </div>
-      <button type="button" className="ghost-button" onClick={onOpenComparison}>
-        Controleer mijn ontbrekende producten
-      </button>
+      <div className="supa-partial-shop__actions">
+        <button type="button" className="ghost-button" onClick={onOpenProducts}>
+          Vergelijk gecontroleerde producten in Producten
+        </button>
+        <button type="button" className="ghost-button" onClick={onOpenComparison}>
+          Controleer ontbrekende bronproducten
+        </button>
+      </div>
     </header>
     {validStores.length > 1 && <div className="supa-partial-shop__switch" aria-label="Kies eigen winkelbron">
       {validStores.map(option => <button key={option} type="button"
@@ -204,6 +216,25 @@ export function PartialReviewedShoppingList({
           </span>
         </label>
         <strong>{exactEuro.formatCents(line.lineTotalCents)}</strong>
+        {pairByIngredient.has(line.ingredientId) && (() => {
+          const pair = pairByIngredient.get(line.ingredientId)!
+          const otherShop = store === 'PLUS' ? 'DekaMarkt' : 'PLUS'
+          const other = store === 'PLUS' ? pair.other : pair.one
+          const own = store === 'PLUS' ? pair.one : pair.other
+          const difference = own.lineTotalCents - other.lineTotalCents
+          return <p className="supa-partial-shop__individual-delta">
+            <small>{otherShop}: {other.packagesNeeded} hele pakken ·
+              {' '}{exactEuro.formatCents(other.lineTotalCents)} voor dezelfde hoeveelheid.
+              {' '}Eigen bronprijs, geen kassagarantie.</small>
+            <strong>{difference === 0
+              ? 'Gelijke hele-pakprijs voor dit ingrediënt.'
+              : exactEuro.formatCents(Math.abs(difference)) +
+                ' lagere hele-pakkosten bij ' +
+                (difference > 0 ? otherShop : store) + ' voor alleen deze regel.'}</strong>
+            <small>Andere ingrediënten blijven onbekend. Dit is geen
+              besparing op het volledige winkelmandje.</small>
+          </p>
+        })()}
         <button type="button" className="ghost-button"
           onClick={() => onReviewIngredient(store, line.ingredientId)}>
           Controleer SKU in Vergelijk

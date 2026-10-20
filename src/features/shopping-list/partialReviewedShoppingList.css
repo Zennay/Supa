@@ -68,3 +68,11 @@
 @media(max-width:420px) {
   .supa-partial-shop__items article { grid-template-columns: minmax(0,1fr); }
 }
+/* One legitimately paired, whole-pack ingredient difference. Never a basket sum. */
+.supa-partial-shop__items .supa-partial-shop__individual-delta {
+  grid-column: 1 / -1; display: grid; gap: .3rem;
+  border: 1px solid #d6e5da; background: #f5faf6;
+  border-radius: 9px; padding: .65rem .8rem;
+}
+.supa-partial-shop__individual-delta strong { color: #214d32; line-height: 1.35; }
+.supa-partial-shop__individual-delta small { color: #425948; }

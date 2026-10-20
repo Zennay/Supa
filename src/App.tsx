@@ -1043,6 +1043,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
                 checked={privateShoppingTicks}
                 setChecked={setPrivateShoppingTicks}
                 onOpenComparison={openOwnPriceImport}
+                onOpenProducts={() => navigate('products')}
                 onReviewIngredient={(store, ingredientId) => {
                   setPrivateReviewFocus(previous => ({
                     planKey: privatePlanKey, store, ingredientId,
