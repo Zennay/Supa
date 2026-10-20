@@ -54,6 +54,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
     text: string
     label: string
     checkedSignature: string
+    paired: boolean
     planKey: string
     plus: PrivateReviewedBasket | null
     deka: PrivateReviewedBasket | null
@@ -149,7 +150,8 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         throw Error('Eigen winkelbron is veranderd.')
       setManualCopy({
         text, label: shop + (onlyOpen ? ' · alleen nog te kopen' : ' · volledige privéweekmand'),
-        checkedSignature, planKey: current.planKey, plus: current.stores.PLUS ?? null,
+        checkedSignature, paired: false, planKey: current.planKey,
+        plus: current.stores.PLUS ?? null,
         deka: current.stores.DekaMarkt ?? null,
       })
       setReceiptMessage('Selecteer de persoonlijke tekst hieronder om zelf te kopiëren of te delen.')
@@ -267,7 +269,8 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
           latest.planKey !== current.planKey) throw Error('De bronnen zijn veranderd.')
       setManualCopy({
         text, label: 'PLUS / DekaMarkt · volledig eigen weekmandje',
-        checkedSignature, planKey: current.planKey, plus: current.stores.PLUS,
+        checkedSignature, paired: true, planKey: current.planKey,
+        plus: current.stores.PLUS,
         deka: current.stores.DekaMarkt,
       })
       setReceiptMessage('Selecteer de volledige persoonlijke vergelijking hieronder om zelf te kopiëren.')
@@ -287,6 +290,16 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
     manualCopy.planKey === reviewed.planKey &&
     manualCopy.plus === (fresh?.stores.PLUS ?? null) &&
     manualCopy.deka === (fresh?.stores.DekaMarkt ?? null) ? manualCopy : null
+  function canCopyCurrentManualText(): boolean {
+    if (!manualCopyVisible) return false
+    const latest = freshReviewedBaskets(reviewedRef.current,
+      reviewedRef.current.planKey, Date.now())
+    return latest?.planKey === manualCopyVisible.planKey &&
+      (latest?.stores.PLUS ?? null) === manualCopyVisible.plus &&
+      (latest?.stores.DekaMarkt ?? null) === manualCopyVisible.deka &&
+      privateCheckedSignature(checkedRef.current) === manualCopyVisible.checkedSignature &&
+      (!manualCopyVisible.paired || ownStoreWeekComparison(latest).status === 'comparable')
+  }
   const plus = fresh?.stores.PLUS
   const deka = fresh?.stores.DekaMarkt
   const comparable = !!plus && !!deka &&
@@ -391,7 +404,8 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
           : 'Het bestaande bronpaar is nog niet betrouwbaar vergelijkbaar voor hetzelfde fysieke weekmandje. Controleer de productkoppelingen opnieuw.'}</p>
       {receiptMessage && <p role="status">{receiptMessage}</p>}
       {manualCopyVisible && <PrivateManualShareText key={manualCopyVisible.text}
-        text={manualCopyVisible.text} label={manualCopyVisible.label} />}
+        text={manualCopyVisible.text} label={manualCopyVisible.label}
+        canCopy={canCopyCurrentManualText} />}
       {manualCopy && !manualCopyVisible && <p role="status">
         De oorspronkelijke bron of afvinkstatus is gewijzigd. Maak je kopieertekst opnieuw.
       </p>}
@@ -550,7 +564,8 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         openbare besparingsclaim of nieuwe winkelbronimport.</small>
       {receiptMessage && <p role="status">{receiptMessage}</p>}
       {manualCopyVisible && <PrivateManualShareText key={manualCopyVisible.text}
-        text={manualCopyVisible.text} label={manualCopyVisible.label} />}
+        text={manualCopyVisible.text} label={manualCopyVisible.label}
+        canCopy={canCopyCurrentManualText} />}
       {manualCopy && !manualCopyVisible && <p role="status">
         De oorspronkelijke bron of afvinkstatus is gewijzigd. Maak je kopieertekst opnieuw.
       </p>}

@@ -131,6 +131,15 @@ Als iemand intussen een origineel artikel heeft afgevinkt of teruggezet,
 vraagt Supa de export opnieuw aan te maken in plaats van een
 verouderde boodschappenlijst stilzwijgend op te slaan.
 
+Ook als het privacyvriendelijke tekstvak al openstaat en de
+originele bron op dat moment verloopt, controleert Supa opnieuw bij
+**selecteren** en bij de echte **Kopieer**-actie van de browser.
+Bij een verlopen, niet langer fysiek vergelijkbare of gewijzigde
+winkelopname of afvinkstatus wordt die kopieeractie gestopt; de
+gebruiker kan dan uitsluitend een nieuw gecontroleerd overzicht
+maken. De vaste historische onderzoeksvergelijking blijft duidelijk
+een aparte niet-live bron, zonder deze persoonlijke bronclaim.
+
 Een weergegeven selecteerbare privétekst is een momentopname van
 de originele winkelbronnen én de afvinkstatus op dat moment. Zodra je
 een boodschappenartikel (ook bij de andere winkel) afvinkt of terugzet,
