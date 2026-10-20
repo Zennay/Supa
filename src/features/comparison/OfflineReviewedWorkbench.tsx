@@ -2192,6 +2192,62 @@ export function OfflineReviewedWorkbench({
     } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
   }
 
+  async function downloadReviewedIngredientLedger() {
+    if (!imported || !basketPair || !coverageRows.length) return
+    try {
+      const { literalCsv } = await import('../../privateBasketComparisonCsv.ts')
+      const nowNs = BigInt(Date.now()) * 1_000_000n
+      const exactLine = (store: typeof stores[number], id: string) => {
+        const source = imported.captures[store]
+        const basket = store === 'PLUS' ? basketPair.plus : basketPair.deka
+        const line = basket?.lines.find(item => item.id === id)
+        const fresh = !!source && nowNs >= source.observedNs - 300_000_000_000n &&
+          nowNs - source.observedNs <= 604_800_000_000_000n
+        const empty = (status: string) => ({ values: [status, source?.observedAt ?? '', '', '', '', '', '', ''], line: null as Matched | null })
+        if (!source) return empty('Geen bron')
+        if (!fresh) return empty('Bron verlopen of toekomstig')
+        if (!line || line.status !== 'matched' ||
+            !isAcceptedKey(reviewedLineKey(store, source.observedAt, line)))
+          return empty('Niet persoonlijk bevestigd')
+        return { values: ['Bevestigde eigen bron', source.observedAt, line.productId,
+          line.productName, String(line.packs), String(line.pricePerPackCents),
+          String(line.lineTotalCents), privateUnitPrice(line) ?? ''], line }
+      }
+      const rows = [[
+        'ingredient_id', 'ingredient', 'benodigd', 'eenheid',
+        ...stores.flatMap(store => ['status', 'bronmoment', 'productcode', 'product',
+          'hele_pakken', 'pakprijs_cent', 'regel_cent', 'eenheidsprijs'].map(field => store + '_' + field)),
+        'Deka_minus_PLUS_cent', 'betekenis',
+      ]]
+      for (const need of coverageRows) {
+        const plus = exactLine('PLUS', need.id)
+        const deka = exactLine('DekaMarkt', need.id)
+        const both = imported.pairedWithin24h && plus.line && deka.line &&
+          plus.line.requirement.amount === deka.line.requirement.amount &&
+          plus.line.requirement.unit === deka.line.requirement.unit
+        const delta = both ? deka.line!.lineTotalCents - plus.line!.lineTotalCents : null
+        const comparable = delta !== null && Number.isSafeInteger(delta)
+        rows.push([need.id, need.label, need.amount === null ? '' : String(need.amount),
+          need.unit, ...plus.values, ...deka.values,
+          comparable ? String(delta) : '',
+          comparable ? 'Eigen gekoppelde ingredientregels' : 'Prijsverschil onbekend'])
+      }
+      const csv = '\uFEFF' + rows.map(row => row.map((cell, index) =>
+        literalCsv(cell, index === rows[0].length - 2)).join(';')).join('\r\n') + '\r\n'
+      if (new TextEncoder().encode(csv).length > 256000) throw Error('Bestand te groot')
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url; link.download = 'supa-prive-deelprijzen-gecontroleerd.csv'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setCoverageMessage('Eigen bevestigde regelprijzen als werkblad gedownload. Leeg betekent onbekend, nooit gratis. Geen totaal of publieke besparingsclaim.')
+    } catch {
+      setCoverageMessage('Prijswerkblad niet beschikbaar; vorige brondata en beoordelingen blijven intact.')
+    }
+  }
+
   const readableReport = canShowDifference && basketPair?.plus && basketPair.deka &&
     basketPair.comparison && basketPair.comparison.deltaCents !== null &&
     imported?.captures.PLUS && imported.captures.DekaMarkt &&
@@ -2885,7 +2941,16 @@ export function OfflineReviewedWorkbench({
                       onClick={() => downloadCoverageChecklist(false)}>
                       Download complete winkeldekking (TXT)
                     </button>
+                    <button className="ghost-button" type="button"
+                      disabled={!imported || !basketPair || coverageRows.length === 0}
+                      onClick={() => void downloadReviewedIngredientLedger()}>
+                      Download bevestigde regelprijzen + onbekende regels (CSV)
+                    </button>
                   </div>
+                  <p className="disclaimer">Privé-werkblad, geen bronimport: alleen actuele
+                    geaccepteerde artikelen krijgen geldvelden. Het prijsverschil geldt per
+                    identieke ingrediëntbehoefte bij tijdsvergelijkbare eigen winkelopnames,
+                    nooit als totale besparing of bewijs van retailerprijzen.</p>
                   {coverageMessage && <p role="status" aria-live="polite">{coverageMessage}</p>}
                   <div className="offline-price-workbench__coverage-filters" role="group"
                     aria-label="Filter de winkeldekking van jouw mandje">
