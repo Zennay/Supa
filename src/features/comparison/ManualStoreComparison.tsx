@@ -63,10 +63,13 @@ function readPastedTable(text: string, needs: readonly ManualNeed[]): {
   const legacyWithoutPackCount = lines[0] === legacyTableHeader
   const boundToDemand = lines[0] === boundTableHeader
   const fullSheet = lines.length === 1 + needs.length * 2
-  const partialSheet = boundToDemand && lines.length === 1 + needs.length
+  // A sparse single-store sheet may contain only the products already
+  // physically found. Remaining Planner ingredients remain unpriced.
+  const partialSheet = boundToDemand && lines.length >= 2 &&
+    lines.length <= 1 + needs.length
   if ((!legacyWithoutPackCount && !boundToDemand && lines[0] !== tableHeader) ||
       (!fullSheet && !partialSheet)) {
-    throw new Error('Gebruik een volledig PLUS/Deka-blad of een exact Planner-gebonden negenkolomsblad voor één winkel.')
+    throw new Error('Gebruik een volledig PLUS/Deka-blad of een negenkoloms deelblad voor één winkel met minstens één productregel.')
   }
   const expected = new Map(needs.map(need => [need.id, need]))
   const entries: ManualEntries = Object.create(null) as ManualEntries
@@ -256,10 +259,20 @@ export function ManualStoreComparison({
       setImportMessage('De persoonlijke boodschappenlijst kon niet worden opgeslagen; controleer de huidige invoer.')
     }
   }
-  function downloadTableFile(store?: ManualRetailer) {
+  function downloadTableFile(store?: ManualRetailer, onlyEntered = false) {
     if (!(staleEntries ? recordedNeeds : needs).length) return
     try {
-      const content = tabularData(staleEntries ? recordedNeeds : needs, entries, store ? [store] : MANUAL_RETAILERS) + '\n'
+      const sourceNeeds = staleEntries ? recordedNeeds : needs
+      const includedNeeds = store && onlyEntered ? sourceNeeds.filter(need => {
+        const row = entries[manualQuoteKey(store, need.id)]
+        return !!row && (row.product.trim() !== '' || row.packAmount.trim() !== '' ||
+          row.packUnit !== '' || (row.packCount ?? '').trim() !== '' || row.price.trim() !== '')
+      }) : sourceNeeds
+      if (!includedNeeds.length) {
+        setImportMessage(`Nog geen ingevulde ${store ?? 'winkel'}-regels om als deelblad te bewaren.`)
+        return
+      }
+      const content = tabularData(includedNeeds, entries, store ? [store] : MANUAL_RETAILERS) + '\n'
       if (new TextEncoder().encode(content).length > 128000) {
         setImportMessage('Het huidige invulblad is te groot om lokaal te bewaren.')
         return
@@ -270,7 +283,7 @@ export function ManualStoreComparison({
       try {
         const link = document.createElement('a')
         link.href = url
-        link.download = store ? `supa-mijn-${store === 'PLUS' ? 'plus' : 'dekamarkt'}-invulblad.tsv` : 'supa-mijn-plus-deka-invulblad.tsv'
+        link.download = store ? `supa-mijn-${store === 'PLUS' ? 'plus' : 'dekamarkt'}-${onlyEntered ? 'deelblad' : 'invulblad'}.tsv` : 'supa-mijn-plus-deka-invulblad.tsv'
         document.body.append(link)
         try { link.click() } finally { link.remove() }
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
@@ -287,8 +300,9 @@ export function ManualStoreComparison({
         setImportMessage('Oud invulblad niet geladen; huidige invoer behouden.')
         return
       }
-      // A one-store sheet may only replace that exact store for unchanged demand.
-      // Never carry old-store prices across a different Planner week.
+      // A sparse one-store sheet changes only its present ingredient rows,
+      // never an unobserved item and never another shop. Different Planner
+      // demand still quarantines both previously entered shops.
       const nextEntries: ManualEntries = imported.partialStore
         ? { ...(staleEntries ? {} : entries), ...imported.entries }
         : imported.entries
@@ -451,7 +465,7 @@ export function ManualStoreComparison({
           </div>
           {showTable && (
             <div className="manual-compare__table">
-              <p>Dit negenkolomsinvulblad bewaart ook de originele hoeveelheid en eenheid per Planner-ingrediënt. Wijzig die twee kolommen niet: Supa weigert oude bladen voor een andere Planner-vraag. Vul uitsluitend winkelproduct, verpakking, multipack en eigen prijs in. Plak of laad daarna het volledige of één los PLUS/Deka-blad terug. Een enkel winkelblad vervangt uitsluitend de invoer van die winkel bij dezelfde Planner-vraag. Oude zes- en zevenkolomsbladen vragen een extra controle, omdat ze niet aan een Planner-hoeveelheid zijn gebonden.</p>
+              <p>Dit negenkolomsinvulblad bewaart ook de originele hoeveelheid en eenheid per Planner-ingrediënt. Wijzig die twee kolommen niet: Supa weigert oude bladen voor een andere Planner-vraag. Vul uitsluitend winkelproduct, verpakking, multipack en eigen prijs in. Plak of laad daarna het volledige of één los PLUS/Deka-blad terug. Een enkel winkelblad vult uitsluitend de opgegeven ingrediënten voor die winkel in; ontbrekende regels blijven ongewijzigd en onbekende prijzen worden niet geschat. Oude zes- en zevenkolomsbladen vragen een extra controle, omdat ze niet aan een Planner-hoeveelheid zijn gebonden.</p>
               <label>Huidige tabel
                 <textarea readOnly rows={7} value={tabularData(staleEntries ? recordedNeeds : needs, entries)}
                   onFocus={event => event.currentTarget.select()} />
@@ -466,10 +480,16 @@ export function ManualStoreComparison({
                 Bewaar beide winkels (.tsv), ook onvolledig
               </button>
               {MANUAL_RETAILERS.map(store => (
-                <button className="ghost-button" type="button" key={store}
-                  onClick={() => downloadTableFile(store)}>
-                  Bewaar alleen {store} (.tsv)
-                </button>
+                <div className="manual-compare__store-actions" key={store}>
+                  <button className="ghost-button" type="button"
+                    onClick={() => downloadTableFile(store)}>
+                    Bewaar {store} met alle regels (.tsv)
+                  </button>
+                  <button className="ghost-button" type="button"
+                    onClick={() => downloadTableFile(store, true)}>
+                    Bewaar alleen ingevulde {store}-regels (.tsv)
+                  </button>
+                </div>
               ))}
               <label>Of kies eerder bewaard lokaal invulblad (.tsv of .txt, maximaal 128 kB)
                 <input type="file" accept=".tsv,.txt,text/tab-separated-values,text/plain"
