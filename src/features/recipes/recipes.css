@@ -250,3 +250,12 @@
   flex-wrap:wrap; gap:8px; }
 .recipe-collection-groceries__day span { overflow-wrap:anywhere; }
 .recipe-collection-groceries__day select { min-width:110px; }
+
+.recipe-collection-groceries__variants { display:grid; gap:10px; padding:14px; margin-top:12px;
+  background:#fffdf4; border:1px solid #ccba88; border-radius:12px; }
+.recipe-collection-groceries__variants h4, .recipe-collection-groceries__variants p { margin:0; }
+.recipe-collection-groceries__variants > button { justify-self:start; min-height:44px; }
+.recipe-collection-groceries__variant { border:1px solid #dccda8; border-radius:8px;
+  padding:9px; margin:5px 0; overflow-wrap:anywhere; }
+.recipe-collection-groceries__variant summary { cursor:pointer; font-weight:700; }
+.recipe-collection-groceries__variant ul { padding-left:22px; }

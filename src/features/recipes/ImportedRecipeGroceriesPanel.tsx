@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { SavedRecipe } from './recipeLibrary.ts'
 import { toPlannerRecipe } from './plannerRecipes.ts'
+import { scaleOwnRecipe } from './scaleOwnRecipe.ts'
+import type { UserRecipeDraft } from '../../domain/userRecipeImport.ts'
 import { m2InitialPlan } from '../../data/m2Fixture.ts'
 import { combinedImportedRecipeGroceries } from './combinedImportedRecipeGroceries.ts'
 import { formatOwnRecipeChecklist } from './recipeShoppingChecklist.ts'
@@ -25,11 +27,14 @@ function savePrivateFile(filename: string, content: string, mime: string) {
  * No automatic store matching, no phantom unit rates, no financial claim.
  */
 export function ImportedRecipeGroceriesPanel({
-  recipes, recentIds, onEdit,
+  recipes, recentIds, onEdit, onSavePortionVariants,
 }: {
   recipes: readonly SavedRecipe[]
   recentIds: readonly string[]
   onEdit: (recipe: SavedRecipe) => void
+  onSavePortionVariants: (changes: readonly {
+    recipeId: string; sourceSnapshot: string; portions: number; draftSnapshot: string
+  }[]) => SavedRecipe[]
 }) {
   const [selectedIds, setSelectedIds] = useState<string[]>(() =>
     (recentIds.length ? recentIds : recipes.slice(0, 3).map(recipe => recipe.id)).slice(0, 15))
@@ -40,6 +45,11 @@ export function ImportedRecipeGroceriesPanel({
   const [checked, setChecked] = useState<Record<string, boolean>>({})
   const [pendingOnly, setPendingOnly] = useState(false)
   const [feedback, setFeedback] = useState('')
+  const [variantPreview, setVariantPreview] = useState<null | {
+    inputKey: string
+    changes: { recipeId: string; sourceSnapshot: string; portions: number;
+      draftSnapshot: string; draft: UserRecipeDraft }[]
+  }>(null)
   // Preserve the actual user's selection order rather than imposing the
   // library's saved-at order on the day plan and combined recipe exports.
   const selected = selectedIds.flatMap(id => {
@@ -75,6 +85,9 @@ export function ImportedRecipeGroceriesPanel({
       })) : []
   const plannerDaysDistinct = plannerAssignments.length > 0 &&
     new Set(plannerAssignments.map(assignment => assignment.day)).size === plannerAssignments.length
+  const variantInputKey = JSON.stringify(selected.map(recipe =>
+    [recipe, Object.hasOwn(portionsById, recipe.id) ? portionsById[recipe.id] : recipe.servings]))
+  useEffect(() => setVariantPreview(null), [variantInputKey])
   const signature = JSON.stringify(selected.map(recipe => [
     recipe.id, portionsById[recipe.id] ?? recipe.servings, recipe.servings,
     recipe.minutes, recipe.warnings,
@@ -129,6 +142,50 @@ export function ImportedRecipeGroceriesPanel({
       detail: { assignments: plannerAssignments.map(({ day, recipeId, recipeSnapshot }) => ({ day, recipeId, recipeSnapshot })), destination },
     }))
     if (!accepted) setFeedback('Het recept of de beveiligde Planner-opslag is veranderd of niet beschikbaar. De hele batch is geweigerd en het bestaande weekmenu is behouden.')
+  }
+  const changedPortions = selected.filter(recipe =>
+    Object.hasOwn(portionsById, recipe.id) &&
+    portionsById[recipe.id] !== recipe.servings)
+  const previewVariants = () => {
+    setFeedback('')
+    setVariantPreview(null)
+    try {
+      if (!changedPortions.length) throw new Error('Kies eerst bij minimaal één recept een ander heel aantal porties.')
+      const changes = changedPortions.map(recipe => {
+        const portions = portionsById[recipe.id]
+        const draft = scaleOwnRecipe(recipe, portions)
+        return {
+          recipeId: recipe.id, sourceSnapshot: JSON.stringify(recipe), portions,
+          draftSnapshot: JSON.stringify(draft), draft,
+        }
+      })
+      setVariantPreview({ inputKey: variantInputKey, changes })
+      setFeedback('Bekijk alle omgerekende hoeveelheden. Er zijn nog geen varianten bewaard.')
+    } catch (cause) {
+      setFeedback(cause instanceof Error ? cause.message : 'De gekozen porties kunnen niet veilig worden omgerekend.')
+    }
+  }
+  const saveVariants = () => {
+    setFeedback('')
+    try {
+      if (!variantPreview || variantPreview.inputKey !== variantInputKey)
+        throw new Error('De recepten of porties zijn gewijzigd. Controleer het voorbeeld opnieuw.')
+      const created = onSavePortionVariants(variantPreview.changes.map(({
+        recipeId, sourceSnapshot, portions, draftSnapshot,
+      }) => ({ recipeId, sourceSnapshot, portions, draftSnapshot })))
+      const variantsByOriginal = new Map(
+        variantPreview.changes.map((change, index) => [change.recipeId, created[index].id]))
+      setSelectedIds(ids => ids.map(id => variantsByOriginal.get(id) ?? id))
+      setPortionsById({})
+      setChecked({})
+      setVariantPreview(null)
+      setFeedback(created.length + ' nieuwe metrische receptvarianten samen opgeslagen. ' +
+        'De varianten zijn geselecteerd; controleer de weekdagen en plan ze hieronder. ' +
+        'Bestaande originele recepten en winkelprijzen zijn niet gewijzigd.')
+    } catch (cause) {
+      setFeedback(cause instanceof Error ? cause.message :
+        'Varianten zijn niet opgeslagen. De originele recepten blijven behouden.')
+    }
   }
   const exportText = () => {
     if (!list?.canCopy) return
@@ -279,6 +336,37 @@ export function ImportedRecipeGroceriesPanel({
         </details>}
       </li>)}</ul>
       {!visible.length && <p role="status">Alle controleerbare boodschappen zijn afgevinkt.</p>}
+      {changedPortions.length > 0 && <section
+        className="recipe-collection-groceries__variants"
+        aria-label="Afwijkende porties als eigen recepten voor Planner bewaren">
+        <h4>Maak eigen Planner-recepten voor je gekozen porties</h4>
+        <p>{changedPortions.length} recept(en) hebben hier andere porties dan in je bibliotheek.
+          De gezamenlijke boodschappenlijst mag die porties alvast gebruiken, maar Planner
+          gebruikt alleen opgeslagen en volledig gecontroleerde fysieke hoeveelheden.
+          Bekijk daarom eerst de omgerekende gram/ml en hele stuks.</p>
+        <button type="button" onClick={previewVariants}>
+          Bekijk {changedPortions.length} nieuwe portievariant(en)
+        </button>
+        {variantPreview && variantPreview.inputKey === variantInputKey && <>
+          <div>{variantPreview.changes.map(change => <details key={change.recipeId}
+            className="recipe-collection-groceries__variant">
+            <summary>{change.draft.title} · {change.portions} porties ·
+              {' '}{change.draft.ingredients.length} ingrediënten</summary>
+            <ul>{change.draft.ingredients.map((ingredient, index) =>
+              <li key={index}>{ingredient.original}
+                {ingredient.reviewReason &&
+                  <strong> — Controle nodig: {ingredient.reviewReason}</strong>}</li>)}</ul>
+            <small>De originele bron blijft intact; dit is nog geen winkelprijs of match.</small>
+          </details>)}</div>
+          <div className="recipe-backup-panel__actions">
+            <button type="button" onClick={saveVariants}>
+              Bevestig en bewaar alle {variantPreview.changes.length} varianten
+            </button>
+            <button type="button" className="ghost-button"
+              onClick={() => setVariantPreview(null)}>Annuleer zonder opslaan</button>
+          </div>
+        </>}
+      </section>}
       <section className="recipe-collection-groceries__week" aria-label="Meerdere eigen recepten samen in mijn Planner zetten">
         <h4>Plan deze recepten als weekmenu</h4>
         <p>Alleen de gekozen dagen worden bijgewerkt. Voor Planner heb je gecontroleerde

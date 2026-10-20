@@ -354,6 +354,45 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       setRecipeFileMessage(cause instanceof Error ? cause.message : 'Variant maken mislukt. Het origineel is ongewijzigd.')
     }
   }
+  /** Save an explicitly reviewed set of metric portion variants in one CAS
+   * write. Originals and unrelated recipes remain byte-identical; a failure
+   * cannot leave half the requested variants in the user's library. */
+  function saveBatchPortionVariants(changes: readonly {
+    recipeId: string; sourceSnapshot: string; portions: number; draftSnapshot: string
+  }[]): SavedRecipe[] {
+    if (library.error) throw new Error(library.error)
+    if (!changes.length || changes.length > 15 ||
+        new Set(changes.map(item => item.recipeId)).size !== changes.length ||
+        library.recipes.length + changes.length > 100) {
+      throw new Error('Kies 1–15 verschillende recepten; de bibliotheek ondersteunt maximaal 100 eigen recepten.')
+    }
+    const savedAt = new Date().toISOString()
+    const additions = changes.map(change => {
+      const source = library.recipes.find(recipe => recipe.id === change.recipeId)
+      if (!source || JSON.stringify(source) !== change.sourceSnapshot) {
+        throw new Error('Een bronrecept is gewijzigd. Controleer de nieuwe hoeveelheden opnieuw.')
+      }
+      const draft = scaleOwnRecipe(source, change.portions)
+      if (JSON.stringify(draft) !== change.draftSnapshot) {
+        throw new Error('De porties komen niet meer overeen met het beoordeelde voorbeeld.')
+      }
+      return { ...reviewRecipe(draft), id: ownRecipeId(), savedAt } satisfies SavedRecipe
+    })
+    const ids = additions.map(recipe => recipe.id)
+    if (new Set(ids).size !== ids.length ||
+        ids.some(id => library.recipes.some(recipe => recipe.id === id))) {
+      throw new Error('Dubbele lokale recept-ID. Probeer opnieuw.')
+    }
+    const next = saveRecipeLibrary(window.localStorage, library,
+      [...additions, ...library.recipes])
+    setLibrary(next)
+    window.dispatchEvent(new Event('supa-recipes-changed'))
+    return additions.map(recipe => {
+      const saved = next.recipes.find(item => item.id === recipe.id)
+      if (!saved) throw new Error('Een bewaarde portievariant is niet beschikbaar.')
+      return saved
+    })
+  }
   function requestRecipeRemoval(recipe: SavedRecipe) {
     setPendingRecipeRemoval(null)
     setRecipeFileMessage('')
@@ -1059,7 +1098,8 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       open={groceryOpen} onToggle={event => setGroceryOpen(event.currentTarget.open)}>
       <summary>Maak één boodschappenlijst van mijn eigen recepten</summary>
       <ImportedRecipeGroceriesPanel recipes={library.recipes}
-        recentIds={lastImportedIds} onEdit={recipe => openSavedRecipeEditor(recipe)} />
+        recentIds={lastImportedIds} onEdit={recipe => openSavedRecipeEditor(recipe)}
+        onSavePortionVariants={saveBatchPortionVariants} />
     </details>}
     <section className="recipe-backup-panel" aria-label="Eigen recepten meenemen naar een ander apparaat">
       <h2>Mijn recepten meenemen</h2>
