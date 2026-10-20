@@ -87,6 +87,19 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOp
   const gapById = new Map<string, number>(paired.status === 'comparable'
     ? paired.lines.map(line => [line.id, Math.abs(line.deltaCents)])
     : [])
+  const signedDeltaById = new Map<string, number>(paired.status === 'comparable'
+    ? paired.lines.map(line => [line.id, line.deltaCents])
+    : [])
+  function priceDifferenceForProduct(shop: OwnStore, line: Matched): string | null {
+    const delta = signedDeltaById.get(line.id)
+    if (delta === undefined) return null
+    if (delta === 0) return 'Zelfde hele-verpakkingenprijs bij PLUS en DekaMarkt.'
+    const against = shop === 'PLUS' ? 'DekaMarkt' : 'PLUS'
+    const ownMinusOther = shop === 'PLUS' ? -delta : delta
+    return money.format(Math.abs(ownMinusOther) / 100) +
+      (ownMinusOther < 0 ? ' goedkoper dan bij ' : ' duurder dan bij ') +
+      against + ' voor exact dezelfde fysieke weekvraag.'
+  }
   const search = productSearchText(query.trim())
   const rate = (line: Matched) => privatePackUnitRate({
     amount: line.pack.amount, unit: line.pack.unit, count: line.pack.count,
@@ -321,7 +334,6 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOp
       <p role="status">{visible.length} van {sources.length} bevestigde productregels.
         {' '}{ordered.filter(row => isChecked(row.shop, row.line)).length}
         {' '}van de getoonde artikelen staan op afgevinkt in je lijst.</p>
-      {checkMessage && <p role="status">{checkMessage}</p>}
       {order === 'unitPrice' && unitFilter === 'all' && <p className="private-reviewed-products__sort-note">
         Eerst per kg, dan per liter en per stuk gesorteerd; verschillende eenheden
         worden niet met elkaar vergeleken. Voor het mandje tellen hele verpakkingen.
@@ -334,6 +346,9 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOp
         <p>{line.packs} × verpakking van {line.pack.count} × {line.pack.amount} {line.pack.unit}</p>
         <strong>{money.format(line.lineTotalCents / 100)} voor de week</strong>
         <small>{money.format(line.pricePerPackCents / 100)} per verpakking · {privateUnitPrice(line) ?? 'Eenheidsprijs onbekend'}</small>
+        {priceDifferenceForProduct(shop, line) && <p className="private-reviewed-products__card-difference">
+          {priceDifferenceForProduct(shop, line)}
+        </p>}
         <button type="button" className="private-reviewed-products__checked-action"
           aria-pressed={isChecked(shop, line)}
           onClick={() => toggleChecked(shop, line)}>
@@ -351,6 +366,7 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOp
       onOpenComparison={onOpenComparison} onOpenList={onOpenList}
       onOpenMixedRoute={onOpenMixedRoute} onChooseRouteLine={onChooseRouteLine}
       checked={checked} />}
+    {checkMessage && <p role="status">{checkMessage}</p>}
     <button type="button" onClick={onOpenComparison}>Open prijsinvoer en productmatching</button>
     <small>Ontbrekende of verlopen bronproducten krijgen nooit een verzonnen prijs.</small>
   </section>

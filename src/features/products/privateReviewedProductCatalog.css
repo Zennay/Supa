@@ -99,3 +99,7 @@ border-radius:9px;padding:.65rem}
 .private-reviewed-products__match-queue li>div{display:grid;gap:.2rem;min-width:0;overflow-wrap:anywhere}
 .private-reviewed-products__match-queue li small{line-height:1.4}
 .private-reviewed-products__match-queue li button{flex:0 1 auto}
+
+.private-reviewed-products__card-difference{padding:.65rem .75rem;border-radius:8px;
+background:#e7f4eb;border:1px solid #c0d3c2;color:#255336;font-weight:600;
+line-height:1.45}
