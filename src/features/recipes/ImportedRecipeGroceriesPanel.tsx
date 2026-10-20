@@ -8,6 +8,7 @@ import { combinedImportedRecipeGroceries } from './combinedImportedRecipeGroceri
 import { formatOwnRecipeChecklist } from './recipeShoppingChecklist.ts'
 import { exportOwnRecipeChecklistCsv } from './recipeShoppingCsv.ts'
 import { exportCombinedRecipesPrivateWeek } from './exportCombinedRecipesPrivateWeek.ts'
+import { exportUnpricedProgress, importUnpricedProgress, unpricedProgressMaxBytes } from '../comparison/unpricedPlannerProgress.ts'
 
 function savePrivateFile(filename: string, content: string, mime: string) {
   const url = URL.createObjectURL(new Blob([content], { type: mime }))
@@ -99,6 +100,16 @@ export function ImportedRecipeGroceriesPanel({
   const result = selected.length
     ? combinedImportedRecipeGroceries(selected, portionsById) : null
   const list = result?.checklist ?? null
+  // Persist ONLY explicit downloaded checkmarks. Bind them to selected recipe
+  // identities, exact current physical amounts and original review warnings.
+  // Positional numeric line keys alone are never enough to restore ticks.
+  const progressIdentity = JSON.stringify({
+    kind: 'supa-owned-recipes-combined-checklist-v1', signature, selectedIds,
+    lines: list?.lines.map(line => [line.key, line.original, line.label,
+      line.query ?? null, line.amount, line.unit, line.needsReview]) ?? [],
+  })
+  const latestProgressIdentity = useRef(progressIdentity)
+  latestProgressIdentity.current = progressIdentity
   const outstanding = list?.lines.filter(line => line.needsReview).length ?? 0
   const checkedCount = list?.lines.filter(line => !line.needsReview && checked[line.key]).length ?? 0
   const visible = list?.lines.filter(line => !pendingOnly || line.needsReview || !checked[line.key]) ?? []
@@ -190,6 +201,18 @@ export function ImportedRecipeGroceriesPanel({
     } catch (cause) {
       setFeedback(cause instanceof Error ? cause.message :
         'Varianten zijn niet opgeslagen. De originele recepten blijven behouden.')
+    }
+  }
+  const downloadChecks = () => {
+    if (!list?.canCopy) return
+    try {
+      const record = exportUnpricedProgress(progressIdentity,
+        list.lines.map(line => line.key), checked)
+      savePrivateFile('supa-receptenbundel-boodschappen-vinkjes.json',
+        record, 'application/json;charset=utf-8')
+      setFeedback('Je afvinkingen zijn lokaal als privé-JSON opgeslagen, zonder prijzen of winkelgegevens.')
+    } catch (cause) {
+      setFeedback(cause instanceof Error ? cause.message : 'Vinkjes opslaan is niet gelukt.')
     }
   }
   const exportText = () => {
@@ -422,6 +445,9 @@ export function ImportedRecipeGroceriesPanel({
       </section>
       <div className="recipe-backup-panel__actions">
         <button type="button" onClick={exportText}>Download gezamenlijke lijst (TXT)</button>
+        <button type="button" onClick={downloadChecks}>
+          Bewaar mijn afvinkingen (JSON)
+        </button>
         <button type="button" onClick={exportCsv}
           disabled={list.lines.length > 80}>Download gezamenlijke lijst (CSV)</button>
         <button type="button" onClick={openInPrivateMatcher}
