@@ -113,24 +113,22 @@ const validHeader = rows => rows.length > 0 &&
   rows[0].length === HEADER.length &&
   HEADER.every((name, index) => rows[0][index] === name)
 
-function convertStoreCsv(text, allowOne) {
-  // Spreadsheet export/paste is comma CSV, Dutch semicolon CSV or TSV.
-  // Admit a separator only when ALL nine canonical column names are intact;
-  // never guess user facts, source rights, physical quantities or prices.
-  let rows = null
+function parseCanonicalRows(text) {
+  // Preview and actual importer must recognize the same original Dutch
+  // spreadsheet formats. A source delimiter is admitted only when all nine
+  // canonical header names are present in exactly their original order.
   for (const delimiter of [',', ';', '\t']) {
     let candidate
     try { candidate = parseCsv(text, delimiter) }
     catch { continue }
-    if (validHeader(candidate)) {
-      rows = candidate
-      break
-    }
+    if (validHeader(candidate)) return candidate
   }
-  if (!rows) {
-    error('Kolomkop moet exact zijn: ' + HEADER.join(',') +
-      ' (CSV komma/puntkomma of gekopieerde tabgescheiden spreadsheet).')
-  }
+  error('Kolomkop moet exact zijn: ' + HEADER.join(',') +
+    ' (CSV komma/puntkomma of gekopieerde tabgescheiden spreadsheet).')
+}
+
+function convertStoreCsv(text, allowOne) {
+  const rows = parseCanonicalRows(text)
   const captures = new Map()
   const seen = new Map()
   for (const retailer of RETAILERS) seen.set(retailer, new Set())
@@ -202,3 +200,44 @@ function convertStoreCsv(text, allowOne) {
 // product, zero-price row or invented second observation).
 export const convertTwoStoreCsv = text => convertStoreCsv(text, false)
 export const convertOwnStoreCsv = text => convertStoreCsv(text, true)
+
+/**
+ * Read-only local worksheet preview. Reuse the exact importer rather than
+ * implementing a second, more permissive way to accept prices. A blank row
+ * is explicitly unobserved, never a free product or a source observation.
+ * Returned counts contain no original labels, SKUs, timestamps or prices.
+ */
+export function previewOwnStoreCsv(text) {
+  const rows = parseCanonicalRows(text)
+  const blanks = Object.fromEntries(RETAILERS.map(store => [store, 0]))
+  for (let index = 1; index < rows.length; index++) {
+    const row = rows[index]
+    if (row.length !== HEADER.length) error('CSV-regel ' + (index + 1) + ': verwacht negen kolommen.')
+    const [store, time, id, name, amount, unit, count, cents, available] = row
+    if (!RETAILERS.includes(store)) error('CSV-regel ' + (index + 1) + ': onbekende winkel.')
+    if (time === '' && id === '' && name === '' && amount === '' &&
+        count === '' && cents === '' && available === 'false' &&
+        (unit === '' || UNITS.includes(unit))) {
+      blanks[store]++
+    }
+  }
+  const admitted = JSON.parse(convertOwnStoreCsv(text))
+  return {
+    stores: admitted.captures.map(capture => ({
+      retailer: capture.retailer,
+      enteredProducts: capture.products.length,
+      unobservedRows: blanks[capture.retailer],
+      observedAt: capture.observedAt,
+      unavailableProducts: capture.products.filter(p => !p.available || p.priceCents === null).length,
+      // Display only. These are the user's original, canonically admitted
+      // local source fields, NOT independently verified retailer facts.
+      previewProducts: capture.products.map(p => ({
+        id: p.id, name: p.name, packAmount: p.packAmount, packUnit: p.packUnit,
+        packCount: p.packCount ?? null, priceCents: p.priceCents, available: p.available,
+      })),
+    })),
+    unobservedOtherStoreRows: RETAILERS
+      .filter(store => !admitted.captures.some(c => c.retailer === store))
+      .reduce((total, store) => total + blanks[store], 0),
+  }
+}
