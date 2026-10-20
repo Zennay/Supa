@@ -1,7 +1,7 @@
 name: Recipe UI preview
 on:
   pull_request:
-    paths: ['src/**', 'server/**', 'tests/recipe-library-browser.mjs', 'tests/product-figma-products-browser.mjs', '.github/workflows/recipe-ui-preview.yml']
+    paths: ['src/**', 'server/**', 'tests/recipe-library-browser.mjs', 'tests/product-figma-products-browser.mjs', 'tests/sync-browser.mjs', '.github/workflows/recipe-ui-preview.yml']
 permissions:
   contents: read
 concurrency:
@@ -36,6 +36,7 @@ jobs:
           done
           node tests/recipe-library-browser.mjs
           node tests/product-figma-products-browser.mjs
+          node tests/sync-browser.mjs
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
@@ -43,5 +44,6 @@ jobs:
           path: |
             artifacts/recipe-ui/
             artifacts/product-ui/
+            artifacts/sync-ui/
             dist/
           retention-days: 7

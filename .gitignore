@@ -13,3 +13,4 @@ vite.config.d.ts
 
 # Generated local/CI output. Canonical field evidence under evidence/ remains versioned.
 artifacts/
+.data/

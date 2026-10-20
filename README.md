@@ -35,8 +35,10 @@ Better, same, worse and unknown are all valid M3 outcomes. One observed week mus
 
 ```bash
 npm install
-npm run dev
+npm run dev:full   # Vite + the API server together (recipe import and sync work)
 ```
+
+`npm run dev` starts only Vite; then `/api` calls fail unless `npm run dev:api` runs too. Production: `npm run build && npm start` serves `dist/` and the API on port 4174. See [docs/BACKEND_API.md](docs/BACKEND_API.md).
 
 Build:
 

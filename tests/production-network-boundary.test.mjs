@@ -500,6 +500,20 @@ test('production source has no direct browser network access', async () => {
       assert.equal(findDirectProductionNetworkAccess(stripped, file.relativePath), null)
       continue
     }
+    // Device sync is one same-origin call to /api/sync from one module.
+    if (file.relativePath === 'lib/syncTransport.ts') {
+      const parsed = ts.createSourceFile(file.relativePath, source, ts.ScriptTarget.Latest, true)
+      const calls = []
+      const collect = node => { if (ts.isCallExpression(node) && node.expression.getText(parsed) === 'fetch') calls.push(node); ts.forEachChild(node, collect) }
+      collect(parsed)
+      assert.equal(calls.length, 1)
+      assert.equal(calls[0].arguments[0].getText(parsed), "'/api/sync'")
+      assert.match(calls[0].arguments[1].getText(parsed), /credentials:\s*'same-origin'/)
+      assert.doesNotMatch(calls[0].arguments[1].getText(parsed), /\.\.\.init/, 'callers must not override credentials')
+      const stripped = source.slice(0, calls[0].getStart(parsed)) + 'Promise.resolve({})' + source.slice(calls[0].end)
+      assert.equal(findDirectProductionNetworkAccess(stripped, file.relativePath), null)
+      continue
+    }
     const finding = findDirectProductionNetworkAccess(source, file.relativePath)
 
     assert.equal(
