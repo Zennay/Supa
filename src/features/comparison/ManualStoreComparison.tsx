@@ -110,19 +110,33 @@ export function ManualStoreComparison({
     catch { return [] }
   }, [plan, recipes, activeDays])
   const [entries, setEntries] = useState<ManualEntries>({})
+  const [entriesDemandSignature, setEntriesDemandSignature] = useState<string | null>(null)
+  const [recordedNeeds, setRecordedNeeds] = useState<readonly ManualNeed[]>([])
   const [importText, setImportText] = useState('')
   const [importMessage, setImportMessage] = useState('')
   const [showTable, setShowTable] = useState(false)
   const editRevision = useRef(0)
   const latestDemand = useRef(needs)
   latestDemand.current = needs
+  const currentDemandSignature = JSON.stringify(
+    needs.map(need => [need.id, need.label, need.amount, need.unit]),
+  )
+  const staleEntries = Object.keys(entries).length > 0 &&
+    entriesDemandSignature !== null && entriesDemandSignature !== currentDemandSignature
+  const activeEntries: ManualEntries = staleEntries ? {} : entries
   const summary = useMemo(() => {
-    try { return needs.length ? calculateManualComparison(needs, entries) : null }
+    try { return needs.length ? calculateManualComparison(needs, activeEntries) : null }
     catch { return null }
-  }, [needs, entries])
+  }, [needs, activeEntries])
   const tripCoverage = useMemo(() => summary ? manualTripCoverage(summary) : [], [summary])
 
   function setQuote(need: ManualLine, store: ManualRetailer, field: keyof ManualQuote, value: string) {
+    if (staleEntries) {
+      setImportMessage('De Planner is veranderd. Bewaar eerst je oude invulblad en begin daarna opnieuw.')
+      return
+    }
+    setEntriesDemandSignature(currentDemandSignature)
+    setRecordedNeeds(needs.map(row => ({ ...row })))
     const key = manualQuoteKey(store, need.ingredientId)
     editRevision.current += 1
     setEntries(previous => {
@@ -220,7 +234,7 @@ export function ManualStoreComparison({
   function downloadTableFile() {
     if (!needs.length) return
     try {
-      const content = tabularData(needs, entries) + '\n'
+      const content = tabularData(staleEntries ? recordedNeeds : needs, entries) + '\n'
       if (new TextEncoder().encode(content).length > 128000) {
         setImportMessage('Het huidige invulblad is te groot om lokaal te bewaren.')
         return
@@ -256,6 +270,8 @@ export function ManualStoreComparison({
       }
       editRevision.current += 1
       setEntries(imported.entries)
+      setEntriesDemandSignature(currentDemandSignature)
+      setRecordedNeeds(needs.map(row => ({ ...row })))
       setShowTable(false)
       setImportText('')
       setImportMessage(imported.legacyWithoutPackCount
@@ -310,6 +326,27 @@ export function ManualStoreComparison({
         </p>
       </div>
 
+          {staleEntries && (
+            <div className="manual-compare__notice" role="alert">
+              <strong>Je Planner-behoefte is veranderd.</strong> Oude eigen winkelprijzen en
+              hele-verpakkingsberekeningen tellen niet meer mee. Bewaar het oorspronkelijke
+              invulblad, of bevestig dat je opnieuw wilt beginnen voor deze Planner-week.
+              <div className="manual-compare__actions">
+                <button type="button" className="ghost-button" onClick={downloadTableFile}>
+                  Bewaar vorige invoer als oorspronkelijk invulblad (.tsv)
+                </button>
+                <button type="button" className="ghost-button" onClick={() => {
+                  if (!window.confirm('De vorige winkelproducten en prijzen worden uit deze rekenhulp verwijderd. Nieuw beginnen?')) return
+                  editRevision.current += 1
+                  setEntries({})
+                  setEntriesDemandSignature(null)
+                  setRecordedNeeds([])
+                  setImportText('')
+                  setImportMessage('Oude eigen prijzen vrijgegeven; voer nieuwe Planner-prijzen in.')
+                }}>Wis oude prijzen en begin opnieuw</button>
+              </div>
+            </div>
+          )}
       {!summary ? (
         <p role="status" className="attention-card">
           Kies eerst geldige maaltijden in je planner. Dan verschijnen hier de benodigde ingrediënten.
@@ -358,6 +395,7 @@ export function ManualStoreComparison({
             </button>
             {MANUAL_RETAILERS.map(store => (
               <button className="ghost-button" type="button" key={store}
+                disabled={staleEntries}
                 onClick={() => downloadOwnStoreTrip(store)}>
                 {store}: eigen boodschappen + ontbrekende prijzen (TXT)
               </button>
@@ -365,6 +403,8 @@ export function ManualStoreComparison({
             <button className="ghost-button" type="button" onClick={() => {
               editRevision.current += 1
               setEntries({})
+              setEntriesDemandSignature(null)
+              setRecordedNeeds([])
               setImportText('')
               setImportMessage('Alle handmatig ingevoerde prijzen zijn gewist.')
             }}>Wis prijzen</button>
@@ -373,7 +413,7 @@ export function ManualStoreComparison({
             <div className="manual-compare__table">
               <p>Dit negenkolomsinvulblad bewaart ook de originele hoeveelheid en eenheid per Planner-ingrediënt. Wijzig die twee kolommen niet: Supa weigert oude bladen voor een andere Planner-vraag. Vul uitsluitend winkelproduct, verpakking, multipack en eigen prijs in. Plak of laad daarna het hele blad terug. Oude zes- en zevenkolomsbladen vragen een extra controle, omdat ze niet aan een Planner-hoeveelheid zijn gebonden.</p>
               <label>Huidige tabel
-                <textarea readOnly rows={7} value={tabularData(needs, entries)}
+                <textarea readOnly rows={7} value={tabularData(staleEntries ? recordedNeeds : needs, entries)}
                   onFocus={event => event.currentTarget.select()} />
               </label>
               <label>Ingevulde tabel terugplakken
@@ -405,10 +445,10 @@ export function ManualStoreComparison({
                 </header>
                 <div className="manual-compare__pair">
                   {MANUAL_RETAILERS.map(shop => {
-                    const quote = entries[manualQuoteKey(shop, row.ingredientId)]
+                    const quote = activeEntries[manualQuoteKey(shop, row.ingredientId)]
                     const state = row.quotes[shop]
                     return (
-                      <fieldset key={shop} className="manual-compare__store">
+                      <fieldset key={shop} className="manual-compare__store" disabled={staleEntries}>
                         <legend>{shop}</legend>
                         <label>Gekozen product
                           <input type="text" maxLength={160} autoComplete="off"
