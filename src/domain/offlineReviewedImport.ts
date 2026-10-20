@@ -42,13 +42,20 @@ function validName(value: unknown, max: number): value is string {
 /** Only real Gregorian civil dates and explicit timezone offsets are accepted. */
 export function observedInstant(raw: unknown): { ms: number; ns: bigint } | null {
   if (typeof raw !== 'string') return null
-  const match = /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)(?:\.(\d{1,9}))?([+-])(\d\d):(\d\d)$/.exec(raw)
+  // Existing approved capture tools and browser Date#toISOString use a
+  // literal UTC "Z", while hand-entered source records may use an explicit
+  // numeric offset. Both represent the SAME real instant; retain the exact
+  // original observedAt string throughout import, review and export.
+  const match = /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)(?:\.(\d{1,9}))?(Z|([+-])(\d\d):(\d\d))$/.exec(raw)
   if (!match) return null
-  const [year, month, day, hour, minute, second, offsetHour, offsetMinute] =
-    [match[1], match[2], match[3], match[4], match[5], match[6], match[9], match[10]].map(Number)
-  if (year < 2000 || year > 2100 || offsetMinute > 59 ||
-      (match[8] === '+' ? offsetHour > 14 || (offsetHour === 14 && offsetMinute > 0)
-        : offsetHour > 12 || (offsetHour === 12 && offsetMinute > 0))) return null
+  const [year, month, day, hour, minute, second] =
+    [match[1], match[2], match[3], match[4], match[5], match[6]].map(Number)
+  const offsetHour = Number(match[10] ?? 0)
+  const offsetMinute = Number(match[11] ?? 0)
+  if (year < 2000 || year > 2100 || (match[8] !== 'Z' &&
+      (offsetMinute > 59 ||
+        (match[9] === '+' ? offsetHour > 14 || (offsetHour === 14 && offsetMinute > 0)
+          : offsetHour > 12 || (offsetHour === 12 && offsetMinute > 0))))) return null
   const civil = new Date(0)
   civil.setUTCFullYear(year, month - 1, day)
   civil.setUTCHours(hour, minute, second, 0)

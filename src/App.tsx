@@ -48,6 +48,9 @@ import {
   serializePlannerPreferences,
   type PlannerPreferences,
 } from './domain/plannerPreferences'
+import { unavailablePlannerRecipes, previewAvailablePlannerMeals } from './domain/unavailablePlannerRecipes.ts'
+import { privatePhysicalPlanIdentity, privateWeekShareIdentity } from './domain/privatePhysicalPlanIdentity.ts'
+import { saveReplacedPlannerRecipes, missingStoredOwnRecipeSelections } from './features/planner/saveReplacedPlannerRecipes.ts'
 import { restorePlannerPreferencesWithCustomBudget } from './features/planner/customWeekBudget.ts'
 import { canReplacePlannerRecord, persistPlannerRecord } from './features/planner/plannerStorageGuard.ts'
 import {
@@ -127,8 +130,15 @@ function readPlannerPreferences(validRecipeIds = availableRecipes().map(recipe =
   }
   try {
     const raw = window.localStorage.getItem(plannerStorageKey)
+    const restored = restorePlannerPreferencesWithCustomBudget(raw, m2InitialPlan, validRecipeIds)
+    const missing = missingStoredOwnRecipeSelections(raw, m2InitialPlan, validRecipeIds)
     return {
-      preferences: restorePlannerPreferencesWithCustomBudget(raw, m2InitialPlan, validRecipeIds),
+      // Missing OWN recipe IDs remain a read-only, in-memory repair intent.
+      // The actual week uses its existing safe temporary built-in fallback
+      // and only a deliberate user action can update the protected v2 bytes.
+      preferences: Object.keys(missing).length
+        ? { ...restored, recipeByDay: { ...restored.recipeByDay, ...missing } }
+        : restored,
       warning: canReplacePlannerRecord(raw, m2InitialPlan.map((meal) => meal.day), validRecipeIds)
         ? null : 'protected',
       raw,
@@ -252,6 +262,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [preferences, setPreferences] = useState(() => initialLoad.preferences)
   const [persistenceWarning, setPersistenceWarning] = useState<PersistenceWarning>(initialLoad.warning)
   const [lastStoredRaw, setLastStoredRaw] = useState(initialLoad.raw)
+  const [planRepairMessage, setPlanRepairMessage] = useState('')
   const [manualWeekCopy, setManualWeekCopy] = useState<WeekSharePreview | null>(null)
   const [includeWeekBudget, setIncludeWeekBudget] = useState(false)
   const [includeWeekDetails, setIncludeWeekDetails] = useState(false)
@@ -374,21 +385,70 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
 
   const { budget, activeDays, recipeByDay } = preferences
 
-  const plannedMeals = useMemo(
-    () =>
-      m2InitialPlan.map((meal) => ({
-        ...meal,
-        recipeId: recipeByDay[meal.day] ?? meal.recipeId,
-      })),
-    [recipeByDay],
+  // A recipe edited or removed in another tab may no longer belong to the
+  // approved physical library. Render a safe built-in recipe for its own day
+  // immediately; never silently persist that fallback or carry forward the
+  // old source-price comparison. A deliberate user action can repair it.
+  const unavailableSelections = useMemo(
+    () => unavailablePlannerRecipes(preferences, m2InitialPlan, validRecipeIds),
+    [preferences, recipes],
   )
+  const plannedMeals = useMemo(
+    () => previewAvailablePlannerMeals(m2InitialPlan, unavailableSelections, recipeByDay),
+    [recipeByDay, unavailableSelections],
+  )
+  function acceptMissingRecipeReplacements() {
+    const remaining = unavailablePlannerRecipes(preferences, m2InitialPlan, recipes.map(recipe => recipe.id))
+    if (!remaining.length) return
+    // A corrupt/unreadable recipe library can masquerade as a deleted
+    // private recipe. Never offer an irreversible replacement of its saved
+    // Planner references while that underlying library cannot be read.
+    try {
+      if (readRecipeLibrary(window.localStorage).error) {
+        setPlanRepairMessage('Je eigen receptbibliotheek is niet leesbaar. De oorspronkelijke weekkeuzes blijven bewaard. Herstel eerst de bibliotheek.')
+        return
+      }
+    } catch {
+      setPlanRepairMessage('Je eigen recepten zijn tijdelijk niet leesbaar. De eerdere Planner-keuzes blijven bewaard.')
+      return
+    }
+    const repaired: PlannerPreferences = {
+      ...preferences,
+      recipeByDay: {
+        ...preferences.recipeByDay,
+        ...Object.fromEntries(remaining.map(item => [item.day, item.fallbackRecipeId])),
+      },
+    }
+    // An orphaned recipe ID makes the ordinary protected-storage guard refuse
+    // to overwrite the old record. This narrowly scoped, explicit user action
+    // is the only permitted recovery; all other records and cross-tab changes
+    // stay protected. Never drop existing preferences on a failed save.
+    const result = saveReplacedPlannerRecipes({
+      read: () => window.localStorage.getItem(plannerStorageKey),
+      write: raw => window.localStorage.setItem(plannerStorageKey, raw),
+      expectedRaw: lastStoredRaw,
+      current: repaired,
+      replacements: remaining,
+      validDays: m2InitialPlan.map(meal => meal.day),
+      validRecipeIds: recipes.map(recipe => recipe.id),
+    })
+    if (result.status !== 'saved') {
+      setPersistenceWarning(result.status)
+      setPlanRepairMessage(result.status === 'protected'
+        ? 'Je eerdere weekmenu is in een ander tabblad gewijzigd of bevat een onbekend formaat. Niets is overschreven.'
+        : 'Browseropslag is niet beschikbaar. Je eerdere weekmenu blijft bewaard.')
+      return
+    }
+    setLastStoredRaw(result.raw)
+    setPreferences(repaired)
+    setPersistenceWarning(null)
+    setPlanRepairMessage('')
+  }
 
-  // Prices never leave React memory. A changed recipe, day or physical demand
-  // immediately invalidates private source receipts in every other tab.
-  const privatePlanKey = JSON.stringify([
-    plannedMeals, activeDays,
-    recipes.map(recipe => [recipe.id, recipe.ingredients]),
-  ])
+  // Preserve still-current, user-reviewed PLUS/Deka captures when somebody
+  // merely adds an unrelated recipe or edits an inactive day. Only changing
+  // the ACTUAL selected physical week can invalidate these private receipts.
+  const privatePlanKey = privatePhysicalPlanIdentity(plannedMeals, recipes, activeDays)
   // Planner and Lijst share the exact same real-source File handoff. Files
   // stay in this tab until the canonical Vergelijk importer consumes them.
   // No alternate CSV parser or implicit retailer approval is introduced.
@@ -413,11 +473,8 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   // Bind prepared copy to the exact user-visible plan state. Clearing it in
   // an effect alone happens after render and briefly exposes stale personal text.
   const shareSourceKey = JSON.stringify([
-    plannedMeals,
-    activeDays,
-    budget,
-    includeWeekBudget,
-    includeWeekDetails,
+    privateWeekShareIdentity(plannedMeals, recipes, activeDays, includeWeekDetails),
+    budget, includeWeekBudget, includeWeekDetails,
   ])
   const currentManualCopy = currentWeekSharePreview(manualWeekCopy, shareSourceKey)
 
@@ -490,11 +547,12 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   }, [preferences])
 
   useEffect(() => {
-    // The export belongs to one exact plan snapshot; don't keep a stale draft
-    // visible after the user changes the plan or budget.
+    // A copy and its success message both belong to the exact visible share
+    // snapshot, including the selected recipe's title/time/servings. Unrelated
+    // library edits or inactive-day choices must not erase valid copy text.
     setManualWeekCopy(null)
     setWeekCopyMessage('')
-  }, [preferences])
+  }, [shareSourceKey])
 
   const prepareWeekPlanCopy = () => {
     try {
@@ -550,6 +608,31 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       </header>}
 
       <div className="content">
+        {(['planner', 'list', 'basket', 'products'] as const).some(view => view === tab) &&
+          unavailableSelections.length > 0 && (
+          <section className="attention-card" role="status" aria-live="polite">
+            <strong>{unavailableSelections.length} receptkeuze(s) niet meer beschikbaar</strong>
+            <p>
+              Een eigen recept is verwijderd of heeft nog onveilige hoeveelheden.
+              Het weekmenu toont tijdelijk het oorspronkelijke standaardrecept voor
+              {unavailableSelections.length === 1 ? ' deze dag' : ' deze dagen'}:
+              {' '}{unavailableSelections.map(item => item.day).join(', ')}.
+              Je eerdere keuze is niet stilzwijgend opgeslagen of vervangen.
+              Alle oude productmatches en eigen winkelprijzen voor een ander
+              weekmenu blijven buiten de huidige prijsberekening.
+            </p>
+            <div className="week-share-actions">
+              <button type="button" onClick={acceptMissingRecipeReplacements}>
+                Bewaar deze standaardrecepten in mijn weekmenu
+              </button>
+              {tab !== 'planner' && <button type="button" className="ghost-button"
+                onClick={() => navigate('planner')}>
+                Bekijk de aangepaste week in Planner
+              </button>}
+            </div>
+            {planRepairMessage && <p role="alert">{planRepairMessage}</p>}
+          </section>
+        )}
         {tab === 'products' && <Suspense fallback={<p role="status">Eigen bronproducten openen…</p>}>
           <PrivateReviewedProductCatalog reviewed={livePrivateReviewed} budget={budget}
             checked={privateShoppingTicks}

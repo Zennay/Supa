@@ -17,8 +17,16 @@ function decimal(raw: string): Fraction | null {
 }
 
 function fraction(raw: string): Fraction | null {
-  const vulgar: Record<string, string> = { '½': '1/2', '¼': '1/4', '¾': '3/4' }
-  const normalized = vulgar[raw] ?? raw
+  const vulgar: Record<string, string> = {
+    '½': '1/2', '¼': '1/4', '¾': '3/4', '⅓': '1/3', '⅔': '2/3',
+    '⅛': '1/8', '⅜': '3/8', '⅝': '5/8', '⅞': '7/8',
+  }
+  // Recipes often write 1½ or 1 ½ without an ASCII slash. Keep these
+  // fractions exact until the final upward rounding to 0.001 g/ml.
+  const joined = /^(\d+)\s?([½¼¾⅓⅔⅛⅜⅝⅞])$/u.exec(raw)
+  const normalized = joined
+    ? joined[1] + ' ' + vulgar[joined[2]]
+    : vulgar[raw] ?? raw
   const mixed = /^(?:(\d+)\s+)?(\d+)\/(\d+)$/u.exec(normalized)
   if (!mixed) return decimal(normalized)
   const whole = BigInt(mixed[1] ?? '0')
