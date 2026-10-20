@@ -126,7 +126,11 @@ function containsSecondPhysicalQuantity(label: string): boolean {
   const pattern = /(?:^|[^\p{L}\p{N}])((?:\d+\s+)?\d+\/\d+|\d+\s?[½¼¾⅓⅔⅛⅜⅝⅞]|\d+(?:[.,]\d+)?|[½¼¾⅓⅔⅛⅜⅝⅞])\s*([a-z]+\.?)(?=\s|[,;]|$)/giu
   let match: RegExpExecArray | null
   while ((match = pattern.exec(label)) !== null) {
-    if (units[match[2].toLowerCase()]) return true
+    // A following quantity may be a unitless whole item: "250 g tomaten
+    // en 2 eieren" or "2 eieren met 3 tenen knoflook". The primary parser
+    // infers those produce counts, so they must also block unsafe combined
+    // lines rather than silently disappearing into the product name.
+    if (units[match[2].toLowerCase()] || pieceNouns.test(match[2])) return true
   }
   return false
 }
