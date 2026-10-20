@@ -78,10 +78,23 @@ function quantity(raw: string): number | null {
 }
 
 const units: Record<string, { unit: MetricUnit; factor: number }> = {
-  'g': { unit: 'g', factor: 1 }, 'gram': { unit: 'g', factor: 1 }, 'grams': { unit: 'g', factor: 1 },
-  'kg': { unit: 'g', factor: 1000 }, 'kilogram': { unit: 'g', factor: 1000 }, 'kilograms': { unit: 'g', factor: 1000 },
-  'ml': { unit: 'ml', factor: 1 }, 'milliliter': { unit: 'ml', factor: 1 }, 'milliliters': { unit: 'ml', factor: 1 },
-  'l': { unit: 'ml', factor: 1000 }, 'liter': { unit: 'ml', factor: 1000 }, 'liters': { unit: 'ml', factor: 1000 },
+  // All conversions are exact physical SI units; never guess tablespoon,
+  // cup or other recipe-specific volumes. Those still require human review.
+  'mg': { unit: 'g', factor: 0.001 }, 'milligram': { unit: 'g', factor: 0.001 },
+  'milligrams': { unit: 'g', factor: 0.001 }, 'milligrammen': { unit: 'g', factor: 0.001 },
+  'g': { unit: 'g', factor: 1 }, 'gr': { unit: 'g', factor: 1 },
+  'gram': { unit: 'g', factor: 1 }, 'grams': { unit: 'g', factor: 1 },
+  'grammen': { unit: 'g', factor: 1 },
+  'kg': { unit: 'g', factor: 1000 }, 'kilogram': { unit: 'g', factor: 1000 },
+  'kilograms': { unit: 'g', factor: 1000 }, 'kilogrammen': { unit: 'g', factor: 1000 },
+  'ml': { unit: 'ml', factor: 1 }, 'milliliter': { unit: 'ml', factor: 1 },
+  'milliliters': { unit: 'ml', factor: 1 }, 'millilitre': { unit: 'ml', factor: 1 },
+  'cl': { unit: 'ml', factor: 10 }, 'centiliter': { unit: 'ml', factor: 10 },
+  'centiliters': { unit: 'ml', factor: 10 }, 'centilitre': { unit: 'ml', factor: 10 },
+  'dl': { unit: 'ml', factor: 100 }, 'deciliter': { unit: 'ml', factor: 100 },
+  'deciliters': { unit: 'ml', factor: 100 }, 'decilitre': { unit: 'ml', factor: 100 },
+  'l': { unit: 'ml', factor: 1000 }, 'liter': { unit: 'ml', factor: 1000 },
+  'liters': { unit: 'ml', factor: 1000 }, 'litre': { unit: 'ml', factor: 1000 },
   'stuks': { unit: 'piece', factor: 1 }, 'stuk': { unit: 'piece', factor: 1 }, 'piece': { unit: 'piece', factor: 1 },
   'pieces': { unit: 'piece', factor: 1 }, 'pcs': { unit: 'piece', factor: 1 },
   'oz': { unit: 'g', factor: 28.349523125 }, 'ounce': { unit: 'g', factor: 28.349523125 },
