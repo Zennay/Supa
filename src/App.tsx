@@ -1,6 +1,10 @@
 import { FigmaImage } from './components/FigmaImage'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { PlannerView } from './features/planner/PlannerView'
+// Planner's full price/budget/editor surface is not needed to open Home.
+const PlannerView = lazy(async () => {
+  const module = await import('./features/planner/PlannerView')
+  return { default: module.PlannerView }
+})
 import { WeekShareManualCopy } from './features/planner/WeekShareManualCopy'
 import { PlannerPortableWeek } from './features/planner/PlannerPortableWeek.tsx'
 import { currentWeekSharePreview, formatShareableWeek } from './features/planner/weekPlanShare'
@@ -747,6 +751,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
           </p>
         )}
         {tab === 'planner' && (
+          <Suspense fallback={<section className="screen" role="status">Weekplanner laden…</section>}>
           <PlannerView
             budget={budget}
             activeDays={activeDays}
@@ -813,6 +818,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             onRecipeChange={changeRecipe}
             onReset={resetPlan}
           />
+          </Suspense>
         )}
         {tab === 'planner' && <PlannerPortableWeek
           preferences={preferences}
