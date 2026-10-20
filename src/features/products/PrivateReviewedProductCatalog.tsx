@@ -188,6 +188,9 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
           </section>
           const lines = capture.basket.lines.filter((line): line is Matched =>
             line.status === 'matched')
+          const unresolved = capture.basket.lines.filter(line => line.status === 'unresolved')
+          const complete = unresolved.length === 0 && lines.length > 0 &&
+            capture.basket.unresolvedLineCount === 0
           const done = lines.filter(line => isChecked(shop, line)).length
           const remaining = lines.filter(line => !isChecked(shop, line))
             .reduce((sum, line) => sum + line.lineTotalCents, 0)
@@ -196,15 +199,33 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
             <p><strong>{done} van {lines.length}</strong> producten afgevinkt</p>
             <progress value={done} max={lines.length}
               aria-label={'Voortgang originele ' + shop + '-boodschappen'} />
-            <strong>Nog op mijn lijst: {money.format(remaining / 100)}</strong>
+            <strong>{complete ? 'Nog op mijn lijst' : 'Minimaal nog bekend op mijn lijst'}: {money.format(remaining / 100)}</strong>
+            {!complete && <p role="status" className="private-reviewed-products__age">
+              <strong>Totaal onbekend.</strong> {unresolved.length} van de {capture.basket.lines.length} fysieke
+              ingrediënten hebben nog geen bevestigde productmatch, verpakking of bruikbare bronprijs.
+              Bekende bedragen zijn geen complete weekmand en mogen niet met de andere winkel worden vergeleken.
+            </p>}
+            {unresolved.length > 0 && <details className="private-reviewed-products__missing">
+              <summary>Welke {unresolved.length} ingrediënten missen een prijs of productmatch?</summary>
+              <ul>{unresolved.map(line => <li key={line.id}>
+                <strong>{line.ingredientLabel}</strong>
+                <span> — {line.requirement.amount === null ? 'hoeveelheid onbekend'
+                  : line.requirement.amount + ' ' + line.requirement.unit} · prijs onbekend</span>
+              </li>)}</ul>
+              <button type="button" onClick={onOpenComparison}>
+                Controleer deze ingrediënten in prijsinvoer en productmatching
+              </button>
+            </details>}
             {privatePriceAgeNotice(capture.capturedMs, nowMs) && (
               <small role="status" className="private-reviewed-products__age">
                 {privatePriceAgeNotice(capture.capturedMs, nowMs)}
               </small>
             )}
-            <small>Oorspronkelijk volledig mandje: {
+            <small>{complete ? 'Oorspronkelijk volledig mandje' : 'Bekend deel van de oorspronkelijke weekmand'}: {
               money.format(capture.basket.totalCents / 100)}.
-              Dit zijn nog niet-afgevinkte productbedragen, geen betaalbewijs.</small>
+              {complete ? ' Deze complete private bron blijft onderhevig aan geldigheid en broncontrole.' :
+                ' Nog niet gematchte ingrediënten hebben geen bekende prijs; het volledige bedrag is onbekend.'}
+              {' '}Dit is geen betaalbewijs.</small>
             <button type="button" onClick={() => {
               const current = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
               if (current?.stores[shop] !== capture) {
