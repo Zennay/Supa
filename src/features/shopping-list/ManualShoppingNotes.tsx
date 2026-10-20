@@ -31,6 +31,8 @@ export function ManualShoppingNotes({ notes, setNotes }: {
   const [message, setMessage] = useState('')
   const [lastRemoved, setLastRemoved] = useState<{ note: UnpricedShoppingNote; index: number } | null>(null)
   const [pendingCleared, setPendingCleared] = useState<UnpricedShoppingNote[] | null>(null)
+  const [pendingNextRound, setPendingNextRound] = useState<UnpricedShoppingNote[] | null>(null)
+  const [lastNextRound, setLastNextRound] = useState<UnpricedShoppingNote[] | null>(null)
   const [lastGroupMove, setLastGroupMove] = useState<{
     from: UnpricedShoppingNote['store']; to: UnpricedShoppingNote['store'];
     items: Array<Pick<UnpricedShoppingNote, 'id' | 'label' | 'done'>>
@@ -315,6 +317,42 @@ export function ManualShoppingNotes({ notes, setNotes }: {
   const visibleIds = new Set(visible.map(note => note.id))
   const remainingVisible = visible.filter(note => !note.done).length
   const completedVisible = visible.length - remainingVisible
+  function samePersonalRound(original: UnpricedShoppingNote[], current: UnpricedShoppingNote[], unchecked = false) {
+    if (original.length !== current.length) return false
+    const expected = new Map(original.map(item => [item.id, item]))
+    return current.every(item => {
+      const prev = expected.get(item.id)
+      return !!prev && prev.label === item.label && prev.store === item.store &&
+        (unchecked ? !item.done : prev.done === item.done)
+    })
+  }
+  function confirmNextRound() {
+    if (!pendingNextRound?.length) return
+    const original = pendingNextRound
+    if (!samePersonalRound(original, notes)) {
+      setPendingNextRound(null)
+      setMessage('Je eigen boodschappenlijst is intussen gewijzigd. Controleer deze eerst opnieuw.')
+      return
+    }
+    setNotes(current => samePersonalRound(original, current)
+      ? current.map(item => item.done ? { ...item, done: false } : item) : current)
+    setLastNextRound(original)
+    setPendingNextRound(null)
+    setMessage('Nieuwe winkelronde: alle eigen vinkjes weer opengezet. Winkels, volgorde en prijzen onveranderd.')
+  }
+  function undoNextRound() {
+    if (!lastNextRound?.length) return
+    const original = lastNextRound
+    if (!samePersonalRound(original, notes, true)) {
+      setLastNextRound(null)
+      setMessage('Herstellen geweigerd: de nieuwe lijst is intussen veranderd.')
+      return
+    }
+    setNotes(current => samePersonalRound(original, current, true)
+      ? current.map(item => ({ ...item, done: !!original.find(old => old.id === item.id)?.done })) : current)
+    setLastNextRound(null)
+    setMessage('De eerdere persoonlijke afvinkstatus is hersteld.')
+  }
   function confirmClearCompleted() {
     if (!pendingCleared?.length) return
     const originals = pendingCleared.map(item => ({
@@ -597,6 +635,23 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       {lastCleared && <button type="button" onClick={undoCleared}>
         Herstel laatste {lastCleared.length} opgeruimde artikelen
       </button>}
+    </section>
+    <section className="manual-shopping-notes__next-round" aria-label="Herhaal je eigen winkelronde">
+      <strong>Een nieuwe winkelronde met mijn vaste artikelen</strong>
+      <p>Heropen alle eigen boodschappen, ook buiten de huidige zoek- of winkelfilter.
+        Je oorspronkelijke winkelgroepen, volgorde, recepten, Planner en bronprijzen blijven ongewijzigd.</p>
+      <button type="button" disabled={!notes.some(item => item.done)}
+        onClick={() => { setPendingNextRound([...notes]); setLastNextRound(null) }}>
+        Bereid nieuwe ronde met {notes.length} artikelen voor
+      </button>
+      {pendingNextRound && <div className="manual-shopping-notes__next-round-confirm" role="group"
+        aria-label="Nieuwe persoonlijke winkelronde bevestigen">
+        <p>{pendingNextRound.filter(item => item.done).length} gekochte artikelen worden
+          weer opengezet; de andere blijven open.</p>
+        <button type="button" onClick={confirmNextRound}>Ja, begin de nieuwe ronde</button>
+        <button type="button" onClick={() => setPendingNextRound(null)}>Annuleer</button>
+      </div>}
+      {lastNextRound && <button type="button" onClick={undoNextRound}>Herstel oude vinkjes</button>}
     </section>
     <nav className="manual-shopping-notes__trip-nav" aria-label="Mijn persoonlijke winkelroute">
       <strong>Winkelroute · alleen mijn eigen ongeprijsde artikelen</strong>
