@@ -13,6 +13,7 @@ type ChecklistProps = {
   recipes: RecipeWithIngredients[]
   activeDays: string[]
   manualNotes?: readonly UnpricedShoppingNote[]
+  onToggleManualNote?: (id: string) => void
   onOpenPriceImport?: () => void
   onOpenRecipes?: () => void
 }
@@ -37,7 +38,7 @@ const portableQuantity = (item: DemandRow) =>
  * The exact physical week demand, independent of either supermarket.
  * No sample product, inferred SKU, price, license or retailer observation.
  */
-export function UnpricedPlannerChecklist({ plan, recipes, activeDays, manualNotes = [], onOpenPriceImport, onOpenRecipes }: ChecklistProps) {
+export function UnpricedPlannerChecklist({ plan, recipes, activeDays, manualNotes = [], onToggleManualNote, onOpenPriceImport, onOpenRecipes }: ChecklistProps) {
   const [progress, setProgress] = useState<{ identity: string; checked: Record<string, boolean> }>({ identity: '', checked: {} })
   const [backupMessage, setBackupMessage] = useState('')
   const currentDemand = useRef('')
@@ -427,11 +428,17 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, manualNote
             </header>
             <p>Dit zijn aparte eigen notities zonder winkelprijs of verpakkingsmatch.
               Ze tellen niet mee bij Planner-ingrediënten of de supermarktvergelijking.
-              Vink ze af of bewerk ze onder Zelf toevoegen verderop in de Lijst.</p>
-            <ul>{visibleHandwritten.map(note => <li key={note.id}>
-              {note.done ? '☑ ' : '☐ '}{safeHandwritten(note.label)}
-              {' '}· {note.store} · prijs onbekend
-            </li>)}</ul>
+              Vink ze hier af, of bewerk ze onder Zelf toevoegen verderop in de Lijst.</p>
+            <div>{visibleHandwritten.map(note => <label key={note.id}
+              className="unpriced-planner-checklist__item">
+              <input type="checkbox" checked={note.done} disabled={!onToggleManualNote}
+                onChange={() => onToggleManualNote?.(note.id)} />
+              <span className="unpriced-planner-checklist__item-copy">
+                <strong>{safeHandwritten(note.label)}</strong>
+                <small>{note.store} · zelf toegevoegd, geen originele winkel-SKU</small>
+              </span>
+              <span className="unpriced-planner-checklist__price" aria-label="Prijs onbekend">—</span>
+            </label>)}</div>
           </section>}
           {copy !== null && <div className="unpriced-planner-checklist__copy">
             <p>Deze kopie is alleen voor de huidige gekozen lijst. Selecteer en kopieer de tekst.</p>

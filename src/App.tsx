@@ -907,6 +907,8 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             <section className="screen" aria-label="Boodschappenlijst uit mijn eigen weekmenu">
               <UnpricedPlannerChecklist plan={plannedMeals} recipes={recipes} activeDays={activeDays}
                 manualNotes={manualShoppingNotes}
+                onToggleManualNote={id => setManualShoppingNotes(previous => previous.map(note =>
+                  note.id === id ? { ...note, done: !note.done } : note))}
                 onOpenPriceImport={openOwnPriceImport} onOpenRecipes={() => navigate('recipes')} />
               {tab === 'list' && (designProductIds.length > 0
                 ? <section aria-label="Mijn expliciet toegevoegde producten">
