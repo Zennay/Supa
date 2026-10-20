@@ -21,6 +21,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
   const bulkFileSerial = useRef(0)
   const [store, setStore] = useState<UnpricedShoppingNote['store']>('Algemeen')
   const [onlyOpen, setOnlyOpen] = useState(false)
+  const [search, setSearch] = useState('')
   const [filterStore, setFilterStore] = useState<'Alle winkels' | UnpricedShoppingNote['store']>('Alle winkels')
   const [exportVisible, setExportVisible] = useState(false)
   const [message, setMessage] = useState('')
@@ -284,7 +285,14 @@ export function ManualShoppingNotes({ notes, setNotes }: {
   }
   const selected = notes.filter(note => filterStore === 'Alle winkels' ||
     note.store === filterStore || note.store === 'Algemeen')
-  const visible = onlyOpen ? selected.filter(note => !note.done) : selected
+  // Search only the shopper's own notes. Never infer a retailer identity.
+  const needle = search.normalize('NFKD').replace(/\p{M}/gu, '').toLocaleLowerCase('nl').trim()
+  const visible = selected.filter(note => (!onlyOpen || !note.done) &&
+    (!needle || note.label.normalize('NFKD').replace(/\p{M}/gu, '')
+      .toLocaleLowerCase('nl').includes(needle)))
+  const grouped = stores.map(groupStore => ({
+    store: groupStore, items: visible.filter(note => note.store === groupStore),
+  })).filter(group => group.items.length > 0)
   const visibleIds = new Set(visible.map(note => note.id))
   const remainingVisible = visible.filter(note => !note.done).length
   const completedVisible = visible.length - remainingVisible
@@ -294,6 +302,14 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       ? { ...item, done } : item))
     setMessage((done ? 'Zichtbare boodschappen afgevinkt' : 'Zichtbare boodschappen weer opengezet') +
       '; andere winkels en oorspronkelijke prijsdata blijven onaangeroerd.')
+  }
+  function markGroup(groupStore: UnpricedShoppingNote['store'], checked: boolean) {
+    const ids = new Set(visible.filter(item => item.store === groupStore).map(item => item.id))
+    if (ids.size === 0) return
+    setNotes(current => current.map(item => ids.has(item.id) && item.done !== checked
+      ? { ...item, done: checked } : item))
+    setMessage(groupStore + ': alleen de zichtbare persoonlijke boodschappen ' +
+      (checked ? 'afgevinkt.' : 'weer opengezet.') + ' Geen prijzen veranderd.')
   }
   const exportText = [
     'SUPA · EIGEN ONGEPRIJSDE BOODSCHAPPEN · ' + filterStore,
@@ -354,6 +370,10 @@ export function ManualShoppingNotes({ notes, setNotes }: {
           {stores.map(item => <option key={item} value={item}>{item}</option>)}
         </select>
       </label>
+      <label>Zoek mijn eigen boodschappen
+        <input type="search" maxLength={120} value={search} placeholder="Zoek zonder accent"
+          onChange={event => setSearch(event.target.value)} />
+      </label>
       <label><input type="checkbox" checked={onlyOpen} onChange={event => setOnlyOpen(event.target.checked)} /> Alleen open</label>
     </div>
     <div className="manual-shopping-notes__batch" role="group" aria-label="Zichtbare boodschappen beheren">
@@ -365,7 +385,20 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       </button>
       <small>Alleen de huidige winkel- en open-filterselectie. Geen prijzen of bronmomenten wijzigen.</small>
     </div>
-    <ul>{visible.map(note => <li key={note.id}>
+    <div className="manual-shopping-notes__groups" aria-label="Boodschappen per winkel">
+      {grouped.map(group => <section className="manual-shopping-notes__group" key={group.store}
+        aria-label={'Eigen ongeprijsde boodschappen bij ' + group.store}>
+        <header className="manual-shopping-notes__group-heading">
+          <h3>{group.store}</h3>
+          <span>{group.items.filter(item => !item.done).length} open · {group.items.length} zichtbaar</span>
+          <div className="manual-shopping-notes__group-actions">
+            <button type="button" disabled={!group.items.some(item => !item.done)}
+              onClick={() => markGroup(group.store, true)}>Vink deze winkel af</button>
+            <button type="button" disabled={!group.items.some(item => item.done)}
+              onClick={() => markGroup(group.store, false)}>Heropen deze winkel</button>
+          </div>
+        </header>
+        <ul>{group.items.map(note => <li key={note.id}>
       {editing?.id === note.id ? <form className="manual-shopping-notes__edit" onSubmit={saveEditedNote}>
         <label>Omschrijving
           <input maxLength={140} value={editing.label} autoFocus
@@ -396,10 +429,13 @@ export function ManualShoppingNotes({ notes, setNotes }: {
         <button type="button" onClick={() => removeOwnNote(note.id)}
           aria-label={`Verwijder ${note.label}`}>Verwijder</button>
       </>}
-    </li>)}</ul>
+        </li>)}</ul>
+      </section>)}
+    </div>
     {!visible.length && <p role="status">
-      {selected.length ? 'Alle boodschappen in deze selectie zijn afgevinkt.' :
-        'Nog geen boodschappen in deze selectie. De lijst werkt zonder winkelprijzen.'}
+      {needle ? 'Geen eigen boodschappen gevonden voor deze zoekopdracht.' :
+        selected.length ? 'Alle boodschappen in deze selectie zijn afgevinkt.' :
+          'Nog geen boodschappen in deze selectie. De lijst werkt zonder winkelprijzen.'}
     </p>}
     {lastRemoved && <button type="button" className="ghost-button" onClick={undoRemove}>
       Herstel laatste verwijderde boodschap: {lastRemoved.note.label}

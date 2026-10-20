@@ -38,3 +38,16 @@
 .manual-shopping-notes__batch { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
 .manual-shopping-notes__batch button:disabled { opacity:.55; cursor:not-allowed; }
 .manual-shopping-notes__batch small { flex-basis:100%; color:#405c4e; }
+
+/* Scan actual own shopping stops by store, without implying priced retailer products. */
+.manual-shopping-notes__groups { display:grid; gap:1rem; }
+.manual-shopping-notes__group { min-width:0; border:1px solid #c5dbcd; border-radius:13px; padding:12px; background:#f8fbf8; }
+.manual-shopping-notes__group-heading { display:flex; flex-wrap:wrap; gap:.6rem; align-items:center; margin-bottom:10px; }
+.manual-shopping-notes__group-heading h3 { margin:0; font-size:1.06rem; }
+.manual-shopping-notes__group-heading span { color:#405c4e; font-size:.88rem; }
+.manual-shopping-notes__group-actions { display:flex; flex-wrap:wrap; gap:.4rem; margin-left:auto; }
+.manual-shopping-notes__group-actions button { font-size:.85rem; padding:7px 9px; }
+.manual-shopping-notes__group-actions button:disabled { opacity:.55; cursor:not-allowed; }
+.manual-shopping-notes__top label { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.manual-shopping-notes__top input[type=search] { max-width:230px; }
+@media(max-width:600px) { .manual-shopping-notes__top label { width:100%; } .manual-shopping-notes__top input[type=search] { max-width:100%; flex:1; } .manual-shopping-notes__group-actions { margin-left:0; width:100%; } }
