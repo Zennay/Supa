@@ -441,3 +441,5 @@ border-radius:10px;padding:.65rem;scroll-margin-top:1.25rem}
 .offline-price-workbench__coverage-filters :is(select,input):focus-visible { outline:3px solid #226f52; outline-offset:2px; }
 .offline-price-workbench__coverage-filters p { grid-column:1 / -1; margin:0; color:#4d5c53; font-size:.86rem; }
 @media(max-width:640px) { .offline-price-workbench__coverage-filters { grid-template-columns:minmax(0,1fr); } }
+
+.offline-price-workbench__confirmed-unit { display:block; margin-top:.45rem; font-weight:650; color:#27543a; line-height:1.4; }

@@ -2030,16 +2030,19 @@ export function OfflineReviewedWorkbench({
       const capture = imported?.captures[store]
       const basket = store === 'PLUS' ? basketPair?.plus : basketPair?.deka
       const line = basket?.lines.find(item => item.id === need.id)
-      if (!capture) return { status: 'Geen bron', canReview: false, product: '' }
-      if (!line) return { status: 'Planning niet koppelbaar', canReview: false, product: '' }
-      if (line.status !== 'matched') return { status: 'SKU/verpakking ontbreekt', canReview: true, product: '' }
+      if (!capture) return { status: 'Geen bron', canReview: false, product: '', confirmedPrice: null as string | null }
+      if (!line) return { status: 'Planning niet koppelbaar', canReview: false, product: '', confirmedPrice: null as string | null }
+      if (line.status !== 'matched') return { status: 'SKU/verpakking ontbreekt', canReview: true, product: '', confirmedPrice: null as string | null }
       const product = line.productName + ' · broncode ' + line.productId +
         ' · ' + line.pack.amount + ' ' + line.pack.unit + ' × ' + line.pack.count
       if (!perStoreReview.find(item => item.store === store)?.fresh)
-        return { status: 'Opname verlopen of toekomstig', canReview: true, product }
+        return { status: 'Opname verlopen of toekomstig', canReview: true, product, confirmedPrice: null as string | null }
       if (!isAcceptedKey(reviewedLineKey(store, capture.observedAt, line)))
-        return { status: 'Product, verpakking en prijs controleren', canReview: true, product }
-      return { status: 'Persoonlijk bevestigd', canReview: true, product }
+        return { status: 'Product, verpakking en prijs controleren', canReview: true, product, confirmedPrice: null as string | null }
+      return { status: 'Persoonlijk bevestigd', canReview: true, product,
+        confirmedPrice: exactEuro.formatCents(line.lineTotalCents) +
+          ' voor ' + line.packs + ' hele pak(ken) · ' +
+          (pricePerUnit(line) ?? 'eenheidsprijs onbekend') }
     }
     return {
       id: need.id, label: need.ingredientLabel,
@@ -2886,7 +2889,7 @@ export function OfflineReviewedWorkbench({
                   </div>
                   <div className="offline-price-workbench__breakdown-scroll">
                     <table>
-                      <caption>Bron- en reviewstatus per ingrediënt, zonder fictieve prijs.</caption>
+                      <caption>Bron- en reviewstatus per ingrediënt. Alleen eigen, actuele, persoonlijk bevestigde regels tonen een hele-pakbedrag en eenheidsprijs; onvolledige mandjes hebben geen bewezen totaal of winnaar.</caption>
                       <thead><tr>
                         <th scope="col">Hetzelfde ingrediënt</th>
                         <th scope="col">PLUS</th>
@@ -2900,6 +2903,9 @@ export function OfflineReviewedWorkbench({
                             return <td key={store}>
                               <strong>{item.status}</strong>
                               {item.product && <small>{item.product}</small>}
+                              {item.confirmedPrice && <small className="offline-price-workbench__confirmed-unit">
+                                {item.confirmedPrice} · eigen gecontroleerde bronregel; nog geen volledig winkelmandje.
+                              </small>}
                               {item.canReview && item.status !== 'Persoonlijk bevestigd' &&
                                 <a href={'#' + reviewRowId(store, row.id)}
                                   onClick={() => setOpenTripOnly(false)}>Open productkeuze en controle</a>}
