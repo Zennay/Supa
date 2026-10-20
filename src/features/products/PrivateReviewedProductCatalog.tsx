@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { BasketTraceLine } from '../../domain/basket.ts'
 import { privatePackUnitRate, privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import { PrivateReviewedTwoStoreTable } from './PrivateReviewedTwoStoreTable.tsx'
+import { productSearchText } from './productSearchText.ts'
 import { privatePriceAgeNotice } from '../comparison/privatePriceAgeNotice.ts'
 import { privatePhysicalShoppingTick } from '../shopping-list/privatePhysicalShoppingTick.ts'
 import { freshReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
@@ -49,7 +50,7 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
     return capture ? capture.basket.lines.filter((line): line is Matched => line.status === 'matched')
       .map(line => ({ shop, line, observedAt: capture.observedAt })) : []
   })
-  const search = query.trim().toLocaleLowerCase('nl')
+  const search = productSearchText(query.trim())
   const rate = (line: Matched) => privatePackUnitRate({
     amount: line.pack.amount, unit: line.pack.unit, count: line.pack.count,
     priceCents: line.pricePerPackCents,
@@ -58,7 +59,7 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
     (store === 'all' || row.shop === store) &&
     (unitFilter === 'all' || rate(row.line)?.unit === unitFilter) &&
     (!search || [row.line.productName, row.line.productId, row.line.ingredientLabel]
-      .some(value => value.toLocaleLowerCase('nl').includes(search))))
+      .some(value => productSearchText(value).includes(search))))
   // Price/kg cannot meaningfully be compared to price/litre/piece. Keep
   // incompatible units in distinct stable groups; prices are advisory only,
   // while weekly whole-pack costs remain the authoritative budget calculation.
@@ -83,6 +84,19 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
     onToggleChecked(shop, line)
     setCheckMessage('Het fysieke vinkje is voor ' + shop +
       ' aangepast. Dit is geen goedkeuring van de prijs of betaalbevestiging.')
+  }
+  function openCurrentCheckedList() {
+    // This action can be pressed after the seven-day price window expires.
+    // Never navigate as though a stale source still certifies a priced list.
+    const latest = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
+    const chosen = store === 'all'
+      ? latest?.stores.PLUS ? 'PLUS' : latest?.stores.DekaMarkt ? 'DekaMarkt' : null
+      : latest?.stores[store] ? store : null
+    if (!chosen) {
+      setCheckMessage('Deze eigen bron is verlopen of gewijzigd. Controleer de originele winkelopname in Vergelijk.')
+      return
+    }
+    onOpenList(chosen)
   }
   return <section className="private-reviewed-products" aria-label="Mijn persoonlijk gecontroleerde winkelproducten">
     <h2>Mijn echte bronartikelen voor dit weekmenu</h2>
@@ -114,7 +128,7 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
           <option value="lineTotal">Weekregelbedrag laag naar hoog</option>
         </select></label>
         <label>Zoek eigen product <input type="search" value={query}
-          onChange={event => setQuery(event.target.value)} placeholder="Product, SKU of ingrediënt" /></label>
+          onChange={event => setQuery(event.target.value)} maxLength={120} placeholder="Product, SKU of ingrediënt" /></label>
       </div>
       <div className="private-reviewed-products__progress" aria-label="Mijn nog te kopen artikelen per winkel">
         {shops.filter(shop => store === 'all' || store === shop).map(shop => {
@@ -183,7 +197,7 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
         </button>
       </article>)}</div>
       {!visible.length && <p>Geen producten gevonden voor deze selectie.</p>}
-      <button type="button" onClick={() => onOpenList(store === 'all' ? undefined : store)}>
+      <button type="button" onClick={openCurrentCheckedList}>
         {store === 'all' ? 'Open mijn gecontroleerde boodschappenlijst' : `Open mijn ${store}-boodschappenlijst`}
       </button>
     </>}
