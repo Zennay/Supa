@@ -74,6 +74,10 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
     }
   }
   async function downloadReceipt(kind: 'csv' | 'txt') {
+    if (kind === 'txt' && costInvalid) {
+      setReceiptMessage('Corrigeer eerst je zelf ingevulde extra winkelstopkosten.')
+      return
+    }
     // Keep the display and export on the same admitted original physical
     // demand. Await lazy receipt code before rechecking source expiry.
     const initial = freshReviewedBaskets(reviewedRef.current,
@@ -101,10 +105,12 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         const text = exports.printableOwnStoreComparison(comparison, {
           PLUS: current.stores.PLUS.observedAt,
           DekaMarkt: current.stores.DekaMarkt.observedAt,
-        })
+        }, splitTrip ? costCents : null)
         exports.downloadOwnStoreText(text)
       }
-      setReceiptMessage('Privé-overzicht gemaakt uit de twee volledige, actuele eigen winkelmandjes.')
+      setReceiptMessage(kind === 'txt' && splitTrip && costCents !== null
+        ? 'Privé-overzicht met jouw zelf opgegeven tweede-winkelstopkosten opgeslagen.'
+        : 'Volledige privébronvergelijking opgeslagen; netto kosten blijven zonder eigen invoer onbekend.')
     } catch {
       setReceiptMessage('Het privé-overzicht kon niet worden gemaakt. Je winkelbronnen blijven ongewijzigd.')
     }
@@ -299,11 +305,12 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         Download volledige PLUS/Deka-prijsvergelijking (CSV)
       </button>
       <button type="button" onClick={() => { void downloadReceipt('txt') }}>
-        Bewaar leesbaar winkeloverzicht (TXT)
+        Bewaar winkeloverzicht (TXT{splitTrip && costCents !== null ? ' met extra kosten' : ''})
       </button>
       <small>Beide downloads bevatten het originele complete weekmandje en
-        bronmomenten, onafhankelijk van je zoekfilter. Alleen privé; geen kassagarantie,
-        openbare besparingsclaim of nieuwe winkelbronimport.</small>
+        bronmomenten, onafhankelijk van je zoekfilter. Alleen TXT neemt jouw zelf
+        ingevoerde extra stopkosten mee; CSV blijft een bronprijsrapport zonder
+        ritkosten. Geen kassagarantie, openbare besparingsclaim of bronimport.</small>
       {receiptMessage && <p role="status">{receiptMessage}</p>}
     </div>
     <div className="private-reviewed-products__advantage-filter"
