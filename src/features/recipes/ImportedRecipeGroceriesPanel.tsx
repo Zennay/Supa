@@ -600,7 +600,7 @@ export function ImportedRecipeGroceriesPanel({
       </section>}
       {result!.heldRecipes.length > 0 && <section className="recipe-collection-groceries__hold">
         <strong>Corrigeer eerst deze recepten voor betrouwbare fysieke hoeveelheden:</strong>
-        {selected.filter(recipe => result!.heldRecipes.includes(recipe.title)).map(recipe =>
+        {selected.filter(recipe => result!.heldRecipeIds.includes(recipe.id)).map(recipe =>
           <div key={recipe.id}>
             <span>{recipe.title}</span>
             <button type="button" onClick={() => onEdit(recipe)}>Controleer recept</button>

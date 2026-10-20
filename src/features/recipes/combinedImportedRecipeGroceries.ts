@@ -18,6 +18,8 @@ export type CombinedImportedGroceries = {
   checklist: OwnRecipeChecklist
   recipes: number
   heldRecipes: string[]
+  /** Stable IDs: identical recipe titles must not share review status. */
+  heldRecipeIds: string[]
   /** The same canonical SKU-facing identity cannot carry different source names. */
   identityConflicts: { query: string; unit: string; entries: { recipeId: string; recipeTitle: string; label: string }[] }[]
   /** This is always unpriced. Only exact matching names + physical units merge. */
@@ -42,6 +44,7 @@ export function combinedImportedRecipeGroceries(
   const groups = new Map<string, OwnRecipeChecklistLine>()
   const contributorsByLine: Record<string, GroceryContribution[]> = Object.create(null)
   const heldRecipes: string[] = []
+  const heldRecipeIds: string[] = []
   // Planner's aggregatePlanIngredients keys own recipes by query + unit and
   // REJECTS different labels for one identity. Detect this at the unpriced
   // list stage so a seemingly complete combined list never masks that drift.
@@ -74,7 +77,7 @@ export function combinedImportedRecipeGroceries(
     const validPortions = typeof portions === 'number' &&
       Number.isSafeInteger(portions) && portions >= 1 && portions <= 100
     const ready = validPortions && !!toPlannerRecipe(recipe, { usage: 'unpriced-demand' })
-    if (!ready) heldRecipes.push(recipe.title)
+    if (!ready) { heldRecipes.push(recipe.title); heldRecipeIds.push(recipe.id) }
     // The ordinary single-recipe checklist deliberately coalesces duplicate
     // product identities. Here, retain EACH original ingredient as a separate
     // contribution first: otherwise a recipe containing two flour rows would
@@ -148,7 +151,7 @@ export function combinedImportedRecipeGroceries(
   }
   checklist.copyText = formatOwnRecipeChecklist(checklist, {})
   return {
-    checklist, contributorsByLine, recipes: recipes.length, heldRecipes, identityConflicts,
+    checklist, contributorsByLine, recipes: recipes.length, heldRecipes, heldRecipeIds, identityConflicts,
     complete: !heldRecipes.length && !identityConflicts.length && lines.every(line => !line.needsReview),
   }
 }
