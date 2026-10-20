@@ -29,10 +29,12 @@ function safeTableCell(value: string) {
   const formula = /^[\p{White_Space}\p{Cf}\p{Mn}\p{Mc}\p{Me}]*[=+@-]/u
   return formula.test(flat.normalize('NFKC')) ? "'" + flat : flat
 }
-function tabularData(needs: readonly ManualNeed[], entries: ManualEntries): string {
+function tabularData(
+  needs: readonly ManualNeed[], entries: ManualEntries, stores: readonly ManualRetailer[] = MANUAL_RETAILERS,
+): string {
   return [
     boundTableHeader,
-    ...needs.flatMap(need => MANUAL_RETAILERS.map(store => {
+    ...needs.flatMap(need => stores.map(store => {
       const quote = entries[manualQuoteKey(store, need.id)]
       return [
         safeTableCell(need.id), store,
@@ -48,6 +50,7 @@ function tabularData(needs: readonly ManualNeed[], entries: ManualEntries): stri
 }
 function readPastedTable(text: string, needs: readonly ManualNeed[]): {
   entries: ManualEntries; legacyWithoutPackCount: boolean; boundToDemand: boolean
+  partialStore: ManualRetailer | null
 } {
   // Bound pasted content like a local file before splitting it into cells.
   // Excel and other spreadsheets may prefix a valid UTF-8 TSV with a BOM.
@@ -58,9 +61,11 @@ function readPastedTable(text: string, needs: readonly ManualNeed[]): {
   const lines = normalized.replace(/\n+$/u, '').split('\n')
   const legacyWithoutPackCount = lines[0] === legacyTableHeader
   const boundToDemand = lines[0] === boundTableHeader
+  const fullSheet = lines.length === 1 + needs.length * 2
+  const partialSheet = boundToDemand && lines.length === 1 + needs.length
   if ((!legacyWithoutPackCount && !boundToDemand && lines[0] !== tableHeader) ||
-      lines.length !== 1 + needs.length * 2) {
-    throw new Error('De tabel moet alle PLUS- en DekaMarkt-regels bevatten; gebruik een Supa-invulblad met 6, 7 of 9 kolommen.')
+      (!fullSheet && !partialSheet)) {
+    throw new Error('Gebruik een volledig PLUS/Deka-blad of een exact Planner-gebonden negenkolomsblad voor één winkel.')
   }
   const expected = new Map(needs.map(need => [need.id, need]))
   const entries: ManualEntries = Object.create(null) as ManualEntries
@@ -95,7 +100,12 @@ function readPastedTable(text: string, needs: readonly ManualNeed[]): {
     used.add(key)
     entries[key] = { product, packAmount, packUnit: unit as ManualQuote['packUnit'], packCount, price }
   }
-  return { entries, legacyWithoutPackCount, boundToDemand }
+  const stores = new Set(Object.keys(entries).map(key => JSON.parse(key)[0] as ManualRetailer))
+  if (partialSheet && stores.size !== 1) {
+    throw new Error('Een los winkelblad mag maar één winkel bevatten; geen PLUS/Deka-regels mengen.')
+  }
+  return { entries, legacyWithoutPackCount, boundToDemand,
+    partialStore: partialSheet ? [...stores][0] : null }
 }
 
 export function ManualStoreComparison({
@@ -231,10 +241,10 @@ export function ManualStoreComparison({
       setImportMessage('De persoonlijke boodschappenlijst kon niet worden opgeslagen; controleer de huidige invoer.')
     }
   }
-  function downloadTableFile() {
-    if (!needs.length) return
+  function downloadTableFile(store?: ManualRetailer) {
+    if (!(staleEntries ? recordedNeeds : needs).length) return
     try {
-      const content = tabularData(staleEntries ? recordedNeeds : needs, entries) + '\n'
+      const content = tabularData(staleEntries ? recordedNeeds : needs, entries, store ? [store] : MANUAL_RETAILERS) + '\n'
       if (new TextEncoder().encode(content).length > 128000) {
         setImportMessage('Het huidige invulblad is te groot om lokaal te bewaren.')
         return
@@ -245,7 +255,7 @@ export function ManualStoreComparison({
       try {
         const link = document.createElement('a')
         link.href = url
-        link.download = 'supa-mijn-plus-deka-invulblad.tsv'
+        link.download = store ? `supa-mijn-${store === 'PLUS' ? 'plus' : 'dekamarkt'}-invulblad.tsv` : 'supa-mijn-plus-deka-invulblad.tsv'
         document.body.append(link)
         try { link.click() } finally { link.remove() }
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
@@ -262,14 +272,24 @@ export function ManualStoreComparison({
         setImportMessage('Oud invulblad niet geladen; huidige invoer behouden.')
         return
       }
-      if (Object.keys(entries).length > 0 &&
-          JSON.stringify(entries) !== JSON.stringify(imported.entries) &&
-          !window.confirm('Dit invulblad vervangt jouw bestaande PLUS- en DekaMarkt-productinvoer voor deze Planner-vraag. Doorgaan?')) {
+      // A one-store sheet may only replace that exact store for unchanged demand.
+      // Never carry old-store prices across a different Planner week.
+      const nextEntries: ManualEntries = imported.partialStore
+        ? { ...(staleEntries ? {} : entries), ...imported.entries }
+        : imported.entries
+      const replacedExisting = Object.entries(imported.entries).some(([key, value]) =>
+        entries[key] && JSON.stringify(entries[key]) !== JSON.stringify(value))
+      if ((staleEntries || replacedExisting) &&
+          !window.confirm(imported.partialStore
+            ? `Het eigen ${imported.partialStore}-blad wordt ingelezen. ${staleEntries
+                ? 'Alle prijzen van de vorige Planner-week vervallen.'
+                : 'Alleen deze winkel wordt vervangen; de andere winkel blijft behouden.'} Doorgaan?`
+            : 'Dit invulblad vervangt bestaande PLUS- en DekaMarkt-invoer. Doorgaan?')) {
         setImportMessage('Annuleren: je eerdere winkelproductinvoer is ongewijzigd.')
         return
       }
       editRevision.current += 1
-      setEntries(imported.entries)
+      setEntries(nextEntries)
       setEntriesDemandSignature(currentDemandSignature)
       setRecordedNeeds(needs.map(row => ({ ...row })))
       setShowTable(false)
@@ -280,7 +300,9 @@ export function ManualStoreComparison({
           'Vul bij iedere winkelregel het echte multipack-aantal in; pas daarna ' +
           'kan een volledig rekenkundig mandverschil verschijnen.'
         : imported.boundToDemand
-          ? 'Invulblad voor exact deze Planner-vraag geladen; controleer de eigen product- en winkelprijzen.'
+          ? imported.partialStore
+            ? `${imported.partialStore} voor de huidige Planner geladen. ${staleEntries ? 'Vorige Planner-prijzen vervallen.' : 'Andere winkel behouden.'} Controleer de eigen prijzen.`
+            : 'Invulblad voor exact deze Planner-vraag geladen; controleer de eigen product- en winkelprijzen.'
           : 'Oud zevenkolomsblad geladen zonder Planner-behoeftecontrole. Controleer de actuele week en winkelprijzen.')
     } catch (error) {
       setImportMessage(error instanceof Error ? error.message : 'Tabel niet herkend.')
@@ -332,7 +354,7 @@ export function ManualStoreComparison({
               hele-verpakkingsberekeningen tellen niet meer mee. Bewaar het oorspronkelijke
               invulblad, of bevestig dat je opnieuw wilt beginnen voor deze Planner-week.
               <div className="manual-compare__actions">
-                <button type="button" className="ghost-button" onClick={downloadTableFile}>
+                <button type="button" className="ghost-button" onClick={() => downloadTableFile()}>
                   Bewaar vorige invoer als oorspronkelijk invulblad (.tsv)
                 </button>
                 <button type="button" className="ghost-button" onClick={() => {
@@ -411,7 +433,7 @@ export function ManualStoreComparison({
           </div>
           {showTable && (
             <div className="manual-compare__table">
-              <p>Dit negenkolomsinvulblad bewaart ook de originele hoeveelheid en eenheid per Planner-ingrediënt. Wijzig die twee kolommen niet: Supa weigert oude bladen voor een andere Planner-vraag. Vul uitsluitend winkelproduct, verpakking, multipack en eigen prijs in. Plak of laad daarna het hele blad terug. Oude zes- en zevenkolomsbladen vragen een extra controle, omdat ze niet aan een Planner-hoeveelheid zijn gebonden.</p>
+              <p>Dit negenkolomsinvulblad bewaart ook de originele hoeveelheid en eenheid per Planner-ingrediënt. Wijzig die twee kolommen niet: Supa weigert oude bladen voor een andere Planner-vraag. Vul uitsluitend winkelproduct, verpakking, multipack en eigen prijs in. Plak of laad daarna het volledige of één los PLUS/Deka-blad terug. Een enkel winkelblad vervangt uitsluitend de invoer van die winkel bij dezelfde Planner-vraag. Oude zes- en zevenkolomsbladen vragen een extra controle, omdat ze niet aan een Planner-hoeveelheid zijn gebonden.</p>
               <label>Huidige tabel
                 <textarea readOnly rows={7} value={tabularData(staleEntries ? recordedNeeds : needs, entries)}
                   onFocus={event => event.currentTarget.select()} />
@@ -422,9 +444,15 @@ export function ManualStoreComparison({
                   placeholder="Plak hier de complete tabgescheiden tabel." />
               </label>
               <button className="ghost-button" type="button" onClick={applyTable}>Geplakte tabel laden</button>
-              <button className="ghost-button" type="button" onClick={downloadTableFile}>
-                Bewaar huidig invulblad (.tsv), ook onvolledig
+              <button className="ghost-button" type="button" onClick={() => downloadTableFile()}>
+                Bewaar beide winkels (.tsv), ook onvolledig
               </button>
+              {MANUAL_RETAILERS.map(store => (
+                <button className="ghost-button" type="button" key={store}
+                  onClick={() => downloadTableFile(store)}>
+                  Bewaar alleen {store} (.tsv)
+                </button>
+              ))}
               <label>Of kies eerder bewaard lokaal invulblad (.tsv of .txt, maximaal 128 kB)
                 <input type="file" accept=".tsv,.txt,text/tab-separated-values,text/plain"
                   onChange={event => {
