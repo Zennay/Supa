@@ -3,9 +3,10 @@ import { FigmaImage } from '../../components/FigmaImage'
 import { figmaAssets as a } from '../home/figmaAssets'
 import { createManualRecipeDraft, importRecipeFromHtml, type UserRecipeDraft } from '../../domain/userRecipeImport'
 import { safeRecipeSourceUrl } from '../../domain/recipeSourceUrl'
-import { RECIPE_LIBRARY_KEY, readRecipeLibrary, saveRecipeLibrary, reviewRecipe, retainUnresolvedRecipeReview, sourceOnlyRecipeWarnings, acknowledgeRecipeSourceWarnings, type LibraryState, type SavedRecipe } from './recipeLibrary'
+import { RECIPE_LIBRARY_KEY, readRecipeLibrary, saveRecipeLibrary, reviewRecipe, retainUnresolvedRecipeReview, sourceOnlyRecipeWarnings, acknowledgeRecipeSourceWarnings, type LibraryState, type SavedRecipe } from './recipeLibrary.ts'
 import { importRecipeLink } from './importRecipeLink'
 import { importPlainTextRecipe } from './importPlainTextRecipe'
+import { importPlainTextRecipeCollection } from './importPlainTextRecipeCollection'
 import { ownRecipeAsMarkdown } from './ownRecipeMarkdown'
 import { prepareRecipeBackupImport, serializeRecipeBackup, type RecipeBackupPreview, RECIPE_BACKUP_MAX_BYTES } from './recipeBackup'
 import { curatedFigmaRecipes } from './curatedFigmaRecipes'
@@ -116,6 +117,13 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const [privateWeekMessage, setPrivateWeekMessage] = useState('')
   const [recipeFileMessage, setRecipeFileMessage] = useState('')
   const shoppingCopy = useRef<HTMLTextAreaElement>(null)
+  const [collectionText, setCollectionText] = useState('')
+  const [collectionPreview, setCollectionPreview] = useState<{
+    source: string; libraryRaw: string | null; recipes: UserRecipeDraft[]; alreadyPresent: number
+  } | null>(null)
+  const [collectionError, setCollectionError] = useState('')
+  const [collectionMessage, setCollectionMessage] = useState('')
+  const collectionReadVersion = useRef(0)
   const [backupPreview, setBackupPreview] = useState<RecipeBackupPreview | null>(null)
   const [backupBusy, setBackupBusy] = useState(false)
   const [backupError, setBackupError] = useState('')
@@ -148,6 +156,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       backupReadVersion.current += 1
       setBackupBusy(false)
       setBackupPreview(null)
+      setCollectionPreview(null)
       setLibrary(next)
       const editing = editingBaseline.current
       if (editing && JSON.stringify(next.recipes.find(recipe => recipe.id === editing.id) ?? null) !== editing.raw) {
@@ -499,6 +508,68 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       setBackupError(cause instanceof Error ? cause.message : 'Importeren is niet gelukt. Je bestaande recepten blijven staan.')
     }
   }
+  async function loadPlainRecipeCollection(file?: File) {
+    if (!file) return
+    const revision = ++collectionReadVersion.current
+    setCollectionError(''); setCollectionMessage(''); setCollectionPreview(null)
+    try {
+      if (!file.size || file.size > 500_000) throw new Error('Het tekstbestand mag maximaal 500 kB bevatten.')
+      const content = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      if (revision !== collectionReadVersion.current) return
+      setCollectionText(content)
+      setCollectionMessage('Tekst lokaal geladen. Controleer alle recepten vóór het bewaren.')
+    } catch (cause) {
+      if (revision === collectionReadVersion.current)
+        setCollectionError(cause instanceof Error ? cause.message : 'Kon dit receptenbestand niet lezen.')
+    }
+  }
+  function previewPlainRecipeCollection() {
+    setCollectionError(''); setCollectionMessage(''); setCollectionPreview(null)
+    try {
+      if (library.error) throw new Error(library.error)
+      const parsed = importPlainTextRecipeCollection(collectionText)
+      const identity = (item: UserRecipeDraft) => JSON.stringify([
+        item.title, item.servings, item.minutes,
+        item.ingredients.map(part => part.original), item.steps,
+      ])
+      const known = new Set(library.recipes.map(identity))
+      const recipes: UserRecipeDraft[] = []
+      let alreadyPresent = 0
+      for (const recipe of parsed) {
+        const key = identity(recipe)
+        if (known.has(key)) { alreadyPresent++; continue }
+        known.add(key); recipes.push(recipe)
+      }
+      if (!recipes.length) throw new Error('Alle recepten staan al op dit apparaat. Er is niets nieuws om te bewaren.')
+      if (library.recipes.length + recipes.length > 100)
+        throw new Error('Je kunt maximaal 100 eigen recepten bewaren. Maak eerst ruimte in je receptenlijst.')
+      setCollectionPreview({ source: collectionText, libraryRaw: library.raw, recipes, alreadyPresent })
+      setCollectionMessage(recipes.length + ' nieuwe recepten lokaal herkend; ' + alreadyPresent + ' al aanwezig of dubbel. Controleer de hoeveelheden en bevestig zelf.')
+    } catch (cause) {
+      setCollectionError(cause instanceof Error ? cause.message : 'Kon de receptenverzameling niet lezen.')
+    }
+  }
+  function confirmPlainRecipeCollection() {
+    setCollectionError('')
+    try {
+      if (!collectionPreview || collectionPreview.source !== collectionText ||
+          collectionPreview.libraryRaw !== library.raw)
+        throw new Error('De tekst of je opgeslagen recepten zijn veranderd. Controleer deze import opnieuw.')
+      const savedAt = new Date().toISOString()
+      const additions: SavedRecipe[] = collectionPreview.recipes.map(draft => ({
+        ...reviewRecipe(draft), id: ownRecipeId(), savedAt,
+      }))
+      const next = saveRecipeLibrary(window.localStorage, library,
+        [...additions, ...library.recipes])
+      setLibrary(next)
+      setCollectionPreview(null); setCollectionText('')
+      setFilter('own'); setQuery('')
+      window.dispatchEvent(new Event('supa-recipes-changed'))
+      setCollectionMessage(additions.length + ' eigen recepten bewaard op dit apparaat. Recepten met onzekere hoeveelheden vereisen nog controle vóór Planner. Winkelprijzen blijven onbekend.')
+    } catch (cause) {
+      setCollectionError(cause instanceof Error ? cause.message : 'Er is niets opgeslagen. Probeer opnieuw.')
+    }
+  }
   function openEditor(next: 'manual' | 'url' | 'paste' | 'plain') {
     pasteReadVersion.current++; setPasteFileMessage('')
     editingBaseline.current = null
@@ -674,6 +745,51 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       {favoriteState.error && <p role="alert" className="recipe-error">{favoriteState.error}</p>}
     </section>
     <div className="recipe-add-actions"><button onClick={() => openEditor('manual')}>＋ Eigen recept</button><button onClick={() => openEditor('url')}>Importeer via link</button><button onClick={() => openEditor('paste')}>Plak receptgegevens (JSON-LD)</button><button onClick={() => openEditor('plain')}>Plak gewone recepttekst</button></div>
+    <section className="recipe-backup-panel" aria-label="Meerdere eigen recepten tegelijk toevoegen">
+      <h2>Meerdere recepten uit tekst</h2>
+      <p>Plak eigen recepten of een lokaal Markdownbestand. Scheid recepten met een regel
+        <code> --- </code>. De recepten blijven privé en ongeprijsd; onzekere
+        ingrediënten moeten vóór gebruik in Planner worden gecorrigeerd.</p>
+      <label className="recipe-collection-label">Importeer .txt of .md (maximaal 500 kB)
+        <input type="file" accept=".txt,.md,text/plain,text/markdown"
+          onChange={event => {
+            void loadPlainRecipeCollection(event.currentTarget.files?.[0]); event.currentTarget.value = ''
+          }} />
+      </label>
+      <label className="recipe-collection-label">Meerdere recepten (titel, Ingrediënten:, Bereiding:)
+        <textarea rows={8} maxLength={500000} value={collectionText}
+          placeholder={'Tomatensoep\nIngrediënten:\n500 g tomaten\nBereiding:\nKook tomaten\n---\nPasta\nIngrediënten:\n200 g pasta\nBereiding:\nKook pasta'}
+          onChange={event => {
+            collectionReadVersion.current++; setCollectionText(event.currentTarget.value)
+            setCollectionPreview(null); setCollectionError(''); setCollectionMessage('')
+          }} />
+      </label>
+      <div className="recipe-backup-panel__actions">
+        <button type="button" onClick={previewPlainRecipeCollection}
+          disabled={!collectionText.trim() || !!library.error}>Controleer mijn recepten</button>
+        <button type="button" onClick={() => {
+          collectionReadVersion.current++; setCollectionText(''); setCollectionPreview(null)
+          setCollectionError(''); setCollectionMessage('')
+        }}>Wis invoer</button>
+      </div>
+      {collectionPreview && collectionPreview.source === collectionText &&
+        collectionPreview.libraryRaw === library.raw &&
+        <div className="recipe-backup-panel__review" role="group" aria-label="Bevestig import van mijn recepten">
+          <strong>{collectionPreview.recipes.length} nieuwe recepten gevonden</strong>
+          <small>{collectionPreview.alreadyPresent} al aanwezig of dubbel — die worden niet opnieuw opgeslagen.</small>
+          <ul>{collectionPreview.recipes.map((recipe, index) => <li key={index}>
+            <strong>{recipe.title}</strong> · {recipe.ingredients.length} ingrediënten ·
+            {' '}{recipe.warnings.length ? recipe.warnings.length + ' controlepunten' : 'Geen openstaande importwaarschuwingen'}
+          </li>)}</ul>
+          <p>Geen prijzen of productmatches. Alle recepten worden pas na jouw bevestiging samen opgeslagen.</p>
+          <div className="recipe-backup-panel__actions">
+            <button type="button" onClick={confirmPlainRecipeCollection}>Bewaar alle recepten</button>
+            <button type="button" onClick={() => setCollectionPreview(null)}>Annuleer</button>
+          </div>
+        </div>}
+      {collectionError && <p role="alert" className="recipe-error">{collectionError}</p>}
+      {collectionMessage && <p role="status">{collectionMessage}</p>}
+    </section>
     <section className="recipe-backup-panel" aria-label="Eigen recepten meenemen naar een ander apparaat">
       <h2>Mijn recepten meenemen</h2>
       <p>Maak een privé-backup van je eigen recepten, of herstel een eerdere SUPA-receptenbackup.
