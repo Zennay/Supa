@@ -2044,10 +2044,29 @@ export function OfflineReviewedWorkbench({
           ' voor ' + line.packs + ' hele pak(ken) · ' +
           (pricePerUnit(line) ?? 'eenheidsprijs onbekend') }
     }
+    const plus = review('PLUS')
+    const deka = review('DekaMarkt')
+    const plusLine = basketPair?.plus?.lines.find(item => item.id === need.id)
+    const dekaLine = basketPair?.deka?.lines.find(item => item.id === need.id)
+    // Only compare an individual, identical physical demand if BOTH exact
+    // source records are fresh, paired and personally/automatically approved.
+    // This never supplies an unverified whole-basket delta or winner.
+    let singleLineDelta: string | null = null
+    if (imported?.pairedWithin24h && plus.confirmedPrice && deka.confirmedPrice &&
+        plusLine?.status === 'matched' && dekaLine?.status === 'matched' &&
+        plusLine.requirement.amount === dekaLine.requirement.amount &&
+        plusLine.requirement.unit === dekaLine.requirement.unit) {
+      const cents = dekaLine.lineTotalCents - plusLine.lineTotalCents
+      if (Number.isSafeInteger(cents)) {
+        singleLineDelta = cents === 0 ? 'Gelijk voor deze ingrediëntregel' :
+          (cents > 0 ? 'PLUS' : 'DekaMarkt') + ' rekent bij jouw gekozen artikelen ' +
+          exactEuro.formatCents(Math.abs(cents)) + ' minder voor deze ingrediëntregel'
+      }
+    }
     return {
       id: need.id, label: need.ingredientLabel,
       amount: need.requirement.amount, unit: need.requirement.unit,
-      PLUS: review('PLUS'), DekaMarkt: review('DekaMarkt'),
+      PLUS: plus, DekaMarkt: deka, singleLineDelta,
     }
   })
   const olderPairCapture = imported?.captures.PLUS && imported.captures.DekaMarkt &&
@@ -2894,6 +2913,7 @@ export function OfflineReviewedWorkbench({
                         <th scope="col">Hetzelfde ingrediënt</th>
                         <th scope="col">PLUS</th>
                         <th scope="col">DekaMarkt</th>
+                        <th scope="col">Eigen prijsverschil per complete ingrediëntregel</th>
                       </tr></thead>
                       <tbody>{visibleCoverageRows.map(row => (
                         <tr key={row.id}>
@@ -2911,6 +2931,10 @@ export function OfflineReviewedWorkbench({
                                   onClick={() => setOpenTripOnly(false)}>Open productkeuze en controle</a>}
                             </td>
                           })}
+                          <td>{row.singleLineDelta ? <>
+                            <strong>{row.singleLineDelta}</strong>
+                            <small>Uitsluitend jouw bevestigde actuele bronartikelen; productgelijkwaardigheid en totale besparing niet bewezen.</small>
+                          </> : <small>Onbekend: eerst beide actuele bronartikelen bevestigen.</small>}</td>
                         </tr>
                       ))}</tbody>
                     </table>
