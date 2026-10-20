@@ -71,13 +71,14 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       setReceiptMessage('Download van eigen ' + shop + '-mand mislukt. Herzie de bron.')
     }
   }
-  async function downloadReceipt(kind: 'csv' | 'txt') {
+  async function downloadReceipt(kind: 'csv' | 'txt' | 'html') {
     // Keep the display and export on the same admitted original physical
     // demand. Await lazy receipt code before rechecking source expiry.
     const initial = freshReviewedBaskets(reviewedRef.current,
       reviewedRef.current.planKey, Date.now())
     try {
       const exports = await import('../planner/downloadOwnStoreComparison.ts')
+      const print = kind === 'html' ? await import('./privateTwoStorePrintableHtml.ts') : null
       const current = freshReviewedBaskets(reviewedRef.current,
         reviewedRef.current.planKey, Date.now())
       if (!current || !initial || current.planKey !== initial.planKey ||
@@ -95,12 +96,34 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       }
       if (kind === 'csv') {
         exports.downloadOwnStoreCsv(current, comparison)
-      } else {
+      } else if (kind === 'txt') {
         const text = exports.printableOwnStoreComparison(comparison, {
           PLUS: current.stores.PLUS.observedAt,
           DekaMarkt: current.stores.DekaMarkt.observedAt,
         })
         exports.downloadOwnStoreText(text)
+      } else {
+        if (!print) throw Error('Printweergave niet beschikbaar.')
+        const html = print.privateTwoStorePrintableHtml(comparison, {
+          PLUS: current.stores.PLUS.observedAt,
+          DekaMarkt: current.stores.DekaMarkt.observedAt,
+        })
+        // The paired sources must still be current after formatting.
+        const final = freshReviewedBaskets(reviewedRef.current,
+          reviewedRef.current.planKey, Date.now())
+        if (!final || final.planKey !== current.planKey ||
+            final.stores.PLUS !== current.stores.PLUS ||
+            final.stores.DekaMarkt !== current.stores.DekaMarkt) {
+          throw Error('De bron is tijdens het afdrukken veranderd.')
+        }
+        const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
+        try {
+          const link = document.createElement('a')
+          link.href = url
+          link.download = 'supa-prive-plus-deka-weekvergelijking.html'
+          document.body.append(link)
+          try { link.click() } finally { link.remove() }
+        } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
       }
       setReceiptMessage('Privé-overzicht gemaakt uit de twee volledige, actuele eigen winkelmandjes.')
     } catch {
@@ -294,7 +317,10 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       <button type="button" onClick={() => { void downloadReceipt('txt') }}>
         Bewaar leesbaar winkeloverzicht (TXT)
       </button>
-      <small>Beide downloads bevatten het originele complete weekmandje en
+      <button type="button" onClick={() => { void downloadReceipt('html') }}>
+        Bewaar printbaar volledig weekmandje (HTML)
+      </button>
+      <small>Alle drie privédownloads bevatten het originele complete weekmandje en
         bronmomenten, onafhankelijk van je zoekfilter. Alleen privé; geen kassagarantie,
         openbare besparingsclaim of nieuwe winkelbronimport.</small>
       {receiptMessage && <p role="status">{receiptMessage}</p>}
