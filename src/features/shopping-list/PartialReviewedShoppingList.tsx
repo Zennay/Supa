@@ -6,6 +6,7 @@ import {
   type OwnStore, type PrivateCaptureProgress, type PrivateReviewedBaskets,
 } from '../comparison/privateReviewedBasketBridge.ts'
 import { confirmedPartialBasket } from '../planner/confirmedPartialBasket.ts'
+import { privatePartialShoppingExport } from './privatePartialShoppingExport.ts'
 import { privatePartialPhysicalShoppingTick } from './privatePhysicalShoppingTick.ts'
 import './partialReviewedShoppingList.css'
 
@@ -92,7 +93,8 @@ export function PartialReviewedShoppingList({
       return
     }
     try {
-      const { privatePartialShoppingExport } = await import('./privatePartialShoppingExport.ts')
+      // Share sheets require transient user activation; the trusted exporter
+      // is already loaded, so a click can open the chooser synchronously.
       if (currentKey.current !== checkedKey ||
           currentPlan.current !== plan ||
           !confirmedPartialBasket(progress, store, Date.now()) ||
