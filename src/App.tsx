@@ -680,6 +680,17 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         )}
         {tab === 'products' && <Suspense fallback={<p role="status">Eigen bronproducten openen…</p>}>
           <PrivateReviewedProductCatalog reviewed={livePrivateReviewed} budget={budget}
+            progress={privateCaptureProgress?.planKey === privatePlanKey
+              ? privateCaptureProgress : null}
+            onImportSourceFiles={handoffOwnPriceFiles}
+            fileWarning={listSourceFileWarning}
+            onReviewIngredient={(store, ingredientId) => {
+              setPrivateReviewFocus(previous => ({
+                planKey: privatePlanKey, store, ingredientId,
+                serial: (previous?.serial ?? 0) + 1,
+              }))
+              navigate('basket')
+            }}
             checked={privateShoppingTicks}
             onToggleChecked={(shop, selected) => {
               // No checkout progress can be created from expired or replaced

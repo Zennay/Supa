@@ -5,8 +5,8 @@ import { PrivateReviewedTwoStoreTable } from './PrivateReviewedTwoStoreTable.tsx
 import { productSearchText } from './productSearchText.ts'
 import { privatePriceAgeNotice } from '../comparison/privatePriceAgeNotice.ts'
 import { privatePhysicalShoppingTick } from '../shopping-list/privatePhysicalShoppingTick.ts'
-import { freshReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
-import type { OwnStore, PrivateReviewedBaskets, PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
+import { freshReviewedBaskets, recentOwnCaptureInstant } from '../comparison/privateReviewedBasketBridge.ts'
+import type { OwnStore, PrivateCaptureProgress, PrivateReviewedBaskets, PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
 import './privateReviewedProductCatalog.css'
 
 const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
@@ -14,10 +14,14 @@ const shops: OwnStore[] = ['PLUS', 'DekaMarkt']
 type Matched = Extract<BasketTraceLine, { status: 'matched' }>
 
 /** Read-only personally reviewed basket sources, never an inferred live catalog. */
-export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparison, onOpenList, onOpenMixedRoute, onChooseRouteLine, checked, onToggleChecked }: {
+export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOpenComparison, onOpenList, onOpenMixedRoute, onChooseRouteLine, onReviewIngredient, onImportSourceFiles, fileWarning, checked, onToggleChecked }: {
   reviewed: PrivateReviewedBaskets | null
+  progress: PrivateCaptureProgress | null
   budget: number
   onOpenComparison: () => void
+  onReviewIngredient: (store: OwnStore, ingredientId: string) => void
+  onImportSourceFiles: (files: File[]) => void
+  fileWarning: string
   onOpenList: (store?: OwnStore) => void
   onOpenMixedRoute: () => void
   onChooseRouteLine: (choice: Omit<PrivateRouteChoice, 'serial'>) => void
@@ -45,6 +49,10 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
   const currentReviewed = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', nowMs)
   const hasExpiredSource = shops.some(shop =>
     !!reviewed?.stores[shop] && !currentReviewed?.stores[shop])
+  // Partial observations are guidance; they are NEVER complete priced baskets.
+  // The parent passes progress scoped to exactly the current physical week.
+  const currentProgress = progress?.planKey === reviewed?.planKey || !reviewed
+    ? progress : null
   const sources = shops.flatMap(shop => {
     const capture = currentReviewed?.stores[shop]
     return capture ? capture.basket.lines.filter((line): line is Matched => line.status === 'matched')
@@ -102,6 +110,57 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
     <h2>Mijn echte bronartikelen voor dit weekmenu</h2>
     <p>Alleen jouw zelf gecontroleerde productregels, geen actuele winkelcatalogus of kassagarantie.
       Historische ontwerpvoorbeelden elders op de pagina tellen niet mee.</p>
+    <label className="private-reviewed-products__own-upload">
+      <strong>Eigen PLUS/DekaMarkt-productbron openen</strong>
+      <span>1–2 rechtmatig verkregen CSV-, TSV-, TXT- of Supa JSON-bestanden.
+        De bestaande Vergelijk-importer controleert de originele SKU, verpakking,
+        bronmoment en prijs en vraagt je om bevestiging.</span>
+      <input type="file" multiple
+        accept=".csv,.tsv,.txt,.json,text/csv,text/plain,text/tab-separated-values,application/json"
+        onChange={event => {
+          const files = Array.from(event.currentTarget.files ?? [])
+          event.currentTarget.value = ''
+          if (files.length) onImportSourceFiles(files)
+        }} />
+    </label>
+    {fileWarning && <p role="alert" className="private-reviewed-products__upload-error">{fileWarning}</p>}
+    <div className="private-reviewed-products__pending" aria-label="Brondekking en openstaande productmatches">
+      {shops.map(shop => {
+        const full = currentReviewed?.stores[shop]
+        const partial = currentProgress?.stores[shop]
+        const recent = !!partial && partial.fresh &&
+          recentOwnCaptureInstant(partial.observedAt, nowMs)
+        const total = full?.basket.lines.length ?? partial?.demandLineCount ?? 0
+        const approved = full ? total : recent ? Math.min(total, partial!.reviewedLineCount) : 0
+        const missing = recent ? partial?.missingIngredients ?? [] : []
+        const pending = recent ? partial?.awaitingReviewIngredients ?? [] : []
+        const next = recent ? (pending[0] ?? missing[0]) : null
+        return <article key={shop}>
+          <header><h3>{shop}</h3><span>{full ? 'Volledig gecontroleerd'
+            : partial && !recent ? 'Opname vernieuwen'
+              : partial ? 'Nog niet compleet' : 'Nog geen bron'}</span></header>
+          {total > 0 && <>
+            <progress value={Math.max(0, approved)} max={total}
+              aria-label={shop + ': gecontroleerde ingrediënten'} />
+            <small>{approved} van {total} ingrediëntregels gecontroleerd</small>
+          </>}
+          {full ? <p>Dit volledige mandje staat hieronder met oorspronkelijke
+            hele-verpakkingsprijzen en eenheidsprijzen.</p>
+            : partial && recent ? <>
+              <p>{missing.length} ontbreken; {pending.length} vragen review.
+                Zonder volledig mandje blijft het prijsverschil onbekend.</p>
+              {next && <p><strong>Volgend product:</strong> {next.label}</p>}
+            </> : <p>Geen actuele, volledige prijsdekking. Bedragen blijven onbekend.</p>}
+          <button type="button" onClick={() => {
+            // A tab wake-up cannot reuse an expired approval as live evidence.
+            if (next && recentOwnCaptureInstant(partial!.observedAt, Date.now()))
+              onReviewIngredient(shop, next.id)
+            else onOpenComparison()
+          }}>{next ? 'Controleer volgend product' : full
+            ? 'Bekijk bronproducten' : 'Open broninvoer'}</button>
+        </article>
+      })}
+    </div>
     {hasExpiredSource && <p role="status" className="private-reviewed-products__age">
       Eén of beide eerdere winkelopnames zijn verlopen of niet meer bruikbaar.
       De bijbehorende prijzen zijn verborgen. Herzie de originele bron in Vergelijk;
