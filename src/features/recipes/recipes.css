@@ -169,3 +169,16 @@
 .recipe-collection-result__recipe { display: grid; gap: 8px; padding: 12px;
   border: 1px solid #c2d5c6; border-radius: 12px; background: #fff; }
 .recipe-collection-result__recipe strong { overflow-wrap: anywhere; }
+
+/* Preserve the original Figma card styling while keeping four recipe import
+   actions and the private bulk importer usable on narrow phones. */
+@media (max-width: 600px) {
+  .recipe-add-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .recipe-add-actions button { min-width: 0; overflow-wrap: anywhere; text-align: center; }
+  .recipe-collection-label, .recipe-collection-result__recipe { min-width: 0; }
+  .recipe-collection-label :is(select, input[type=file], textarea) { max-width: 100%; min-width: 0; }
+  .recipe-backup-panel__actions button { width: 100%; overflow-wrap: anywhere; }
+}
+@media (max-width: 360px) {
+  .recipe-add-actions { grid-template-columns: 1fr; }
+}
