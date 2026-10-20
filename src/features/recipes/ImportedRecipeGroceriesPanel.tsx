@@ -9,6 +9,7 @@ import { formatOwnRecipeChecklist } from './recipeShoppingChecklist.ts'
 import { exportOwnRecipeChecklistCsv } from './recipeShoppingCsv.ts'
 import { exportCombinedRecipesPrivateWeek } from './exportCombinedRecipesPrivateWeek.ts'
 import { exportUnpricedProgress, importUnpricedProgress, unpricedProgressMaxBytes, unpricedProgressStorageKey } from '../comparison/unpricedPlannerProgress.ts'
+import { exportRecipeBundleSelection, importRecipeBundleSelection, recipeBundleMaxBytes } from './recipeBundleSelection.ts'
 
 // UI-only discovery, never a synonym mapping or verified retailer-product match.
 function searchableIngredient(value: string): string {
@@ -295,6 +296,65 @@ export function ImportedRecipeGroceriesPanel({
   latestCopyKey.current = currentCopyKey
   const readyLineKeys = list?.lines.filter(line => !line.needsReview)
     .map(line => line.key) ?? []
+  function downloadRecipeBundle() {
+    setFeedback('')
+    try {
+      requireLatestOwnedRecipes()
+      const json = exportRecipeBundleSelection(selected, portionsById,
+        dayOverrides, startDay, plannerDays)
+      savePrivateFile('supa-prive-receptenselectie.json', json,
+        'application/json;charset=utf-8')
+      setFeedback('Je gekozen recepten, porties en weekdagen zijn als privébestand opgeslagen. ' +
+        'Winkelproducten, vinkjes en prijzen zijn niet meegenomen.')
+    } catch (cause) {
+      setFeedback(cause instanceof Error ? cause.message :
+        'Je receptenkeuze kon niet veilig worden opgeslagen.')
+    }
+  }
+
+  async function restoreRecipeBundle(file: File | null) {
+    if (!file) return
+    setFeedback('')
+    const before = JSON.stringify(recipes)
+    try {
+      if (file.size < 1 || file.size > recipeBundleMaxBytes)
+        throw new Error('Kies een privé-receptenselectie van maximaal 256 kB.')
+      const json = await file.text()
+      if (JSON.stringify(recipes) !== before)
+        throw new Error('Je receptenbibliotheek is intussen veranderd. Open het bestand opnieuw.')
+      const library = readRecipeLibrary(window.localStorage)
+      if (library.error) throw new Error(library.error)
+      const bundle = importRecipeBundleSelection(json, library.recipes, plannerDays)
+      if (bundle.selectedIds.some(id => {
+        const current = library.recipes.find(recipe => recipe.id === id)
+        const visible = recipes.find(recipe => recipe.id === id)
+        return !current || !visible || JSON.stringify(current) !== JSON.stringify(visible)
+      })) throw new Error('De recepten op dit scherm zijn verouderd. Heropen eerst de bibliotheek.')
+      if (!window.confirm('Vervang je huidige receptselectie, gewenste porties en weekdagen ' +
+        'door de gecontroleerde selectie uit dit privébestand? Je recepten, ' +
+        'winkelbronnen en reeds opgeslagen Planner blijven ongewijzigd.')) return
+      const latest = readRecipeLibrary(window.localStorage)
+      if (latest.error || bundle.selectedIds.some(id => {
+        const original = library.recipes.find(recipe => recipe.id === id)
+        const current = latest.recipes.find(recipe => recipe.id === id)
+        return !original || !current || JSON.stringify(original) !== JSON.stringify(current)
+      }) || JSON.stringify(recipes) !== before)
+        throw new Error('Een recept is ondertussen gewijzigd; de huidige selectie blijft behouden.')
+      setSelectedIds(bundle.selectedIds)
+      setPortionsById(bundle.portionsById)
+      setDayOverrides(bundle.dayOverrides)
+      setStartDay(bundle.startDay)
+      setChecked({})
+      setVariantPreview(null)
+      setFeedback('Privé-receptenselectie hersteld: ' + bundle.selectedIds.length +
+        ' recepten, gekozen porties en weekdagen. Controleer het plan opnieuw. ' +
+        'Geen winkelprijzen, matches of Planner-dagen zijn overgenomen.')
+    } catch (cause) {
+      setFeedback(cause instanceof Error ? cause.message :
+        'Het privébestand is geweigerd. De huidige selectie is behouden.')
+    }
+  }
+
   async function restoreChecks(file: File | null) {
     if (!file || !list?.canCopy) return
     setFeedback('')
@@ -770,6 +830,25 @@ export function ImportedRecipeGroceriesPanel({
             onClick={() => planSelected('list')}>Plan en open de boodschappenlijst</button>
           <button type="button" disabled={!plannerReadyForSelection || !plannerAssignments.length || !plannerDaysDistinct}
             onClick={() => planSelected('basket')}>Plan en vergelijk mijn winkelbronnen</button>
+        </div>
+      </section>
+      <section className="recipe-collection-groceries__week"
+        aria-label="Mijn receptenkeuze privé bewaren of herstellen">
+        <h4>Bewaar deze receptenkeuze voor later</h4>
+        <p>Neem je gekozen recepten, volgorde, porties en weekdagen mee als een lokaal privébestand.
+          Herstellen werkt alleen wanneer precies dezelfde originele recepten nog in je eigen
+          bibliotheek staan. Je winkelprijzen, vinkjes en bestaande Planner worden niet gewijzigd.</p>
+        <div className="recipe-backup-panel__actions">
+          <button type="button" onClick={downloadRecipeBundle}>
+            Download receptenkeuze (JSON)
+          </button>
+          <label className="recipe-collection-groceries__restore">Herstel receptenkeuze (JSON)
+            <input type="file" accept="application/json,.json" onChange={event => {
+              const file = event.currentTarget.files?.[0] ?? null
+              event.currentTarget.value = ''
+              void restoreRecipeBundle(file)
+            }} />
+          </label>
         </div>
       </section>
       <section className="recipe-collection-groceries__capture" aria-label="Eigen fysieke receptenboodschappen in PLUS en DekaMarkt opnemen">
