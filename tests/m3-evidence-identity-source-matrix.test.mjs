@@ -99,7 +99,7 @@ test('M3 accepts every explicitly allowed observation source pair in both price 
         study.baseline.source = baselineSource
         study.candidate.source = candidateSource
         const original = structuredClone(study)
-        const assessment = assessWeeklyBasketStudy(study)
+        const assessment = assessWeeklyBasketStudy(study, { referenceNowMs: Date.now() })
 
         assert.equal(
           assessment.claimable,
@@ -140,7 +140,7 @@ test('M3 invalid evidence identity, source or study metadata suppresses all savi
     const study = syntheticStudy()
     mutate(study)
     const original = structuredClone(study)
-    const assessment = assessWeeklyBasketStudy(study)
+    const assessment = assessWeeklyBasketStudy(study, { referenceNowMs: Date.now() })
     assertUnknownWithoutSavings(assessment, reason)
     assert.deepEqual(study, original, `${label}: invalid evidence mutated`)
   }
@@ -150,13 +150,13 @@ test('M3 invalid evidence identity, source or study metadata suppresses all savi
 test('M3 validity is independent from the order of distinct source/evidence identifiers', () => {
   const study = syntheticStudy()
   const original = structuredClone(study)
-  const forward = assessWeeklyBasketStudy(study)
+  const forward = assessWeeklyBasketStudy(study, { referenceNowMs: Date.now() })
 
   const swapped = structuredClone(study)
   const priorBaseline = swapped.baseline
   swapped.baseline = swapped.candidate
   swapped.candidate = priorBaseline
-  const reverse = assessWeeklyBasketStudy(swapped)
+  const reverse = assessWeeklyBasketStudy(swapped, { referenceNowMs: Date.now() })
 
   assert.equal(forward.claimable, true)
   assert.equal(reverse.claimable, true)

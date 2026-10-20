@@ -262,13 +262,18 @@ function assessWeeklyBasketStudyCore(
 
   const baselineObservedAt = validTimestamp(study.baseline.observedAt)
   const candidateObservedAt = validTimestamp(study.candidate.observedAt)
-  const referenceNowMs = validOptionsContainer
+  const configuredReferenceNowMs = validOptionsContainer
     ? (options as { referenceNowMs?: unknown }).referenceNowMs
     : undefined
-  if (referenceNowMs !== undefined &&
-    (typeof referenceNowMs !== 'number' || !Number.isFinite(referenceNowMs))) {
+  // The financial domain must remain deterministic: the caller must provide
+  // a validated evaluation time. Missing time cannot authorize a savings
+  // result; CLI and UI entry points supply the actual processing clock.
+  const referenceNowMs = configuredReferenceNowMs
+  if (referenceNowMs === undefined) {
+    reasons.push('assessment reference clock is required')
+  } else if (typeof referenceNowMs !== 'number' || !Number.isFinite(referenceNowMs)) {
     reasons.push('assessment reference clock is malformed')
-  } else if (typeof referenceNowMs === 'number') {
+  } else {
     if (baselineObservedAt !== null && baselineObservedAt > referenceNowMs) {
       reasons.push('baseline observedAt is later than assessment reference time')
     }

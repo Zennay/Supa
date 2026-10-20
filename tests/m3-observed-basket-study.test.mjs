@@ -71,7 +71,7 @@ function study(overrides = {}) {
 }
 
 test('M3 observed-basket study accepts comparable evidence in one time window', () => {
-  const result = assessWeeklyBasketStudy(study())
+  const result = assessWeeklyBasketStudy(study(), { referenceNowMs: Date.now() })
 
   assert.equal(result.claimable, true)
   assert.equal(result.comparison.outcome, 'better')
@@ -92,7 +92,7 @@ test('M3 observed-basket study accepts explicit timezone offsets', () => {
     observedAt: '2026-10-02T20:15:00+02:00',
   }
 
-  const result = assessWeeklyBasketStudy(value)
+  const result = assessWeeklyBasketStudy(value, { referenceNowMs: Date.now() })
 
   assert.equal(result.claimable, true)
   assert.equal(result.observationWindowHours, 1.25)
@@ -106,7 +106,7 @@ test('M3 observed-basket study preserves a worse observed outcome', () => {
     basket: basket(candidateStore, 25),
   }
 
-  const result = assessWeeklyBasketStudy(value)
+  const result = assessWeeklyBasketStudy(value, { referenceNowMs: Date.now() })
 
   assert.equal(result.claimable, true)
   assert.equal(result.comparison.outcome, 'worse')
@@ -120,7 +120,7 @@ test('M3 observed-basket study fails closed when observations are too far apart'
     observedAt: '2026-10-04T18:15:00Z',
   }
 
-  const result = assessWeeklyBasketStudy(value)
+  const result = assessWeeklyBasketStudy(value, { referenceNowMs: Date.now() })
 
   assert.equal(result.claimable, false)
   assert.equal(result.comparison.outcome, 'unknown')
@@ -130,7 +130,7 @@ test('M3 observed-basket study fails closed when observations are too far apart'
 
 
 test('M3 observed-basket study cannot disable the time window with non-finite configuration', () => {
-  const result = assessWeeklyBasketStudy(study(), {
+  const result = assessWeeklyBasketStudy(study(), { referenceNowMs: Date.now(), 
     maxObservationWindowHours: Number.POSITIVE_INFINITY,
   })
 
@@ -143,7 +143,7 @@ test('M3 observed-basket study cannot disable the time window with non-finite co
 })
 
 test('M3 observed-basket study rejects non-positive time-window configuration', () => {
-  const result = assessWeeklyBasketStudy(study(), {
+  const result = assessWeeklyBasketStudy(study(), { referenceNowMs: Date.now(), 
     maxObservationWindowHours: 0,
   })
 
@@ -159,7 +159,7 @@ test('M3 observed-basket study fails closed without an explicit price context', 
   const value = study()
   value.priceContext = 'mixed-channel'
 
-  const result = assessWeeklyBasketStudy(value)
+  const result = assessWeeklyBasketStudy(value, { referenceNowMs: Date.now() })
 
   assert.equal(result.claimable, false)
   assert.equal(result.comparison.outcome, 'unknown')
@@ -168,7 +168,7 @@ test('M3 observed-basket study fails closed without an explicit price context', 
 
 
 test('M3 observed-basket study rejects impossible calendar week dates', () => {
-  const result = assessWeeklyBasketStudy(study({ weekStart: '2026-02-31' }))
+  const result = assessWeeklyBasketStudy(study({ weekStart: '2026-02-31' }), { referenceNowMs: Date.now() })
 
   assert.equal(result.claimable, false)
   assert.equal(result.comparison.outcome, 'unknown')
@@ -182,7 +182,7 @@ test('M3 observed-basket study rejects date-only observation timestamps', () => 
     observedAt: '2026-10-02',
   }
 
-  const result = assessWeeklyBasketStudy(value)
+  const result = assessWeeklyBasketStudy(value, { referenceNowMs: Date.now() })
 
   assert.equal(result.claimable, false)
   assert.equal(result.comparison.outcome, 'unknown')
@@ -197,7 +197,7 @@ test('M3 observed-basket study rejects impossible observation timestamps', () =>
     observedAt: '2026-02-31T18:15:00Z',
   }
 
-  const result = assessWeeklyBasketStudy(value)
+  const result = assessWeeklyBasketStudy(value, { referenceNowMs: Date.now() })
 
   assert.equal(result.claimable, false)
   assert.equal(result.comparison.outcome, 'unknown')
@@ -212,7 +212,7 @@ test('M3 observed-basket study rejects non-observed fixture-style source labels'
     source: 'controlled-fixture',
   }
 
-  const result = assessWeeklyBasketStudy(value)
+  const result = assessWeeklyBasketStudy(value, { referenceNowMs: Date.now() })
 
   assert.equal(result.claimable, false)
   assert.equal(result.comparison.outcome, 'unknown')
@@ -234,7 +234,7 @@ test('M3 observed-basket study carries basket uncertainty into study claimabilit
     }),
   }
 
-  const result = assessWeeklyBasketStudy(value)
+  const result = assessWeeklyBasketStudy(value, { referenceNowMs: Date.now() })
 
   assert.equal(result.claimable, false)
   assert.equal(result.comparison.outcome, 'unknown')
@@ -252,7 +252,7 @@ test('M3 observed-basket study fails closed on unsafe monetary integers', () => 
   line.lineTotalCents = Number.MAX_SAFE_INTEGER + 1
   value.baseline.basket.totalCents = Number.MAX_SAFE_INTEGER + 1
 
-  const result = assessWeeklyBasketStudy(value)
+  const result = assessWeeklyBasketStudy(value, { referenceNowMs: Date.now() })
 
   assert.equal(result.claimable, false)
   assert.equal(result.comparison.outcome, 'unknown')

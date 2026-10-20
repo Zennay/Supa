@@ -97,7 +97,7 @@ test('M3 exactly-24h observations remain eligible across winter-time offset chan
     '2025-10-26T02:30:00+02:00',
     '2025-10-27T01:30:00+01:00',
   )
-  const result = assessWeeklyBasketStudy(value)
+  const result = assessWeeklyBasketStudy(value, { referenceNowMs: Date.now() })
   assert.equal(result.observationWindowHours, 24)
   assert.equal(result.claimable, true)
   assert.equal(result.comparison.outcome, 'better')
@@ -135,7 +135,7 @@ test('M3 checks actual instants, not wall-clock strings, during the DST fold', (
   ]
 
   for (const [baselineAt, candidateAt, expectedHours] of cases) {
-    const result = assessWeeklyBasketStudy(study(baselineAt, candidateAt))
+    const result = assessWeeklyBasketStudy(study(baselineAt, candidateAt), { referenceNowMs: Date.now() })
     assert.equal(result.observationWindowHours, expectedHours, `${baselineAt} -> ${candidateAt}`)
     assert.equal(result.claimable, true, `${baselineAt} -> ${candidateAt}: ${result.reasons}`)
     assert.equal(result.comparison.outcome, 'better')
@@ -152,7 +152,7 @@ test('M3 absolute time window rejects distant but deceptively similar local time
   ]
 
   for (const [baselineAt, candidateAt] of cases) {
-    const result = assessWeeklyBasketStudy(study(baselineAt, candidateAt))
+    const result = assessWeeklyBasketStudy(study(baselineAt, candidateAt), { referenceNowMs: Date.now() })
     assert.equal(result.observationWindowHours, 25)
     assertUnknownAtWindowBoundary(result)
     const report = buildObservedWeekReport(study(baselineAt, candidateAt))
@@ -177,7 +177,7 @@ test('M3 rejects invalid timezone/date fields without inferring a savings outcom
     for (const side of ['baseline', 'candidate']) {
       const value = study('2025-10-26T00:30:00Z', '2025-10-26T01:30:00Z')
       value[side].observedAt = timestamp
-      const result = assessWeeklyBasketStudy(value)
+      const result = assessWeeklyBasketStudy(value, { referenceNowMs: Date.now() })
       assert.equal(result.claimable, false, `${side} ${timestamp}`)
       assert.equal(result.observationWindowHours, null)
       assert.equal(result.comparison.outcome, 'unknown')
@@ -195,14 +195,14 @@ test('M3 spring-time transition uses elapsed UTC time, not apparent 25h local ti
   const afterEnd = '2026-03-30T02:30:00.001+02:00'
 
   for (const candidateAt of [beforeEnd, exactEnd]) {
-    const result = assessWeeklyBasketStudy(study(baselineAt, candidateAt))
+    const result = assessWeeklyBasketStudy(study(baselineAt, candidateAt), { referenceNowMs: Date.now() })
     assert.equal(result.claimable, true, candidateAt)
     assert.equal(result.comparison.outcome, 'better')
     assert.ok(result.observationWindowHours <= 24)
     assert.equal(result.observationWindowHours, Math.abs(Date.parse(candidateAt) - Date.parse(baselineAt)) / 3_600_000)
   }
 
-  const over = assessWeeklyBasketStudy(study(baselineAt, afterEnd))
+  const over = assessWeeklyBasketStudy(study(baselineAt, afterEnd), { referenceNowMs: Date.now() })
   assertUnknownAtWindowBoundary(over)
   assert.ok(over.observationWindowHours > 24)
 })
@@ -214,7 +214,7 @@ test('M3 accepts whole- and half-hour offset representations of the same instant
     '2026-03-29T06:00:00+05:30',
     '2026-03-28T19:30:00-05:00',
   ]) {
-    const result = assessWeeklyBasketStudy(study(baselineAt, candidateAt))
+    const result = assessWeeklyBasketStudy(study(baselineAt, candidateAt), { referenceNowMs: Date.now() })
     assert.equal(result.claimable, true, candidateAt)
     assert.equal(result.observationWindowHours, 0, candidateAt)
     assert.equal(result.comparison.outcome, 'better')

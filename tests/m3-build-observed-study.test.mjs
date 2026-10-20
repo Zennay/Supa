@@ -58,7 +58,7 @@ function completedSheet() {
 
 test('M3 observation sheet converts into a structurally valid claimable weekly study', () => {
   const study = buildWeeklyBasketStudyFromObservationSheet(completedSheet())
-  const assessment = assessWeeklyBasketStudy(study)
+  const assessment = assessWeeklyBasketStudy(study, { referenceNowMs: Date.now() })
 
   assert.equal(study.priceContext, 'in-store')
   assert.equal(study.baseline.basket.matchedLineCount, 11)
@@ -74,7 +74,7 @@ test('M3 converter preserves an observed unavailable product as unknown evidence
   sheet.candidate.lines[0].observedProduct.available = false
 
   const study = buildWeeklyBasketStudyFromObservationSheet(sheet)
-  const assessment = assessWeeklyBasketStudy(study)
+  const assessment = assessWeeklyBasketStudy(study, { referenceNowMs: Date.now() })
 
   assert.equal(study.candidate.basket.unresolvedLineCount, 1)
   assert.equal(assessment.claimable, false)
