@@ -3,6 +3,7 @@ import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import { privateKnownPricePairs, privateProgressProductRows } from '../products/privateProgressProductRows.ts'
 import { euro } from '../../lib/money.ts'
 import { downloadPrivateKnownLinePriceCsv } from '../products/privateKnownLinePriceCsv.ts'
+import { downloadPrivateKnownLinePricePrint } from '../products/privateKnownLinePricePrint.ts'
 import {
   privateReviewedPairWithin24Hours, freshReviewedBaskets,
   recentOwnCaptureInstant, partialReviewedLinePairs,
@@ -202,6 +203,14 @@ export function PrivateComparisonJourney({
           setExportMessage('De bron of prijsvergelijking is gewijzigd of verlopen. Open Producten of Vergelijk voor een actuele controle.')
         }
       }}>Download mijn bekende regelprijzen voor beide winkels (CSV)</button>
+      <button type="button" className="ghost-button" onClick={() => {
+        try {
+          downloadPrivateKnownLinePricePrint(progress, reviewed)
+          setExportMessage('Alleen de bekende vergelijkbare ingredientprijzen staan nu in een lokaal, afdrukbaar HTML-bestand.')
+        } catch {
+          setExportMessage('De originele bron is verlopen of gewijzigd; controleer je winkelopnames opnieuw.')
+        }
+      }}>Bewaar mijn bekende winkelprijzen als offline afdruk (HTML)</button>
       {exportMessage && <p role="status">{exportMessage}</p>}
     </section>}
     <div className="private-comparison-journey__actions">

@@ -5,6 +5,7 @@ import type {
 } from '../comparison/privateReviewedBasketBridge.ts'
 import { productSearchText } from './productSearchText.ts'
 import { downloadPrivateKnownLinePriceCsv } from './privateKnownLinePriceCsv.ts'
+import { downloadPrivateKnownLinePricePrint } from './privateKnownLinePricePrint.ts'
 import {
   privateProgressProductRows, privateKnownPricePairs,
   type PrivateProgressProductRow,
@@ -98,6 +99,14 @@ export function PrivatePartialProductCards({
           setMessage('De oorspronkelijke bronmomenten of producten zijn gewijzigd. Open Vergelijk en bekijk je eigen opnames opnieuw.')
         }
       }}>Download bekende PLUS/Deka-ingrediëntrijen (CSV)</button>
+      <button type="button" className="ghost-button" onClick={() => {
+        try {
+          downloadPrivateKnownLinePricePrint(progress, reviewed)
+          setMessage('Bekende eigen ingrediëntprijsverschillen lokaal afdrukbaar opgeslagen (HTML). Geen compleet winkelmandje.')
+        } catch {
+          setMessage('De oorspronkelijke bron is veranderd of verlopen. Open Vergelijk voor een nieuwe controle.')
+        }
+      }}>Offline afdrukbare deellijst (HTML)</button>
     </div>}
     <div className="private-reviewed-products__controls">
       <label>Winkel <select value={store}
