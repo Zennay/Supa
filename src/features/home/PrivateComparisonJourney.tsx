@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
-import { privateKnownPricePairs, privateProgressProductRows, type PrivateKnownProduct } from '../products/privateProgressProductRows.ts'
+import { privateKnownPricePairs, privateProgressProductRows, formatKnownUnitGap, type PrivateKnownProduct, type PrivateKnownUnitGap } from '../products/privateProgressProductRows.ts'
 import { euro } from '../../lib/money.ts'
 import { downloadPrivateKnownLinePriceCsv } from '../products/privateKnownLinePriceCsv.ts'
 import { downloadPrivateKnownLinePricePrint } from '../products/privateKnownLinePricePrint.ts'
@@ -66,6 +66,7 @@ export function PrivateComparisonJourney({
     id: string; name: string; amount: number; unit: string;
     plusPacks: number; dekaPacks: number; plusCents: number; dekaCents: number;
     plusProduct?: PrivateKnownProduct; dekaProduct?: PrivateKnownProduct;
+    unitGap?: PrivateKnownUnitGap | null;
   }> = ready ? [] : privateKnownPricePairs(progress, reviewed, nowMs)
     .flatMap(pair => {
       const need = originalNeeds.get(pair.ingredientId)
@@ -76,6 +77,7 @@ export function PrivateComparisonJourney({
         plusPacks: pair.plusPacks, dekaPacks: pair.dekaPacks,
         plusCents: pair.plusCents, dekaCents: pair.dekaCents,
         plusProduct: pair.plusProduct, dekaProduct: pair.dekaProduct,
+        unitGap: pair.unitGap,
       }]
     })
   // A complete reviewed basket may be available independently of the current
@@ -202,6 +204,7 @@ export function PrivateComparisonJourney({
             : (item.plusCents < item.dekaCents ? 'PLUS' : 'DekaMarkt') +
               ' heeft ' + euro.formatCents(Math.abs(item.plusCents - item.dekaCents)) +
               ' lagere hele-pakkosten'}.</small>
+          {item.unitGap !== undefined && <small>{formatKnownUnitGap(item.unitGap)}</small>}
         </li>)}</ul>
       {partialPairs.length > 3 && <small>En nog {partialPairs.length - 3} andere
         gedeeltelijk vergelijkbare ingrediënten in Producten.</small>}

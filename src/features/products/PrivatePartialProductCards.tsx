@@ -7,7 +7,7 @@ import { productSearchText } from './productSearchText.ts'
 import { downloadPrivateKnownLinePriceCsv } from './privateKnownLinePriceCsv.ts'
 import { downloadPrivateKnownLinePricePrint } from './privateKnownLinePricePrint.ts'
 import {
-  privateProgressProductRows, privateKnownPricePairs,
+  privateProgressProductRows, privateKnownPricePairs, formatKnownUnitGap,
   type PrivateProgressProductRow,
 } from './privateProgressProductRows.ts'
 
@@ -177,6 +177,8 @@ export function PrivatePartialProductCards({
               money.format(Math.abs(difference) / 100) +
               ' lagere hele-pakkosten bij ' +
               (difference > 0 ? 'PLUS' : 'DekaMarkt') + ' voor alleen deze regel.'}</strong>
+            <small>{formatKnownUnitGap(comparison.unitGap)} Alleen indicatieve eenheidsprijs;
+              het betaalbare bedrag rekent met hele verpakkingen.</small>
             <small>Afzonderlijke echte SKU’s voor dezelfde hoeveelheid; merk en verpakking kunnen verschillen.
               Beide oorspronkelijke winkelmomenten maximaal 24 uur uiteen.
               {' '}{comparison.basis === 'complete-and-partial'

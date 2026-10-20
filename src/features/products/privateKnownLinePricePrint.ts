@@ -1,5 +1,5 @@
 import type { PrivateCaptureProgress, PrivateReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
-import { privateKnownPricePairs, privateProgressProductRows } from './privateProgressProductRows.ts'
+import { privateKnownPricePairs, privateProgressProductRows, formatKnownUnitGap } from './privateProgressProductRows.ts'
 
 const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const esc = (value: string): string => value.replace(/&/gu, '&amp;')
@@ -42,7 +42,9 @@ export function privateKnownLinePricePrintHtml(
       '</small><strong>' + esc(money.format(pair.dekaCents / 100)) +
       '</strong><small>' + esc(String(pair.dekaPacks)) + ' hele pakken · ' +
       esc(pair.dekaObservedAt) + '</small></td>' +
-      '<td>' + esc(difference) + '</td></tr>'
+      '<td><strong>' + esc(difference) + '</strong><small>' +
+      esc(formatKnownUnitGap(pair.unitGap)) +
+      '</small><small>Eenheidsprijs is indicatief; hele pakken bepalen regelprijs.</small></td></tr>'
   }).join('')
   const html = '<!doctype html><html lang="nl"><head><meta charset="utf-8">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1">' +

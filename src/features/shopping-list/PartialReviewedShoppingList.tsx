@@ -6,7 +6,7 @@ import {
   type OwnStore, type PrivateCaptureProgress, type PrivateReviewedBaskets,
 } from '../comparison/privateReviewedBasketBridge.ts'
 import { confirmedPartialBasket } from '../planner/confirmedPartialBasket.ts'
-import { privateKnownPricePairs } from '../products/privateProgressProductRows.ts'
+import { privateKnownPricePairs, formatKnownUnitGap } from '../products/privateProgressProductRows.ts'
 import { privatePartialShoppingExport } from './privatePartialShoppingExport.ts'
 import { privatePartialPhysicalShoppingTick } from './privatePhysicalShoppingTick.ts'
 import './partialReviewedShoppingList.css'
@@ -243,6 +243,7 @@ export function PartialReviewedShoppingList({
               : exactEuro.formatCents(Math.abs(difference)) +
                 ' lagere hele-pakkosten bij ' +
                 (difference > 0 ? otherShop : store) + ' voor alleen deze regel.'}</strong>
+            <small>{formatKnownUnitGap(pair.unitGap)} Indicatief per eenheid;</small>
             <small>{pair.basis === 'complete-and-partial'
               ? 'De andere winkel heeft een compleet gecontroleerd mandje; jouw winkel nog niet. '
               : ''}Andere ingrediënten blijven onbekend. Dit is geen

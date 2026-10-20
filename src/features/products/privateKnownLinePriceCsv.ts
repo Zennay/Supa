@@ -10,7 +10,8 @@ const headers = [
   'DekaMarkt_originele_opnametijd', 'DekaMarkt_SKU', 'DekaMarkt_productnaam',
   'DekaMarkt_pakinhoud', 'DekaMarkt_pakeenheid', 'DekaMarkt_stuks_per_pak',
   'DekaMarkt_pakprijs_cent', 'DekaMarkt_eenheidsprijs', 'DekaMarkt_hele_verpakkingen',
-  'DekaMarkt_regelprijs_cent', 'regelverschil_cent', 'goedkoper_bij', 'geldigheid',
+  'DekaMarkt_regelprijs_cent', 'regelverschil_cent', 'goedkoper_bij',
+  'vergelijkbare_eenheid', 'eenheidsverschil_cent', 'eenheidsprijs_lager_bij', 'geldigheid',
 ]
 
 /** Private, non-importable, per-ingredient export. A missing basket never
@@ -44,7 +45,9 @@ export function privateKnownLinePriceCsv(
       pair.dekaProduct.unitRate ?? 'onbekend', String(pair.dekaPacks), String(pair.dekaCents),
       String(Math.abs(pair.difference)), pair.difference === 0 ? 'gelijk' :
         pair.difference > 0 ? 'PLUS' : 'DekaMarkt',
-      'Eigen oorspronkelijk gecontroleerde bronregels; binnen 24 uur; geen compleet winkelmandje, kassagarantie of onafhankelijke besparingsclaim.',
+      pair.unitGap?.unit ?? '', pair.unitGap ? String(pair.unitGap.roundedDifferenceCents) : '',
+      pair.unitGap?.cheaper ?? (pair.unitGap ? 'gelijk' : 'onbekend'),
+      'Eigen oorspronkelijk gecontroleerde bronregels; binnen 24 uur; eenheidsprijzen zijn indicatief; geen compleet winkelmandje, kassagarantie of onafhankelijke besparingsclaim.',
     ]
   })
   const csv = [headers, ...rows].map(row => row.map(value => literalCsv(value)).join(','))

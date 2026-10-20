@@ -109,6 +109,42 @@ function originalPartialProduct(line: PrivateReviewedSourceLine): PrivateKnownPr
     pricePerPackCents: line.pricePerPackCents })
 }
 
+export type PrivateKnownUnitGap = {
+  unit: 'kg' | 'liter' | 'stuk'
+  differenceMilliCents: number
+  roundedDifferenceCents: number
+  cheaper: 'PLUS' | 'DekaMarkt' | null
+}
+
+/** Compare only matching physical units; never rank €/kg against €/litre. */
+function knownUnitGap(plus: PrivateKnownProduct, deka: PrivateKnownProduct): PrivateKnownUnitGap | null {
+  const rate = (product: PrivateKnownProduct) => privatePackUnitRate({
+    amount: product.packAmount, unit: product.packUnit, count: product.packCount,
+    priceCents: product.pricePerPackCents,
+  })
+  const left = rate(plus)
+  const right = rate(deka)
+  if (!left || !right || left.unit !== right.unit) return null
+  const signed = right.milliCentsPerUnit - left.milliCentsPerUnit
+  if (!Number.isSafeInteger(signed)) return null
+  return { unit: left.unit, differenceMilliCents: Math.abs(signed),
+    roundedDifferenceCents: Math.floor((Math.abs(signed) + 500) / 1000),
+    cheaper: signed > 0 ? 'PLUS' : signed < 0 ? 'DekaMarkt' : null }
+}
+
+const knownGapEuros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
+
+/** Advisory per-unit difference, not a whole-package basket difference. */
+export function formatKnownUnitGap(gap: PrivateKnownUnitGap | null): string {
+  if (!gap) return 'Eenheidsprijsverschil onbekend: ongelijksoortige of ongeldige eenheden.'
+  if (gap.cheaper === null) return 'Gelijke eenheidsprijs per ' + gap.unit + '.'
+  if (gap.roundedDifferenceCents === 0)
+    return 'Klein eenheidsprijsverschil per ' + gap.unit + ' bij ' + gap.cheaper +
+      ' (afgerond minder dan een halve cent).'
+  return knownGapEuros.format(gap.roundedDifferenceCents / 100) + ' / ' + gap.unit +
+    ' lagere eenheidsprijs bij ' + gap.cheaper + '.'
+}
+
 export type PrivateKnownPricePair = {
   ingredientId: string
   ingredientLabel: string
@@ -124,6 +160,7 @@ export type PrivateKnownPricePair = {
   dekaObservedAt: string
   plusProduct: PrivateKnownProduct
   dekaProduct: PrivateKnownProduct
+  unitGap: PrivateKnownUnitGap | null
 }
 
 export function privateKnownPricePairs(
@@ -139,6 +176,8 @@ export function privateKnownPricePairs(
   // admitted receipt. An older progress snapshot must not compete with it.
   if (!complete?.stores.PLUS && !complete?.stores.DekaMarkt)
   for (const pair of privateProgressPricePairs(progress, now)) {
+    const plusProduct = originalPartialProduct(pair.one)
+    const dekaProduct = originalPartialProduct(pair.other)
     result.set(pair.one.ingredientId, {
       ingredientId: pair.one.ingredientId,
       ingredientLabel: pair.one.ingredientLabel,
@@ -152,8 +191,7 @@ export function privateKnownPricePairs(
       basis: 'partial-pair',
       plusObservedAt: progress.stores.PLUS!.observedAt,
       dekaObservedAt: progress.stores.DekaMarkt!.observedAt,
-      plusProduct: originalPartialProduct(pair.one),
-      dekaProduct: originalPartialProduct(pair.other),
+      plusProduct, dekaProduct, unitGap: knownUnitGap(plusProduct, dekaProduct),
     })
   }
   if (!complete) return [...result.values()]
@@ -185,6 +223,10 @@ export function privateKnownPricePairs(
         ? original.lineTotalCents : line.lineTotalCents
       const difference = dekaCents - plusCents
       if (!Number.isSafeInteger(difference)) continue
+      const plusProduct = completeStore === 'PLUS'
+        ? originalCompleteProduct(original) : originalPartialProduct(line)
+      const dekaProduct = completeStore === 'DekaMarkt'
+        ? originalCompleteProduct(original) : originalPartialProduct(line)
       result.set(line.ingredientId, {
         ingredientId: line.ingredientId,
         ingredientLabel: line.ingredientLabel,
@@ -196,10 +238,7 @@ export function privateKnownPricePairs(
         difference, basis: 'complete-and-partial',
         plusObservedAt: completeStore === 'PLUS' ? receipt.observedAt : partialCapture.observedAt,
         dekaObservedAt: completeStore === 'DekaMarkt' ? receipt.observedAt : partialCapture.observedAt,
-        plusProduct: completeStore === 'PLUS'
-          ? originalCompleteProduct(original) : originalPartialProduct(line),
-        dekaProduct: completeStore === 'DekaMarkt'
-          ? originalCompleteProduct(original) : originalPartialProduct(line),
+        plusProduct, dekaProduct, unitGap: knownUnitGap(plusProduct, dekaProduct),
       })
     }
   }

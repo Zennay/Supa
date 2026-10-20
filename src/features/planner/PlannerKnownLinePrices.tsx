@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { privateKnownPricePairs } from '../products/privateProgressProductRows.ts'
+import { privateKnownPricePairs, formatKnownUnitGap } from '../products/privateProgressProductRows.ts'
 import { downloadPrivateKnownLinePriceCsv } from '../products/privateKnownLinePriceCsv.ts'
 import { downloadPrivateKnownLinePricePrint } from '../products/privateKnownLinePricePrint.ts'
 import type { PrivateCaptureProgress, PrivateReviewedBaskets, OwnStore } from '../comparison/privateReviewedBasketBridge.ts'
@@ -72,7 +72,8 @@ export function PlannerKnownLinePrices({ progress, reviewed, now, onReviewIngred
         <p><b>{pair.difference === 0 ? 'Gelijke regelprijs' :
           euro.formatCents(Math.abs(pair.difference)) + ' lager bij ' +
           (pair.difference > 0 ? 'PLUS' : 'DekaMarkt')}</b>
-          {' '}voor deze ene ingrediëntvraag, niet voor het hele mandje.</p>
+          {' '}voor deze ene ingrediëntvraag, niet voor het hele mandje.
+          <small>{formatKnownUnitGap(pair.unitGap)} Geen netto winkelbesparingsclaim.</small></p>
         <div className="planner-known-lines__actions">
           <button type="button" onClick={() => onReviewIngredient('PLUS', pair.ingredientId)}>Controleer PLUS-SKU</button>
           <button type="button" onClick={() => onReviewIngredient('DekaMarkt', pair.ingredientId)}>Controleer DekaMarkt-SKU</button>
