@@ -158,6 +158,40 @@ export function PrivateComparisonJourney({
       setCaptureMessage(error instanceof Error ? error.message : 'Kon het opnameblad niet downloaden.')
     }
   }
+  function downloadSingleStoreCapture(store: OwnStore, format: 'csv' | 'txt') {
+    const selectedWeek = captureKey
+    setCaptureMessage('')
+    try {
+      if (!captureNeeds.length || captureNeeds.length > 200)
+        throw new Error('Kies eerst een geldig weekmenu met maximaal 200 ingrediënten.')
+      // The ordinary one-store CSV remains usable by the existing private
+      // converter. An unvisited second shop is never silently fabricated.
+      const text = format === 'csv'
+        ? makeBlankPlannerCaptureCsv(captureNeeds, [store], ';')
+        : makePlannerCaptureGuide(captureNeeds, [store])
+      if (selectedWeek !== liveCaptureKey.current)
+        throw new Error('Het weekmenu is gewijzigd. Maak een nieuw opnameblad.')
+      if (new TextEncoder().encode(text).length > 256000)
+        throw new Error('Het winkelblad is groter dan de veilige importlimiet.')
+      const url = URL.createObjectURL(new Blob([text], {
+        type: format === 'csv' ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8',
+      }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-' + store.toLowerCase() +
+          (format === 'csv' ? '-leeg-winkelopnameblad.csv' : '-ingredient-rijnummers.txt')
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setCaptureMessage(format === 'csv'
+        ? store + ': apart leeg CSV-blad gedownload. Vul uitsluitend originele productprijzen en bronmomenten in.'
+        : store + ': persoonlijke ingrediënten en de juiste CSV-rijnummers gedownload.')
+    } catch (error) {
+      setCaptureMessage(error instanceof Error ? error.message : 'Kon het winkelblad niet downloaden.')
+    }
+  }
+
   async function handOffBlankHomeCapture(action: 'copy' | 'share') {
     // User-initiated handoff of the exact SAME blank two-store worksheet that
     // the download uses. It contains personal planned demand, never prices.
@@ -299,10 +333,21 @@ export function PrivateComparisonJourney({
         <p>Dit zijn je oorspronkelijke Planner-hoeveelheden bij allebei de winkels.
           De CSV heeft bewust lege productcodes, verpakkingen, bronmomenten en prijzen.
           Koppel de waargenomen producten aan deze rijnummers; vul géén receptnamen
-          als zogenaamd geobserveerde winkelproductnamen in.</p>
+          als zogenaamd geobserveerde winkelproductnamen in.
+          De onderstaande rijnummers gelden voor de gecombineerde twee-winkel-CSV.
+          In een apart winkelbestand beginnen de regels opnieuw bij 2; gebruik
+          de TXT-gids van die winkel voor de juiste nummers.</p>
         <div className="private-comparison-journey__field-guide-shops">
           {stores.map((store, storeIndex) => <section key={store} aria-label={store + ' CSV-rijnummers'}>
             <h3>{store}</h3>
+            <div className="private-comparison-journey__single-store-buttons">
+              <button type="button" onClick={() => downloadSingleStoreCapture(store, 'csv')}>
+                {store}-opnameblad (CSV)
+              </button>
+              <button type="button" onClick={() => downloadSingleStoreCapture(store, 'txt')}>
+                Ingrediëntengids (TXT)
+              </button>
+            </div>
             <ol start={2 + storeIndex * captureNeeds.length}>
               {captureNeeds.map((need, index) => <li key={store + '-' + index + '-' + need.id}>
                 <strong>{need.label}</strong>

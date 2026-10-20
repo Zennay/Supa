@@ -100,3 +100,5 @@
 .private-comparison-journey__field-guide-shops strong,.private-comparison-journey__field-guide-shops small{display:block}
 .private-comparison-journey__field-guide-shops small{color:#516756;line-height:1.4}
 @media(max-width:630px){.private-comparison-journey__field-guide-shops{grid-template-columns:1fr}}
+.private-comparison-journey__single-store-buttons{display:flex;flex-wrap:wrap;gap:.45rem}
+.private-comparison-journey__single-store-buttons button{flex:1 1 140px;background:#e8f1e9;color:#204a30;padding:.5rem .6rem;font-size:.87rem;min-height:44px}
