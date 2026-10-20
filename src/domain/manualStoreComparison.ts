@@ -7,6 +7,8 @@ export type ManualQuote = Readonly<{
   product: string
   packAmount: string
   packUnit: MatchUnit | ''
+  /** Explicit count of units inside one physically priced multipack. */
+  packCount?: string
   price: string
 }>
 export type ManualEntries = Record<string, ManualQuote>
@@ -65,16 +67,19 @@ function evaluatedQuote(need: ManualNeed, quote: ManualQuote | undefined) {
   const empty = { state: 'missing' as const, packs: null, lineCents: null, unitPriceCents: null }
   if (!quote || !quote.product.trim() && !quote.packAmount.trim() && !quote.price.trim()) return empty
   const amount = amountValue(quote.packAmount)
+  const countRaw = quote.packCount ?? ''
+  const count = /^(?:[1-9]\d{0,2}|1000)$/.test(countRaw) ? Number(countRaw) : null
   const cents = manualPriceCents(quote.price)
   const name = quote.product.trim()
   if (need.amount === null || !Number.isFinite(need.amount) || need.amount <= 0 ||
       name.length < 2 || name.length > 160 || /[\u0000-\u001f\u007f]/u.test(name) ||
-      !unitsFor(need.unit).includes(quote.packUnit as MatchUnit) || amount === null || cents === null) {
+      !unitsFor(need.unit).includes(quote.packUnit as MatchUnit) ||
+      amount === null || count === null || cents === null) {
     return { state: 'invalid' as const, packs: null, lineCents: null, unitPriceCents: null }
   }
   const packs = calculateDecimalPackCount(
     [{ amount: need.amount, unit: need.unit }],
-    { amount, unit: quote.packUnit as MatchUnit, count: 1 },
+    { amount, unit: quote.packUnit as MatchUnit, count },
   )
   if (packs === null || packs > 10000 || !Number.isSafeInteger(packs * cents) ||
       packs * cents > 100000000) {
@@ -82,7 +87,7 @@ function evaluatedQuote(need: ManualNeed, quote: ManualQuote | undefined) {
   }
   const baseAmount = (quote.packUnit === 'kg' || quote.packUnit === 'l') ? amount * 1000 : amount
   const unitPriceCents = baseAmount > 0 && quote.packUnit !== 'piece'
-    ? Math.round(1000 * cents / baseAmount)
+    ? Math.round(1000 * cents / (baseAmount * count))
     : null // EUR per kg or liter, in cents, for this one entered pack.
   return {
     state: 'complete' as const,
