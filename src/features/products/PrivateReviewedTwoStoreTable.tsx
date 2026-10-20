@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ownStoreWeekComparison } from '../planner/ownStoreBudgetComparison.ts'
+import { observedInstant } from '../../domain/offlineReviewedImport.ts'
 import type { BasketTraceLine } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import { privatePackUnitRate, privateUnitPrice } from '../comparison/privateUnitPrice.ts'
@@ -90,6 +91,10 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   if (!comparable || !plus || !deka) {
     const missing = (['PLUS', 'DekaMarkt'] as const).filter(store => !fresh?.stores[store])
     const gap = !!plus && !!deka && !privateReviewedPairWithin24Hours(plus, deka)
+    const plusMoment = plus ? observedInstant(plus.observedAt) : null
+    const dekaMoment = deka ? observedInstant(deka.observedAt) : null
+    const older: OwnStore | null = gap && plusMoment && dekaMoment
+      ? (plusMoment.ns < dekaMoment.ns ? 'PLUS' : 'DekaMarkt') : null
     return <section className="private-reviewed-products__paired" aria-label="Winkelvergelijking van eigen artikelen">
       <h3>Vergelijk PLUS met DekaMarkt</h3>
       <div className="private-reviewed-products__source-coverage">
@@ -108,13 +113,16 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
               </button>
             </> : <>
               <strong>Prijs onbekend</strong>
-              <small>Geen volledige, actuele en door jou gecontroleerde eigen opname.</small>
+              <small>{reviewed.stores[shop]
+                ? 'Je eerdere eigen opname is verlopen of niet meer bruikbaar. Herzie deze bron.'
+                : 'Nog geen volledige, actuele en persoonlijk gecontroleerde eigen opname.'}</small>
             </>}
           </article>
         })}
       </div>
       <p role="status">{gap
-        ? 'Beide eigen winkelmandjes bestaan, maar de waarnemingen liggen meer dan 24 uur uiteen. Herzie de oudere opname; er is nog geen geldig prijsverschil.'
+        ? 'Je eigen PLUS- en DekaMarkt-opnames liggen meer dan 24 uur uiteen. Herzie ' +
+          (older ?? 'de oudste winkelbron') + ' voor een controleerbaar bronpaar; een prijsverschil blijft onbekend.'
         : missing.length > 0
           ? missing.join(' en ') + ' heeft nog geen volledig bruikbare eigen prijsopname. Vul de brongegevens aan voordat Supa een prijsverschil toont.'
           : 'Het bestaande bronpaar is nog niet betrouwbaar vergelijkbaar voor hetzelfde fysieke weekmandje. Controleer de productkoppelingen opnieuw.'}</p>

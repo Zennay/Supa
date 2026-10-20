@@ -12,6 +12,7 @@ import './privateReviewedProductCatalog.css'
 
 const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const shops: OwnStore[] = ['PLUS', 'DekaMarkt']
+const emptyReviewed: PrivateReviewedBaskets = { planKey: '', stores: {} }
 type Matched = Extract<BasketTraceLine, { status: 'matched' }>
 
 /** Read-only personally reviewed basket sources, never an inferred live catalog. */
@@ -212,7 +213,7 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
         {store === 'all' ? 'Open mijn gecontroleerde boodschappenlijst' : `Open mijn ${store}-boodschappenlijst`}
       </button>
     </>}
-    {store === 'all' && reviewed && <PrivateReviewedTwoStoreTable reviewed={reviewed}
+    {store === 'all' && <PrivateReviewedTwoStoreTable reviewed={reviewed ?? emptyReviewed}
       search={search} unitFilter={unitFilter} order={order} budget={budget}
       onOpenComparison={onOpenComparison} onOpenList={onOpenList}
       onOpenMixedRoute={onOpenMixedRoute} onChooseRouteLine={onChooseRouteLine}
