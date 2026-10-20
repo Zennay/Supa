@@ -48,6 +48,7 @@ export function ImportedRecipeGroceriesPanel({
   const [reuseFirst, setReuseFirst] = useState(false)
   const [startDay, setStartDay] = useState(m2InitialPlan[0].day)
   const [captureTarget, setCaptureTarget] = useState<'both' | 'PLUS' | 'DekaMarkt'>('both')
+  const [copyableCaptureGuide, setCopyableCaptureGuide] = useState<{ identity: string; target: string; text: string } | null>(null)
   const [dayOverrides, setDayOverrides] = useState<Record<string, string>>({})
   const [portionsById, setPortionsById] = useState<Record<string, number>>({})
   const [checked, setChecked] = useState<Record<string, boolean>>({})
@@ -322,6 +323,38 @@ export function ImportedRecipeGroceriesPanel({
       setFeedback('CSV met fysieke hoeveelheden, controlepunten en onbekende prijzen lokaal opgeslagen.')
     } catch (cause) {
       setFeedback(cause instanceof Error ? cause.message : 'De CSV kon niet worden opgeslagen.')
+    }
+  }
+  async function copyCaptureGuide() {
+    if (!result?.complete || selected.length > 14) return
+    setFeedback('')
+    setCopyableCaptureGuide(null)
+    const identity = progressIdentity
+    const target = captureTarget
+    try {
+      const { combinedRecipesCaptureKit } = await import('./combinedRecipesCaptureKit.ts')
+      if (latestProgressIdentity.current !== identity)
+        throw new Error('De fysieke receptenbundel veranderde tijdens voorbereiden. Probeer opnieuw.')
+      const shops = target === 'both' ? ['PLUS', 'DekaMarkt'] as const
+        : [target as 'PLUS' | 'DekaMarkt']
+      const content = combinedRecipesCaptureKit(selected, portionsById, shops).guide
+      if (latestProgressIdentity.current !== identity)
+        throw new Error('De fysieke ingrediënten veranderden; kopieer de nieuwe gids.')
+      if (navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(content)
+          if (latestProgressIdentity.current === identity)
+            setFeedback('De actuele ongeprijsde opnamegids voor jouw winkelkeuze is gekopieerd.')
+          else setFeedback('De recepten veranderden tijdens kopiëren. Maak de nieuwe gids opnieuw.')
+          return
+        } catch { /* Browser denied clipboard access. Display only own source hints. */ }
+      }
+      if (latestProgressIdentity.current !== identity)
+        throw new Error('De recepten zijn veranderd. Maak de gids opnieuw.')
+      setCopyableCaptureGuide({ identity, target, text: content })
+      setFeedback('Klembordtoegang ontbreekt. Selecteer en kopieer je ongeprijsde rijgids hieronder.')
+    } catch (cause) {
+      setFeedback(cause instanceof Error ? cause.message : 'De opnamegids kon niet worden gekopieerd.')
     }
   }
   async function downloadCaptureKit(kind: 'csv' | 'guide') {
