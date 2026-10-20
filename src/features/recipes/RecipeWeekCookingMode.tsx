@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import type { SavedRecipe } from './recipeLibrary.ts'
 import { ownRecipeShoppingChecklist } from './recipeShoppingChecklist.ts'
 import './recipeWeekCookingMode.css'
@@ -27,11 +27,16 @@ export function RecipeWeekCookingMode({
         JSON.stringify(recipe) === assignment.recipeSnapshot ? recipe : null,
     }
   }), [assignments, byId, days])
+  const weekIdentity = JSON.stringify(assignments.map(row =>
+    [row.day, row.recipeId, row.recipeSnapshot]))
+  const latestWeekIdentity = useRef(weekIdentity)
+  latestWeekIdentity.current = weekIdentity
   const [activeDay, setActiveDay] = useState(days[0] ?? '')
   const current = slots.find(slot => slot.day === activeDay) ?? slots[0]
   const selected = current?.recipe
   const [finishedSteps, setFinishedSteps] = useState<Record<string, number[]>>({})
   const [prepared, setPrepared] = useState<Record<string, string[]>>({})
+  const [message, setMessage] = useState('')
   const snapshot = selected ? JSON.stringify([current.day, selected]) : ''
   const doneSteps = new Set(finishedSteps[snapshot] ?? [])
   const doneIngredients = new Set(prepared[snapshot] ?? [])
@@ -57,6 +62,52 @@ export function RecipeWeekCookingMode({
       ? [...new Set([...(previous[snapshot] ?? []), key])]
       : (previous[snapshot] ?? []).filter(value => value !== key),
   }))
+  async function downloadCookingProgress() {
+    const expected = weekIdentity
+    try {
+      const { exportRecipeCookingProgress } =
+        await import('./recipeCookingProgress.ts')
+      if (latestWeekIdentity.current !== expected)
+        throw Error('Het gekozen weekmenu is gewijzigd. Download opnieuw.')
+      const json = exportRecipeCookingProgress(assignments, recipes, finishedSteps, prepared)
+      const url = URL.createObjectURL(new Blob([json], { type: 'application/json;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-prive-kookvoortgang.json'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setMessage('Je afgevinkte kookstappen en voorbereidingen zijn lokaal opgeslagen in een privébestand.')
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message :
+        'Kon de huidige kookvoortgang niet veilig bewaren.')
+    }
+  }
+  async function importCookingProgress(file: File | null) {
+    if (!file) return
+    const expected = weekIdentity
+    try {
+      const { cookingProgressLimit, restoreRecipeCookingProgress } =
+        await import('./recipeCookingProgress.ts')
+      if (file.size < 1 || file.size > cookingProgressLimit)
+        throw Error('Kies een privé-kookvoortgangbestand van maximaal 256 kB.')
+      const text = await file.text()
+      if (latestWeekIdentity.current !== expected)
+        throw Error('De recepten of weekdagen veranderden tijdens het openen.')
+      const restored = restoreRecipeCookingProgress(text, assignments, recipes)
+      if (!window.confirm('Vervang alle tijdelijke kookafvinkingen van deze exacte receptenweek ' +
+        'met de voortgang uit dit privébestand? Je Planner, boodschappenlijst en winkelprijzen blijven ongemoeid.')) return
+      if (latestWeekIdentity.current !== expected)
+        throw Error('Het weekmenu is ondertussen gewijzigd; niets hersteld.')
+      setFinishedSteps(restored.finishedSteps)
+      setPrepared(restored.prepared)
+      setMessage('De kookvoortgang is hersteld voor exact deze eigen receptenweek.')
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message :
+        'Het kookvoortgangbestand is geweigerd. Je vinkjes zijn behouden.')
+    }
+  }
   const nextStep = steps.findIndex((_, index) => !doneSteps.has(index))
   return <section className="recipe-week-cooking" aria-label="Kookmodus voor mijn gekozen weekrecepten">
     <h4>Kookmodus · mijn weekrecepten</h4>
@@ -119,6 +170,22 @@ export function RecipeWeekCookingMode({
             }}>Herstart dit recept</button>
         </div>
       </div>}
+    <div className="recipe-week-cooking__backup">
+      <strong>Kookvoortgang privé bewaren</strong>
+      <p>Download je huidige afvinkingen als JSON. Herstellen kan alleen bij exact dezelfde
+        recepten en weekdagen. Er worden geen winkelprijzen of persoonlijke gegevens verstuurd.</p>
+      <button type="button" onClick={() => void downloadCookingProgress()}>
+        Download kookvoortgang (JSON)
+      </button>
+      <label>Herstel kookvoortgang (JSON)
+        <input type="file" accept=".json,application/json" onChange={event => {
+          const file = event.currentTarget.files?.[0] ?? null
+          event.currentTarget.value = ''
+          void importCookingProgress(file)
+        }} />
+      </label>
+      {message && <p role="status">{message}</p>}
+    </div>
     <small>Een kookstap afvinken is geen bewijs dat een winkelproduct is gekocht,
       beschikbaar of geprijsd. Weekmenu en bronprijzen blijven ongewijzigd.</small>
   </section>
