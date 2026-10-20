@@ -292,3 +292,56 @@
 }
 .own-store-planner__history td > div { margin-bottom: .25rem; }
 .own-store-planner__history td > strong { display: inline-block; margin: .1rem 0; }
+
+
+/* Genuine entire-basket comparison comes before long import and review tools.
+ * Its numbers are only rendered from the existing canonical comparable state. */
+.own-store-planner__overview {
+  display: grid;
+  gap: .8rem;
+  min-width: 0;
+  margin-bottom: 1.1rem;
+  padding: clamp(.9rem, 2vw, 1.5rem);
+  border: 1px solid var(--border, #d8e2da);
+  border-radius: 1rem;
+  background: var(--surface, #fff);
+}
+.own-store-planner__overview h3,
+.own-store-planner__overview p { margin: 0; }
+.own-store-planner__overview small {
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.own-store-planner__overview-totals {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .7rem;
+}
+.own-store-planner__overview-totals > div {
+  padding: 1rem;
+  border: 1px solid var(--border, #d8e2da);
+  border-radius: .7rem;
+  min-width: 0;
+  display: grid;
+  gap: .25rem;
+}
+.own-store-planner__overview-totals span { font-size: .9rem; }
+.own-store-planner__overview-totals strong {
+  font-size: clamp(1.25rem, 3vw, 1.8rem);
+  overflow-wrap: anywhere;
+}
+.own-store-planner__overview-actions {
+  display: flex;
+  gap: .65rem;
+  flex-wrap: wrap;
+}
+.own-store-planner__overview-actions button {
+  min-height: 44px;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 540px) {
+  .own-store-planner__overview-totals { grid-template-columns: minmax(0, 1fr); }
+  .own-store-planner__overview-actions button { flex: 1 1 100%; }
+}
