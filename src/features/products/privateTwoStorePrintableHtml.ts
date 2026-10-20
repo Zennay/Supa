@@ -1,5 +1,6 @@
 import type { OwnStoreWeekComparison } from '../planner/ownStoreBudgetComparison.ts'
 import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
+import { privatePhysicalShoppingTick } from '../shopping-list/privatePhysicalShoppingTick.ts'
 
 type Comparable = Extract<OwnStoreWeekComparison, { status: 'comparable' }>
 const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
@@ -9,13 +10,23 @@ const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR
 export function privateTwoStorePrintableHtml(
   comparison: Comparable,
   moments: { PLUS: string; DekaMarkt: string },
+  shopping: {
+    planKey: string
+    storeIds: { PLUS: string; DekaMarkt: string }
+    checked: Readonly<Record<string, boolean>>
+  },
 ): string {
   const esc = (value: string): string => value.replace(/&/gu, '&amp;')
     .replace(/</gu, '&lt;').replace(/>/gu, '&gt;')
     .replace(/"/gu, '&quot;').replace(/'/gu, '&#39;')
   const euro = (cents: number): string => esc(money.format(cents / 100))
-  const entry = (line: Comparable['lines'][number]['plus']): string =>
-    '<strong>' + esc(line.productName) + '</strong><br>' +
+  const entry = (shop: 'PLUS' | 'DekaMarkt',
+    line: Comparable['lines'][number]['plus']): string => {
+    const checked = shopping.checked[
+      privatePhysicalShoppingTick(shopping.planKey, shop, shopping.storeIds[shop], line)
+    ] === true
+    return '<span class="tick">' + (checked ? '☑ Afgevinkt' : '☐ Nog te kopen') +
+      '</span><br><strong>' + esc(line.productName) + '</strong><br>' +
     '<small>SKU ' + esc(line.productId) + '</small><br>' +
     esc(String(line.packs)) + ' hele pak(ken) · ' +
     esc(String(line.pack.count)) + ' × ' + esc(String(line.pack.amount)) +
@@ -23,11 +34,12 @@ export function privateTwoStorePrintableHtml(
     euro(line.pricePerPackCents) + ' per pak · ' +
     esc(privateUnitPrice(line) ?? 'Eenheidsprijs onbekend') +
     '<br><strong>' + euro(line.lineTotalCents) + ' voor de week</strong>'
+  }
   const lines = comparison.lines.map(line =>
     '<tr><th scope="row">' + esc(line.ingredientLabel) +
     '<small>' + esc(String(line.plus.requirement.amount)) + ' ' +
     esc(line.plus.requirement.unit) + ' nodig</small></th><td>' +
-    entry(line.plus) + '</td><td>' + entry(line.deka) +
+    entry('PLUS', line.plus) + '</td><td>' + entry('DekaMarkt', line.deka) +
     '</td><td>' + (line.deltaCents === 0 ? 'Gelijk' :
       euro(Math.abs(line.deltaCents)) + ' lager bij ' +
       (line.deltaCents > 0 ? 'PLUS' : 'DekaMarkt')) +
@@ -54,6 +66,7 @@ export function privateTwoStorePrintableHtml(
     'body{font:15px/1.5 system-ui,sans-serif;max-width:1100px;padding:24px;margin:auto;color:#21352d}' +
     'table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #ccd9d1;text-align:left;padding:12px;vertical-align:top;overflow-wrap:anywhere}' +
     'th{min-width:120px}th small{display:block;font-weight:normal}td{width:28%}small{color:#56695e}' +
+    '.tick{display:inline-block;border:1px solid #adbfb0;padding:2px 7px;border-radius:6px;margin-bottom:6px;font-weight:bold}' +
     'section{margin:24px 0}h1,h2{line-height:1.2}@media(max-width:700px){body{padding:12px}' +
     'table,tbody,tr,th,td{display:block}thead{display:none}tr{padding:16px 0;border-bottom:2px solid #21352d}' +
     'td{width:auto;padding:4px 12px;border:0}td:before{display:block;font-weight:bold;color:#56695e}' +
@@ -61,6 +74,8 @@ export function privateTwoStorePrintableHtml(
     'td:nth-child(4):before{content:"Prijsverschil"}}' +
     '@media print{body{max-width:none;padding:0}tr{break-inside:avoid}section{break-inside:avoid}}' +
     '</style></head><body><h1>Mijn persoonlijke twee-winkelweekmand</h1>' +
+    '<p>De afvinkstatus is jouw momentopname van de eigen boodschappenlijst. ' +
+    'Afvinken is geen bewijs van betaling of prijscontrole.</p>' +
     '<p>Alleen eigen lokaal gecontroleerde bronartikelen, geen openbare of actuele winkelprijsclaim. ' +
     'Geen kassagarantie of onafhankelijk aangetoonde besparing.</p>' +
     '<section><h2>Volledige mandjes</h2><p>PLUS: <strong>' + euro(comparison.plusCents) +

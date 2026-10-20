@@ -107,6 +107,13 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         const html = print.privateTwoStorePrintableHtml(comparison, {
           PLUS: current.stores.PLUS.observedAt,
           DekaMarkt: current.stores.DekaMarkt.observedAt,
+        }, {
+          planKey: current.planKey,
+          storeIds: {
+            PLUS: current.stores.PLUS.basket.store.id,
+            DekaMarkt: current.stores.DekaMarkt.basket.store.id,
+          },
+          checked,
         })
         // The paired sources must still be current after formatting.
         const final = freshReviewedBaskets(reviewedRef.current,
