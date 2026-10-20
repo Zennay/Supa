@@ -149,6 +149,13 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         const text = exports.printableOwnStoreComparison(comparison, {
           PLUS: current.stores.PLUS.observedAt,
           DekaMarkt: current.stores.DekaMarkt.observedAt,
+        }, null, {
+          planKey: current.planKey,
+          stores: {
+            PLUS: current.stores.PLUS.basket.store.id,
+            DekaMarkt: current.stores.DekaMarkt.basket.store.id,
+          },
+          checked,
         })
         exports.downloadOwnStoreText(text)
       } else {
@@ -212,6 +219,13 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       const text = printableOwnStoreComparison(comparison, {
         PLUS: current.stores.PLUS.observedAt,
         DekaMarkt: current.stores.DekaMarkt.observedAt,
+      }, null, {
+        planKey: current.planKey,
+        stores: {
+          PLUS: current.stores.PLUS.basket.store.id,
+          DekaMarkt: current.stores.DekaMarkt.basket.store.id,
+        },
+        checked,
       })
       if (kind === 'copy') {
         if (!navigator.clipboard?.writeText) {

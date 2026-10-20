@@ -64,6 +64,10 @@ hun bronmomenten maximaal 24 uur uiteen liggen, verschijnen in **Producten**
 de complete PLUS/DekaMarkt-weekmandjes. Dezelfde canonieke hele-pakkenvergelijking
 levert de bedragen, de goedkopere winkel en de verschillen per ingrediënt.
 
+De TXT-/klembord-/deeltekst neemt nu ook de oorspronkelijke afvinkstatus per winkel over;
+de winkelprijzen blijven altijd de volledige originele fysieke mand, niet alleen de nog
+open boodschappen. Afvinken is geen betalingsbewijs.
+
 Via **Bewaar printbaar volledig weekmandje (HTML)** krijg je een lokaal,
 scriptvrij document met de twee bronmomenten, oorspronkelijke SKU's,
 pakinhoud, pakprijzen, eenheidsprijzen, daadwerkelijke hele-pakkentotalen en
