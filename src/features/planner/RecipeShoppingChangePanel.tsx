@@ -15,6 +15,7 @@ export function RecipeShoppingChangePanel({ preview, day }: {
   const [showCopy, setShowCopy] = useState(false)
   const [showFullCopy, setShowFullCopy] = useState(false)
   const [captureGuideCopy, setCaptureGuideCopy] = useState<{ stores: string; text: string; identity: string } | null>(null)
+  const [captureTableCopy, setCaptureTableCopy] = useState<{ stores: string; text: string; identity: string } | null>(null)
   if (preview.status !== 'ready') return <section className="recipe-reuse-preview-shopping"
     aria-label="Boodschappenwijziging niet beschikbaar">
     <h4>Nieuwe boodschappen nog niet betrouwbaar</h4>
@@ -94,6 +95,32 @@ export function RecipeShoppingChangePanel({ preview, day }: {
     }
   }
 
+  async function copyStoreCaptureTable(stores: readonly CaptureStore[]) {
+    try {
+      // TSV can be pasted directly as individual spreadsheet columns and can
+      // be ingested later by the existing source converter after actual facts
+      // have been filled in. No product identity or price is inserted by Supa.
+      const kit = proposedWeekCaptureKit(preview, stores)
+      const table = makeBlankPlannerCaptureCsv(preview.nextNeeds, kit.stores, '\t')
+      if (typeof navigator.clipboard?.writeText !== 'function')
+        throw new Error('Klembord niet beschikbaar')
+      await navigator.clipboard.writeText(table)
+      setCaptureTableCopy(null)
+      setNotice('Lege ' + stores.join(' + ') + '-tabel gekopieerd: plak in Excel of Sheets en vul je eigen originele brongegevens in.')
+    } catch {
+      try {
+        const kit = proposedWeekCaptureKit(preview, stores)
+        setCaptureTableCopy({
+          stores: stores.join(' + '),
+          text: makeBlankPlannerCaptureCsv(preview.nextNeeds, kit.stores, '\t'),
+          identity: previewIdentity,
+        })
+        setNotice('Klembord niet beschikbaar. Selecteer de tabgescheiden tabel hieronder.')
+      } catch (error) {
+        setNotice(error instanceof Error ? error.message : 'Leeg winkelinvulblad is niet beschikbaar.')
+      }
+    }
+  }
   async function copyStoreCaptureGuide(stores: readonly CaptureStore[]) {
     try {
       const kit = proposedWeekCaptureKit(preview, stores)
@@ -311,6 +338,10 @@ export function RecipeShoppingChangePanel({ preview, day }: {
             onClick={() => downloadStoreCapture([store], 'guide')}>Download {store}-opnamegids</button>
           <button type="button" className="ghost-button"
             onClick={() => void copyStoreCaptureGuide([store])}>Kopieer {store}-opnamegids (mobiel)</button>
+          <button type="button" className="ghost-button"
+            onClick={() => void copyStoreCaptureTable([store])}>
+            Kopieer lege {store}-tabel voor Excel/Sheets
+          </button>
         </div>)}
         <button type="button" className="ghost-button"
           onClick={() => void shareStoreCapture(['PLUS', 'DekaMarkt'])}>
@@ -321,6 +352,12 @@ export function RecipeShoppingChangePanel({ preview, day }: {
     <small>De invulbladen bevatten geen bronproducten of bedragen en horen alleen bij dit
       voorgestelde weekmenu. Kies het recept eerst en vul uitsluitend echt waargenomen
       brongegevens in voordat je de CSV via Vergelijk importeert.</small>
+    {captureTableCopy?.identity === previewIdentity && <label>
+      Lege {captureTableCopy.stores}-invultabel (tabgescheiden) zelf kopiëren
+      <textarea readOnly rows={10} value={captureTableCopy.text}
+        onFocus={event => event.currentTarget.select()} />
+      <small>Dit bevat geen echte winkelproducten, prijzen of opnames. Vul die zelf in.</small>
+    </label>}
     {captureGuideCopy?.identity === previewIdentity && <label>Opnamegids voor {captureGuideCopy.stores} handmatig kopiëren
       <textarea readOnly rows={12} value={captureGuideCopy.text}
         onFocus={event => event.currentTarget.select()} />
