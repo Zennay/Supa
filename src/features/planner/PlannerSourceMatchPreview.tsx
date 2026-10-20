@@ -127,16 +127,24 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
           const found = diagnostic.type === 'match'
             ? incomplete.find(product => product.id === diagnostic.productId) : null
           if (found) {
+            // 'available' is the derived purchasable flag and is false when
+            // an original product is in stock but lacks its captured price.
+            // Show the user's ACTUAL distinct original source facts, including
+            // more than one missing field. Never infer out-of-stock from a
+            // missing monetary value.
+            const blockers = [
+              found.sourceAvailable === false ? 'niet beschikbaar volgens de originele bron' :
+                found.sourceAvailable !== true ? 'beschikbaarheid niet vastgesteld' : null,
+              found.packAmount === null || found.packAmount <= 0 ||
+                family(found.packUnit) === null ? 'verpakking of maateenheid ontbreekt' : null,
+              typeof found.sourcePriceCents !== 'number' ||
+                !Number.isSafeInteger(found.sourcePriceCents) || found.sourcePriceCents < 0
+                ? 'pakprijs ontbreekt of is ongeldig' : null,
+            ].filter((reason): reason is string => !!reason)
             unpricedHints[store] = {
               name: found.name,
               sku: found.id,
-              reason: found.available !== true ? 'volgens de originele bron niet beschikbaar'
-                : found.packAmount === null || found.packAmount <= 0 ||
-                    family(found.packUnit) === null ? 'verpakking of maateenheid ontbreekt'
-                  : typeof found.sourcePriceCents !== 'number' ||
-                      !Number.isSafeInteger(found.sourcePriceCents) ||
-                      found.sourcePriceCents < 0 ? 'pakprijs ontbreekt of is ongeldig'
-                    : 'brongegevens vragen persoonlijke controle',
+              reason: blockers.join(' · ') || 'brongegevens vragen persoonlijke controle',
             }
           }
         }
