@@ -60,3 +60,26 @@
   display: grid; gap: .15rem; overflow-wrap: anywhere; border-bottom: 1px solid #e2eee5;
   padding: .45rem 0;
 }
+
+/* Local original-SKU inspector: keep long codes visible and filters usable on phones. */
+.supa-planner-source-paste__source-filter {
+  display: flex; flex-wrap: wrap; align-items: flex-end;
+  gap: .4rem 1rem; padding: .55rem .7rem;
+  background: #f2f8f4; border: 1px solid #d2e1d5; border-radius: 9px;
+}
+.supa-planner-source-paste__source-filter label { flex: 1 1 220px; min-width: 0; }
+.supa-planner-source-paste__source-filter input[type=search] {
+  width: 100%; max-width: 100%; min-height: 44px;
+  box-sizing: border-box; padding: .55rem .65rem;
+  border: 1px solid #96ad9c; border-radius: 8px; background: #fff;
+}
+.supa-planner-source-paste__source-filter .supa-planner-source-paste__filter-checkbox {
+  display: flex; align-items: center; flex: 1 1 250px;
+  gap: .7rem; font-weight: 600; cursor: pointer;
+}
+.supa-planner-source-paste__source-filter input[type=checkbox] {
+  width: 20px; height: 20px; flex: 0 0 20px; accent-color: #246b50;
+}
+.supa-planner-source-paste__source-filter :is(input,button):focus-visible {
+  outline: 3px solid #297252; outline-offset: 2px;
+}
