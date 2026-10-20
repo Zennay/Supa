@@ -313,6 +313,15 @@ export function LocalTwoStorePriceEditor({
     catch { return [] }
   }, [plan, recipes, activeDays])
   const activeNeeds = needs.filter(item => item.label.trim() && item.query.trim())
+  // Count the SAME physical ingredient needs with two complete provisional
+  // price entries. No partial total or store winner may be inferred from this.
+  const readyPairedDraftIds = new Set(activeNeeds.filter(need =>
+    currentDraftPackMath(rows[key('PLUS', need.id)] ?? emptyDraft(need.unit), need) &&
+    currentDraftPackMath(rows[key('DekaMarkt', need.id)] ?? emptyDraft(need.unit), need),
+  ).map(need => need.id))
+  const nextIncompletePairIndex = activeNeeds.findIndex(need =>
+    !readyPairedDraftIds.has(need.id))
+
   const allowedDraftRows = new Set(activeNeeds.flatMap(need => stores.map(store => key(store, need.id))))
   // Ingredient identity includes its human meaning, not just a stable ID.
   // Editing a recipe from e.g. 'rice' to 'pasta' with the same ID, quantity
@@ -873,6 +882,32 @@ export function LocalTwoStorePriceEditor({
           <h4>Hetzelfde weekmandje · voortgang per winkel</h4>
           <p>Dezelfde Planner-behoefte staat bij beide winkels. Invoer is nog geen
             bevestigde SKU, actuele winkelprijs of vergelijkbaar volledig mandje.</p>
+          <div className="offline-manual-editor__pair-coverage" role="status">
+            <strong>{readyPairedDraftIds.size} van {activeNeeds.length} fysieke ingrediënten
+              hebben een ingevuld, rekenbaar PLUS- én DekaMarkt-concept.</strong>
+            <progress value={readyPairedDraftIds.size} max={activeNeeds.length}
+              aria-label="Dekgraad voorlopig prijsconcept bij beide winkels" />
+            <small>{sameTimePair
+              ? 'Beide originele bronmomenten zijn voorlopig binnen 24 uur en maximaal zeven dagen oud.'
+              : 'Prijsverschillen blijven verborgen tot beide echte winkelmomenten geldig en maximaal 24 uur uit elkaar zijn.'}
+              {' '}Dit is geen bevestigde match en geen volledig mandtotaal.</small>
+            {nextIncompletePairIndex >= 0 && <button type="button" className="ghost-button"
+              onClick={() => {
+                const need = activeNeeds[nextIncompletePairIndex]
+                const plusReady = currentDraftPackMath(
+                  rows[key('PLUS', need.id)] ?? emptyDraft(need.unit), need)
+                const store = plusReady ? 'DekaMarkt' : 'PLUS'
+                setOnlyOpenRows(false)
+                window.requestAnimationFrame(() => {
+                  const field = document.getElementById(`own-price-${store}-${nextIncompletePairIndex}`)
+                  field?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                  field?.querySelector('input')?.focus({ preventScroll: true })
+                })
+              }}>Vul volgend ontbrekend winkelproduct aan</button>}
+            {readyPairedDraftIds.size === activeNeeds.length && !sameTimePair &&
+              <small>Alle conceptregels zijn ingevuld, maar kijk eerst de echte
+                opnamemomenten na; anders zijn de winkelprijzen niet vergelijkbaar.</small>}
+          </div>
           {activeNeeds.map((need, index) => <div key={need.id}
             className="offline-manual-editor__pair-row">
             <strong>{need.label} <small>· {need.amount ?? '?'} {need.unit}</small></strong>
