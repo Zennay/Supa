@@ -294,6 +294,20 @@ border-radius:10px;padding:.65rem;scroll-margin-top:1.25rem}
 .offline-manual-editor__pair-matrix { display:grid; gap:.55rem; padding:1rem;
   border:1px solid #cbd9ce; border-radius:14px; background:#f7faf5; min-width:0; }
 .offline-manual-editor__pair-matrix h4 { margin:0; }
+.offline-manual-editor__pair-coverage {
+  display:grid; grid-template-columns:1fr; justify-items:start; gap:.35rem;
+  padding:.75rem; border:1px solid #cbd9ce; border-radius:.7rem;
+  background:#fff; max-width:100%; min-width:0;
+}
+.offline-manual-editor__pair-coverage strong { overflow-wrap:anywhere; }
+.offline-manual-editor__pair-coverage progress {
+  width:100%; max-width:460px; height:.75rem;
+}
+.offline-manual-editor__pair-coverage small {
+  color:#4e6253; line-height:1.5; overflow-wrap:anywhere;
+}
+.offline-manual-editor__pair-coverage button { min-height:44px; max-width:100%; text-align:left; }
+
 .offline-manual-editor__pair-matrix p { margin:.2rem 0; line-height:1.45; }
 .offline-manual-editor__pair-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,2fr);
   align-items:center; gap:.7rem; border-bottom:1px solid #d9e3d8; padding:.5rem 0; }
