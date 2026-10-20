@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { lazy, Suspense, useMemo, useState, type FormEvent } from 'react'
 import type { PlannedMeal, Recipe } from '../../domain/types'
 import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../domain/basket.ts'
 import { buildIngredientReuseInsight } from '../../domain/ingredientReuse.ts'
@@ -10,7 +10,10 @@ import { RecipePriceExplanation } from './RecipePriceExplanation'
 import { plannerKnownMinimumOverrunCents } from './plannerKnownMinimumOverrun.ts'
 import { parseCustomWeekBudgetCents, validCustomWeekBudgetEuros } from './customWeekBudget.ts'
 import { HiFiPlannerWeekCard } from './HiFiPlannerWeekCard.tsx'
-import { PlannerOwnStoreComparison } from './PlannerOwnStoreComparison.tsx'
+// The full trusted source matching and multi-store comparison are only needed
+// when the user opens Planner, never on the lightweight Supa home screen.
+const PlannerOwnStoreComparison = lazy(() => import('./PlannerOwnStoreComparison.tsx')
+  .then(module => ({ default: module.PlannerOwnStoreComparison })))
 import type { PrivateReviewedBaskets, PrivateCaptureProgress, OwnStore, PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
 import './planner.css'
 
@@ -344,6 +347,7 @@ export function PlannerView({
         </p>}
       </section>
 
+      <Suspense fallback={<p role="status" aria-live="polite">Eigen PLUS/Deka-winkelvergelijking laden…</p>}>
       <PlannerOwnStoreComparison reviewed={ownReviewed ?? null} captureProgress={captureProgress ?? null}
         preferred={preferredOwnStore}
         captureNeeds={captureNeeds}
@@ -353,6 +357,7 @@ export function PlannerView({
         onImportSourceFiles={onImportSourceFiles} onReviewIngredient={onReviewIngredient}
         onOpenList={onOpenShoppingList}
         onOpenMixedRoute={onOpenMixedRoute} onChooseRouteLine={onChooseRouteLine} />
+      </Suspense>
 
       {hasIngredientData && <IngredientReuseCard insight={reuseInsight} />}
       {hasIngredientData && (
