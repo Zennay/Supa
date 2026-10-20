@@ -401,6 +401,53 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
     onChooseRouteLine(choice)
   }
   return <section className="own-store-planner" aria-labelledby="own-store-planner-heading">
+    {hasDemand && <div className="own-store-planner__overview" aria-label="Mijn fysieke PLUS/Deka-weekmand in één oogopslag">
+      <h3>Hetzelfde weekmandje · PLUS en DekaMarkt</h3>
+      {summary.status === 'comparable'
+        ? <>
+          <div className="own-store-planner__overview-totals">
+            <div><span>PLUS · eigen gecontroleerde bron</span>
+              <strong>{exactEuro.formatCents(summary.plusCents)}</strong></div>
+            <div><span>DekaMarkt · eigen gecontroleerde bron</span>
+              <strong>{exactEuro.formatCents(summary.dekaCents)}</strong></div>
+          </div>
+          <p role="status"><strong>{summary.cheapest === null
+            ? 'Beide winkels zijn even duur voor dit hele eigen mandje.'
+            : summary.cheapest + ' heeft een ' + exactEuro.formatCents(summary.differenceCents) +
+              ' lager heel-mandtotaal.'}</strong></p>
+          <small>Alleen jouw oorspronkelijke, volledig gecontroleerde prijzen en dezelfde fysieke
+            weekvraag met hele verpakkingen. Bronmomenten liggen maximaal 24 uur uiteen.
+            Geen kassagarantie of onafhankelijk bewezen besparing.</small>
+          <div className="own-store-planner__overview-actions">
+            <button type="button" className="ghost-button"
+              onClick={() => openConfirmedStoreList(summary.cheapest ?? selected)}>
+              Open {summary.cheapest ?? selected}-boodschappenlijst
+            </button>
+            <button type="button" className="ghost-button" onClick={onOpenComparison}>
+              Bekijk originele SKU- en pakprijsregels
+            </button>
+          </div>
+        </>
+        : <>
+          <p role="status"><strong>Prijsverschil nog onbekend.</strong>
+            {' '}{summary.status === 'missing'
+              ? 'Er zijn nog geen twee volledig gecontroleerde winkelmandjes voor dezelfde week.'
+              : summary.status === 'different-moments'
+                ? 'De originele winkelmomenten liggen meer dan 24 uur uiteen.'
+                : 'De fysieke mandjes zijn nog niet aantoonbaar gelijkwaardig.'}</p>
+          <small>Ontbrekende of verlopen winkelprijzen worden nooit geschat of als € 0 ingevuld.
+            Je kunt de rest van je planning en ongeprijsde boodschappenlijst wel blijven gebruiken.</small>
+          <div className="own-store-planner__overview-actions">
+            <button type="button" className="ghost-button" onClick={onOpenComparison}>
+              {summary.status === 'different-moments'
+                ? 'Vernieuw originele winkelopname' : 'Ga naar bronimport en matching'}
+            </button>
+            <button type="button" className="ghost-button" onClick={onOpenList}>
+              Open mijn boodschappenlijst
+            </button>
+          </div>
+        </>}
+    </div>}
     <header className="own-store-planner__header">
       <div><span className="eyebrow">Eigen gecontroleerde winkelopnames</span>
         <h3 id="own-store-planner-heading">Jouw weekmand per winkel</h3></div>
