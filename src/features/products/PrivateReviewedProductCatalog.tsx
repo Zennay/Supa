@@ -420,7 +420,8 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOp
     </>}
     {store === 'all' && <PrivateReviewedTwoStoreTable reviewed={reviewed ?? emptyReviewed}
       search={search} unitFilter={unitFilter} order={order} budget={budget}
-      onOpenComparison={onOpenComparison} onOpenList={onOpenList}
+      onOpenComparison={onOpenComparison} onReviewIngredient={onReviewIngredient}
+      onOpenList={onOpenList}
       onOpenMixedRoute={onOpenMixedRoute} onChooseRouteLine={onChooseRouteLine}
       checked={checked} />}
     {checkMessage && <p role="status">{checkMessage}</p>}
