@@ -13,6 +13,7 @@ import {
   type ManualQuote,
   type ManualRetailer,
 } from '../../domain/manualStoreComparison.ts'
+import { manualTripCoverage, privateManualShoppingTripText } from './privateManualShoppingTrip.ts'
 import './manualStoreComparison.css'
 
 const UNIT_LABEL: Record<string, string> = {
@@ -107,6 +108,7 @@ export function ManualStoreComparison({
     try { return needs.length ? calculateManualComparison(needs, entries) : null }
     catch { return null }
   }, [needs, entries])
+  const tripCoverage = useMemo(() => summary ? manualTripCoverage(summary) : [], [summary])
 
   function setQuote(need: ManualLine, store: ManualRetailer, field: keyof ManualQuote, value: string) {
     const key = manualQuoteKey(store, need.ingredientId)
@@ -184,6 +186,23 @@ export function ManualStoreComparison({
     } catch (error) {
       setImportMessage(error instanceof Error ? error.message :
         'Kon de persoonlijke winkelvergelijking niet lokaal bewaren.')
+    }
+  }
+  function downloadOwnStoreTrip(store: ManualRetailer) {
+    if (!summary) return
+    try {
+      const content = privateManualShoppingTripText(summary, entries, store)
+      const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `supa-mijn-ongeverifieerde-${store === 'PLUS' ? 'plus' : 'dekamarkt'}-boodschappen.txt`
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setImportMessage(`${store}-boodschappenlijst lokaal bewaard inclusief ontbrekende prijzen. Geen compleet mandtotaal.`)
+    } catch {
+      setImportMessage('De persoonlijke boodschappenlijst kon niet worden opgeslagen; controleer de huidige invoer.')
     }
   }
   function downloadTableFile() {
@@ -281,6 +300,16 @@ export function ManualStoreComparison({
           <div className="manual-compare__summary" role="status" aria-live="polite">
             <p><strong>{summary.complete} van {needs.length * 2}</strong> winkelregels ingevuld</p>
             <p>{summary.missing} ontbrekend · {summary.invalid} ongeldig of onvolledig</p>
+            <div className="manual-compare__coverage" aria-label="Eigen bronprijsdekking per winkel">
+              {tripCoverage.map(coverage => (
+                <p key={coverage.store}><strong>{coverage.store}:</strong>{' '}
+                  {coverage.known}/{needs.length} regels met eigen ingevulde prijzen;{' '}
+                  {coverage.unresolved} nog controleren.{' '}
+                  {coverage.known > 0 && <>Deelbedrag bekende regels: {' '}
+                    {exactEuro.formatCents(coverage.knownSubtotalCents)} (geen mandtotaal).</>}
+                </p>
+              ))}
+            </div>
             <div className="manual-compare__totals">
               {MANUAL_RETAILERS.map(shop => (
                 <div key={shop}><span>{shop}</span><strong>
@@ -308,6 +337,12 @@ export function ManualStoreComparison({
               onClick={downloadMyCalculatedComparison}>
               Download mijn complete berekening (TXT)
             </button>
+            {MANUAL_RETAILERS.map(store => (
+              <button className="ghost-button" type="button" key={store}
+                onClick={() => downloadOwnStoreTrip(store)}>
+                {store}: eigen boodschappen + ontbrekende prijzen (TXT)
+              </button>
+            ))}
             <button className="ghost-button" type="button" onClick={() => {
               editRevision.current += 1
               setEntries({})
