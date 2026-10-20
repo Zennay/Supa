@@ -158,3 +158,7 @@
 .recipe-collection-preview__item ul { max-height: none; padding-left: 20px; }
 .recipe-collection-preview__item li small { display: block; margin: 2px 0 5px; }
 .recipe-collection-preview__item p { margin: 9px 0; }
+.recipe-collection-preview__select { display: flex; align-items: center; gap: 9px;
+  min-height: 44px; font-weight: 680; cursor: pointer; }
+.recipe-collection-preview__select input { width: 20px; height: 20px; accent-color: #005135; }
+.recipe-collection-preview__item details summary { min-height: 32px; }

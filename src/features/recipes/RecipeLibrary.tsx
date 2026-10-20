@@ -119,6 +119,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const shoppingCopy = useRef<HTMLTextAreaElement>(null)
   const [collectionText, setCollectionText] = useState('')
   const [collectionExportBatch, setCollectionExportBatch] = useState(0)
+  const [collectionSelected, setCollectionSelected] = useState<number[]>([])
   const [collectionPreview, setCollectionPreview] = useState<{
     source: string; libraryRaw: string | null; recipes: UserRecipeDraft[]; alreadyPresent: number
   } | null>(null)
@@ -572,6 +573,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       if (!recipes.length) throw new Error('Alle recepten staan al op dit apparaat. Er is niets nieuws om te bewaren.')
       if (library.recipes.length + recipes.length > 100)
         throw new Error('Je kunt maximaal 100 eigen recepten bewaren. Maak eerst ruimte in je receptenlijst.')
+      setCollectionSelected(recipes.map((_, index) => index))
       setCollectionPreview({ source: collectionText, libraryRaw: library.raw, recipes, alreadyPresent })
       setCollectionMessage(recipes.length + ' nieuwe recepten lokaal herkend; ' + alreadyPresent + ' al aanwezig of dubbel. Controleer de hoeveelheden en bevestig zelf.')
     } catch (cause) {
@@ -585,8 +587,12 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
           collectionPreview.libraryRaw !== library.raw)
         throw new Error('De tekst of je opgeslagen recepten zijn veranderd. Controleer deze import opnieuw.')
       const savedAt = new Date().toISOString()
-      const additions: SavedRecipe[] = collectionPreview.recipes.map(draft => ({
-        ...reviewRecipe(draft), id: ownRecipeId(), savedAt,
+      const indexes = [...new Set(collectionSelected)]
+      if (!indexes.length || indexes.some(index => !Number.isSafeInteger(index) ||
+          index < 0 || index >= collectionPreview.recipes.length))
+        throw new Error('Kies eerst ten minste één geldig recept om op te slaan.')
+      const additions: SavedRecipe[] = indexes.map(index => ({
+        ...reviewRecipe(collectionPreview.recipes[index]), id: ownRecipeId(), savedAt,
       }))
       const next = saveRecipeLibrary(window.localStorage, library,
         [...additions, ...library.recipes])
@@ -816,9 +822,25 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
         <div className="recipe-backup-panel__review" role="group" aria-label="Bevestig import van mijn recepten">
           <strong>{collectionPreview.recipes.length} nieuwe recepten gevonden</strong>
           <small>{collectionPreview.alreadyPresent} al aanwezig of dubbel — die worden niet opnieuw opgeslagen.</small>
+          <div className="recipe-backup-panel__actions">
+            <button type="button" onClick={() => setCollectionSelected(collectionPreview.recipes.map((_, i) => i))}>
+              Selecteer alle nieuwe recepten
+            </button>
+            <button type="button" onClick={() => setCollectionSelected([])}>Deselecteer alles</button>
+          </div>
           <div className="recipe-collection-preview">{collectionPreview.recipes.map((recipe, index) =>
-            <details key={index} className="recipe-collection-preview__item">
-              <summary><strong>{recipe.title}</strong> · {recipe.ingredients.length} ingrediënten ·
+            <div key={index} className="recipe-collection-preview__item">
+              <label className="recipe-collection-preview__select">
+                <input type="checkbox" checked={collectionSelected.includes(index)}
+                  onChange={event => {
+                    const checked = event.currentTarget.checked
+                    setCollectionSelected(previous => checked
+                      ? [...new Set([...previous, index])].sort((a, b) => a - b)
+                      : previous.filter(value => value !== index))
+                  }} />
+                Bewaar {recipe.title}
+              </label>
+              <details><summary><strong>{recipe.title}</strong> · {recipe.ingredients.length} ingrediënten ·
                 {' '}{recipe.warnings.length ? recipe.warnings.length + ' controlepunten' : 'Geen openstaande importwaarschuwingen'}</summary>
               <p>{recipe.servings ?? '?'} porties · {recipe.minutes ?? '?'} minuten.
                 {' '}Originele hoeveelheden en waarschuwingen blijven bij het recept.</p>
@@ -833,10 +855,13 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
                 <ul>{recipe.warnings.map((warning, warningIndex) => <li key={warningIndex}>{warning}</li>)}</ul>
               </div>}
               <small>{recipe.steps.length} bereidingsstappen worden privé bewaard.</small>
-            </details>)}</div>
-          <p>Geen prijzen of productmatches. Alle recepten worden pas na jouw bevestiging samen opgeslagen.</p>
+              </details>
+            </div>)}</div>
+          <p>Geen prijzen of productmatches. Alleen de {collectionSelected.length} geselecteerde
+            recepten worden na jouw bevestiging samen opgeslagen.</p>
           <div className="recipe-backup-panel__actions">
-            <button type="button" onClick={confirmPlainRecipeCollection}>Bewaar alle recepten</button>
+            <button type="button" onClick={confirmPlainRecipeCollection}
+              disabled={!collectionSelected.length}>Bewaar {collectionSelected.length} geselecteerde recepten</button>
             <button type="button" onClick={() => setCollectionPreview(null)}>Annuleer</button>
           </div>
         </div>}
