@@ -13,6 +13,7 @@ import {
 import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
 import { makePlannerCaptureGuide } from '../comparison/plannerPriceCaptureGuide.ts'
 import { makeBlankPlannerCaptureCsv } from '../comparison/plannerPriceCaptureSheet.ts'
+import { pendingOwnSourceReviewCsv, pendingOwnSourceReviewText } from '../planner/pendingOwnSourceReviewCsv.ts'
 import './privateComparisonJourney.css'
 
 const PlannerQuickSourcePaste = lazy(async () => {
@@ -47,6 +48,8 @@ export function PrivateComparisonJourney({
   const [captureMessage, setCaptureMessage] = useState('')
   const [partialQuery, setPartialQuery] = useState('')
   const [showAllPartial, setShowAllPartial] = useState(false)
+  const [pendingCopyText, setPendingCopyText] = useState('')
+  const [pendingMessage, setPendingMessage] = useState('')
   const captureKey = JSON.stringify(captureNeeds.map(need =>
     [need.id, need.label, need.amount, need.unit, need.query]))
   const liveCaptureKey = useRef(captureKey)
@@ -139,6 +142,58 @@ export function PrivateComparisonJourney({
     a.name.localeCompare(b.name, 'nl-NL'))
   const shownPartialPairs = showAllPartial ? orderedPartialPairs
     : orderedPartialPairs.slice(0, 3)
+
+  async function handOffPendingSourceWork(action: 'csv' | 'copy' | 'share') {
+    setPendingMessage('')
+    setPendingCopyText('')
+    try {
+      if (!progress || !progress.planKey)
+        throw new Error('Importeer eerst je eigen winkelopnames in Vergelijk.')
+      // The canonical Planner pending-task exporter is shared with Home:
+      // missing/stale prices remain unknown, never become purchasable SKUs.
+      // Build synchronously to keep the mobile share user gesture.
+      const now = Date.now()
+      const content = action === 'csv'
+        ? pendingOwnSourceReviewCsv(progress, progress.planKey, now)
+        : pendingOwnSourceReviewText(progress, progress.planKey, now)
+      if (action === 'share' && typeof navigator.share === 'function') {
+        try {
+          await navigator.share({
+            title: 'Supa · openstaande PLUS/Deka-broncontroles',
+            text: content,
+          })
+          setPendingMessage('Je persoonlijke lijst met ontbrekende broncontroles is gedeeld.')
+          return
+        } catch (error) {
+          if (error instanceof Error && error.name === 'AbortError') return
+          // Unsupported share targets can still use ordinary clipboard copy.
+        }
+      }
+      if (action !== 'csv') {
+        try {
+          if (!navigator.clipboard?.writeText)
+            throw new Error('Klembord niet beschikbaar.')
+          await navigator.clipboard.writeText(content)
+          setPendingMessage('De originele ontbrekende PLUS/Deka-broncontroles zijn gekopieerd.')
+        } catch {
+          setPendingCopyText(content)
+          setPendingMessage('Selecteer de persoonlijke controlelijst hieronder en kopieer handmatig.')
+        }
+        return
+      }
+      const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-openstaande-eigen-winkelcontroles.csv'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setPendingMessage('Openstaande broncontroles lokaal als CSV opgeslagen; zonder onbekende prijzen.')
+    } catch (error) {
+      setPendingMessage(error instanceof Error ? error.message : 'Openstaande controles niet beschikbaar.')
+    }
+  }
 
   async function downloadBlankHomeCapture(format: 'csv' | 'html' | 'txt') {
     const selectedWeek = captureKey
@@ -461,6 +516,31 @@ export function PrivateComparisonJourney({
         </div>
       })}
     </div>
+
+    {progress && !ready && <section className="private-comparison-journey__pending-export"
+      aria-label="Mijn openstaande winkelbroncontroles">
+      <div>
+        <h3>Neem ontbrekende winkelproducten mee</h3>
+        <p>Download of deel de controlepunten uit jouw huidige winkelopnames.
+          Nog niet gevonden artikelen en verouderde bronnen hebben geen prijs.
+          De lijst is geen winkelcatalogus of compleet mandje.</p>
+      </div>
+      <div className="private-comparison-journey__pending-actions">
+        <button type="button" onClick={() => void handOffPendingSourceWork('csv')}>
+          Bewaar openstaande PLUS/Deka-controles (CSV)
+        </button>
+        <button type="button" onClick={() => void handOffPendingSourceWork('copy')}>
+          Kopieer controles voor onderweg
+        </button>
+        <button type="button" onClick={() => void handOffPendingSourceWork('share')}>
+          Deel mijn ontbrekende winkelproducten
+        </button>
+      </div>
+      {pendingMessage && <p role="status">{pendingMessage}</p>}
+      {pendingCopyText && <textarea readOnly rows={8} value={pendingCopyText}
+        aria-label="Selecteerbare privé-lijst met ontbrekende winkelbroncontroles"
+        onFocus={event => event.currentTarget.select()} />}
+    </section>}
 
     <div className="private-comparison-journey__result" role="status" aria-live="polite">
       {ready && delta !== null ? <>

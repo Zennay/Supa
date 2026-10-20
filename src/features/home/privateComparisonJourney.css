@@ -116,3 +116,10 @@
 .private-comparison-journey__review-queue li{display:grid;gap:.5rem;border-top:1px solid #e0eae0;padding:.6rem 0}
 .private-comparison-journey__review-queue li strong,.private-comparison-journey__review-queue li small{display:block;overflow-wrap:anywhere}
 .private-comparison-journey__review-queue li button{justify-self:start;background:#e8f1e9;color:#204a30;padding:.55rem .7rem;font-size:.87rem}
+/* Reuse the original Planner missing-source exporter, including unknown prices. */
+.private-comparison-journey__pending-export{margin:1rem 0;padding:1rem;background:#f8fbf7;border:1px solid #d7e5d9;border-radius:14px;min-width:0}
+.private-comparison-journey__pending-export h3{margin:0 0 .35rem;font-size:1.07rem}
+.private-comparison-journey__pending-export p{margin:.35rem 0 .8rem;line-height:1.5}
+.private-comparison-journey__pending-actions{display:flex;flex-wrap:wrap;gap:.55rem}
+.private-comparison-journey__pending-actions button{flex:1 1 190px}
+.private-comparison-journey__pending-export textarea{display:block;width:100%;max-width:100%;min-height:120px;padding:.7rem;resize:vertical;overflow-wrap:anywhere;border:1px solid #9ab39e;border-radius:10px;background:#fff}
