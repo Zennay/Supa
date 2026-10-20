@@ -49,6 +49,7 @@ export function ImportedRecipeGroceriesPanel({
     ? selected.map((recipe, index) => ({
         day: plannerDays[(startDayIndex + index) % plannerDays.length],
         recipeId: recipe.id, title: recipe.title, servings: recipe.servings,
+        recipeSnapshot: JSON.stringify(recipe),
       })) : []
   const signature = JSON.stringify(selected.map(recipe => [
     recipe.id, portionsById[recipe.id] ?? recipe.servings, recipe.servings,
@@ -88,7 +89,7 @@ export function ImportedRecipeGroceriesPanel({
       'Je huidige winkelbronprijzen zijn geen bewijs voor het nieuwe mandje.')) return
     const accepted = window.dispatchEvent(new CustomEvent('supa-plan-own-recipes', {
       cancelable: true,
-      detail: { assignments: plannerAssignments.map(({ day, recipeId }) => ({ day, recipeId })), destination },
+      detail: { assignments: plannerAssignments.map(({ day, recipeId, recipeSnapshot }) => ({ day, recipeId, recipeSnapshot })), destination },
     }))
     if (!accepted) setFeedback('De Planner kan één of meer recepten niet meer veilig plaatsen. Open de actuele bibliotheek opnieuw; het bestaande weekmenu blijft behouden.')
   }

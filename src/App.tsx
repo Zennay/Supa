@@ -326,19 +326,23 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       const validDays = new Set(m2InitialPlan.map(meal => meal.day))
       const days = new Set<string>()
       const ids = new Set<string>()
-      const pairs: { day: string; recipeId: string }[] = []
+      const pairs: { day: string; recipeId: string; recipeSnapshot: string }[] = []
       for (const assignment of assignments) {
         if (!assignment || typeof assignment !== 'object' || Array.isArray(assignment)) return deny()
-        const { day, recipeId } = assignment as { day?: unknown; recipeId?: unknown }
+        const { day, recipeId, recipeSnapshot } = assignment as {
+          day?: unknown; recipeId?: unknown; recipeSnapshot?: unknown
+        }
         if (typeof day !== 'string' || !validDays.has(day) || days.has(day) ||
-            typeof recipeId !== 'string' || ids.has(recipeId)) return deny()
-        days.add(day); ids.add(recipeId); pairs.push({ day, recipeId })
+            typeof recipeId !== 'string' || ids.has(recipeId) ||
+            typeof recipeSnapshot !== 'string' || recipeSnapshot.length > 100_000) return deny()
+        days.add(day); ids.add(recipeId); pairs.push({ day, recipeId, recipeSnapshot })
       }
       try {
         const library = readRecipeLibrary(window.localStorage)
         if (library.error || !pairs.every(pair => {
           const recipe = library.recipes.find(item => item.id === pair.recipeId)
           return !!recipe && !!toPlannerRecipe(recipe) &&
+            JSON.stringify(recipe) === pair.recipeSnapshot &&
             recipes.some(item => item.id === pair.recipeId)
         })) return deny()
         setPreferences(current => ({
