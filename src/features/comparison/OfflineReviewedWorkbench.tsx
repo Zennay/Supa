@@ -79,7 +79,7 @@ type CapturePreviewStore = {
   observedAt: string; observedNs?: bigint; unavailableProducts: number
   previewProducts: {
     id: string; name: string; packAmount: number | null; packUnit: string
-    packCount: number; priceCents: number | null; available: boolean
+    packCount: number | null; priceCents: number | null; available: boolean
   }[]
 }
 
@@ -2244,7 +2244,7 @@ export function OfflineReviewedWorkbench({
         <section className="offline-price-workbench__input offline-price-workbench__capture-review"
           aria-label="Eigen ingevuld prijsblad eerst controleren">
           <label>Controleer één ingevuld CSV-prijsblad of twee aparte winkelbladen vóór import
-            <input type="file" accept=".csv,text/csv" multiple
+            <input type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" multiple
               disabled={busy || plannerCaptureNeeds.length === 0}
               onChange={event => {
                 const files = Array.from(event.currentTarget.files ?? [])
@@ -2303,13 +2303,13 @@ export function OfflineReviewedWorkbench({
                     {store.previewProducts.slice(0, capturePreviewShown[store.retailer]).map(product => {
                       const rate = privatePackUnitRate({
                         amount: product.packAmount, unit: product.packUnit,
-                        count: product.packCount,
+                        count: product.packCount ?? 0,
                         priceCents: product.available ? product.priceCents : null,
                       })
                       return <li key={product.id}>
                         <strong>{product.name}</strong> · originele code {product.id}
                         {' '}· {product.packAmount ?? 'onbekend'} {product.packUnit}
-                        {' '}× {product.packCount}
+                        {' '}× {product.packCount === null ? 'niet opgegeven' : product.packCount}
                         {' '}· {product.available && product.priceCents !== null
                           ? exactEuro.formatCents(product.priceCents) + ' per verpakking'
                           : 'pakprijs onbekend / niet beschikbaar'}

@@ -233,7 +233,7 @@ export function previewOwnStoreCsv(text) {
       // local source fields, NOT independently verified retailer facts.
       previewProducts: capture.products.map(p => ({
         id: p.id, name: p.name, packAmount: p.packAmount, packUnit: p.packUnit,
-        packCount: p.packCount ?? 1, priceCents: p.priceCents, available: p.available,
+        packCount: p.packCount ?? null, priceCents: p.priceCents, available: p.available,
       })),
     })),
     unobservedOtherStoreRows: RETAILERS
