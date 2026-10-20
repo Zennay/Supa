@@ -699,6 +699,10 @@ export function ImportedRecipeGroceriesPanel({
         </label>
         <div className="recipe-backup-panel__actions">
           <button type="button" disabled={!privateTransfer.ready}
+            onClick={() => void showCapturePreview()}>
+            Bekijk exacte winkelopnameregels
+          </button>
+          <button type="button" disabled={!privateTransfer.ready}
             onClick={() => void downloadCaptureKit('csv')}>
             Download leeg winkelinvulblad (CSV)
           </button>
@@ -711,6 +715,25 @@ export function ImportedRecipeGroceriesPanel({
             Kopieer opnamegids (mobiel)
           </button>
         </div>
+        {capturePreview?.key === captureKey && <details open
+          className="recipe-collection-groceries__capture-preview">
+          <summary>Dezelfde {capturePreview.rows.length} fysieke rijen als in het lege CSV-bronblad</summary>
+          <p>Alleen jouw exacte gekozen ingrediënten en hoeveelheden worden weergegeven.
+            Een benodigde hoeveelheid is <strong>geen</strong> gemeten winkelverpakking.
+            De originele SKU, bronmomenten, echte pakprijzen en productmatches
+            blijven onbekend tot je die zelf in de bestaande import controleert.</p>
+          <div className="recipe-collection-groceries__capture-scroll">
+            <table>
+              <thead><tr><th scope="col">CSV-rij</th><th scope="col">Winkel</th>
+                <th scope="col">Originele fysieke vraag</th><th scope="col">Bronproduct en prijs</th></tr></thead>
+              <tbody>{capturePreview.rows.map(row => <tr key={JSON.stringify([row.csvRow, row.id])}>
+                <td>{row.csvRow}</td><td>{row.store}</td>
+                <td>{row.amount} {row.unit === 'piece' ? 'stuks' : row.unit} {row.label}</td>
+                <td>Niet opgenomen</td>
+              </tr>)}</tbody>
+            </table>
+          </div>
+        </details>}
         {copyableCaptureGuide?.identity === progressIdentity &&
           copyableCaptureGuide.target === captureTarget &&
           <label className="recipe-collection-groceries__mobile-copy">

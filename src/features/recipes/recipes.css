@@ -274,3 +274,10 @@
 .recipe-collection-groceries__capture p { line-height: 1.5; margin: 0; }
 .recipe-collection-groceries__capture label { display: grid; gap: .35rem; max-width: 360px; }
 .recipe-collection-groceries__capture select { min-height: 44px; padding: .45rem; font: inherit; border-radius: 8px; border: 1px solid #8ba893; }
+
+.recipe-collection-groceries__capture-preview { max-width: 100%; }
+.recipe-collection-groceries__capture-preview summary { cursor: pointer; font-weight: 650; margin: .55rem 0; }
+.recipe-collection-groceries__capture-scroll { overflow-x: auto; max-height: 350px; border: 1px solid #d6dfd9; border-radius: 8px; background: #fff; }
+.recipe-collection-groceries__capture-preview table { width: 100%; min-width: 490px; border-collapse: collapse; text-align: left; font-size: .875rem; }
+.recipe-collection-groceries__capture-preview th, .recipe-collection-groceries__capture-preview td { padding: .55rem; border-bottom: 1px solid #e3ebe6; vertical-align: top; overflow-wrap: anywhere; }
+.recipe-collection-groceries__capture-preview th { position: sticky; top: 0; background: #f2f8f4; }
