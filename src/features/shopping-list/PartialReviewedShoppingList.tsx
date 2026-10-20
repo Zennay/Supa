@@ -125,6 +125,10 @@ export function PartialReviewedShoppingList({
       }
       if (kind === 'copy' || kind === 'share') {
         try {
+          if (currentKey.current !== checkedKey ||
+              !confirmedPartialBasket(progress, store, Date.now()) ||
+              !recentOwnCaptureInstant(capture!.observedAt, Date.now()))
+            throw new Error('De eigen bronopname is inmiddels verlopen.')
           if (!navigator.clipboard?.writeText)
             throw new Error('Geen klembordtoegang')
           await navigator.clipboard.writeText(content)
