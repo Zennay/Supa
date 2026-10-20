@@ -414,6 +414,8 @@ export function OfflineReviewedWorkbench({
   }, [plan, recipes, activeDays])
   const captureWeek = JSON.stringify([planKey ?? null, plannerCaptureNeeds.map(n => [n.id, n.label, n.unit, n.amount])])
   const currentPreview = capturePreview?.week === captureWeek ? capturePreview : null
+  const captureWeekRef = useRef(captureWeek)
+  captureWeekRef.current = captureWeek
   const freshPreviewInstant = (observedNs?: bigint): boolean => {
     if (observedNs === undefined || !Number.isSafeInteger(clockMs)) return false
     const age = BigInt(Math.trunc(clockMs)) * 1_000_000n - observedNs
@@ -511,7 +513,7 @@ export function OfflineReviewedWorkbench({
           })),
         }
       }
-      if (version !== importRevision.current) return
+      if (version !== importRevision.current || captureWeek !== captureWeekRef.current) return
       // One newly imported store can be compared with the independently
       // retained other capture, not merely the stores inside this CSV file.
       // Never invent a missing retailer instant or silently refresh the old one.
@@ -530,6 +532,7 @@ export function OfflineReviewedWorkbench({
           }
         }
       }
+      if (version !== importRevision.current || captureWeek !== captureWeekRef.current) return
       setCapturePreview({
         files, week: captureWeek, stores: storesInPreview,
         unobservedOtherStoreRows: blankOtherRows,
@@ -613,12 +616,12 @@ export function OfflineReviewedWorkbench({
     const needs = missingPreviewCaptureNeeds(store)
     if (!needs.length) return
     const revision = importRevision.current
-    const selectedPlan = planKey
+    const selectedWeek = captureWeek
     try {
       const content = kind === 'csv'
         ? (await import('./plannerPriceCaptureSheet.ts')).makeBlankPlannerCaptureCsv(needs, [store])
         : (await import('./plannerPriceCaptureGuide.ts')).makePlannerCaptureGuide(needs, [store])
-      if (revision !== importRevision.current || selectedPlan !== currentlySelectedPlan.current) {
+      if (revision !== importRevision.current || selectedWeek !== captureWeekRef.current) {
         setWeekExportMessage('Weekmenu of bronimport is veranderd. Bekijk eerst de actuele ontbrekende regels.')
         return
       }
