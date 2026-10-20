@@ -6,8 +6,8 @@ import { ownStoreWeekComparison } from '../planner/ownStoreBudgetComparison.ts'
 import { productSearchText } from './productSearchText.ts'
 import { privatePriceAgeNotice } from '../comparison/privatePriceAgeNotice.ts'
 import { privatePhysicalShoppingTick } from '../shopping-list/privatePhysicalShoppingTick.ts'
-import { freshReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
-import type { OwnStore, PrivateReviewedBaskets, PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
+import { freshReviewedBaskets, recentOwnCaptureInstant } from '../comparison/privateReviewedBasketBridge.ts'
+import type { OwnStore, PrivateReviewedBaskets, PrivateCaptureProgress, PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
 import './privateReviewedProductCatalog.css'
 
 const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
@@ -16,8 +16,10 @@ const emptyReviewed: PrivateReviewedBaskets = { planKey: '', stores: {} }
 type Matched = Extract<BasketTraceLine, { status: 'matched' }>
 
 /** Read-only personally reviewed basket sources, never an inferred live catalog. */
-export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparison, onOpenList, onOpenMixedRoute, onChooseRouteLine, checked, onToggleChecked }: {
+export function PrivateReviewedProductCatalog({ reviewed, captureProgress, budget, onOpenComparison, onReviewIngredient, onOpenList, onOpenMixedRoute, onChooseRouteLine, checked, onToggleChecked }: {
   reviewed: PrivateReviewedBaskets | null
+  captureProgress?: PrivateCaptureProgress | null
+  onReviewIngredient?: (shop: OwnStore, ingredientId: string) => void
   budget: number
   onOpenComparison: () => void
   onOpenList: (store?: OwnStore) => void
@@ -141,6 +143,56 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
     <h2>Mijn echte bronartikelen voor dit weekmenu</h2>
     <p>Alleen jouw zelf gecontroleerde productregels, geen actuele winkelcatalogus of kassagarantie.
       Historische ontwerpvoorbeelden elders op de pagina tellen niet mee.</p>
+    {captureProgress && <section className="private-reviewed-products__capture-progress"
+      aria-label="Bronproducten en nog te controleren ingrediënten">
+      <h3>Mijn broninvoer en productmatching</h3>
+      <p>Dit is voortgang van jouw lokaal ingevoerde bronbestanden, géén geprijsd totaal.
+        Pas na een complete, verse en expliciet beoordeelde winkelbron kunnen bedragen
+        in de vergelijking en het weekbudget meetellen.</p>
+      <div className="private-reviewed-products__capture-grid">
+        {shops.map(shop => {
+          const source = captureProgress.stores[shop]
+          const freshSource = !!source && recentOwnCaptureInstant(source.observedAt, nowMs)
+          return <article key={shop}>
+            <h4>{shop}</h4>
+            {!source ? <p>Nog geen bronbestand voor deze winkel.</p> : <>
+              <strong>{source.reviewedLineCount} van {source.demandLineCount} ingrediënten beoordeeld</strong>
+              <progress value={Math.min(source.reviewedLineCount, source.demandLineCount)}
+                max={Math.max(1, source.demandLineCount)}
+                aria-label={'Beoordeelde eigen ingrediënten bij ' + shop} />
+              <small>{source.originalProductCount} bronartikelen, waarvan {
+                source.pricedProductCount} met originele bronprijs.</small>
+              <small role="status">{freshSource
+                ? 'Bronmoment binnen zeven dagen, nog geen bewijs van actuele kassaprijs.'
+                : 'Bronmoment verlopen of niet bruikbaar: prijzen tellen niet als actueel.'}</small>
+              {(source.missingIngredients.length > 0 || source.awaitingReviewIngredients.length > 0) &&
+                <details className="private-reviewed-products__missing">
+                  <summary>{source.missingIngredients.length} zonder betrouwbare match · {
+                    source.awaitingReviewIngredients.length} nog te beoordelen</summary>
+                  <ul>{[
+                    ...source.missingIngredients.map(row => ({ ...row, reason: 'Geen productmatch of prijs' })),
+                    ...source.awaitingReviewIngredients.map(row => ({ ...row, reason: 'Beoordeel originele SKU en verpakking' })),
+                  ].map(row => <li key={row.reason + ':' + row.id}>
+                    <strong>{row.label}</strong>
+                    <span> · {row.amount === null || row.amount === undefined
+                      ? 'hoeveelheid onbekend' : row.amount + ' ' + (row.unit ?? '')}
+                      {' '}· {row.reason.toLowerCase()}</span>
+                    <button type="button" disabled={!onReviewIngredient}
+                      onClick={() => onReviewIngredient?.(shop, row.id)}>
+                      Open in matching
+                    </button>
+                  </li>)}</ul>
+                </details>}
+              {source.missingIngredients.length === 0 && source.awaitingReviewIngredients.length === 0 &&
+                <small>Geen openstaande matchcontrole in deze importvoortgang.</small>}
+            </>}
+            <button type="button" onClick={onOpenComparison}>
+              {source ? 'Open eigen bron en review' : 'Voeg eigen winkelbron toe'}
+            </button>
+          </article>
+        })}
+      </div>
+    </section>}
     {hasExpiredSource && <p role="status" className="private-reviewed-products__age">
       Eén of beide eerdere winkelopnames zijn verlopen of niet meer bruikbaar.
       De bijbehorende prijzen zijn verborgen. Herzie de originele bron in Vergelijk;
