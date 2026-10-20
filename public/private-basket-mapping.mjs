@@ -268,6 +268,8 @@ function updateSelect(select, store, unit) {
   const search = row.querySelector('[data-search-store="' + store + '"]')
   const query = search.value.trim().toLocaleLowerCase('nl')
   const chosen = select.value
+  const age = captures?.[store] ? ageNs(captures[store].observedAt, Date.now()) : null
+  const priceCurrent = age !== null && !needsRecapture(age)
   const all = observedProducts(store, unit)
   const kept = all.find(product => product.id === chosen)
   const filtered = all.filter(product => !query ||
@@ -288,9 +290,11 @@ function updateSelect(select, store, unit) {
   for (const product of shown) {
     const pack = product.packAmount === null ? 'verpakking onbekend'
       : String(product.packAmount).replace('.', ',') + ' ' + product.packUnit
-    const state = !product.available ? ' · niet leverbaar'
-      : product.priceCents === null || product.packAmount === null
-        ? ' · prijs/verpakking onbekend' : ''
+    const state = !priceCurrent ? ' · oude/toekomstige opname: huidige prijs onbekend'
+      : !product.available ? ' · niet leverbaar'
+        : product.priceCents === null || product.packAmount === null
+          ? ' · prijs/verpakking onbekend' :
+          ' · ' + ownEuro.format(product.priceCents / 100) + ' per pak (eigen opname)'
     const option = new Option(product.name + ' · ' + pack + ' · ID ' + product.id + state, product.id)
     select.add(option)
   }
@@ -304,10 +308,11 @@ function updateSelect(select, store, unit) {
       '), bewust niet automatisch gekozen. ' : '') +
     (chosenProduct
       ? 'Gekozen SKU ' + chosenProduct.id + ': ' +
-        (!chosenProduct.available ? 'niet leverbaar; niet in winkelmandprijs' :
-          chosenProduct.priceCents === null || chosenProduct.packAmount === null
-            ? 'prijs of verpakking ontbreekt; blijft onbekend'
-            : observedPackDescription(chosenProduct)) +
+        (!priceCurrent ? 'oorspronkelijke opname verlopen/toekomstig; huidige prijs onbekend' :
+          !chosenProduct.available ? 'niet leverbaar; niet in winkelmandprijs' :
+            chosenProduct.priceCents === null || chosenProduct.packAmount === null
+              ? 'prijs of verpakking ontbreekt; blijft onbekend'
+              : observedPackDescription(chosenProduct)) +
         '. Controleer zelf de echte productnaam, voorraad en verpakking. ' +
         chosenWholePackPreview(row, store, chosenProduct)
       : 'Kies expliciet de juiste winkel-SKU; geen automatische productmatch.')
