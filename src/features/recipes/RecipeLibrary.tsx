@@ -124,6 +124,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const [collectionExportBatch, setCollectionExportBatch] = useState(0)
   const [collectionSelected, setCollectionSelected] = useState<number[]>([])
   const [lastImportedIds, setLastImportedIds] = useState<string[]>([])
+  const [groceryOpen, setGroceryOpen] = useState(false)
   const [lastBulkImport, setLastBulkImport] = useState<{ afterRaw: string; ids: string[] } | null>(null)
   const [confirmBulkUndo, setConfirmBulkUndo] = useState(false)
   const [collectionPreview, setCollectionPreview] = useState<{
@@ -633,6 +634,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
         [...additions, ...library.recipes])
       setLibrary(next)
       setLastImportedIds(additions.map(recipe => recipe.id))
+      setGroceryOpen(true)
       if (next.raw !== null) setLastBulkImport({ afterRaw: next.raw, ids: additions.map(recipe => recipe.id) })
       setConfirmBulkUndo(false)
       setCollectionPreview(null); setCollectionText('')
@@ -1010,7 +1012,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       {collectionMessage && <p role="status">{collectionMessage}</p>}
     </section>
     {!!library.recipes.length && !library.error && <details className="recipe-bulk-grocery-details"
-      key={lastImportedIds.join(':')} defaultOpen={lastImportedIds.length > 0}>
+      open={groceryOpen} onToggle={event => setGroceryOpen(event.currentTarget.open)}>
       <summary>Maak één boodschappenlijst van mijn eigen recepten</summary>
       <ImportedRecipeGroceriesPanel recipes={library.recipes}
         recentIds={lastImportedIds} onEdit={recipe => openSavedRecipeEditor(recipe)} />

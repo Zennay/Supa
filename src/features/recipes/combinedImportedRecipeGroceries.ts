@@ -36,7 +36,7 @@ export function combinedImportedRecipeGroceries(recipes: readonly SavedRecipe[])
     const single = ready
       ? ownRecipeShoppingChecklist(recipe, recipe.servings!)
       : null
-    const sourceLines = single?.canCopy ? single.lines : recipe.ingredients.map((ingredient, index) => ({
+    const sourceLines = single?.canCopy ? single.lines : recipe.ingredients.map((ingredient: SavedRecipe['ingredients'][number], index: number) => ({
       key: String(index), label: ingredient.label || ingredient.original,
       amount: null, unit: null, original: ingredient.original, needsReview: true,
     } as OwnRecipeChecklistLine))
