@@ -14,6 +14,7 @@ import {
   type ManualRetailer,
 } from '../../domain/manualStoreComparison.ts'
 import { manualTripCoverage, privateManualShoppingTripText } from './privateManualShoppingTrip.ts'
+import { privateManualPartialComparisonText } from './privateManualPartialComparison.ts'
 import { readPrivateManualSession, savePrivateManualSession, clearPrivateManualSession } from './privateManualCompareSession.ts'
 import './manualStoreComparison.css'
 
@@ -242,6 +243,23 @@ export function ManualStoreComparison({
         'Kon de persoonlijke winkelvergelijking niet lokaal bewaren.')
     }
   }
+  function downloadPartialComparison() {
+    if (!summary || staleEntries) return
+    try {
+      const content = privateManualPartialComparisonText(summary, entries)
+      const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-mijn-gedeeltelijke-plus-deka-vergelijking.txt'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setImportMessage('Eigen gedeeltelijke PLUS/Deka-regelvergelijking bewaard. Ontbrekende prijzen blijven onbekend.')
+    } catch {
+      setImportMessage('Kon de gedeeltelijke privévergelijking niet bewaren.')
+    }
+  }
   function downloadOwnStoreTrip(store: ManualRetailer) {
     if (!summary) return
     try {
@@ -454,6 +472,10 @@ export function ManualStoreComparison({
               disabled={!summary.fullBasket}
               onClick={downloadMyCalculatedComparison}>
               Download mijn complete berekening (TXT)
+            </button>
+            <button className="ghost-button" type="button" disabled={staleEntries}
+              onClick={downloadPartialComparison}>
+              Download gedeeltelijke PLUS/Deka-vergelijking (TXT, ook met ontbrekende prijzen)
             </button>
             {MANUAL_RETAILERS.map(store => (
               <button className="ghost-button" type="button" key={store}
