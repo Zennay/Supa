@@ -79,6 +79,31 @@ export function PlannerTwoStoreCoverage({
     ['ready', 'reviewed'].includes(item.cells[index].kind)).length)
   const pending = items.filter(item => item.cells.some(cell =>
     cell.kind !== 'ready' && cell.kind !== 'reviewed'))
+  // Prefer an actionable existing original-SKU review over a new empty
+  // capture. This is navigation only: no SKU is approved by this choice.
+  const nextAction = (
+    pending.flatMap(({ need, cells }) => STORES.map((store, index) => ({
+      need, store, cell: cells[index],
+    }))).find(item => item.cell.kind === 'review' || item.cell.kind === 'missing') ??
+    pending.flatMap(({ need, cells }) => STORES.map((store, index) => ({
+      need, store, cell: cells[index],
+    }))).find(item => item.cell.kind === 'source' || item.cell.kind === 'expired') ??
+    null
+  )
+  function openNextAction() {
+    if (!nextAction) return
+    // Re-admit all source freshness at click time: a long-open tab cannot
+    // silently authorize an expired product or invent a new price.
+    const latest = freshReviewedBaskets(safeReviewed, safeReviewed?.planKey ?? '', Date.now())
+    const current = cellFor(nextAction.store, nextAction.need.id,
+      safeProgress, safeReviewed, latest, Date.now())
+    if (current.kind === 'ready' || current.kind === 'reviewed') return
+    if (current.kind === 'source' || current.kind === 'expired') {
+      onOpenComparison()
+    } else {
+      onReviewIngredient(nextAction.store, nextAction.need.id)
+    }
+  }
   const normalizedSearch = ingredientSearch.trim().normalize('NFKC').toLocaleLowerCase('nl')
   const visible = (showAll ? items : pending).filter(item => {
     if (normalizedSearch &&
@@ -153,6 +178,26 @@ export function PlannerTwoStoreCoverage({
       <button type="button" className="ghost-button" onClick={onOpenComparison}>
         Open mijn bronimport
       </button>
+    </div>
+    <div className="supa-two-store-coverage__next" role="status">
+      {comparisonStatus === 'comparable' && pending.length === 0
+        ? <p><strong>Je eigen twee-winkelmandje is compleet gecontroleerd.</strong>
+          Bekijk het werkelijke voorwaardelijke prijsverschil en de route in Planner
+          of open je huidige Lijst.</p>
+        : nextAction
+          ? <>
+            <p><strong>Volgende stap · {nextAction.store}</strong> —
+              {' '}{nextAction.need.label}: {nextAction.cell.text.toLowerCase()}.
+              De originele bron en de productcontrole blijven verplicht.</p>
+            <button type="button" className="ghost-button" onClick={openNextAction}>
+              {nextAction.cell.kind === 'source' || nextAction.cell.kind === 'expired'
+                ? 'Open originele ' + nextAction.store + '-bronimport'
+                : 'Controleer ' + nextAction.need.label + ' bij ' + nextAction.store}
+            </button>
+          </>
+          : <p>Alle ingrediënten lijken gekoppeld, maar een betrouwbaar volledig
+            prijsverschil is nog onbekend. Controleer de bronmomenten en volledige
+            verpakkingen via Vergelijk.</p>}
     </div>
     <div className="supa-two-store-coverage__export-actions">
       <button type="button" className="ghost-button" onClick={downloadCoverage}>
