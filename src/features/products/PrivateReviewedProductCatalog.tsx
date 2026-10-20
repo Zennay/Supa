@@ -31,12 +31,13 @@ const PlannerQuickSourcePaste = lazy(async () => {
 })
 
 /** Read-only personally reviewed basket sources, never an inferred live catalog. */
-export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOpenComparison, onOpenList, onOpenMixedRoute, onChooseRouteLine, onReviewIngredient, onImportSourceFiles, fileWarning, checked, onToggleChecked }: {
+export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOpenComparison, onOpenList, onOpenMixedRoute, onChooseRouteLine, onReviewIngredient, onAddMissingToOwnList, onImportSourceFiles, fileWarning, checked, onToggleChecked }: {
   reviewed: PrivateReviewedBaskets | null
   progress: PrivateCaptureProgress | null
   budget: number
   onOpenComparison: () => void
   onReviewIngredient: (store: OwnStore, ingredientId: string) => void
+  onAddMissingToOwnList: (store: OwnStore, ingredients: readonly {id: string; label: string}[]) => string | null
   onImportSourceFiles: (files: File[]) => void
   fileWarning: string
   onOpenList: (store?: OwnStore) => void
@@ -233,6 +234,21 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOp
               <p>{missing.length} ontbreken; {pending.length} vragen review.
                 Zonder volledig mandje blijft het prijsverschil onbekend.</p>
               {next && <p><strong>Volgend product:</strong> {next.label}</p>}
+              {missing.length > 0 && <div className="private-reviewed-products__missing-transfer">
+                <p>Je kunt de ontbrekende fysieke ingrediënten alvast als <strong>ongeprijsde</strong>
+                  boodschappen meenemen, zonder SKU, prijs of winkelgoedkeuring over te dragen.</p>
+                <button type="button" onClick={() => {
+                  if (!recentOwnCaptureInstant(partial!.observedAt, Date.now())) {
+                    setCheckMessage('De bron is verlopen; controleer je oorspronkelijke opname opnieuw.')
+                    return
+                  }
+                  const message = onAddMissingToOwnList(shop, missing.map(item =>
+                    ({ id: item.id, label: item.label })))
+                  if (message) setCheckMessage(message)
+                }}>
+                  Zet {missing.length} ontbrekende {shop}-ingrediënten op mijn ongeprijsde Lijst
+                </button>
+              </div>}
               {queued.length > 0 && <div className="private-reviewed-products__match-queue">
                 <strong>Openstaande productmatching · {queued.length} unieke ingrediënten</strong>
                 <ul>{visibleQueued.map(item => <li key={item.id}>

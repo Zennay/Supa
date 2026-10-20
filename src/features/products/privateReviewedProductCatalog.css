@@ -118,3 +118,9 @@ background:#e7f4eb!important}
 .private-reviewed-products__copy-fallback textarea:focus-visible{
   outline:3px solid #247a59;outline-offset:2px}
 .private-reviewed-products__copy-fallback button{justify-self:start}
+
+/* Missing demands can become personal, strictly unpriced notes; never SKU proof. */
+.private-reviewed-products__missing-transfer { display:grid; gap:.55rem; padding:.75rem;
+  border:1px solid #c5d8c7; border-radius:10px; background:#fffaf0; }
+.private-reviewed-products__missing-transfer p { margin:0; font-size:.9rem; line-height:1.5; }
+.private-reviewed-products__missing-transfer button { width:100%; }

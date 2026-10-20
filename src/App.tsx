@@ -50,7 +50,7 @@ const OwnExtraGroceries = lazy(async () => {
 import type { PrivateExtraVisitCostIntent } from './features/comparison/privateExtraVisitCost.ts'
 import type { PrivateSourceFileHandoff } from './features/comparison/privateSourceFileHandoff.ts'
 import { parsePrivateExtraVisitCostCents } from './features/comparison/privateExtraVisitCost.ts'
-import { freshReviewedBaskets, type PrivateReviewedBaskets, type PrivateCaptureProgress, type PrivateReviewFocus, type OwnStore, type PrivateRouteChoice } from './features/comparison/privateReviewedBasketBridge.ts'
+import { recentOwnCaptureInstant, freshReviewedBaskets, type PrivateReviewedBaskets, type PrivateCaptureProgress, type PrivateReviewFocus, type OwnStore, type PrivateRouteChoice } from './features/comparison/privateReviewedBasketBridge.ts'
 import { ObservationView } from './features/observation/ObservationView'
 import { IdentityAvatar } from './components/IdentityAvatar.tsx'
 import { HiFiHome, HiFiDemoList } from './features/home/HiFiHome'
@@ -683,6 +683,58 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         )}
         {tab === 'products' && <Suspense fallback={<p role="status">Eigen bronproducten openen…</p>}>
           <PrivateReviewedProductCatalog reviewed={livePrivateReviewed} budget={budget}
+            onAddMissingToOwnList={(shop, ingredients) => {
+              const progress = privateCaptureProgress?.planKey === privatePlanKey
+                ? privateCaptureProgress.stores[shop] : null
+              if (!progress || !progress.fresh ||
+                  !recentOwnCaptureInstant(progress.observedAt, Date.now())) {
+                return 'Deze bronopname is verlopen of vervangen; herzie eerst de originele bron.'
+              }
+              // The exact current private capture, NOT the UI label, decides
+              // which physical demands are genuinely missing a source match.
+              const missing = new Map(progress.missingIngredients.map(row => [row.id, row]))
+              if (!ingredients.length || ingredients.length > 100 ||
+                  ingredients.some(row => missing.get(row.id)?.label !== row.label)) {
+                return 'Deze productmatching is gewijzigd. Open de actuele lijst opnieuw.'
+              }
+              const normalize = (value: string) => value
+                .replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/gu, ' ')
+                .replace(/\s+/gu, ' ').trim()
+              const proposed = ingredients.map(row => {
+                const amount = missing.get(row.id)!
+                const quantity = amount.amount === null || amount.amount === undefined ||
+                  !Number.isFinite(amount.amount) || amount.amount <= 0
+                  ? 'hoeveelheid controleren' : String(amount.amount) + ' ' + (amount.unit ?? '')
+                return normalize(row.label + ' · ' + quantity)
+              })
+              if (proposed.some(label => !label || label.length > 140)) {
+                return 'Een omschrijving is te lang voor de eigen lijst. Bekijk de losse ingrediënten.'
+              }
+              const existing = new Set(manualShoppingNotes.filter(note => note.store === shop)
+                .map(note => note.label.normalize('NFC').toLocaleLowerCase('nl-NL')))
+              const seen = new Set(existing)
+              const additions = proposed.filter(label => {
+                const key = label.normalize('NFC').toLocaleLowerCase('nl-NL')
+                if (seen.has(key)) return false
+                seen.add(key)
+                return true
+              })
+              if (manualShoppingNotes.length + additions.length > 100) {
+                return 'Je eigen lijst heeft maximaal 100 artikelen. Ruim eerst oude artikelen op.'
+              }
+              setManualShoppingNotes(current => {
+                const currentKeys = new Set(current.filter(note => note.store === shop)
+                  .map(note => note.label.normalize('NFC').toLocaleLowerCase('nl-NL')))
+                const safeNew = additions.filter(label =>
+                  !currentKeys.has(label.normalize('NFC').toLocaleLowerCase('nl-NL')))
+                if (current.length + safeNew.length > 100) return current
+                return [...current, ...safeNew.map(label => ({
+                  id: 'own-note-' + crypto.randomUUID(), label, store: shop, done: false,
+                }))]
+              })
+              navigate('list')
+              return null
+            }}
             progress={privateCaptureProgress?.planKey === privatePlanKey
               ? privateCaptureProgress : null}
             onImportSourceFiles={handoffOwnPriceFiles}
