@@ -1,0 +1,4 @@
+import{l}from"./privateBasketComparisonCsv-D5yqCuzk.js";import{x as s}from"./index-DXw3hHG-.js";import"./plannerRecipes-Crut8BCR.js";function c(e,o){if(!e.startsWith('"soort","winkel","opnametijd",')||!e.endsWith(`\r
+`)||o.length<1||o.length>100)throw Error("Een geldige eigen winkelbron en bewaarde extra artikelen zijn vereist.");const i=o.map(r=>{if(!s(r))throw Error("Een eigen extra artikel is ongeldig.");const n=Array(18).fill("");return n[0]="eigen_extra_ongeprijsd",n[3]=r.id,n[4]=r.name,n[5]=String(r.quantity),n[6]=r.unit==="piece"?"stuks":r.unit,n[16]=r.done?"ja":"nee",n[17]="Eigen extra zonder winkel, SKU of bronprijs. Niet in mandtotaal of besparing.",n.map(a=>l(a)).join(",")}),t=e+i.join(`\r
+`)+`\r
+`;if(new TextEncoder().encode(t).length>256e3)throw Error("Complete boodschappenlijst is te groot voor CSV.");return t}export{c as appendUnpricedExtrasToSingleStoreCsv};

@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>Supa · Twee winkelopnames importeren</title>
+  <style>
+    :root { font: 16px/1.55 system-ui, sans-serif; color: #192c25; background: #f7f8f4; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    main { max-width: 890px; margin: 0 auto; padding: 28px 18px 72px; }
+    h1 { font-size: clamp(1.7rem, 5vw, 2.5rem); line-height: 1.12; margin: 10px 0; }
+    h2 { font-size: 1.15rem; margin-top: 0; }
+    p { max-width: 72ch; }
+    a { color: #145d44; }
+    .eyebrow { text-transform: uppercase; letter-spacing: .1em; font-weight: 750; font-size: .78rem; }
+    .panel { background: white; border: 1px solid #d7e1d9; border-radius: 18px; padding: 22px; margin-top: 22px; }
+    label { display: block; font-weight: 700; margin: 16px 0 7px; }
+    input, textarea { display: block; width: 100%; border: 1px solid #829589; border-radius: 10px; padding: 11px; font: inherit; color: inherit; background: #fff; }
+    textarea { resize: vertical; min-height: 175px; font: 13px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; }
+    input:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible { outline: 3px solid #559879; outline-offset: 3px; }
+    button { border: 0; border-radius: 10px; padding: 12px 17px; font: inherit; font-weight: 750; cursor: pointer; }
+    .primary { background: #145d44; color: white; }
+    .secondary { background: #e6efe8; color: #184734; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 17px; }
+    .hint { font-size: .89rem; color: #405c4e; }
+    #status { padding: 12px 14px; border-left: 4px solid #7a9282; background: #f2f5f1; border-radius: 5px; min-height: 48px; }
+    #status[data-state="error"] { border-color: #a33b2c; }
+    code { overflow-wrap: anywhere; font-size: .89em; }
+    ol { padding-left: 23px; }
+  </style>
+</head>
+<body>
+<main>
+  <a href="/" aria-label="Terug naar Supa">← Terug naar Supa</a>
+  <p class="eyebrow">Supa · Privé hulpmiddel</p>
+  <h1>Zet je eigen winkelprijzen om naar een Supa-bestand</h1>
+  <p>Heb je echte, rechtmatig verkregen PLUS- en DekaMarkt-productwaarnemingen in een spreadsheet? Maak er lokaal een bestand van dat <strong>Supa → Vergelijk</strong> kan openen. De twee winkels worden niet benaderd; deze pagina verzint geen prijzen, verpakkingen of observatietijden.</p>
+  <section class="panel" aria-labelledby="intro">
+    <h2 id="intro">Wat moet in je CSV staan?</h2>
+    <ol>
+      <li>Exporteer je spreadsheet als <strong>UTF-8 CSV met komma's</strong>.</li>
+      <li>Gebruik precies de kolommen hieronder, in deze volgorde. Een echte tijd moet de tijdzone bevatten, bijvoorbeeld <code>+01:00</code> of <code>+02:00</code> wanneer dat klopt voor jouw observatie.</li>
+      <li>Zet <code>available=true</code> alleen bij daadwerkelijk geobserveerde, beschikbare producten met gemeten verpakking, aantal en <strong>hele eurocenten</strong>. Bij onbekende prijzen laat je <code>priceCents</code> leeg en zet je <code>available=false</code>.</li>
+    </ol>
+    <p class="hint"><code>retailer,observedAt,id,name,packAmount,packUnit,packCount,priceCents,available</code></p>
+    <p class="hint">Gebruik per winkel steeds dezelfde echte observatietijd; voer minimaal één regel voor PLUS en één voor DekaMarkt in. Ontbrekende producten blijven onbekend. Een geldig CSV- of JSON-bestand is geen bronlicentie of bewijs van een uitgevoerde veldstudie.</p>
+  </section>
+  <section class="panel" aria-labelledby="convert-title">
+    <h2 id="convert-title">Converteer je winkelopnames</h2>
+    <form id="converter" novalidate>
+      <label for="csv-file">Kies CSV-bestand</label>
+      <input id="csv-file" type="file" accept=".csv,text/csv" aria-describedby="csv-help">
+      <p class="hint" id="csv-help">Maximaal 256 kB. Alles blijft op dit apparaat, alleen in dit tabblad.</p>
+      <label for="csv-paste">Of plak je volledige CSV hier</label>
+      <textarea id="csv-paste" spellcheck="false" autocomplete="off" placeholder="retailer,observedAt,id,name,packAmount,packUnit,packCount,priceCents,available" aria-describedby="paste-help"></textarea>
+      <p class="hint" id="paste-help">Als je tekst plakt, wordt het gekozen bestand genegeerd. Met deze pagina kun je ontbrekende productprijzen niet invullen of gokken.</p>
+      <div class="actions">
+        <button class="primary" type="submit">Controleer en maak JSON</button>
+        <button class="secondary" id="download" type="button" disabled>Download JSON voor Supa</button>
+        <button class="secondary" id="clear" type="button">Wis invoer</button>
+      </div>
+    </form>
+    <p id="status" role="status" aria-live="polite">Er is nog geen bestand verwerkt.</p>
+  </section>
+  <section class="panel" aria-labelledby="after">
+    <h2 id="after">Daarna in Supa</h2>
+    <p>Ga naar <strong>Planner</strong>, kies je maaltijden en open <strong>Vergelijk</strong>. Importeer je gedownloade JSON in de lokale twee-winkelsvergelijking. Controleer per winkel de productmatches, volledige verpakkingen, eenheidsprijzen, ontbrekende regels en opnametijden. Supa toont alleen een volledig prijsverschil bij twee complete, voldoende recente mandjes.</p>
+    <p class="hint">Deze import geeft geen toestemming om PLUS of DekaMarkt te scrapen en levert geen publiek of onafhankelijk onderzoeksbewijs. Er vindt geen automatische upload plaats.</p>
+  </section>
+</main>
+<script type="module">
+  import { convertTwoStoreCsv } from './offline-two-store-csv.mjs'
+  const form = document.getElementById('converter')
+  const file = document.getElementById('csv-file')
+  const paste = document.getElementById('csv-paste')
+  const download = document.getElementById('download')
+  const clear = document.getElementById('clear')
+  const status = document.getElementById('status')
+  let readyJson = null
+  const setStatus = (message, state = 'normal') => {
+    status.textContent = message
+    status.dataset.state = state
+  }
+  const invalidate = () => {
+    readyJson = null
+    download.disabled = true
+  }
+  file.addEventListener('change', () => { paste.value = ''; invalidate(); setStatus('Bestand geselecteerd. Klik op Controleer en maak JSON.') })
+  paste.addEventListener('input', () => { file.value = ''; invalidate(); setStatus('Invoer gewijzigd. Controleer opnieuw voor je downloadt.') })
+  clear.addEventListener('click', () => {
+    file.value = ''
+    paste.value = ''
+    invalidate()
+    setStatus('Invoer gewist uit dit formulier.')
+  })
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault()
+    invalidate()
+    const selected = file.files?.[0]
+    try {
+      if (selected && selected.size > 256000) throw new Error('CSV is groter dan 256 kB.')
+      const source = selected
+        ? new TextDecoder('utf-8', { fatal: true }).decode(await selected.arrayBuffer())
+        : paste.value
+      if (new TextEncoder().encode(source).length > 256000) throw new Error('CSV is groter dan 256 kB.')
+      const json = convertTwoStoreCsv(source)
+      const captures = JSON.parse(json).captures
+      readyJson = json
+      download.disabled = false
+      const counts = captures.map(item => item.retailer + ': ' + item.products.length + ' productregels').join('; ')
+      setStatus('Lokale conversie klaar. ' + counts + '. Controleer de echte waarnemingen in Supa; dit is geen gecontroleerde besparingsclaim.')
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'CSV kon niet worden verwerkt.', 'error')
+    }
+  })
+  download.addEventListener('click', () => {
+    if (!readyJson) return
+    const url = URL.createObjectURL(new Blob([readyJson], { type: 'application/json;charset=utf-8' }))
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = 'supa-twee-winkels.json'
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  })
+</script>
+</body>
+</html>
