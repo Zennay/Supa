@@ -95,3 +95,57 @@ export function saveReplacedPlannerRecipes({
     return { status: 'protected', raw: actual }
   }
 }
+
+
+/**
+ * On a fresh browser load, the ordinary safe preference reader substitutes
+ * missing recipe IDs with built-in defaults. Without this narrowly admitted
+ * view of the ORIGINAL v2 bytes the user would never see the recovery
+ * warning or be able to explicitly repair the still-protected record.
+ *
+ * Return ONLY missing IDs for otherwise admissible v2 records. Never infer
+ * a source, overwrite storage, or inspect unknown/future schema formats.
+ */
+export function missingStoredOwnRecipeSelections(
+  raw: string | null,
+  defaultPlan: readonly { day: string; recipeId: string }[],
+  validRecipeIds: readonly string[],
+): Readonly<Record<string, string>> {
+  const nothing: Readonly<Record<string, string>> = {}
+  if (!raw || raw.length > 64_000) return nothing
+  try {
+    const value: unknown = JSON.parse(raw)
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return nothing
+    const record = value as Record<string, unknown>
+    if (Object.keys(record).length !== 3 ||
+        !['budget', 'activeDays', 'recipeByDay'].every(key => Object.hasOwn(record, key)) ||
+        !record.recipeByDay || typeof record.recipeByDay !== 'object' ||
+        Array.isArray(record.recipeByDay)) return nothing
+
+    const validDays = defaultPlan.map(meal => meal.day)
+    const fallbackByDay = new Map(defaultPlan.map(meal => [meal.day, meal.recipeId]))
+    const original = Object.entries(record.recipeByDay as Record<string, unknown>)
+    const restored = Object.fromEntries(original)
+    const missing: Record<string, string> = Object.create(null)
+    for (const [day, recipeId] of original) {
+      if (!validDays.includes(day) || typeof recipeId !== 'string' ||
+          recipeId !== recipeId.trim() || !recipeId) return nothing
+      if (validRecipeIds.includes(recipeId)) continue
+      // A missing private recipe is recoverable. An unknown built-in or a
+      // future application version must not be mistaken for a deleted recipe.
+      const fallback = fallbackByDay.get(day)
+      if (!recipeId.startsWith('own-') || !fallback ||
+          !validRecipeIds.includes(fallback)) return nothing
+      missing[day] = recipeId
+      restored[day] = fallback
+    }
+    if (!Object.keys(missing).length) return nothing
+    // This admission checks the complete candidate: exact v2 envelope,
+    // legitimate budget/days, and every OTHER saved recipe choice.
+    const candidate = JSON.stringify({ ...record, recipeByDay: restored })
+    return canReplacePlannerRecord(candidate, validDays, validRecipeIds)
+      ? missing : nothing
+  } catch {
+    return nothing
+  }
+}
