@@ -299,6 +299,27 @@ export function ImportedRecipeGroceriesPanel({
         'Het printbare weekmenu kon niet veilig worden gemaakt.')
     }
   }
+  async function downloadDayGroceryOrigin() {
+    setFeedback('')
+    const expected = variantInputKey
+    try {
+      if (!plannerReadyForSelection || !plannerDaysDistinct ||
+        plannerAssignments.length === 0 || !result?.complete)
+        throw new Error('Controleer eerst alle ingrediënten en kies voor elk recept een eigen dag.')
+      requireLatestOwnedRecipes()
+      const { formatRecipeWeekShoppingByDay } = await import('./formatRecipeWeekShoppingByDay.ts')
+      if (expected !== latestVariantInputKey.current)
+        throw new Error('De recepten of porties zijn intussen veranderd. Probeer opnieuw.')
+      requireLatestOwnedRecipes()
+      const text = formatRecipeWeekShoppingByDay(result, plannerAssignments)
+      savePrivateFile('supa-weekboodschappen-per-kookdag.txt',
+        text, 'text/plain;charset=utf-8')
+      setFeedback('De complete ongeprijsde weeklijst met oorspronkelijke receptbijdragen per kookdag is opgeslagen.')
+    } catch (cause) {
+      setFeedback(cause instanceof Error ? cause.message :
+        'De boodschappen per kookdag konden niet veilig worden gemaakt.')
+    }
+  }
   const changedPortions = selected.filter(recipe =>
     Object.hasOwn(portionsById, recipe.id) &&
     portionsById[recipe.id] !== recipe.servings)
@@ -792,7 +813,10 @@ export function ImportedRecipeGroceriesPanel({
           <summary>Bekijk de oorspronkelijke ingrediëntbijdragen ({result!.contributorsByLine[line.key].length})</summary>
           <ul>{result!.contributorsByLine[line.key].map((source, index) =>
             <li key={index}>
-              <strong>{source.recipeTitle}</strong>{' — '}
+              <strong>{source.recipeTitle}</strong>
+              {plannerDaysDistinct && plannerAssignments.some(row => row.recipeId === source.recipeId) &&
+                <small>{plannerAssignments.find(row => row.recipeId === source.recipeId)?.day}</small>}
+              {' — '}
               {source.amount === null || source.unit === null
                 ? 'Hoeveelheid nog controleren'
                 : source.amount + ' ' + (source.unit === 'piece' ? 'stuks' : source.unit)}
@@ -896,6 +920,11 @@ export function ImportedRecipeGroceriesPanel({
             disabled={!plannerReadyForSelection || !plannerAssignments.length || !plannerDaysDistinct}
             onClick={() => void downloadPrintableRecipeWeek()}>
             Download printbaar weekmenu + bereidingsstappen (HTML)
+          </button>
+          <button type="button" className="ghost-button"
+            disabled={!plannerReadyForSelection || !plannerAssignments.length || !plannerDaysDistinct}
+            onClick={() => void downloadDayGroceryOrigin()}>
+            Download weekboodschappen met receptbijdragen per dag (TXT)
           </button>
         </div>
       </section>
