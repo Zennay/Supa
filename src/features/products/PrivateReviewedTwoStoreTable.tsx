@@ -196,6 +196,19 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
     if (!intent) { onOpenComparison(); return }
     onChooseRouteLine(intent)
   }
+  function unitPriceWarning(first: Matched, second: Matched): string | null {
+    const a = rate(first)
+    const b = rate(second)
+    if (!a || !b || a.unit !== b.unit ||
+        a.centsPerUnit === b.centsPerUnit ||
+        first.lineTotalCents === second.lineTotalCents) return null
+    const cheaperUnit: OwnStore = a.centsPerUnit < b.centsPerUnit ? 'PLUS' : 'DekaMarkt'
+    const cheaperWeek: OwnStore = first.lineTotalCents < second.lineTotalCents
+      ? 'PLUS' : 'DekaMarkt'
+    return cheaperUnit === cheaperWeek ? null
+      : cheaperUnit + ' heeft de lagere indicatieve prijs per ' + a.unit +
+        ', maar ' + cheaperWeek + ' kost minder aan HELE verpakkingen voor jouw weekvraag.'
+  }
   const product = (line: Matched, store: OwnStore) => <div className="private-reviewed-products__paired-option">
     <strong>{store}</strong>
     <span>{line.productName}</span>
@@ -281,6 +294,11 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
           : (first.lineTotalCents < second.lineTotalCents ? 'PLUS' : 'DekaMarkt') + ' is ' +
             money.format(Math.abs(first.lineTotalCents - second.lineTotalCents) / 100) +
             ' voordeliger voor dit ingrediënt.'}</p>
+        {unitPriceWarning(first, second) && <p className="private-reviewed-products__unit-caveat">
+          {unitPriceWarning(first, second)}
+          {' '}Supa rekent het winkelmandje met de werkelijk benodigde hele pakken,
+          nooit alleen met de indicatieve eenheidsprijs.
+        </p>}
         <div className="private-reviewed-products__ingredient-route-actions"
           aria-label={'Kies winkel voor ' + first.ingredientLabel}>
           <button type="button" onClick={() => chooseIngredientStore(first.id, 'PLUS')}>
