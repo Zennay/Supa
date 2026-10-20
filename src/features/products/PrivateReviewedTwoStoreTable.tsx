@@ -329,11 +329,17 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
     const remainingCents = lines.reduce((total, line) =>
       checked[privatePhysicalShoppingTick(reviewed.planKey, shop, basket.store.id, line)]
         ? total : total + line.lineTotalCents, 0)
+    const unresolved = basket.lines.filter(line => line.status === 'unresolved')
+    const full = basket.lines.length > 0 && unresolved.length === 0 &&
+      basket.unresolvedLineCount === 0
     return <div className="private-reviewed-products__shop-progress">
       <label>{done} van {lines.length} oorspronkelijke artikelen afgevinkt
         <progress value={done} max={Math.max(1, lines.length)} />
       </label>
-      <strong>Nog op jouw lijst: {money.format(remainingCents / 100)}</strong>
+      <strong>{full ? 'Nog op jouw lijst' : 'Bekend open deel'}: {money.format(remainingCents / 100)}</strong>
+      {!full && <small role="status">{unresolved.length} fysieke ingrediënten zijn nog niet
+        gekoppeld aan een bruikbare prijs. Het totale open bedrag is onbekend;
+        dit is uitsluitend het bekende bedrag voor gematchte hele verpakkingen.</small>}
       <small>Dit zijn oorspronkelijke hele-pakprijzen van open artikelen,
         geen betaalde kassasom of actuele winkelprijs.</small>
     </div>
@@ -380,10 +386,21 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
           return <article key={shop}>
             <h4>{shop}</h4>
             {capture ? <>
-              <strong>{money.format(capture.basket.totalCents / 100)}</strong>
-              {budgetComparison(capture.basket.totalCents) && <small>
-                {budgetComparison(capture.basket.totalCents)}</small>}
-              <small>{capture.basket.lines.length} oorspronkelijke, gecontroleerde SKU-regels</small>
+              <strong>{capture.basket.unresolvedLineCount === 0 &&
+                capture.basket.lines.length > 0 ? 'Volledige eigen mand' : 'Bekende regels, totaal onbekend'}: {
+                money.format(capture.basket.totalCents / 100)}</strong>
+              {capture.basket.unresolvedLineCount === 0 &&
+                capture.basket.lines.length > 0 &&
+                budgetComparison(capture.basket.totalCents) && <small>
+                  {budgetComparison(capture.basket.totalCents)}
+                </small>}
+              {capture.basket.unresolvedLineCount > 0 && <small role="status">
+                {capture.basket.unresolvedLineCount} van {capture.basket.lines.length} fysieke
+                ingrediënten ontbreken nog of zijn niet bevestigd; de volledige prijs en
+                budgetruimte zijn onbekend.
+              </small>}
+              <small>{capture.basket.matchedLineCount} gematchte bronproducten van {
+                capture.basket.lines.length} benodigde ingrediënten</small>
               <time dateTime={capture.observedAt}>{capture.observedAt}</time>
               {shopProgress(shop, capture.basket)}
               {singleStoreTripActions(shop)}
