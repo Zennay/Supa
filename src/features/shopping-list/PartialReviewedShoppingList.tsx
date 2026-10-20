@@ -81,7 +81,7 @@ export function PartialReviewedShoppingList({
     const key = tick(line)
     setChecked(previous => ({ ...previous, [key]: !previous[key] }))
   }
-  async function produce(kind: 'text' | 'csv' | 'copy') {
+  async function produce(kind: 'text' | 'csv' | 'copy' | 'share') {
     setMessage('')
     setCopyFallback(null)
     const plan = progress?.planKey
@@ -103,7 +103,27 @@ export function PartialReviewedShoppingList({
         store, observedAt: capture!.observedAt, rows, unknown: incompleteNeeds,
         checked: selected, totalDemandLines: confirmed.physicalLineCount,
       }, kind === 'csv' ? 'csv' : 'text')
-      if (kind === 'copy') {
+      if (kind === 'share' && typeof navigator.share === 'function') {
+        try {
+          // Original observed source is checked immediately before native OS handoff.
+          if (currentKey.current !== checkedKey ||
+              !confirmedPartialBasket(progress, store, Date.now()) ||
+              !recentOwnCaptureInstant(capture!.observedAt, Date.now()))
+            throw new Error('De originele winkelopname is inmiddels gewijzigd of verlopen.')
+          await navigator.share({
+            title: 'Supa · ' + store + ' · gedeeltelijk gecontroleerde boodschappen',
+            text: content,
+          })
+          if (currentKey.current === checkedKey)
+            setMessage('De deellijst is via jouw gekozen app gedeeld. Ontbrekende producten blijven onbekend.')
+          return
+        } catch (cause) {
+          if (cause instanceof DOMException && cause.name === 'AbortError') return
+          if (currentKey.current !== checkedKey) return
+          // Browser or OS cannot share: use existing clipboard/text fallback.
+        }
+      }
+      if (kind === 'copy' || kind === 'share') {
         try {
           if (!navigator.clipboard?.writeText)
             throw new Error('Geen klembordtoegang')
@@ -203,6 +223,9 @@ export function PartialReviewedShoppingList({
     </div>}
     <div className="supa-partial-shop__actions">
       <button type="button" onClick={() => void produce('copy')}>Kopieer gecontroleerde deellijst</button>
+      <button type="button" className="ghost-button" onClick={() => void produce('share')}>
+        Deel gecontroleerde deellijst via mijn telefoon
+      </button>
       <button type="button" className="ghost-button" onClick={() => void produce('text')}>Download TXT</button>
       <button type="button" className="ghost-button" onClick={() => void produce('csv')}>Download CSV</button>
     </div>
