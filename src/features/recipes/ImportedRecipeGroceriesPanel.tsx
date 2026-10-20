@@ -119,6 +119,9 @@ export function ImportedRecipeGroceriesPanel({
   })
   const latestProgressIdentity = useRef(progressIdentity)
   latestProgressIdentity.current = progressIdentity
+  const captureKey = JSON.stringify([progressIdentity, captureTarget])
+  const latestCaptureKey = useRef(captureKey)
+  latestCaptureKey.current = captureKey
   const outstanding = list?.lines.filter(line => line.needsReview).length ?? 0
   const checkedCount = list?.lines.filter(line => !line.needsReview && checked[line.key]).length ?? 0
   const visible = list?.lines.filter(line => !pendingOnly || line.needsReview || !checked[line.key]) ?? []
@@ -330,26 +333,27 @@ export function ImportedRecipeGroceriesPanel({
     setFeedback('')
     setCopyableCaptureGuide(null)
     const identity = progressIdentity
+    const key = captureKey
     const target = captureTarget
     try {
       const { combinedRecipesCaptureKit } = await import('./combinedRecipesCaptureKit.ts')
-      if (latestProgressIdentity.current !== identity)
+      if (latestCaptureKey.current !== key)
         throw new Error('De fysieke receptenbundel veranderde tijdens voorbereiden. Probeer opnieuw.')
       const shops = target === 'both' ? ['PLUS', 'DekaMarkt'] as const
         : [target as 'PLUS' | 'DekaMarkt']
       const content = combinedRecipesCaptureKit(selected, portionsById, shops).guide
-      if (latestProgressIdentity.current !== identity)
+      if (latestCaptureKey.current !== key)
         throw new Error('De fysieke ingrediënten veranderden; kopieer de nieuwe gids.')
       if (navigator.clipboard?.writeText) {
         try {
           await navigator.clipboard.writeText(content)
-          if (latestProgressIdentity.current === identity)
+          if (latestCaptureKey.current === key)
             setFeedback('De actuele ongeprijsde opnamegids voor jouw winkelkeuze is gekopieerd.')
           else setFeedback('De recepten veranderden tijdens kopiëren. Maak de nieuwe gids opnieuw.')
           return
         } catch { /* Browser denied clipboard access. Display only own source hints. */ }
       }
-      if (latestProgressIdentity.current !== identity)
+      if (latestCaptureKey.current !== key)
         throw new Error('De recepten zijn veranderd. Maak de gids opnieuw.')
       setCopyableCaptureGuide({ identity, target, text: content })
       setFeedback('Klembordtoegang ontbreekt. Selecteer en kopieer je ongeprijsde rijgids hieronder.')
@@ -641,7 +645,20 @@ export function ImportedRecipeGroceriesPanel({
             onClick={() => void downloadCaptureKit('guide')}>
             Download bijbehorende opnamegids (TXT)
           </button>
+          <button type="button" disabled={!result!.complete || selected.length > 14}
+            onClick={() => void copyCaptureGuide()}>
+            Kopieer opnamegids (mobiel)
+          </button>
         </div>
+        {copyableCaptureGuide?.identity === progressIdentity &&
+          copyableCaptureGuide.target === captureTarget &&
+          <label className="recipe-collection-groceries__mobile-copy">
+            Selecteer en kopieer de volledige ongeprijsde winkelopnamegids
+            <textarea rows={12} readOnly value={copyableCaptureGuide.text}
+              onFocus={event => {
+                if (latestCaptureKey.current === captureKey) event.currentTarget.select()
+              }} />
+          </label>}
         {!result!.complete && <small>Controleer de ontbrekende hoeveelheden en recipe-bronnen
           voordat je een fysiek opnamemandje aanmaakt.</small>}
         <small>De twee bestandsnamen dragen dezelfde lokale bundelcode als je selectie gelijk is.
