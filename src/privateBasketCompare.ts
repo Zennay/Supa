@@ -57,6 +57,10 @@ const coverageLabels = {
   PLUS: document.querySelector<HTMLElement>('#coverage-plus-text')!,
   DekaMarkt: document.querySelector<HTMLElement>('#coverage-deka-text')!,
 }
+const recaptureButtons = {
+  PLUS: document.querySelector<HTMLButtonElement>('#blank-plus-recapture')!,
+  DekaMarkt: document.querySelector<HTMLButtonElement>('#blank-deka-recapture')!,
+}
 const budgetInput = document.querySelector<HTMLInputElement>('#budget-euros')!
 const budgetStatus = document.querySelector<HTMLDivElement>('#budget-status')!
 let budgetTotals: Record<StoreName, number | null> | null = null
@@ -356,6 +360,49 @@ function storeBasket(store: StoreName, capture: Capture | undefined, demand: Dem
     store: { id: store, name: store }, selectedMealCount: demand.selectedMealCount,
     lines, totalCents, matchedLineCount, unresolvedLineCount,
   }
+}
+
+// A new individual capture must cover the SAME complete physical demand.
+// Do not make a misleading 'missing only' retailer file: importing that as
+// a replacement store capture could silently drop previously priced products.
+for (const store of stores) {
+  recaptureButtons[store].addEventListener('click', async () => {
+    if (result.hidden || !lastPrivateDemand) return
+    const demand = lastPrivateDemand
+    const button = recaptureButtons[store]
+    button.disabled = true
+    try {
+      const { makeBlankPlannerCaptureCsv } =
+        await import('./features/comparison/plannerPriceCaptureSheet.ts')
+      if (result.hidden || lastPrivateDemand !== demand)
+        throw Error('De fysieke mandvraag is gewijzigd. Open de nieuwe vergelijking.')
+      const csv = makeBlankPlannerCaptureCsv(
+        demand.ingredients.map(item => ({
+          id: item.id, label: item.label, unit: item.unit,
+        })), [store], ';')
+      if (result.hidden || lastPrivateDemand !== demand)
+        throw Error('De oorspronkelijke fysieke mandvraag is gewijzigd.')
+      const url = URL.createObjectURL(new Blob(['\uFEFF' + csv], {
+        type: 'text/csv;charset=utf-8',
+      }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-' + store.toLowerCase() + '-nieuw-volledig-waarneemblad.csv'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setStatus('Leeg volledig ' + store + '-heropnameblad gedownload voor exact dezelfde ' +
+        demand.ingredients.length + ' fysieke ingrediënten. Alleen echte originele winkel-SKU’s, ' +
+        'waarnemingstijd, verpakkingen en prijzen mogen worden ingevuld. De huidige prijsbron is ' +
+        'niet gewijzigd. Een leeg product heeft nooit een bekende prijs.')
+    } catch (cause) {
+      setStatus(cause instanceof Error ? cause.message :
+        'Het lege lokale heropnameblad is niet beschikbaar.', true)
+    } finally {
+      button.disabled = false
+    }
+  })
 }
 
 function nanoseconds(raw: string): bigint {
