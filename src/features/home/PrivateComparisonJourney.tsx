@@ -294,6 +294,28 @@ export function PrivateComparisonJourney({
         </button>
       </div>
       {captureMessage && <p role="status">{captureMessage}</p>}
+      {captureNeeds.length > 0 && <details className="private-comparison-journey__field-guide">
+        <summary>Bekijk mijn {captureNeeds.length} ingrediënten en de juiste CSV-rijnummers</summary>
+        <p>Dit zijn je oorspronkelijke Planner-hoeveelheden bij allebei de winkels.
+          De CSV heeft bewust lege productcodes, verpakkingen, bronmomenten en prijzen.
+          Koppel de waargenomen producten aan deze rijnummers; vul géén receptnamen
+          als zogenaamd geobserveerde winkelproductnamen in.</p>
+        <div className="private-comparison-journey__field-guide-shops">
+          {stores.map((store, storeIndex) => <section key={store} aria-label={store + ' CSV-rijnummers'}>
+            <h3>{store}</h3>
+            <ol start={2 + storeIndex * captureNeeds.length}>
+              {captureNeeds.map((need, index) => <li key={store + '-' + index + '-' + need.id}>
+                <strong>{need.label}</strong>
+                <small>{need.amount !== null && Number.isFinite(need.amount) && need.amount > 0
+                  ? 'Planner-vraag: ' + need.amount + ' ' + need.unit
+                  : 'Planner-hoeveelheid nog controleren'}</small>
+              </li>)}
+            </ol>
+          </section>)}
+        </div>
+      </details>}
+      <small>Bij delen kies je zelf een ontvangende app. Die krijgt dan je
+        persoonlijke ingrediëntenlijst; Supa voegt geen winkelprijzen toe.</small>
       <button type="button" aria-expanded={showPasteSource}
         onClick={() => setShowPasteSource(open => !open)}>
         {showPasteSource ? 'Sluit spreadsheet-invoer' : 'Plak mijn eigen winkelprijzen uit CSV of JSON'}

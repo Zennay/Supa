@@ -86,3 +86,17 @@
 .private-comparison-journey__capture-buttons button{flex:1 1 210px}
 .private-comparison-journey__capture-buttons button:disabled{opacity:.55;cursor:not-allowed}
 .private-comparison-journey__paste p[role=status]{margin:.25rem 0;line-height:1.5;color:#385a3c}
+/* Physical Planner demand stays separate from unobserved retailer fields. */
+.private-comparison-journey__field-guide{min-width:0;border:1px solid #cbdccb;border-radius:12px;background:#fff}
+.private-comparison-journey__field-guide summary{cursor:pointer;padding:.85rem;font-weight:700;min-height:44px}
+.private-comparison-journey__field-guide summary:focus-visible{outline:3px solid #cf9738;outline-offset:2px}
+.private-comparison-journey__field-guide>p{margin:.5rem 1rem 1rem;line-height:1.5;color:#455b4a}
+.private-comparison-journey__field-guide-shops{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;padding:0 1rem 1rem}
+.private-comparison-journey__field-guide-shops section{min-width:0}
+.private-comparison-journey__field-guide-shops h3{margin:.4rem 0;font-size:1.05rem}
+.private-comparison-journey__field-guide-shops ol{margin:.4rem 0 0;padding-left:2.2rem;max-height:360px;overflow-y:auto}
+.private-comparison-journey__field-guide-shops li{padding:.5rem .4rem;overflow-wrap:anywhere}
+.private-comparison-journey__field-guide-shops li+li{border-top:1px solid #e3ebe3}
+.private-comparison-journey__field-guide-shops strong,.private-comparison-journey__field-guide-shops small{display:block}
+.private-comparison-journey__field-guide-shops small{color:#516756;line-height:1.4}
+@media(max-width:630px){.private-comparison-journey__field-guide-shops{grid-template-columns:1fr}}
