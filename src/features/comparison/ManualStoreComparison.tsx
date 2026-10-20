@@ -46,7 +46,13 @@ function tabularData(needs: readonly ManualNeed[], entries: ManualEntries): stri
 function readPastedTable(text: string, needs: readonly ManualNeed[]): {
   entries: ManualEntries; legacyWithoutPackCount: boolean
 } {
-  const lines = text.replace(/\r\n/g, '\n').replace(/\n$/u, '').split('\n')
+  // Bound pasted content like a local file before splitting it into cells.
+  // Excel and other spreadsheets may prefix a valid UTF-8 TSV with a BOM.
+  if (typeof text !== 'string' || new TextEncoder().encode(text).length > 128000) {
+    throw new Error('Het invulblad is te groot (maximaal 128 kB).')
+  }
+  const normalized = text.replace(/^\uFEFF/u, '').replace(/\r\n?/gu, '\n')
+  const lines = normalized.replace(/\n+$/u, '').split('\n')
   const legacyWithoutPackCount = lines[0] === legacyTableHeader
   if ((!legacyWithoutPackCount && lines[0] !== tableHeader) ||
       lines.length !== 1 + needs.length * 2) {
