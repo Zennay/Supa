@@ -43,7 +43,9 @@ export function ImportedRecipeGroceriesPanel({
   }[]) => SavedRecipe[]
 }) {
   const [selectedIds, setSelectedIds] = useState<string[]>(() =>
-    (recentIds.length ? recentIds : recipes.slice(0, 3).map(recipe => recipe.id)).slice(0, 15))
+    [...new Set(recentIds.length
+      ? recentIds : recipes.slice(0, 3).map(recipe => recipe.id))]
+      .filter(id => recipes.some(recipe => recipe.id === id)).slice(0, 15))
   const [query, setQuery] = useState('')
   const [reuseFirst, setReuseFirst] = useState(false)
   const [startDay, setStartDay] = useState(m2InitialPlan[0].day)
@@ -166,13 +168,19 @@ export function ImportedRecipeGroceriesPanel({
   const checkedCount = list?.lines.filter(line => !line.needsReview && checked[line.key]).length ?? 0
   const visible = list?.lines.filter(line => !pendingOnly || line.needsReview || !checked[line.key]) ?? []
   const changeSelection = (id: string, include: boolean) => {
-    if (include && selectedIds.length >= 15 && !selectedIds.includes(id)) {
+    // Deleted recipes from another tab must not occupy invisible selection
+    // slots. A restored/imported batch can also contain duplicate IDs.
+    if (include && selected.length >= 15 && !selectedIds.includes(id)) {
       setFeedback('Kies maximaal vijftien recepten voor één fysieke boodschappenlijst.')
       return
     }
-    setSelectedIds(current => include
-      ? [...new Set([...current, id])]
-      : current.filter(value => value !== id))
+    setSelectedIds(current => {
+      const available = [...new Set(current)].filter(value =>
+        recipes.some(recipe => recipe.id === value))
+      return include
+        ? [...new Set([...available, id])]
+        : available.filter(value => value !== id)
+    })
     setChecked({}); setFeedback('')
   }
   const moveRecipe = (id: string, direction: -1 | 1) => {
