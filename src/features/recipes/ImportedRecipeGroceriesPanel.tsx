@@ -180,6 +180,12 @@ export function ImportedRecipeGroceriesPanel({
                 ? 'Hoeveelheid nog controleren'
                 : source.amount + ' ' + (source.unit === 'piece' ? 'stuks' : source.unit)}
               <small> · Origineel: {source.original}</small>
+              <button type="button" onClick={() => {
+                const sourceRecipe = recipes.find(recipe => recipe.id === source.recipeId)
+                if (sourceRecipe) onEdit(sourceRecipe)
+              }} aria-label={'Bewerk ' + source.recipeTitle + ' voor ' + line.label}>
+                Bewerk dit recept
+              </button>
             </li>)}</ul>
         </details>}
       </li>)}</ul>

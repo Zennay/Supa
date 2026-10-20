@@ -4,6 +4,7 @@ import { toPlannerRecipe } from './plannerRecipes.ts'
 import type { SavedRecipe } from './recipeLibrary.ts'
 
 export type GroceryContribution = {
+  recipeId: string
   recipeTitle: string
   original: string
   amount: number | null
@@ -62,7 +63,7 @@ export function combinedImportedRecipeGroceries(
       const groupKey = complete && typeof item.query === 'string' && item.query.trim()
         ? JSON.stringify([item.query, item.unit]) : null
       const contribution: GroceryContribution = {
-        recipeTitle: recipe.title, original: item.original,
+        recipeId: recipe.id, recipeTitle: recipe.title, original: item.original,
         amount: complete ? item.amount : null, unit: complete ? item.unit : null,
       }
       const prior = groupKey ? groups.get(groupKey) : null
