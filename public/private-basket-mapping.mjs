@@ -133,21 +133,26 @@ function observedPackDescription(product) {
       ' · indicatief ' + ownEuro.format(advisory) + '/' + family : '')
 }
 
-// Only a read-only estimate for an explicitly chosen OWN observed SKU.
- // Canonical TS pack arithmetic does the calculation; this plain browser
- // shell does not duplicate unit conversion or invent purchase prices.
-function chosenWholePackPreview(row, store, product) {
-  if (!product || !captures?.[store] || !product.available) return ''
-  const original = captures[store].observedAt
-  const age = ageNs(original, Date.now())
-  if (needsRecapture(age)) return 'Oorspronkelijke opname is niet actueel; geen bruikbaar prijsadvies.'
+// Read-only preview for an explicitly chosen OWN observed SKU. The source
+// must be recent; only the canonical TS calculator may decide whole packs.
+function ownPhysicalPricePreview(row, store, product) {
+  if (!product || !captures?.[store] || !product.available) return null
+  const age = ageNs(captures[store].observedAt, Date.now())
+  if (age === null || needsRecapture(age)) return null
   const raw = row.querySelector('.amount').value.trim()
   const amount = raw ? numeric(raw) : null
   const request = {
     amount, unit: row.querySelector('.unit').value, product, outcome: null,
   }
   document.dispatchEvent(new CustomEvent('supa:private-pack-preview', { detail: request }))
-  const chosen = request.outcome
+  return request.outcome
+}
+function chosenWholePackPreview(row, store, product) {
+  if (!product || !captures?.[store] || !product.available) return ''
+  const age = ageNs(captures[store].observedAt, Date.now())
+  if (age === null || needsRecapture(age))
+    return 'Oorspronkelijke opname is niet actueel; geen bruikbaar prijsadvies.'
+  const chosen = ownPhysicalPricePreview(row, store, product)
   if (!chosen) return 'Geen geldig aantal hele verpakkingen voor deze fysieke behoefte.'
   const duplicate = Array.from(lines.querySelectorAll('.ingredient'))
     .filter(other => other.querySelector('[data-store="' + store + '"]').value === product.id).length > 1
@@ -197,18 +202,21 @@ function updateCoverage() {
       const sku = row.querySelector('[data-store="' + store + '"]').value
       if (!sku) continue
       if (countBySku.get(sku) > 1) { duplicated++; continue }
-      const input = row.querySelector('.amount').value.trim()
-      const amount = input === '' ? null : numeric(input)
       const unit = row.querySelector('.unit').value
-      if (amount !== null && validText(row.querySelector('.label').value.trim())) {
-        if (availableProducts(store, unit).some(p => p.id === sku)) ready++
-        else if (observedProducts(store, unit).some(p => p.id === sku)) knownButUnpriced++
-      }
+      const product = observedProducts(store, unit).find(p => p.id === sku)
+      if (!product) continue
+      // The same canonical whole-pack pricing used for the displayed preview
+      // determines readiness here. Merely selecting an SKU with a pack price
+      // must not mark a fractional piece, stale capture or impossible pack as
+      // a ready physical shopping line.
+      if (validText(row.querySelector('.label').value.trim()) &&
+          ownPhysicalPricePreview(row, store, product)) ready++
+      else knownButUnpriced++
     }
     return store + ': ' + ready + ' van ' + rows.length +
       ' fysieke regels met uniek gekozen, prijsbaar eigen product' +
       (knownButUnpriced ? ' · ' + knownButUnpriced +
-        ' gekoppeld maar niet prijsbaar/beschikbaar' : '') +
+        ' gekoppeld maar niet actueel of niet als hele verpakkingen prijsbaar' : '') +
       (duplicated ? ' · ' + duplicated + ' regels met dubbel gekozen SKU' : '')
   })
   const now = Date.now()
