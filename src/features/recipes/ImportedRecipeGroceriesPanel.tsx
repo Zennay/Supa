@@ -49,6 +49,10 @@ export function ImportedRecipeGroceriesPanel({
   const [startDay, setStartDay] = useState(m2InitialPlan[0].day)
   const [captureTarget, setCaptureTarget] = useState<'both' | 'PLUS' | 'DekaMarkt'>('both')
   const [copyableCaptureGuide, setCopyableCaptureGuide] = useState<{ identity: string; target: string; text: string } | null>(null)
+  const [capturePreview, setCapturePreview] = useState<{
+    key: string; rows: { csvRow: number; store: string; id: string;
+      label: string; amount: number; unit: string }[]
+  } | null>(null)
   const [dayOverrides, setDayOverrides] = useState<Record<string, string>>({})
   const [portionsById, setPortionsById] = useState<Record<string, number>>({})
   const [checked, setChecked] = useState<Record<string, boolean>>({})
@@ -341,6 +345,28 @@ export function ImportedRecipeGroceriesPanel({
       setFeedback('CSV met fysieke hoeveelheden, controlepunten en onbekende prijzen lokaal opgeslagen.')
     } catch (cause) {
       setFeedback(cause instanceof Error ? cause.message : 'De CSV kon niet worden opgeslagen.')
+    }
+  }
+  async function showCapturePreview() {
+    if (!privateTransfer.ready) return
+    setFeedback('')
+    const key = captureKey
+    const target = captureTarget
+    try {
+      const { combinedRecipesCaptureKit } = await import('./combinedRecipesCaptureKit.ts')
+      if (latestCaptureKey.current !== key)
+        throw new Error('De receptenbundel of winkelkeuze veranderde. Bekijk de nieuwe rijen.')
+      const stores = target === 'both' ? ['PLUS', 'DekaMarkt'] as const
+        : [target as 'PLUS' | 'DekaMarkt']
+      const kit = combinedRecipesCaptureKit(selected, portionsById, stores)
+      if (latestCaptureKey.current !== key)
+        throw new Error('De fysieke boodschappen veranderden. Bekijk het actuele winkelblad opnieuw.')
+      setCapturePreview({ key, rows: kit.rows })
+      setFeedback(kit.rows.length + ' lege opname-rijen voorbereid. ' +
+        'Alle productcodes, werkelijk waargenomen verpakkingen en winkelprijzen ontbreken bewust.')
+    } catch (cause) {
+      setFeedback(cause instanceof Error ? cause.message :
+        'De actuele originele bronopname kan niet worden getoond.')
     }
   }
   async function copyCaptureGuide() {
