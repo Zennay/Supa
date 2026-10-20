@@ -8,6 +8,8 @@ const stores = ['Algemeen', 'PLUS', 'DekaMarkt'] as const
 const privateSessionKey = 'supa:unpriced-notes:session:v1'
 const safeLabel = (value: string) => value.replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/gu, ' ')
   .replace(/\s+/g, ' ').trim()
+const duplicateKey = (store: UnpricedShoppingNote['store'], label: string) =>
+  JSON.stringify([store, label.normalize('NFC').toLocaleLowerCase('nl-NL')])
 
 /** Private volatile notes; no product match, price or retailer-source authority. */
 export function ManualShoppingNotes({ notes, setNotes }: {
@@ -143,18 +145,32 @@ export function ManualShoppingNotes({ notes, setNotes }: {
     const parsed = bulkDraft.split(/\r?\n/u)
       .map(line => safeLabel(line.replace(/^(?:[-*•]\s+|☐\s+|\d{1,3}[.)]\s+)/u, '')))
       .filter(Boolean)
-    if (!parsed.length || parsed.some(line => line.length > 140) ||
-        parsed.length > 100 || notes.length + parsed.length > 100) {
-      setMessage('Controleer de geplakte lijst: maximaal 100 artikelen totaal en 140 tekens per regel.')
+    if (!parsed.length || parsed.some(line => line.length > 140) || parsed.length > 100) {
+      setMessage('Controleer de geplakte lijst: maximaal 100 regels van 140 tekens.')
       return
     }
-    const appended = parsed.map(label => ({
+    const seen = new Set(notes.map(item => duplicateKey(item.store, item.label)))
+    const distinct = parsed.filter(label => {
+      const key = duplicateKey(store, label)
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+    if (notes.length + distinct.length > 100) {
+      setMessage('Je lijst heeft ruimte voor maximaal 100 verschillende artikelen. Er is niets toegevoegd.')
+      return
+    }
+    const added = distinct.map(label => ({
       id: 'own-note-' + crypto.randomUUID(), label, store, done: false,
     }))
-    setNotes(current => current.length + appended.length > 100 ? current : [...current, ...appended])
+    setNotes(current => {
+      const existing = new Set(current.map(item => duplicateKey(item.store, item.label)))
+      const newItems = added.filter(item => !existing.has(duplicateKey(item.store, item.label)))
+      return current.length + newItems.length > 100 ? current : [...current, ...newItems]
+    })
     setBulkDraft('')
-    setMessage(parsed.length + ' eigen artikelen toegevoegd aan ' + store +
-      ', zonder prijzen of invloed op je winkelvergelijking.')
+    setMessage(distinct.length + ' nieuwe artikelen toegevoegd aan ' + store +
+      '; ' + (parsed.length - distinct.length) + ' dubbele regels overgeslagen. Zonder winkelprijzen.')
   }
   function add(event: FormEvent) {
     event.preventDefault()
@@ -163,8 +179,13 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       setMessage('Vul een geldige omschrijving in (max. 140 tekens en 100 artikelen).')
       return
     }
-    setNotes(current => current.length >= 100 ? current : [...current,
-      { id: `own-note-${crypto.randomUUID()}`, label, store, done: false }])
+    if (notes.some(item => duplicateKey(item.store, item.label) === duplicateKey(store, label))) {
+      setMessage('Dit artikel staat al bij ' + store + '; de bestaande afvinking blijft behouden.')
+      return
+    }
+    setNotes(current => current.length >= 100 ||
+      current.some(item => duplicateKey(item.store, item.label) === duplicateKey(store, label))
+      ? current : [...current, { id: `own-note-${crypto.randomUUID()}`, label, store, done: false }])
     setName('')
     setMessage(`${label} toegevoegd zonder prijs. Dit verandert de supermarktvergelijking niet.`)
   }
