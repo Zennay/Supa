@@ -17,13 +17,31 @@ const fail = () => { throw new Error(FAIL) }
 const object = v => v !== null && typeof v === 'object' && !Array.isArray(v)
 const safe = v => v === null || (Number.isSafeInteger(v) && v >= 0)
 const count = v => Number.isSafeInteger(v) && v >= 0
-function instant(value, asOf) {
-  if (typeof value !== 'string' ||
-      !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?Z$/.test(value)) fail()
+// Match the reviewed product adapters' accepted ISO times, while comparing
+// absolute nanosecond instants (Date.parse alone truncates beyond 3 digits).
+// Different representations of one capture instant are ONE physical event.
+function instant(value, cutoffNs) {
+  if (typeof value !== 'string') fail()
+  const fields = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,9}))?)?(Z|[+-]\d{2}:\d{2})$/.exec(value)
+  if (!fields) fail()
+  const year = Number(fields[1]), month = Number(fields[2]), day = Number(fields[3])
+  const dayCheck = new Date(Date.UTC(year, month - 1, day))
+  if (dayCheck.getUTCFullYear() !== year ||
+      dayCheck.getUTCMonth() !== month - 1 ||
+      dayCheck.getUTCDate() !== day ||
+      Number(fields[4]) > 23 || Number(fields[5]) > 59 ||
+      Number(fields[6] ?? 0) > 59) fail()
+  const offset = fields[8]
+  if (offset !== 'Z') {
+    const [hours, minutes] = offset.slice(1).split(':').map(Number)
+    if (hours > 23 || minutes > 59) fail()
+  }
   const ms = Date.parse(value)
-  if (!Number.isFinite(ms) || ms > asOf ||
-      new Date(ms).toISOString().slice(0, 19) !== value.slice(0, 19)) fail()
-  return ms
+  if (!Number.isFinite(ms)) fail()
+  const fraction = (fields[7] ?? '').padEnd(9, '0')
+  const ns = BigInt(ms) * 1_000_000n + BigInt(fraction.slice(3) || '0')
+  if (ns > cutoffNs) fail()
+  return ns
 }
 function origin(value, retailer, kind, clock) {
   if (!object(value) || value.supermarket !== retailer ||
@@ -37,8 +55,8 @@ function origin(value, retailer, kind, clock) {
       url.href !== value.url ||
       [...url.searchParams.keys()].some(key =>
         /(?:token|secret|key|session|auth|password|credential)/i.test(key))) fail()
-  instant(value.capturedAt, clock)
-  return JSON.stringify([retailer, kind, value.url, value.capturedAt, value.sha256])
+  const capturedInstantNs = instant(value.capturedAt, clock)
+  return JSON.stringify([retailer, kind, value.url, capturedInstantNs.toString(), value.sha256])
 }
 function facts(value) {
   return JSON.stringify([
@@ -55,7 +73,7 @@ function facts(value) {
  * review is historical dataset consistency, not real-time price permission.
  */
 export function auditPrivateRetailerCaptureEvents(batch, { asOf = new Date().toISOString() } = {}) {
-  const clock = instant(asOf, Date.now())
+  const clock = instant(asOf, BigInt(Date.now()) * 1_000_000n)
   if (!object(batch) || !object(batch.summary) ||
       batch.summary.mode !== 'reviewed-offline-only' ||
       batch.summary.productionEnabled !== false ||
