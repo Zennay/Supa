@@ -56,6 +56,14 @@ function same(left, right) {
   return JSON.stringify(stable(left)) === JSON.stringify(stable(right))
 }
 
+
+function isSafeSourceId(value) {
+  return (
+    typeof value === 'string' &&
+    /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)
+  )
+}
+
 function indexById(report) {
   if (report.milestone !== 'M1 Data Feasibility') {
     throw new Error(`Unexpected milestone: ${report.milestone}`)
@@ -66,7 +74,7 @@ function indexById(report) {
 
   const index = new Map()
   for (const source of report.sources) {
-    if (!source?.id || index.has(source.id)) {
+    if (!isSafeSourceId(source?.id) || index.has(source.id)) {
       throw new Error(`Invalid or duplicate source id: ${source?.id}`)
     }
     index.set(source.id, source)
@@ -78,6 +86,9 @@ export function compareInspectionReports(baseline, current) {
   const baselineById = indexById(baseline)
   const currentById = indexById(current)
   const ids = [...new Set([...baselineById.keys(), ...currentById.keys()])].sort()
+  if (ids.length === 0) {
+    throw new Error('Cannot compare empty M1 inspection reports')
+  }
 
   const changes = ids.map((id) => {
     const before = baselineById.get(id)
@@ -102,6 +113,9 @@ export function compareInspectionReports(baseline, current) {
       }
     }
 
+    const supermarketChanged =
+      (before.supermarket ?? null) !== (after.supermarket ?? null)
+    const kindChanged = (before.kind ?? null) !== (after.kind ?? null)
     const captureStatusChanged = Boolean(before.success) !== Boolean(after.success)
     const finalUrlChanged = (before.finalUrl ?? null) !== (after.finalUrl ?? null)
     const contentChanged =
@@ -110,6 +124,8 @@ export function compareInspectionReports(baseline, current) {
     const schemaContractChanged = !same(schemaView(before), schemaView(after))
 
     const reasons = []
+    if (supermarketChanged) reasons.push('supermarket-changed')
+    if (kindChanged) reasons.push('source-kind-changed')
     if (captureStatusChanged) reasons.push('capture-status-changed')
     if (finalUrlChanged) reasons.push('final-url-changed')
     if (structureChanged) reasons.push('structured-markup-changed')
