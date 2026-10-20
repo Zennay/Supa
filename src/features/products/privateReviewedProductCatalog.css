@@ -106,3 +106,15 @@ line-height:1.45}
 
 .private-reviewed-products__route-choice{font-weight:650;border-color:#236d4d!important;
 background:#e7f4eb!important}
+
+/* Explicit offline share/copy fallback for browsers without clipboard permissions. */
+.private-reviewed-products__copy-fallback{display:grid;gap:.55rem;flex:1 1 100%;min-width:0;
+  border:1px solid #c0d3c2;background:#f7faf7;border-radius:10px;padding:.8rem}
+.private-reviewed-products__copy-fallback label{font-weight:650}
+.private-reviewed-products__copy-fallback textarea{display:block;width:100%;max-width:100%;box-sizing:border-box;
+  min-height:160px;padding:.75rem;border:1px solid #9aae9e;border-radius:8px;
+  font:inherit;font-size:.88rem;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;
+  color:#183c2a;background:#fff}
+.private-reviewed-products__copy-fallback textarea:focus-visible{
+  outline:3px solid #247a59;outline-offset:2px}
+.private-reviewed-products__copy-fallback button{justify-self:start}
