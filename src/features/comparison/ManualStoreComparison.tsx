@@ -54,7 +54,7 @@ function readPastedTable(text: string, needs: readonly ManualNeed[]): ManualEntr
     if (cells.length !== 6) throw new Error('Gebruik zes tabgescheiden kolommen.')
     const [id, shop, product, packAmount, unit, price] = cells
     if (!expected.has(id) || (shop !== 'PLUS' && shop !== 'DekaMarkt') ||
-        (unit !== '' && !manualCompatibleUnits(expected.get(id)!.unit).includes(unit as ManualQuote['packUnit'])) ||
+        (unit !== '' && !manualCompatibleUnits(expected.get(id)!.unit).includes(unit as Exclude<ManualQuote['packUnit'], ''>)) ||
         product.length > 160 || packAmount.length > 32 || price.length > 20) {
       throw new Error('De tabel bevat een onbekend product, winkel of eenheid.')
     }
