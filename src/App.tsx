@@ -49,6 +49,7 @@ import {
   type PlannerPreferences,
 } from './domain/plannerPreferences'
 import { unavailablePlannerRecipes, previewAvailablePlannerMeals } from './domain/unavailablePlannerRecipes.ts'
+import { saveReplacedPlannerRecipes } from './features/planner/saveReplacedPlannerRecipes.ts'
 import { restorePlannerPreferencesWithCustomBudget } from './features/planner/customWeekBudget.ts'
 import { canReplacePlannerRecord, persistPlannerRecord } from './features/planner/plannerStorageGuard.ts'
 import {
@@ -253,6 +254,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [preferences, setPreferences] = useState(() => initialLoad.preferences)
   const [persistenceWarning, setPersistenceWarning] = useState<PersistenceWarning>(initialLoad.warning)
   const [lastStoredRaw, setLastStoredRaw] = useState(initialLoad.raw)
+  const [planRepairMessage, setPlanRepairMessage] = useState('')
   const [manualWeekCopy, setManualWeekCopy] = useState<WeekSharePreview | null>(null)
   const [includeWeekBudget, setIncludeWeekBudget] = useState(false)
   const [includeWeekDetails, setIncludeWeekDetails] = useState(false)
@@ -330,17 +332,39 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
     [recipeByDay, unavailableSelections],
   )
   function acceptMissingRecipeReplacements() {
-    setPreferences(current => {
-      const remaining = unavailablePlannerRecipes(current, m2InitialPlan, recipes.map(recipe => recipe.id))
-      if (!remaining.length) return current
-      return {
-        ...current,
-        recipeByDay: {
-          ...current.recipeByDay,
-          ...Object.fromEntries(remaining.map(item => [item.day, item.fallbackRecipeId])),
-        },
-      }
+    const remaining = unavailablePlannerRecipes(preferences, m2InitialPlan, recipes.map(recipe => recipe.id))
+    if (!remaining.length) return
+    const repaired: PlannerPreferences = {
+      ...preferences,
+      recipeByDay: {
+        ...preferences.recipeByDay,
+        ...Object.fromEntries(remaining.map(item => [item.day, item.fallbackRecipeId])),
+      },
+    }
+    // An orphaned recipe ID makes the ordinary protected-storage guard refuse
+    // to overwrite the old record. This narrowly scoped, explicit user action
+    // is the only permitted recovery; all other records and cross-tab changes
+    // stay protected. Never drop existing preferences on a failed save.
+    const result = saveReplacedPlannerRecipes({
+      read: () => window.localStorage.getItem(plannerStorageKey),
+      write: raw => window.localStorage.setItem(plannerStorageKey, raw),
+      expectedRaw: lastStoredRaw,
+      current: repaired,
+      replacements: remaining,
+      validDays: m2InitialPlan.map(meal => meal.day),
+      validRecipeIds: recipes.map(recipe => recipe.id),
     })
+    if (result.status !== 'saved') {
+      setPersistenceWarning(result.status)
+      setPlanRepairMessage(result.status === 'protected'
+        ? 'Je eerdere weekmenu is in een ander tabblad gewijzigd of bevat een onbekend formaat. Niets is overschreven.'
+        : 'Browseropslag is niet beschikbaar. Je eerdere weekmenu blijft bewaard.')
+      return
+    }
+    setLastStoredRaw(result.raw)
+    setPreferences(repaired)
+    setPersistenceWarning(null)
+    setPlanRepairMessage('')
   }
 
   // Prices never leave React memory. A changed recipe, day or physical demand
@@ -525,6 +549,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             <button type="button" onClick={acceptMissingRecipeReplacements}>
               Bewaar deze standaardrecepten in mijn weekmenu
             </button>
+            {planRepairMessage && <p role="alert">{planRepairMessage}</p>}
           </section>
         )}
         {tab === 'products' && <Suspense fallback={<p role="status">Eigen bronproducten openen…</p>}>
