@@ -1,5 +1,5 @@
 import { euro as exactEuro } from '../../lib/money.ts'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import type { ManualLine } from '../../domain/manualStoreComparison.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../domain/basket.ts'
@@ -94,6 +94,9 @@ export function ManualStoreComparison({
   const [importText, setImportText] = useState('')
   const [importMessage, setImportMessage] = useState('')
   const [showTable, setShowTable] = useState(false)
+  const editRevision = useRef(0)
+  const latestDemand = useRef(needs)
+  latestDemand.current = needs
   const summary = useMemo(() => {
     try { return needs.length ? calculateManualComparison(needs, entries) : null }
     catch { return null }
@@ -101,6 +104,7 @@ export function ManualStoreComparison({
 
   function setQuote(need: ManualLine, store: ManualRetailer, field: keyof ManualQuote, value: string) {
     const key = manualQuoteKey(store, need.ingredientId)
+    editRevision.current += 1
     setEntries(previous => {
       const quote = previous[key] ?? {
         product: '', packAmount: '', packUnit: '', packCount: '', price: '',
@@ -176,9 +180,39 @@ export function ManualStoreComparison({
         'Kon de persoonlijke winkelvergelijking niet lokaal bewaren.')
     }
   }
-  function applyTable() {
+  function downloadTableFile() {
+    if (!needs.length) return
     try {
-      const imported = readPastedTable(importText, needs)
+      const content = tabularData(needs, entries) + '\n'
+      if (new TextEncoder().encode(content).length > 128000) {
+        setImportMessage('Het huidige invulblad is te groot om lokaal te bewaren.')
+        return
+      }
+      const url = URL.createObjectURL(new Blob([content], {
+        type: 'text/tab-separated-values;charset=utf-8',
+      }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-mijn-plus-deka-invulblad.tsv'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setImportMessage('Eigen invulblad lokaal bewaard, ook als prijzen nog ontbreken. Geen geverifieerde brondata.')
+    } catch {
+      setImportMessage('Kon het eigen invulblad niet lokaal bewaren.')
+    }
+  }
+  function restoreTable(text: string) {
+    try {
+      const imported = readPastedTable(text, needs)
+      if (Object.keys(entries).length > 0 &&
+          JSON.stringify(entries) !== JSON.stringify(imported.entries) &&
+          !window.confirm('Dit invulblad vervangt jouw bestaande PLUS- en DekaMarkt-productinvoer voor deze Planner-vraag. Doorgaan?')) {
+        setImportMessage('Annuleren: je eerdere winkelproductinvoer is ongewijzigd.')
+        return
+      }
+      editRevision.current += 1
       setEntries(imported.entries)
       setShowTable(false)
       setImportText('')
@@ -190,6 +224,25 @@ export function ManualStoreComparison({
         : 'Tabel geladen op dit apparaat; controleer de echte multipack-inhoud en verpakkingenaantallen.')
     } catch (error) {
       setImportMessage(error instanceof Error ? error.message : 'Tabel niet herkend.')
+    }
+  }
+  function applyTable() { restoreTable(importText) }
+  async function loadTableFile(file: File) {
+    const revision = editRevision.current
+    const originalDemand = needs
+    if (!/\.(?:tsv|txt)$/iu.test(file.name) || file.size <= 0 || file.size > 128000) {
+      setImportMessage('Kies een lokaal .tsv- of .txt-invulblad van maximaal 128 kB.')
+      return
+    }
+    try {
+      const contents = await file.text()
+      if (revision !== editRevision.current || originalDemand !== latestDemand.current) {
+        setImportMessage('Planner of winkelinvoer is intussen gewijzigd. Kies het bestand opnieuw; niets vervangen.')
+        return
+      }
+      restoreTable(contents)
+    } catch {
+      setImportMessage('Kon dit lokale invulblad niet lezen; bestaande invoer behouden.')
     }
   }
   const header = 'Eigen winkelprijzen vergelijken'
@@ -250,6 +303,7 @@ export function ManualStoreComparison({
               Download mijn complete berekening (TXT)
             </button>
             <button className="ghost-button" type="button" onClick={() => {
+              editRevision.current += 1
               setEntries({})
               setImportText('')
               setImportMessage('Alle handmatig ingevoerde prijzen zijn gewist.')
@@ -267,7 +321,18 @@ export function ManualStoreComparison({
                   onChange={event => setImportText(event.target.value)}
                   placeholder="Plak hier de complete tabgescheiden tabel." />
               </label>
-              <button className="ghost-button" type="button" onClick={applyTable}>Tabel laden</button>
+              <button className="ghost-button" type="button" onClick={applyTable}>Geplakte tabel laden</button>
+              <button className="ghost-button" type="button" onClick={downloadTableFile}>
+                Bewaar huidig invulblad (.tsv), ook onvolledig
+              </button>
+              <label>Of kies eerder bewaard lokaal invulblad (.tsv of .txt, maximaal 128 kB)
+                <input type="file" accept=".tsv,.txt,text/tab-separated-values,text/plain"
+                  onChange={event => {
+                    const file = event.currentTarget.files?.[0]
+                    event.currentTarget.value = ''
+                    if (file) void loadTableFile(file)
+                  }} />
+              </label>
             </div>
           )}
           <p className="manual-compare__message" role="status">{importMessage}</p>
