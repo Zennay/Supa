@@ -190,6 +190,9 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       recipeIngredientHit(r, searchTerm) !== null)
   const demo = filter === 'own' ? [] : examples.filter(matches)
   const own = library.recipes.filter(matches)
+  const markdownExportable = library.recipes.filter(recipe => {
+    try { ownRecipeAsMarkdown(recipe); return true } catch { return false }
+  })
   if (sort) { demo.sort((x, y) => x.title.localeCompare(y.title, 'nl')); own.sort((x, y) => x.title.localeCompare(y.title, 'nl')) }
   const ownShopping = selected && 'savedAt' in selected ? ownRecipeShoppingChecklist(selected, Number(shoppingPortions)) : null
   const selectedRecipeShoppingText = ownShopping ? formatOwnRecipeChecklist(ownShopping, shoppingChecks) : ''
@@ -516,13 +519,13 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     setCollectionError(''); setCollectionMessage('')
     try {
       if (library.error) throw new Error(library.error)
-      if (!library.recipes.length) throw new Error('Voeg eerst eigen recepten toe.')
+      if (!markdownExportable.length) throw new Error('Geen recepten zonder openstaande broncontroles geschikt voor Markdown. Gebruik de volledige JSON-back-up.')
       // Large libraries can be transferred in explicit 15-recipe batches.
       // One user click only starts one local download.
-      const batchCount = Math.ceil(library.recipes.length / 15)
+      const batchCount = Math.ceil(markdownExportable.length / 15)
       const batch = Math.min(Math.max(0, collectionExportBatch), batchCount - 1)
       const from = batch * 15
-      const selected = library.recipes.slice(from, from + 15)
+      const selected = markdownExportable.slice(from, from + 15)
       // Readable Markdown cannot retain source-review holds. Each unreviewed
       // recipe must travel in the existing lossless JSON backup instead.
       const markdown = selected.map(ownRecipeAsMarkdown).join('\n---\n')
@@ -535,7 +538,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
         document.body.append(link)
         try { link.click() } finally { link.remove() }
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
-      setCollectionMessage('Recepten ' + (from + 1) + ' t/m ' + (from + selected.length) + ' staan in je Markdownbestand. Importeer ze via Meerdere recepten uit tekst.')
+      setCollectionMessage('Gecontroleerde recepten ' + (from + 1) + ' t/m ' + (from + selected.length) + ' staan in het Markdownbestand. Niet-geschikte recepten zijn niet stilzwijgend als Markdown meegenomen: gebruik de JSON-back-up voor de volledige bibliotheek.')
     } catch (cause) {
       setCollectionError(cause instanceof Error ? cause.message : 'Exporteren is niet gelukt.')
     }
@@ -818,19 +821,22 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
             setCollectionPreview(null); setCollectionError(''); setCollectionMessage('')
           }} />
       </label>
-      {library.recipes.length > 15 &&
+      <p role="status">{markdownExportable.length} gecontroleerde recepten beschikbaar voor Markdown;
+        {' '}{library.recipes.length - markdownExportable.length} recept(en) met bronvermelding,
+        waarschuwingen of ongeldig exportformaat blijven uitsluitend in de volledige JSON-back-up.</p>
+      {markdownExportable.length > 15 &&
         <label className="recipe-collection-label">Kies welke 15 recepten je als Markdown meeneemt
-          <select value={Math.min(collectionExportBatch, Math.ceil(library.recipes.length / 15) - 1)}
+          <select value={Math.min(collectionExportBatch, Math.ceil(markdownExportable.length / 15) - 1)}
             onChange={event => { setCollectionExportBatch(Number(event.currentTarget.value)); setCollectionError(''); setCollectionMessage('') }}>
-            {Array.from({ length: Math.ceil(library.recipes.length / 15) }, (_, index) => <option
-              value={index} key={index}>Recepten {index * 15 + 1} t/m {Math.min(library.recipes.length, (index + 1) * 15)}</option>)}
+            {Array.from({ length: Math.ceil(markdownExportable.length / 15) }, (_, index) => <option
+              value={index} key={index}>Recepten {index * 15 + 1} t/m {Math.min(markdownExportable.length, (index + 1) * 15)}</option>)}
           </select>
         </label>}
       <div className="recipe-backup-panel__actions">
         <button type="button" onClick={previewPlainRecipeCollection}
           disabled={!collectionText.trim() || !!library.error}>Controleer mijn recepten</button>
         <button type="button" onClick={downloadPlainRecipeCollection}
-          disabled={!!library.error || !library.recipes.length}>Download mijn recepten (Markdown)</button>
+          disabled={!!library.error || !markdownExportable.length}>Download mijn recepten (Markdown)</button>
         <button type="button" onClick={() => {
           collectionReadVersion.current++; setCollectionText(''); setCollectionPreview(null)
           setCollectionError(''); setCollectionMessage('')
