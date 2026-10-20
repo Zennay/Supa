@@ -178,7 +178,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
     <div className="private-reviewed-products__difference-focus" aria-label="Prijsverschil per ingrediënt">
       <strong>{changed.length} van {rows.length} zichtbare ingrediënten verschillen in hele-pakprijs.</strong>
       {largest ? <p>Grootste zichtbaar verschil: <strong>{largest.plus.ingredientLabel}</strong> · {' '}
-        {money.format(Math.abs(largest.plus.lineTotalCents - largest.deka.lineTotalCents))} goedkoper bij {' '}
+        {money.format(Math.abs(largest.plus.lineTotalCents - largest.deka.lineTotalCents) / 100)} goedkoper bij {' '}
         {largest.plus.lineTotalCents < largest.deka.lineTotalCents ? 'PLUS' : 'DekaMarkt'}.
       </p> : <p>Geen verschillende hele-pakprijzen in deze selectie.</p>}
       <small>Dit overzicht volgt de zoek- en eenheidsfilters; de mandtotalen en
