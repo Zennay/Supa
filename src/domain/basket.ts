@@ -66,7 +66,10 @@ function baseAmount(
   if (unit === 'g') return { amount, family: 'mass' }
   if (unit === 'l') return { amount: amount * 1000, family: 'volume' }
   if (unit === 'ml') return { amount, family: 'volume' }
-  if (unit === 'piece') return { amount, family: 'piece' }
+  // Physical pieces need explicit human review when fractional. Other
+  // dimensions can be decimal and must continue to use exact pack math.
+  if (unit === 'piece') return Number.isSafeInteger(amount)
+    ? { amount, family: 'piece' } : null
   return null
 }
 
@@ -127,9 +130,17 @@ export function aggregatePlanIngredients(
         throw new Error('Ingredient query must be non-blank')
       }
 
+      // A recipe may legitimately read 'half an onion', but this does not
+      // authorise a priced 0.5-piece retailer SKU or automatic rounding.
+      // Keep the ingredient identity and show unknown shopping quantity until
+      // the user reviews a whole purchasable piece in the recipe editor.
+      const physicalAmount = ingredient.unit === 'piece' &&
+        ingredient.amount !== null &&
+        (!Number.isSafeInteger(ingredient.amount) || ingredient.amount <= 0)
+          ? null : ingredient.amount
       const current = aggregated.get(ingredient.id)
       if (!current) {
-        aggregated.set(ingredient.id, { ...ingredient })
+        aggregated.set(ingredient.id, { ...ingredient, amount: physicalAmount })
         continue
       }
 
@@ -142,14 +153,14 @@ export function aggregatePlanIngredients(
       }
 
       current.amount =
-        current.amount === null || ingredient.amount === null
+        current.amount === null || physicalAmount === null
           ? null
           : current.unit === ingredient.unit
-            ? sumDecimalAmounts([current.amount, ingredient.amount])
+            ? sumDecimalAmounts([current.amount, physicalAmount])
             : sumDecimalDemandUnits(
                 [
                   { amount: current.amount, unit: current.unit },
-                  { amount: ingredient.amount, unit: ingredient.unit },
+                  { amount: physicalAmount, unit: ingredient.unit },
                 ],
                 current.unit,
               )
@@ -207,7 +218,8 @@ export function buildOneStoreBasket({
     if (
       ingredient.amount === null ||
       !Number.isFinite(ingredient.amount) ||
-      ingredient.amount <= 0
+      ingredient.amount <= 0 ||
+      (ingredient.unit === 'piece' && !Number.isSafeInteger(ingredient.amount))
     ) {
       return {
         id: ingredient.id,
