@@ -61,6 +61,10 @@ const recaptureButtons = {
   PLUS: document.querySelector<HTMLButtonElement>('#blank-plus-recapture')!,
   DekaMarkt: document.querySelector<HTMLButtonElement>('#blank-deka-recapture')!,
 }
+const recaptureGuides = {
+  PLUS: document.querySelector<HTMLButtonElement>('#guide-plus-recapture')!,
+  DekaMarkt: document.querySelector<HTMLButtonElement>('#guide-deka-recapture')!,
+}
 const budgetInput = document.querySelector<HTMLInputElement>('#budget-euros')!
 const budgetStatus = document.querySelector<HTMLDivElement>('#budget-status')!
 let budgetTotals: Record<StoreName, number | null> | null = null
@@ -399,6 +403,43 @@ for (const store of stores) {
     } catch (cause) {
       setStatus(cause instanceof Error ? cause.message :
         'Het lege lokale heropnameblad is niet beschikbaar.', true)
+    } finally {
+      button.disabled = false
+    }
+  })
+}
+
+// The nine-column blank CSV intentionally contains no original ingredient
+// names, since those are not observed retailer names. The separate human
+// guide maps every physical need back to its precise source CSV row number.
+for (const store of stores) {
+  recaptureGuides[store].addEventListener('click', async () => {
+    if (result.hidden || !lastPrivateDemand) return
+    const demand = lastPrivateDemand
+    const button = recaptureGuides[store]
+    button.disabled = true
+    try {
+      const { makePlannerCaptureGuide } =
+        await import('./features/comparison/plannerPriceCaptureGuide.ts')
+      if (result.hidden || lastPrivateDemand !== demand)
+        throw Error('De fysieke mandvraag is tussentijds veranderd.')
+      const content = makePlannerCaptureGuide(demand.ingredients.map(item => ({
+        id: item.id, label: item.label, unit: item.unit, amount: item.amount,
+      })), [store])
+      if (result.hidden || lastPrivateDemand !== demand)
+        throw Error('De fysieke mandvraag is veranderd; maak de rijgids opnieuw.')
+      const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-' + store.toLowerCase() + '-nieuw-volledig-waarneemblad-rijgids.txt'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setStatus('De lege ' + store + '-CSV en deze rijgids horen bij hetzelfde volledige fysieke mandje. ' +
+        'Originele winkelproductnamen, bronmoment en echte pakprijzen zijn niet ingevuld.')
+    } catch (cause) {
+      setStatus(cause instanceof Error ? cause.message : 'De rijgids kan niet worden gemaakt.', true)
     } finally {
       button.disabled = false
     }
