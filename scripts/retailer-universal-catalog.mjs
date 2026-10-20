@@ -9,9 +9,14 @@ import { validateRawProductObservation } from '../src/data/ingestion.ts'
  * digits that Date.parse would otherwise truncate below milliseconds.
  * This remains an offline provenance check, never permission to use prices.
  */
-function physicalCaptureNanoseconds(capturedAt) {
-  const parts = typeof capturedAt === 'string'
-    ? /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,9}))?)?(Z|[+-]\d{2}:\d{2})$/.exec(capturedAt)
+function physicalCaptureNanoseconds(capturedAt, { allowFuture = false, allowDateOnly = false } = {}) {
+  // Offers may legitimately start later than the historical capture, and
+  // legacy M1 offers can declare an ISO civil date without a time-of-day.
+  const instant = allowDateOnly && typeof capturedAt === 'string' &&
+    /^\d{4}-\d{2}-\d{2}$/.test(capturedAt)
+    ? capturedAt + 'T00:00:00Z' : capturedAt
+  const parts = typeof instant === 'string'
+    ? /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,9}))?)?(Z|[+-]\d{2}:\d{2})$/.exec(instant)
     : null
   if (!parts) throw new Error('Invalid retailer capture calendar or timestamp')
   const year = Number(parts[1]), month = Number(parts[2]), day = Number(parts[3])
@@ -26,16 +31,17 @@ function physicalCaptureNanoseconds(capturedAt) {
   const timezone = parts[8]
   if (timezone !== 'Z') {
     const [hours, minutes] = timezone.slice(1).split(':').map(Number)
-    if (hours > 14 || minutes > 59 || (hours === 14 && minutes !== 0)) {
+    const maximum = timezone[0] === '-' ? 12 : 14
+    if (hours > maximum || minutes > 59 || (hours === maximum && minutes !== 0)) {
       throw new Error('Invalid retailer capture UTC offset')
     }
   }
-  const millis = Date.parse(capturedAt)
+  const millis = Date.parse(instant)
   if (!Number.isFinite(millis)) throw new Error('Invalid retailer capture instant')
   const fractional = (parts[7] ?? '').padEnd(9, '0')
   const nanos = BigInt(millis) * 1_000_000n +
     BigInt(fractional.slice(3) || '0')
-  if (nanos > BigInt(Date.now()) * 1_000_000n) {
+  if (!allowFuture && nanos > BigInt(Date.now()) * 1_000_000n) {
     throw new Error('Future retailer capture instant')
   }
   return nanos
@@ -45,19 +51,61 @@ function safeId(value) {
   return typeof value === 'string' && /^[a-zA-Z0-9._-]{1,160}$/.test(value)
 }
 
+// Direct catalog consumers do not pass through the six retailer adapters.
+// Bind each observation to the same explicitly reviewed offline host/route;
+// never turn a plausible but unrelated URL into retailer price provenance.
+function verifiedRetailerSourceUrl(raw, supermarket, kind) {
+  const host = { plus: 'www.plus.nl', dekamarkt: 'www.dekamarkt.nl' }[supermarket]
+  if (typeof raw !== 'string' || !host ||
+      !['product', 'catalog', 'offers'].includes(kind)) {
+    return false
+  }
+  try {
+    const url = new URL(raw)
+    if (url.protocol !== 'https:' || url.hostname !== host ||
+        url.username || url.password || url.port || url.search || url.hash ||
+        raw.includes('?') || raw.includes('#')) {
+      return false
+    }
+    const route = supermarket === 'plus'
+      ? { product: '/product/', catalog: '/producten', offers: '/aanbiedingen' }[kind]
+      : { product: '/producten/', catalog: '/producten/', offers: '/aanbiedingen' }[kind]
+    const pathMatches = kind === 'product' || (supermarket === 'dekamarkt' && kind === 'catalog')
+      ? url.pathname.startsWith(route) && url.pathname.length > route.length
+      : url.pathname === route || url.pathname.startsWith(route + '/')
+    if (!pathMatches) return false
+    // WHATWG normalizes an explicit default HTTPS port; tolerate ONLY the
+    // existing reviewed :443 spelling, never loose percent/host/port aliases.
+    return raw === url.href ||
+      raw === url.href.replace('https://' + host + '/', 'https://' + host + ':443/')
+  } catch {
+    return false
+  }
+}
+
 function normalizedObservation(value) {
   validateRawProductObservation(value)
   if (!safeId(value.sourceProductId)) throw new Error('Unsafe/missing retail product identity')
   // A direct caller must not bypass source trust by providing a structurally
   // valid yet credential-bearing URL, impossible clock or unsafe money value.
-  const origin = new URL(value.provenance.url)
-  if (origin.username || origin.password || origin.hash ||
-      origin.port || origin.searchParams.has('access_token')) {
+  if (!verifiedRetailerSourceUrl(
+    value.provenance.url, value.supermarket, value.provenance.kind,
+  )) {
     throw new Error('Untrusted retailer capture source URL')
   }
   // Strict direct API admission: Date.parse alone normalizes impossible
   // days such as February 30 and drops submillisecond source chronology.
   physicalCaptureNanoseconds(value.provenance.capturedAt)
+  if (value.offer !== null) {
+    const options = { allowFuture: true, allowDateOnly: true }
+    const from = value.offer.validFrom === null ? null
+      : physicalCaptureNanoseconds(value.offer.validFrom, options)
+    const to = value.offer.validTo === null ? null
+      : physicalCaptureNanoseconds(value.offer.validTo, options)
+    if (from !== null && to !== null && from > to) {
+      throw new Error('Retailer offer validity ends before its true start instant')
+    }
+  }
   const safeCents = n => n === null ||
     (Number.isSafeInteger(n) && n >= 0)
   if (!safeCents(value.currentPriceCents) ||
@@ -80,11 +128,19 @@ function normalizedObservation(value) {
 }
 
 function truthSignature(record) {
-  // Category/source kind and capture time are NOT authority to silently choose
-  // between unequal prices, packs or availability.
+  // Semantic source facts, not accidental insertion order of an incoming
+  // JSON/JS object's pack or offer keys. True amount/price/offer conflicts
+  // still remain separate captures requiring independent human review.
+  const pack = record.pack
+  const offer = record.offer
   return JSON.stringify([
     record.name, record.currentPriceCents, record.currency,
-    record.pack, record.offer, record.availability,
+    [pack.rawText, pack.amount, pack.unit],
+    offer === null ? null : [
+      offer.label, offer.mechanics, offer.offerPriceCents,
+      offer.originalPriceCents, offer.validFrom, offer.validTo,
+    ],
+    record.availability,
   ])
 }
 

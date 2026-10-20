@@ -1,0 +1,781 @@
+import { euro as exactEuro } from '../../lib/money.ts'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots } from '../../domain/offlineReviewedImport.ts'
+import { recentOwnCaptureInstant } from '../comparison/privateReviewedBasketBridge.ts'
+import { privatePackUnitRate, formatPrivateUnitRate } from '../comparison/privateUnitPrice.ts'
+import { productSearchText } from '../products/productSearchText.ts'
+import { completeOwnSourceProduct, privateSourceReviewChecklist } from './privateSourceReviewChecklist.ts'
+import {
+  privateFullStoreRecaptureCsv, privateFullStoreRecaptureGuide,
+  privatePairedStoreRecaptureCsv, privatePairedStoreRecaptureGuide,
+} from './privateFullStoreRecapture.ts'
+import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
+import { PlannerSourceMatchPreview } from './PlannerSourceMatchPreview.tsx'
+import { replaceOwnStoreCapture, type CaptureRefreshChanges } from './combineOwnSourceCapture.ts'
+import { privateSourceChangeCsv } from './privateSourceChangeCsv.ts'
+import './plannerQuickSourcePaste.css'
+
+type Preview = { raw: string; normalized: string; data: OfflinePriceSnapshots }
+const limit = 256000
+const dateText = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
+
+
+async function normalizedOwnSource(raw: string): Promise<string> {
+  // Spreadsheet/desktop copy can include a single UTF-8 BOM even when the
+  // rest of the supplied input is JSON. JSON.parse refuses that marker,
+  // while the existing CSV converter already handles the CSV BOM itself.
+  const jsonInput = raw.startsWith('\uFEFF') ? raw.slice(1) : raw
+  if (/^\s*\{/u.test(jsonInput)) return jsonInput
+  const moduleUrl = import.meta.env.BASE_URL + 'offline-two-store-csv.mjs'
+  const converter: unknown = await import(/* @vite-ignore */ moduleUrl)
+  if (!converter || typeof converter !== 'object' ||
+      !('convertOwnStoreCsv' in converter) ||
+      typeof converter.convertOwnStoreCsv !== 'function')
+    throw new Error('De bestaande lokale CSV-converter ontbreekt.')
+  return (converter.convertOwnStoreCsv as (input: string) => string)(raw)
+}
+
+/** Local preview using the same converter and source contract as Vergelijk. */
+export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredient, hasDemand, needs }: {
+  onImport: (files: File[]) => void
+  onRecapture: (store: 'PLUS' | 'DekaMarkt') => void
+  onReviewIngredient?: (store: 'PLUS' | 'DekaMarkt', ingredientId: string) => void
+  hasDemand: boolean
+  needs: readonly PlannerCaptureGuideNeed[]
+}) {
+  const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState('')
+  const [sourceSearch, setSourceSearch] = useState('')
+  const [incompleteOnly, setIncompleteOnly] = useState(false)
+  const [separateDrafts, setSeparateDrafts] = useState({ PLUS: '', DekaMarkt: '' })
+  const [updateDraft, setUpdateDraft] = useState('')
+  const [preview, setPreview] = useState<Preview | null>(null)
+  const [undoSnapshot, setUndoSnapshot] = useState<Preview | null>(null)
+  const [refreshSummary, setRefreshSummary] = useState<{
+    store: 'PLUS' | 'DekaMarkt'; changes: CaptureRefreshChanges
+  } | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [dropActive, setDropActive] = useState(false)
+  const [message, setMessage] = useState('')
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!preview) return
+    const refresh = () => setNow(Date.now())
+    refresh()
+    const timer = window.setInterval(refresh, 60_000)
+    document.addEventListener('visibilitychange', refresh)
+    window.addEventListener('focus', refresh)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', refresh)
+      window.removeEventListener('focus', refresh)
+    }
+  }, [preview])
+  // This is not the originally cached freshness flag: a tab can stay open
+  // past seven days while the original retailer capture does not change.
+  const liveAdmission = useMemo(() => {
+    if (!preview) return null
+    try { return parseOfflinePriceSnapshots(preview.normalized, now) }
+    catch { return null } // e.g. device clock moved back beyond source time
+  }, [preview, now])
+  const revision = useRef(0)
+  function changeDraft(raw: string) {
+    ++revision.current
+    setDraft(raw); setPreview(null); setUndoSnapshot(null); setRefreshSummary(null); setBusy(false)
+    setMessage(raw ? 'Concept gewijzigd. Controleer opnieuw voor import.' : '')
+  }
+  async function inspectSource(raw: string) {
+    const ticket = ++revision.current
+    setPreview(null); setUndoSnapshot(null); setRefreshSummary(null); setMessage('')
+    if (!raw.trim()) { setMessage('Plak eerst echte eigen CSV-, TSV- of JSON-bronregels.'); return }
+    if (new TextEncoder().encode(raw).length > limit) {
+      setMessage('Bron groter dan 256 kB. Splits de originele opnames op.'); return
+    }
+    setBusy(true)
+    try {
+      const normalized = await normalizedOwnSource(raw)
+      if (ticket !== revision.current) return
+      const data = parseOfflinePriceSnapshots(normalized, Date.now())
+      setPreview({ raw, normalized, data })
+      setMessage('Structuur lokaal herkend. Controleer de bronmomenten en prijsdekking.')
+    } catch (cause) {
+      if (ticket === revision.current)
+        setMessage(cause instanceof Error ? cause.message : 'Bronindeling niet herkend.')
+    } finally {
+      if (ticket === revision.current) setBusy(false)
+    }
+  }
+  async function inspect() { await inspectSource(draft) }
+
+  async function previewOneFile(file: File | undefined) {
+    if (!file) return
+    const ticket = ++revision.current
+    setPreview(null); setUndoSnapshot(null); setRefreshSummary(null); setMessage('')
+    if (file.size === 0 || file.size > limit) {
+      setMessage('Kies één gevuld bronbestand van maximaal 256 kB.')
+      return
+    }
+    setBusy(true)
+    try {
+      const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      if (ticket !== revision.current) return
+      setDraft(raw)
+      await inspectSource(raw)
+    } catch {
+      if (ticket === revision.current) setMessage('Bronbestand moet geldige UTF-8 CSV, TSV of JSON bevatten.')
+    } finally {
+      if (ticket === revision.current) setBusy(false)
+    }
+  }
+
+  async function previewFiles(files: File[]) {
+    if (files.length === 1) { await previewOneFile(files[0]); return }
+    if (files.length !== 2) {
+      setMessage('Selecteer één of twee echte winkelbestanden.')
+      return
+    }
+    const ticket = ++revision.current
+    setPreview(null); setUndoSnapshot(null); setRefreshSummary(null); setMessage(''); setBusy(true)
+    try {
+      const captures: unknown[] = []
+      const seen = new Set<string>()
+      for (const file of files) {
+        if (file.size === 0 || file.size > limit)
+          throw new Error('Elk bestand moet gevuld en maximaal 256 kB zijn.')
+        const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+        if (ticket !== revision.current) return
+        const normalized = await normalizedOwnSource(raw)
+        if (ticket !== revision.current) return
+        const source = parseOfflinePriceSnapshots(normalized, Date.now())
+        const names = Object.keys(source.captures)
+        if (names.length !== 1)
+          throw new Error('Twee bestanden moeten elk precies één winkel bevatten.')
+        if (seen.has(names[0]))
+          throw new Error('Beide bestanden zijn dezelfde winkel. Kies PLUS én DekaMarkt.')
+        seen.add(names[0])
+        const input = JSON.parse(normalized) as { captures: unknown[] }
+        if (!Array.isArray(input.captures) || input.captures.length !== 1)
+          throw new Error('Originele winkelopname niet herkenbaar.')
+        captures.push(input.captures[0])
+      }
+      const combined = JSON.stringify({ schema: 'supa-offline-prices-v1', captures })
+      if (new TextEncoder().encode(combined).length > limit)
+        throw new Error('Gecombineerde winkelbestanden zijn groter dan 256 kB.')
+      const data = parseOfflinePriceSnapshots(combined, Date.now())
+      if (ticket !== revision.current) return
+      setDraft(combined)
+      setPreview({ raw: combined, normalized: combined, data })
+      setMessage('Twee originele winkelbestanden lokaal gecombineerd voor preview. Alle SKU’s en bronmomenten blijven ongewijzigd.')
+    } catch (cause) {
+      if (ticket === revision.current)
+        setMessage(cause instanceof Error ? cause.message : 'Twee winkelbronnen niet herkend.')
+    } finally {
+      if (ticket === revision.current) setBusy(false)
+    }
+  }
+
+  // Refresh one retailer inside an already imported, local pair. This is a
+  // deliberate, whole-capture replacement, never a merger of historical SKU
+  // prices under an invented common observation timestamp.
+  async function useNewStoreCapture(file: File | undefined) {
+    if (!file || !preview || preview.raw !== draft) return
+    const original = preview.normalized
+    const ticket = ++revision.current
+    setMessage('')
+    if (file.size === 0 || file.size > limit) {
+      setMessage('Kies één gevuld nieuw winkelbestand van maximaal 256 kB.')
+      return
+    }
+    setBusy(true)
+    try {
+      const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      if (ticket !== revision.current) return
+      const normalized = await normalizedOwnSource(raw)
+      if (ticket !== revision.current) return
+      const result = replaceOwnStoreCapture(original, normalized, Date.now())
+      const data = parseOfflinePriceSnapshots(result.normalized, Date.now())
+      if (ticket !== revision.current) return
+      // One-step undo lives only in React memory. No browser persistence,
+      // retailer cache, remote upload or implicit Workbench approval.
+      setUndoSnapshot(preview)
+      setRefreshSummary({ store: result.retailer, changes: result.changes })
+      setDraft(result.normalized)
+      // Do not retain a second raw copy of the just-ingested private source.
+      setUpdateDraft('')
+      setPreview({ raw: result.normalized, normalized: result.normalized, data })
+      setMessage(result.retailer + ': originele nieuwere winkelopname ' +
+        (result.action === 'replaced' ? 'vervangt de oudere opname' : 'is toegevoegd') +
+        '. ' + (Object.keys(data.captures).length === 2
+          ? result.pairedWithin24h
+            ? 'De bronmomenten liggen binnen 24 uur; controleer nu alle SKU’s en pakken in Vergelijk.'
+            : 'De bronmomenten liggen meer dan 24 uur uiteen: nog geen twee-winkelprijsverschil.'
+          : 'De andere winkel heeft nog geen bron; diens prijzen blijven onbekend.'))
+    } catch (cause) {
+      if (ticket === revision.current) setMessage(
+        cause instanceof Error ? cause.message : 'De nieuwere winkelopname kon niet worden ingelezen.')
+    } finally {
+      if (ticket === revision.current) setBusy(false)
+    }
+  }
+
+  function downloadRefreshChanges() {
+    if (!refreshSummary) return
+    try {
+      const csv = privateSourceChangeCsv(refreshSummary.store, refreshSummary.changes)
+      const url = URL.createObjectURL(new Blob([csv], {
+        type: 'text/csv;charset=utf-8',
+      }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-eigen-' + refreshSummary.store.toLowerCase() + '-sku-wijzigingen.csv'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setMessage('Alle eigen originele SKU-wijzigingen lokaal als privé-CSV gedownload; geen retailerprijsbewijs.')
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : 'Volledige bronwijzigingenlijst is niet exporteerbaar.')
+    }
+  }
+
+  function undoStoreReplacement() {
+    if (!undoSnapshot || busy) return
+    ++revision.current
+    try {
+      // Restoring a preview is NOT approval of an old retailer price.
+      // Recheck the captured original time with the current device clock.
+      const data = parseOfflinePriceSnapshots(undoSnapshot.normalized, Date.now())
+      setDraft(undoSnapshot.raw)
+      setPreview({ ...undoSnapshot, data })
+      setUndoSnapshot(null)
+      setRefreshSummary(null)
+      setUpdateDraft('')
+      setMessage('Vorige eigen winkelopname(s) in de lokale preview hersteld. Open Vergelijk opnieuw om deze bron te beoordelen; oude of verlopen prijzen blijven onbekend.')
+    } catch {
+      setMessage('Vorige lokale opname kan niet opnieuw worden toegelaten. Controleer de originele bron en actuele apparaatklok.')
+    }
+  }
+
+  function changeSeparateDraft(store: 'PLUS' | 'DekaMarkt', raw: string) {
+    ++revision.current
+    setSeparateDrafts(previous => ({ ...previous, [store]: raw }))
+    setPreview(null); setUndoSnapshot(null); setRefreshSummary(null)
+    setMessage('Winkelbron gewijzigd. Controleer beide originele bronnen opnieuw.')
+  }
+
+  // Each paste is checked as an original single-retailer capture first.
+  async function inspectSeparateDrafts() {
+    const ticket = ++revision.current
+    setPreview(null); setUndoSnapshot(null); setRefreshSummary(null); setMessage(''); setBusy(true)
+    try {
+      const provided = (['PLUS', 'DekaMarkt'] as const)
+        .filter(store => separateDrafts[store].trim().length > 0)
+      if (!provided.length) throw new Error('Plak eerst PLUS en/of DekaMarkt-bronregels.')
+      const captures: unknown[] = []
+      let singleNormalized = ''
+      for (const store of provided) {
+        const raw = separateDrafts[store]
+        if (new TextEncoder().encode(raw).length > limit)
+          throw new Error(store + ': maximaal 256 kB aan originele bronregels.')
+        const normalized = await normalizedOwnSource(raw)
+        if (ticket !== revision.current) return
+        const checked = parseOfflinePriceSnapshots(normalized, Date.now())
+        if (Object.keys(checked.captures).length !== 1 || !checked.captures[store])
+          throw new Error(store + ': bron bevat niet precies deze winkel. Controleer de originele retailer-ID.')
+        const original = JSON.parse(normalized) as { captures?: unknown[] }
+        if (!Array.isArray(original.captures) || original.captures.length !== 1)
+          throw new Error(store + ': originele opname niet herkenbaar.')
+        captures.push(original.captures[0])
+        singleNormalized = normalized
+      }
+      const normalized = provided.length === 1 ? singleNormalized
+        : JSON.stringify({ schema: 'supa-offline-prices-v1', captures })
+      if (new TextEncoder().encode(normalized).length > limit)
+        throw new Error('Gecombineerde winkelbronnen zijn groter dan 256 kB.')
+      const data = parseOfflinePriceSnapshots(normalized, Date.now())
+      if (ticket !== revision.current) return
+      setDraft(normalized)
+      setPreview({ raw: normalized, normalized, data })
+      setMessage(provided.length === 2
+        ? 'Twee originele bronnen lokaal gecombineerd. Controleer de SKU’s en bronmomenten in Vergelijk.'
+        : provided[0] + ' lokaal herkend; de andere winkel blijft ongeprijsd.')
+    } catch (cause) {
+      if (ticket === revision.current)
+        setMessage(cause instanceof Error ? cause.message : 'Winkelbronnen niet herkend.')
+    } finally {
+      if (ticket === revision.current) setBusy(false)
+    }
+  }
+
+  async function pasteClipboard() {
+    const ticket = ++revision.current
+    setPreview(null); setUndoSnapshot(null); setRefreshSummary(null); setMessage('')
+    try {
+      if (!navigator.clipboard?.readText) throw new Error('Klembord niet beschikbaar')
+      const raw = await navigator.clipboard.readText()
+      if (ticket !== revision.current) return
+      if (new TextEncoder().encode(raw).length > limit)
+        throw new Error('Klembord groter dan 256 kB.')
+      setDraft(raw)
+      setMessage('Gekopieerde bron lokaal geplakt. Controleer hem voor import.')
+    } catch {
+      if (ticket === revision.current)
+        setMessage('Klembord niet beschikbaar. Plak handmatig in het tekstvak.')
+    }
+  }
+  const nextSourceToCapture = (() => {
+    if (!preview) return null
+    const shops = preview.data.captures
+    const stale = (['PLUS', 'DekaMarkt'] as const).find(store =>
+      shops[store] && !recentOwnCaptureInstant(shops[store]!.observedAt, now))
+    if (stale) return stale
+    const missing = (['PLUS', 'DekaMarkt'] as const).find(store => !shops[store])
+    if (missing) return missing
+    if (shops.PLUS && shops.DekaMarkt && !preview.data.pairedWithin24h)
+      return shops.PLUS.observedNs <= shops.DekaMarkt.observedNs ? 'PLUS' : 'DekaMarkt'
+    return null
+  })()
+
+  async function downloadPairedStoreRecapture(kind: 'csv' | 'csv-excel' | 'guide') {
+    if (!preview || preview.raw !== draft) return
+    const original = preview
+    const ticket = revision.current
+    try {
+      // Small trusted local formatter is already loaded: the download remains
+      // in the original user gesture, including on mobile browsers.
+      if (ticket !== revision.current || original.raw !== draft) return
+      const current = parseOfflinePriceSnapshots(original.normalized, Date.now())
+      const plus = current.captures.PLUS
+      const deka = current.captures.DekaMarkt
+      if (!plus || !deka)
+        throw new Error('Voor het gezamenlijke invulblad zijn twee oorspronkelijke winkelopnames nodig.')
+      const content = kind === 'guide'
+        ? privatePairedStoreRecaptureGuide(plus, deka)
+        : privatePairedStoreRecaptureCsv(plus, deka, kind === 'csv-excel' ? ';' : ',')
+      const url = URL.createObjectURL(new Blob([content], {
+        type: kind === 'guide' ? 'text/plain;charset=utf-8' : 'text/csv;charset=utf-8',
+      }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = kind === 'guide'
+          ? 'supa-plus-deka-nieuwe-winkelopnames-uitleg.txt'
+          : 'supa-plus-deka-twee-winkels-echt-opnieuw-opnemen.csv'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      if (ticket === revision.current) setMessage(
+        'Nieuwe PLUS én DekaMarkt-invoer voorbereid. Oude bedragen en tijden zijn leeg; vul beide echte bronmomenten en productgegevens volledig opnieuw in.')
+    } catch (cause) {
+      if (ticket === revision.current) setMessage(cause instanceof Error ? cause.message :
+        'Het gecombineerde lege bronblad kon niet worden gemaakt.')
+    }
+  }
+
+  async function downloadFullStoreRecapture(store: 'PLUS' | 'DekaMarkt',
+    kind: 'csv' | 'csv-excel' | 'guide') {
+    if (!preview || preview.raw !== draft) return
+    const original = preview
+    const ticket = revision.current
+    try {
+      // Same synchronous private exporter as the combined field sheet.
+      if (ticket !== revision.current || original.raw !== draft) return
+      const current = parseOfflinePriceSnapshots(original.normalized, Date.now())
+      const source = current.captures[store]
+      if (!source) throw new Error(store + ': geen oorspronkelijke winkelopname beschikbaar.')
+      const content = kind === 'guide'
+        ? privateFullStoreRecaptureGuide(source)
+        : privateFullStoreRecaptureCsv(source, kind === 'csv-excel' ? ';' : ',')
+      const url = URL.createObjectURL(new Blob([content], {
+        type: kind === 'guide' ? 'text/plain;charset=utf-8' : 'text/csv;charset=utf-8',
+      }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-' + store.toLowerCase() +
+          (kind === 'guide' ? '-nieuwe-bronopname-uitleg.txt' : '-hele-winkel-opnieuw-opnemen.csv')
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      if (ticket === revision.current) setMessage(store +
+        ': nieuw invulblad met originele SKU/naam, maar ZONDER oude prijzen, voorraad, verpakking of opnametijd. Vul uitsluitend echte nieuwe waarnemingen in.')
+    } catch (cause) {
+      if (ticket === revision.current) setMessage(cause instanceof Error ? cause.message :
+        'Volledige nieuwe winkelopname kon niet worden voorbereid.')
+    }
+  }
+
+  function downloadCurrentSourceRepairList(store: 'PLUS' | 'DekaMarkt') {
+    if (!preview || preview.raw !== draft) return
+    try {
+      // No field evidence, permission or timestamp is synthesized. The
+      // original source is re-read at click; the list is only a field task.
+      const current = parseOfflinePriceSnapshots(preview.normalized, Date.now())
+      const capture = current.captures[store]
+      if (!capture) throw new Error(store + ': oorspronkelijke bron ontbreekt.')
+      const term = productSearchText(sourceSearch.trim())
+      const stale = !recentOwnCaptureInstant(capture.observedAt, Date.now())
+      const products = capture.products.filter(product =>
+        (!term || [product.id, product.name].some(value =>
+          productSearchText(value).includes(term))) &&
+        (!incompleteOnly || stale || !completeOwnSourceProduct(product)))
+      const content = privateSourceReviewChecklist({ store, observedAt: capture.observedAt,
+        products, stale })
+      const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-' + store.toLowerCase() + '-ontbrekende-eigen-broncontroles.txt'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setMessage(store + ': alleen ontbrekende of opnieuw te observeren originele SKU-taken gedownload. Geen oude prijzen overgenomen.')
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message :
+        'Eigen broncontrolelijst niet beschikbaar. Verklein de selectie.')
+    }
+  }
+
+  function downloadCanonicalPreview() {
+    if (!preview || preview.raw !== draft) return
+    try {
+      // Re-admit the actual local source at export time, never transform
+      // unavailable, stale or unreviewed prices into confirmed basket totals.
+      const current = parseOfflinePriceSnapshots(preview.normalized, Date.now())
+      const count = Object.keys(current.captures).length
+      const bytes = new TextEncoder().encode(preview.normalized)
+      if (bytes.length > limit) throw new Error('Genormaliseerde bron te groot.')
+      const url = URL.createObjectURL(new Blob([bytes], { type: 'application/json' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = count === 2
+          ? 'supa-mijn-eigen-plus-deka-bronnen.json'
+          : 'supa-mijn-eigen-winkelbron.json'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setMessage('Gecontroleerde structuur lokaal opgeslagen. Dit is geen bewijs van actuele prijzen of bronrechten.')
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : 'Lokale export mislukt.')
+    }
+  }
+
+  function handoff(focus?: { store: 'PLUS' | 'DekaMarkt'; ingredientId: string }) {
+    if (!preview || preview.raw !== draft) return
+    try {
+      const current = parseOfflinePriceSnapshots(preview.normalized, Date.now())
+      // Old sources may still be inspected or renewed. Only the canonical
+      // Workbench can admit an amount into a current complete basket.
+      if (!current.currentEnough) {
+        setMessage('Oude opname: in Vergelijk alleen voor broncontrole of vernieuwing; geen actueel prijsverschil.')
+      }
+      const file = new File([preview.normalized], 'supa-eigen-winkelbron.json',
+        { type: 'application/json' })
+      if (file.size > limit) throw new Error('Genormaliseerde bron te groot.')
+      if (focus && (!current.captures[focus.store] ||
+          !recentOwnCaptureInstant(current.captures[focus.store]!.observedAt, Date.now()))) {
+        throw new Error('De gekozen winkelopname is niet actueel. Vernieuw eerst je echte bron.')
+      }
+      onImport([file])
+      // Existing App review intent merely focuses an ingredient after the
+      // canonical Workbench import. It does not approve a price or source.
+      if (focus) onReviewIngredient?.(focus.store, focus.ingredientId)
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : 'Importeren niet mogelijk.')
+    }
+  }
+  return <details className="supa-planner-source-paste" open={open}
+    onToggle={event => setOpen(event.currentTarget.open)}>
+    <summary>Plak winkelprijzen vanuit spreadsheet of JSON</summary>
+    {open && <>
+      <p>Gebruik alleen zelf rechtmatig verkregen PLUS/Deka-productdata. Plak de negen
+        Supa-kolommen als CSV, puntkomma-CSV of tabgescheiden spreadsheet, of
+        eigen JSON met één of beide winkels. Alles wordt lokaal gecontroleerd:
+        een geldige import bewijst geen bronrechten of actuele winkelprijzen.</p>
+      <div className={'supa-planner-source-paste__drop' + (dropActive ? ' is-dragging' : '')}
+        onDragOver={event => {
+          if (!Array.from(event.dataTransfer.types).includes('Files')) return
+          event.preventDefault()
+          event.dataTransfer.dropEffect = 'copy'
+          setDropActive(true)
+        }}
+        onDragLeave={event => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+            setDropActive(false)
+        }}
+        onDrop={event => {
+          if (!Array.from(event.dataTransfer.types).includes('Files')) return
+          event.preventDefault()
+          setDropActive(false)
+          void previewFiles(Array.from(event.dataTransfer.files))
+        }}>
+        <strong>{dropActive
+          ? 'Laat de eigen winkelbestanden los om eerst de bron te controleren'
+          : 'Sleep hier je eigen PLUS-/Deka-bestand(en) voor een lokale preview'}</strong>
+      <label>Of bekijk eerst één of twee eigen CSV-, TSV- of JSON-bestanden
+        <input type="file" multiple accept=".csv,.tsv,.json,.txt,text/csv,text/plain,text/tab-separated-values,application/json"
+          onChange={event => {
+            const files = Array.from(event.currentTarget.files ?? [])
+            event.currentTarget.value = ''
+            if (files.length) void previewFiles(files)
+          }} />
+        <small>Eén bestand mag beide winkels bevatten; twee aparte bestanden moeten ieder precies één verschillende winkel bevatten.</small>
+      </label>
+      </div>
+      <div className="supa-planner-source-paste__separate">
+        <strong>Heb je twee losse spreadsheetselecties? Plak ze per winkel.</strong>
+        <p>De winkelidentiteit moet in de originele negen kolommen staan. Supa voegt
+          alleen gecontroleerde winkelopnames samen; prijzen blijven ongeverifieerd
+          tot je de producten en verpakkingen in Vergelijk beoordeelt.</p>
+        {(['PLUS', 'DekaMarkt'] as const).map(store => <label key={store}>
+          {store} — eigen CSV-, TSV- of JSON-bron
+          <textarea rows={4} spellCheck={false} value={separateDrafts[store]}
+            placeholder="retailer,observedAt,id,name,packAmount,packUnit,packCount,priceCents,available"
+            onChange={event => changeSeparateDraft(store, event.target.value)} />
+        </label>)}
+        <button type="button" disabled={busy ||
+          (!separateDrafts.PLUS.trim() && !separateDrafts.DekaMarkt.trim())}
+          onClick={() => void inspectSeparateDrafts()}>
+          Controleer losse winkelbronnen en maak één import
+        </button>
+      </div>
+      <button type="button" className="ghost-button" onClick={() => void pasteClipboard()}>
+        Plak uit mijn klembord
+      </button>
+      <label>Originele winkelregels
+        <textarea rows={7} value={draft} spellCheck={false} maxLength={256000}
+          placeholder="retailer,observedAt,id,name,packAmount,packUnit,packCount,priceCents,available"
+          onChange={event => changeDraft(event.currentTarget.value)} />
+      </label>
+      <button type="button" disabled={busy || !draft.trim()} onClick={() => void inspect()}>
+        {busy ? 'Bron wordt lokaal gelezen…' : 'Controleer mijn winkelbron'}
+      </button>
+      {message && <p role="status" aria-live="polite">{message}</p>}
+      {preview && <div className="supa-planner-source-paste__preview">
+        <strong>{Object.keys(preview.data.captures).length} eigen winkelopname(s) gevonden</strong>
+        <div className="supa-planner-source-paste__source-filter">
+          <label>Zoek in originele bronproducten of SKU's
+            <input type="search" maxLength={120} value={sourceSearch}
+              placeholder="Bijvoorbeeld crème, creme of originele artikelcode"
+              onChange={event => setSourceSearch(event.currentTarget.value)} />
+          </label>
+          <label className="supa-planner-source-paste__filter-checkbox">
+            <input type="checkbox" checked={incompleteOnly}
+              onChange={event => setIncompleteOnly(event.currentTarget.checked)} />
+            Alleen artikelen met ontbrekende of onbruikbare brondata
+          </label>
+          {(sourceSearch || incompleteOnly) && <button type="button" className="ghost-button"
+            onClick={() => { setSourceSearch(''); setIncompleteOnly(false) }}>
+            Wis bronproductfilters
+          </button>}
+        </div>
+        {(['PLUS', 'DekaMarkt'] as const).map(store => {
+          const capture = preview.data.captures[store]
+          if (!capture) return <p key={store}>{store}: geen bron; geen prijs beschikbaar.</p>
+          const priced = capture.products.filter(completeOwnSourceProduct).length
+          const query = productSearchText(sourceSearch.trim())
+          const visibleProducts = capture.products.filter(product =>
+            (!query || [product.name, product.id].some(value =>
+              productSearchText(value).includes(query))) &&
+            (!incompleteOnly || !completeOwnSourceProduct(product)))
+            .sort((a, b) => Number(completeOwnSourceProduct(a)) -
+              Number(completeOwnSourceProduct(b)))
+          return <section key={store}>
+            <h4>{store}</h4>
+            <p>{capture.products.length} originele SKU's;
+              {' '}{priced} met vastgelegde (niet per se actuele) pakprijs en
+              {' '}{capture.products.length - priced} zonder bruikbare prijs.</p>
+            <small>Oorspronkelijk bronmoment: {dateText.format(new Date(capture.observedMs))}</small>
+            <details className="supa-planner-source-paste__products">
+              <summary>Bekijk originele SKU’s, verpakkingen en ontbrekende prijzen</summary>
+              <p role="status">Bronpreview: {visibleProducts.length} van {capture.products.length}
+                {' '}originele SKU's voldoen aan je filters; maximaal 24 regels in beeld.
+                Niet gekoppeld, geen actueel winkelmandtotaal of geaccepteerde matching.</p>
+              <ul>
+                {visibleProducts.slice(0, 24).map(product => {
+                  const priced = completeOwnSourceProduct(product)
+                  const rate = priced ? privatePackUnitRate({
+                    amount: product.packAmount, unit: product.packUnit,
+                    count: product.packCount ?? 1, priceCents: product.sourcePriceCents ?? null,
+                  }) : null
+                  return <li key={product.id}>
+                    <strong>{product.name}</strong> — SKU {product.id}
+                    <span>{product.packAmount ?? 'onbekend'} {product.packUnit}
+                      {product.packCount && product.packCount > 1
+                        ? ' × ' + product.packCount + ' per verpakking' : ' per verpakking'}</span>
+                    <span>{!product.sourceAvailable
+                      ? 'Niet beschikbaar volgens eigen bron; geen pakprijs'
+                      : !priced
+                        ? 'Pakprijs of verpakking ontbreekt'
+                        : exactEuro.formatCents(product.sourcePriceCents!) +
+                          ' per pak · ' + (rate ? formatPrivateUnitRate(rate) : 'eenheidsprijs onbekend')}</span>
+                  </li>
+                })}
+              </ul>
+              {visibleProducts.length === 0 && <li>Geen originele SKU's bij deze filters.
+                Wis de filters of zoek op een andere productnaam of artikelcode.</li>}
+              {visibleProducts.length > 24 &&
+                <small>Toon hier de eerste 24 gevonden SKU's. Verfijn je zoekterm
+                  of bekijk alle oorspronkelijke producten in Vergelijk.</small>}
+            </details>
+            {visibleProducts.some(product => !completeOwnSourceProduct(product) ||
+                !recentOwnCaptureInstant(capture.observedAt, now)) &&
+              <button type="button" className="ghost-button"
+                onClick={() => downloadCurrentSourceRepairList(store)}>
+                Download {store}-controles voor originele ontbrekende SKU-data (TXT)
+              </button>}
+            <div className="supa-planner-source-paste__recapture">
+              <strong>Nieuwe volledige {store}-bronopname (niet ingevuld)</strong>
+              <p>Dit invulblad bewaart alleen oorspronkelijke artikelcodes en namen als
+                herkenningshulp. Alle oudere prijzen, verpakkingen, beschikbaarheid en
+                observatietijden zijn leeg. Vul dezelfde werkelijke nieuwe tijd en
+                de opnieuw waargenomen gegevens in; de bestaande import weigert
+                onvoltooide bronregels. Maak de héle winkelopname opnieuw als je
+                deze winkel wilt vervangen.</p>
+              <button type="button" className="ghost-button"
+                onClick={() => void downloadFullStoreRecapture(store, 'csv')}>
+                Nieuwe {store}-bronopname als invulbare CSV
+              </button>
+              <button type="button" className="ghost-button"
+                onClick={() => void downloadFullStoreRecapture(store, 'csv-excel')}>
+                Spreadsheet CSV (puntkomma)
+              </button>
+              <button type="button" className="ghost-button"
+                onClick={() => void downloadFullStoreRecapture(store, 'guide')}>
+                Stappen voor nieuwe bronopname (TXT)
+              </button>
+            </div>
+          </section>
+        })}
+        {preview.data.captures.PLUS && preview.data.captures.DekaMarkt &&
+          <div className="supa-planner-source-paste__recapture">
+            <strong>Beide winkels echt opnieuw vastleggen in één spreadsheet</strong>
+            <p>Een samenhangend invulblad voor de oorspronkelijke PLUS- én
+              DekaMarkt-artikelcodes. Oude winkelmomenten, pakprijzen,
+              beschikbaarheid en verpakkingen zijn bewust leeg. Gebruik
+              alleen nieuw waargenomen prijzen; daarna controleert Vergelijk
+              beide volledige fysieke mandjes voor een eventueel prijsverschil.</p>
+            <button type="button" className="ghost-button"
+              onClick={() => void downloadPairedStoreRecapture('csv')}>
+              Maak nieuwe PLUS + DekaMarkt-CSV met lege prijsvelden
+            </button>
+            <button type="button" className="ghost-button"
+              onClick={() => void downloadPairedStoreRecapture('csv-excel')}>
+              Beide winkels in spreadsheet-CSV (puntkomma)
+            </button>
+            <button type="button" className="ghost-button"
+              onClick={() => void downloadPairedStoreRecapture('guide')}>
+              Stappen voor beide winkelopnames (TXT)
+            </button>
+          </div>}
+        <p>{!liveAdmission?.currentEnough
+          ? 'Oude of toekomstige bron. Vernieuw je werkelijke waarnemingen.'
+          : preview.data.pairedWithin24h
+            ? 'Beide opnames binnen 24 uur; SKU, pakken en volledige mand nog te controleren.'
+            : Object.keys(preview.data.captures).length === 2
+              ? 'Bronmomenten meer dan 24 uur uiteen: geen volledig prijsverschil mogelijk.'
+              : 'Nog maar één winkelbron. De andere winkel blijft ongeprijsd.'}</p>
+        {!liveAdmission && <p role="alert">
+          De bronopname is niet geldig voor de actuele apparaatklok of invoer.
+          Controleer het bronmoment opnieuw voordat er een kandidaat kan worden voorgesteld.
+        </p>}
+        {hasDemand && needs.length > 0 && liveAdmission &&
+          <PlannerSourceMatchPreview needs={needs} source={liveAdmission}
+            onRecapture={onRecapture}
+            onReviewIngredient={onReviewIngredient
+              ? (store, ingredientId) => handoff({ store, ingredientId })
+              : undefined} />}
+        <button type="button" disabled={!hasDemand}
+          onClick={() => handoff()}>Open mijn bron in Vergelijk voor productmatching</button>
+        <button type="button" className="ghost-button"
+          onClick={downloadCanonicalPreview}>
+          Download mijn gecombineerde winkelbron als lokaal JSON-bestand
+        </button>
+        <label className="supa-planner-source-paste__refresh">
+          Werk één winkel bij, behoud de originele andere opname
+          <input type="file" disabled={busy}
+            accept=".csv,.tsv,.json,.txt,text/csv,text/plain,text/tab-separated-values,application/json"
+            onChange={event => {
+              const file = event.currentTarget.files?.[0]
+              event.currentTarget.value = ''
+              void useNewStoreCapture(file)
+            }} />
+          <small>Gebruik één nieuwe PLUS- of DekaMarkt-bron met een later werkelijk
+            opnamemoment. Supa vervangt die winkel als geheel, bewaart de andere
+            originele SKU’s en hercontroleert de 24-uursgrens. Geen prijs of
+            verpakking wordt automatisch goedgekeurd.</small>
+        </label>
+        <label className="supa-planner-source-paste__refresh">
+          Of plak de nieuwere bron van één winkel
+          <textarea rows={4} spellCheck={false} value={updateDraft}
+            maxLength={256000} placeholder="retailer,observedAt,id,name,packAmount,packUnit,packCount,priceCents,available"
+            onChange={event => {
+              ++revision.current
+              setUpdateDraft(event.currentTarget.value)
+              setBusy(false)
+            }} />
+        </label>
+        <button type="button" className="ghost-button"
+          disabled={busy || !updateDraft.trim()}
+          onClick={() => void useNewStoreCapture(new File(
+            [updateDraft], 'supa-geplakte-nieuwe-winkelbron.csv',
+            { type: 'text/plain;charset=utf-8' }))}>
+          Vernieuw alleen deze winkel met geplakte bronregels
+        </button>
+        {refreshSummary && <div className="supa-planner-source-paste__changes"
+          role="status" aria-label="Verschillen tussen eigen originele winkelopnames">
+          <strong>{refreshSummary.store} · wijzigingen in je originele winkelbron</strong>
+          <small>Vorige echte bronopname:
+            {' '}{refreshSummary.changes.previousObservedAt ?? 'geen oudere bron'}.
+            {' '}Nieuwe echte bronopname:
+            {' '}{refreshSummary.changes.newObservedAt}.</small>
+          <p>{refreshSummary.changes.addedSkus} nieuwe SKU’s;
+            {' '}{refreshSummary.changes.removedSkus} verdwenen SKU’s;
+            {' '}{refreshSummary.changes.priceChangedSkus} SKU’s met een andere
+            {' '}opgenomen pakprijs;
+            {' '}{refreshSummary.changes.packageChangedSkus} met een gewijzigde
+            {' '}verpakking;
+            {' '}{refreshSummary.changes.becameUnpricedSkus} voorheen geprijsde
+            {' '}SKU’s nu zonder pakprijs;
+            {' '}{refreshSummary.changes.availabilityChangedSkus} SKU’s
+            {' '}met gewijzigde bronbeschikbaarheid.</p>
+          {refreshSummary.changes.affectedTotal > 0 && <details>
+            <summary>Bekijk originele SKU’s die opnieuw aandacht vragen
+              {' '}({refreshSummary.changes.affectedTotal})</summary>
+            <ul>
+              {refreshSummary.changes.affectedProducts.slice(0, 15).map(item =>
+                <li key={item.sku}><strong>{item.name}</strong>
+                  {' '}· originele SKU {item.sku}
+                  <small>{item.change}</small>
+                </li>)}
+            </ul>
+            {refreshSummary.changes.affectedTotal > 15 &&
+              <small>En nog
+                {' '}{refreshSummary.changes.affectedTotal - 15}
+                {' '}andere originele artikelen. Open de complete nieuwe bron in Vergelijk.
+              </small>}
+          </details>}
+          {refreshSummary.changes.affectedTotal > 0 &&
+            <button type="button" className="ghost-button"
+              onClick={downloadRefreshChanges}>
+              Download alle gewijzigde originele SKU’s als privé-CSV
+            </button>}
+          <small>Dit zijn verschillen tussen je twee eigen bronbestanden,
+            geen onafhankelijke actuele prijscontrole. Verdwenen of ongeprijsde
+            artikelen moeten opnieuw gekoppeld of werkelijk opgenomen worden;
+            vergelijk pas na de bestaande bron- en SKU-review.</small>
+        </div>}
+        {undoSnapshot && <button type="button" className="ghost-button"
+          disabled={busy} onClick={undoStoreReplacement}>
+          Herstel vorige eigen winkelopname in deze preview
+        </button>}
+        {nextSourceToCapture && <button type="button" className="ghost-button"
+          onClick={() => onRecapture(nextSourceToCapture)}>
+          Open leeg opnameblad voor {nextSourceToCapture} en leg echte prijzen vast
+        </button>}
+        {!hasDemand && <small>Kies eerst recepten in je Planner-weekmenu.</small>}
+      </div>}
+    </>}
+  </details>
+}

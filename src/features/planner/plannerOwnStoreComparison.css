@@ -1,0 +1,356 @@
+.own-store-planner { border: 1px solid #d9ded9; border-radius: 18px; padding: clamp(14px, 3vw, 24px); margin: 20px 0; background: #fff; }
+.own-store-planner__header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
+.own-store-planner__header h3 { margin: 4px 0 12px; font-size: 1.15rem; }
+.own-store-planner__cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.own-store-planner__card { padding: 14px; border-radius: 12px; border: 1px solid #d9ded9; min-width: 0; display: grid; gap: 8px; }
+.own-store-planner__price { font-size: 1.4rem; font-weight: 750; font-variant-numeric: tabular-nums; }
+.own-store-planner__card small { overflow-wrap: anywhere; }
+.own-store-planner__card button, .own-store-planner__result button { min-height: 44px; white-space: normal; }
+.own-store-planner__result { margin-top: 15px; border-top: 1px solid #d9ded9; padding-top: 13px; }
+.own-store-planner__result p { line-height: 1.5; }
+.own-store-planner__result button { margin: 3px 8px 3px 0; }
+@media (max-width: 550px) { .own-store-planner__cards { grid-template-columns: 1fr; } }
+
+.own-store-planner__budget-gap { font-weight: 650; font-variant-numeric: tabular-nums; }
+.own-store-planner__details { margin-top: 18px; max-width: 100%; }
+.own-store-planner__details summary { cursor: pointer; font-weight: 700; min-height: 44px; padding: 10px 0; }
+.own-store-planner__scroll { max-width: 100%; overflow-x: auto; border: 1px solid #d9ded9; border-radius: 10px; }
+.own-store-planner__scroll table { width: 100%; min-width: 660px; border-collapse: collapse; text-align: left; }
+.own-store-planner__scroll th, .own-store-planner__scroll td { border-bottom: 1px solid #e5e9e5; padding: 12px; vertical-align: top; }
+.own-store-planner__scroll thead { background: #f4f7f4; }
+.own-store-planner__scroll tbody tr:last-child td, .own-store-planner__scroll tbody tr:last-child th { border-bottom: none; }
+.own-store-planner__scroll td small { display: block; margin-top: 5px; overflow-wrap: anywhere; max-width: 260px; }
+.own-store-planner__scroll td strong { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.own-store-planner__mix-preview { margin-top: 18px; padding: 14px; background: #f4f7f4; border-radius: 12px; }
+.own-store-planner__mix-preview h4 { margin: 0 0 8px; font-size: 1rem; }
+.own-store-planner__mix-preview p { margin: 6px 0 12px; }
+
+.own-store-planner__start { padding: 14px; margin-top: 16px; border: 1px dashed #b7c8b9; border-radius: 12px; background: #f8faf8; }
+.own-store-planner__start p { line-height: 1.55; }
+.own-store-planner__start button { min-height: 44px; }
+.own-store-planner__line-actions { display:grid; gap:.45rem; margin-top:.75rem; }
+.own-store-planner__line-actions button {
+  min-height:42px; padding:.4rem .6rem; border:1px solid #6b947c;
+  background:#f1f8f3; color:#20563a; border-radius:8px; cursor:pointer;
+  text-align:left; font-weight:600;
+}
+.own-store-planner__line-actions button:focus-visible {
+  outline:3px solid #226f52; outline-offset:2px;
+}
+.own-store-planner__capture {
+  display:grid; gap:.65rem; border:1px solid #cee0d0; border-radius:12px;
+  margin-bottom:1rem; padding:1rem; background:#f7faf6;
+}
+.own-store-planner__capture p { margin:0; line-height:1.5; }
+.own-store-planner__capture label { display:grid; gap:.3rem; font-weight:600; max-width:340px; }
+.own-store-planner__capture select { min-height:44px; padding:.5rem; border:1px solid #819f8c; border-radius:8px; }
+.own-store-planner__capture-buttons { display:flex; flex-wrap:wrap; gap:.5rem; }
+.own-store-planner__capture-buttons button { min-height:44px; }
+.own-store-planner__age { display:block; padding:.65rem; border-left:3px solid #a47638; background:#faf5ea; color:#624c2c; line-height:1.45; }
+.own-store-planner__second-stop { display:grid; gap:.55rem; padding:1rem; margin:1rem 0; background:#f0f6f1; border:1px solid #b9d5c2; border-radius:12px; }
+.own-store-planner__second-stop label { display:grid; gap:.5rem; max-width:340px; font-weight:600; }
+.own-store-planner__second-stop input { min-height:44px; padding:.6rem; border:1px solid #789687; border-radius:8px; font:inherit; }
+.own-store-planner__second-stop p { margin:0; line-height:1.5; }
+.own-store-planner__second-stop input:focus-visible { outline:3px solid #246b50; outline-offset:2px; }
+
+.own-store-planner__progress-meters { display: grid; gap: .5rem; padding: .65rem 0; }
+.own-store-planner__progress-meters label { display: grid; gap: .25rem; font-size: .84rem; line-height: 1.4; }
+.own-store-planner__progress-meters progress { width: 100%; height: .8rem; accent-color: #276c4b; }
+.own-store-planner__progress-meters span { font-variant-numeric: tabular-nums; }
+
+.own-store-planner__review-queue { display: grid; gap: .4rem; margin: .55rem 0; }
+.own-store-planner__review-queue > strong { font-size: .86rem; }
+.own-store-planner__review-queue button {
+  width: 100%; text-align: left; min-height: 44px; overflow-wrap: anywhere;
+}
+
+.own-store-planner__review-download { margin-bottom: 1rem; line-height: 1.45; }
+.own-store-planner__review-download p { margin: .3rem 0 .65rem; }
+.own-store-planner__review-download button { min-height: 44px; }
+
+
+/* Direct Planner → canonical source import: a touch-friendly local file picker.
+   It does not mark prices, matches or retailer rights as verified. */
+.supa-planner-direct-source {
+  display: grid;
+  gap: .35rem;
+  width: 100%;
+  padding: .8rem;
+  border: 1px solid #bfd7c7;
+  background: #f7faf8;
+  border-radius: 10px;
+  color: #1d5037;
+  font-weight: 650;
+}
+.supa-planner-direct-source input[type="file"] {
+  display: block;
+  box-sizing: border-box;
+  max-width: 100%;
+  padding: .5rem;
+  border: 1px solid #819f8c;
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+}
+.supa-planner-direct-source input[type="file"]::file-selector-button {
+  min-height: 44px;
+  margin-right: .75rem;
+  padding: .45rem .7rem;
+  border: 1px solid #4b8865;
+  border-radius: 8px;
+  background: #e8f2ea;
+  font: inherit;
+  cursor: pointer;
+}
+.supa-planner-direct-source input[type="file"]:focus-visible {
+  outline: 3px solid #246b50;
+  outline-offset: 2px;
+}
+.supa-planner-direct-source small {
+  font-weight: 400;
+  color: #395a48;
+  line-height: 1.5;
+}
+
+.supa-planner-source-drop {
+  flex: 1 1 300px;
+  max-width: 100%;
+  border: 2px dashed transparent;
+  border-radius: 12px;
+}
+.supa-planner-source-drop.is-dragging {
+  border-color: #33835b;
+  background: #edf9f0;
+}
+.supa-planner-source-error {
+  margin: .4rem .6rem;
+  padding: .5rem;
+  color: #802c20;
+  border-left: 3px solid #b64c3d;
+  background: #fff2ed;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+/* Complete one-shop lists are usable independently of a two-shop price pair.
+   Keep export actions touch friendly without mistaking a source for savings. */
+.own-store-planner__single-exports {
+  display: grid;
+  gap: .45rem;
+  border-top: 1px solid #dce9df;
+  padding-top: .6rem;
+}
+.own-store-planner__single-exports button { width: 100%; min-height: 44px; }
+.own-store-planner__single-exports small {
+  color: #496152;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.own-store-planner__copy-fallback {
+  display: grid;
+  gap: .35rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #254932;
+}
+.own-store-planner__copy-fallback textarea {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: .65rem;
+  border: 1px solid #8ba991;
+  border-radius: 8px;
+  resize: vertical;
+  background: #fbfdfb;
+  color: #173d2a;
+  font: .85rem/1.45 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+.own-store-planner__copy-fallback textarea:focus-visible {
+  outline: 3px solid #246b50;
+  outline-offset: 2px;
+}
+
+/* Progress-only subtotal of personally admitted SKU lines; it must never
+   look like the complete basket total or claim an entire-shop winner. */
+.own-store-planner__partial-amount {
+  display: grid;
+  gap: .55rem;
+  margin: .65rem 0;
+  padding: .8rem;
+  border: 1px dashed #9baea2;
+  border-radius: 10px;
+  background: #f5f8f5;
+  line-height: 1.5;
+}
+.own-store-planner__partial-amount > strong {
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+.own-store-planner__partial-amount small { display: block; color: #405948; }
+.own-store-planner__partial-amount button { min-height: 44px; }
+
+/* Read-only private receipt archive. Never overlaps the live comparison totals. */
+.own-store-planner__archive {
+  margin-block: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border, #dce2e7);
+  border-radius: 0.9rem;
+}
+.own-store-planner__archive summary { cursor: pointer; font-weight: 650; }
+.own-store-planner__archive label { display: grid; gap: 0.4rem; margin-block: 0.9rem; }
+.own-store-planner__archive input[type=file] { width: 100%; max-width: 100%; }
+.own-store-planner__archive-content { margin-block: 1rem; }
+.own-store-planner__archive-content table { width: 100%; min-width: 580px; }
+.own-store-planner__archive-content td { overflow-wrap: anywhere; }
+
+.own-store-planner__archive-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.8rem;
+  margin-block: 1rem;
+}
+.own-store-planner__archive-filters label { flex: 1 1 12rem; margin: 0; }
+.own-store-planner__archive-filters input,
+.own-store-planner__archive-filters select { max-width: 100%; min-width: 0; }
+
+/* Historic local receipts in the actual Planner (not only the standalone page).
+   Product/source permission gates live upstream; this view never fetches prices. */
+.own-store-planner__history-pickers,
+.own-store-planner__history-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: .85rem;
+}
+.own-store-planner__history-pickers label { min-width: 0; }
+.own-store-planner__history-pickers input[type=file] {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.own-store-planner__history-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .6rem;
+}
+.own-store-planner__history-actions button {
+  min-height: 44px;
+  flex: 1 1 10rem;
+}
+.own-store-planner__history-cards section {
+  display: grid;
+  gap: .4rem;
+  align-content: start;
+  background: #f5f8f5;
+  border: 1px solid #cbdcd0;
+  border-radius: .8rem;
+  padding: .85rem;
+  min-width: 0;
+}
+.own-store-planner__history-cards section p { margin: 0; }
+.own-store-planner__history-cards section small { color: #385f47; }
+.own-store-planner__history-notice {
+  border-inline-start: 4px solid #54856b;
+  padding: .6rem .8rem;
+  background: #f2f7f3;
+  overflow-wrap: anywhere;
+}
+.own-store-planner__history table { width: 100%; min-width: 32rem; }
+.own-store-planner__history th,
+.own-store-planner__history td { overflow-wrap: anywhere; }
+.own-store-planner__history td small {
+  display: block;
+  color: #6c493f;
+}
+.own-store-planner__history input[type=search] {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+@media (max-width: 600px) {
+  .own-store-planner__history { padding: .8rem; }
+  .own-store-planner__history-actions button { flex-basis: 100%; }
+}
+
+/* Keep the historic store/changed-product filters operable at phone widths. */
+.own-store-planner__history .own-store-planner__history-check {
+  display: flex;
+  flex: 1 1 12rem;
+  gap: .55rem;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.own-store-planner__history-check input[type=checkbox] {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: 0 0 auto;
+}
+.own-store-planner__history td > div { margin-bottom: .25rem; }
+.own-store-planner__history td > strong { display: inline-block; margin: .1rem 0; }
+
+
+/* Genuine entire-basket comparison comes before long import and review tools.
+ * Its numbers are only rendered from the existing canonical comparable state. */
+.own-store-planner__overview {
+  display: grid;
+  gap: .8rem;
+  min-width: 0;
+  margin-bottom: 1.1rem;
+  padding: clamp(.9rem, 2vw, 1.5rem);
+  border: 1px solid var(--border, #d8e2da);
+  border-radius: 1rem;
+  background: var(--surface, #fff);
+}
+.own-store-planner__overview h3,
+.own-store-planner__overview p { margin: 0; }
+.own-store-planner__overview small {
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.own-store-planner__overview-totals {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .7rem;
+}
+.own-store-planner__overview-totals > div {
+  padding: 1rem;
+  border: 1px solid var(--border, #d8e2da);
+  border-radius: .7rem;
+  min-width: 0;
+  display: grid;
+  gap: .25rem;
+}
+.own-store-planner__overview-totals span { font-size: .9rem; }
+.own-store-planner__overview-totals strong {
+  font-size: clamp(1.25rem, 3vw, 1.8rem);
+  overflow-wrap: anywhere;
+}
+.own-store-planner__overview-actions {
+  display: flex;
+  gap: .65rem;
+  flex-wrap: wrap;
+}
+.own-store-planner__overview-actions button {
+  min-height: 44px;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 540px) {
+  .own-store-planner__overview-totals { grid-template-columns: minmax(0, 1fr); }
+  .own-store-planner__overview-actions button { flex: 1 1 100%; }
+}
+
+.own-store-planner__break-even { border-left: 3px solid #407958; padding: .65rem .8rem; background: #fff; overflow-wrap: anywhere; }
+
+.own-store-planner__route-choice { display: grid; gap: .5rem; margin: 1rem 0; padding: 1rem; border: 1px solid #b9d5c2; border-radius: 12px; background: #f0f6f1; }
+.own-store-planner__route-choice label { display: grid; gap: .4rem; max-width: 340px; font-weight: 650; }
+.own-store-planner__route-choice input { width: 100%; min-height: 44px; box-sizing: border-box; padding: .6rem; border: 1px solid #789687; border-radius: 8px; font: inherit; }
+.own-store-planner__route-choice input:focus-visible { outline: 3px solid #246b50; outline-offset: 2px; }
+.own-store-planner__route-choice p { margin: .35rem 0; line-height: 1.45; }
+.own-store-planner__route-choice button { min-height: 44px; text-align: left; }
