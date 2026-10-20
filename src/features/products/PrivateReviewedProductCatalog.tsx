@@ -3,6 +3,7 @@ import type { BasketTraceLine } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import { privatePackUnitRate, privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import { PrivateReviewedTwoStoreTable } from './PrivateReviewedTwoStoreTable.tsx'
+import { ownStoreWeekComparison } from '../planner/ownStoreBudgetComparison.ts'
 import { productSearchText } from './productSearchText.ts'
 import { privatePriceAgeNotice } from '../comparison/privatePriceAgeNotice.ts'
 import { privatePhysicalShoppingTick } from '../shopping-list/privatePhysicalShoppingTick.ts'
@@ -12,6 +13,7 @@ import './privateReviewedProductCatalog.css'
 
 const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const shops: OwnStore[] = ['PLUS', 'DekaMarkt']
+const emptyReviewed: PrivateReviewedBaskets = { planKey: '', stores: {} }
 type Matched = Extract<BasketTraceLine, { status: 'matched' }>
 // Reuse the Planner's admitted partial-source rows and same-demand pairing.
 // Its formatter never converts incomplete sources into whole-basket totals.
@@ -38,7 +40,7 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOp
   const [store, setStore] = useState<'all' | OwnStore>('all')
   const [query, setQuery] = useState('')
   const [unitFilter, setUnitFilter] = useState<'all' | 'kg' | 'liter' | 'stuk'>('all')
-  const [order, setOrder] = useState<'source' | 'unitPrice' | 'lineTotal'>('source')
+  const [order, setOrder] = useState<'source' | 'unitPrice' | 'lineTotal' | 'priceGap'>('source')
   const [checkMessage, setCheckMessage] = useState('')
   const [nowMs, setNowMs] = useState(() => Date.now())
   useEffect(() => {
@@ -70,6 +72,12 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOp
     return capture ? capture.basket.lines.filter((line): line is Matched => line.status === 'matched')
       .map(line => ({ shop, line, observedAt: capture.observedAt })) : []
   })
+  // One canonical physical basket comparison for the two-store cards too:
+  // never rank a missing or unpaired price as if it were a valid difference.
+  const paired = ownStoreWeekComparison(currentReviewed)
+  const gapById = new Map<string, number>(paired.status === 'comparable'
+    ? paired.lines.map(line => [line.id, Math.abs(line.deltaCents)])
+    : [])
   const search = productSearchText(query.trim())
   const rate = (line: Matched) => privatePackUnitRate({
     amount: line.pack.amount, unit: line.pack.unit, count: line.pack.count,
@@ -85,9 +93,12 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOp
   // while weekly whole-pack costs remain the authoritative budget calculation.
   const group = (line: Matched) =>
     ({ kg: 0, liter: 1, stuk: 2 } as Record<string, number>)[rate(line)?.unit ?? ''] ?? 3
-  const ordered = order === 'source' ? visible : [...visible].sort((a, b) =>
-    order === 'lineTotal'
-      ? a.line.lineTotalCents - b.line.lineTotalCents
+  const ordered = order === 'source' || (order === 'priceGap' && paired.status !== 'comparable')
+    ? visible : [...visible].sort((a, b) =>
+    order === 'priceGap'
+      ? (gapById.get(b.line.id) ?? -1) - (gapById.get(a.line.id) ?? -1)
+      : order === 'lineTotal'
+        ? a.line.lineTotalCents - b.line.lineTotalCents
       : group(a.line) - group(b.line) ||
         (rate(a.line)?.centsPerUnit ?? Infinity) - (rate(b.line)?.centsPerUnit ?? Infinity))
   const isChecked = (shop: OwnStore, line: Matched) => {
@@ -187,7 +198,11 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOp
     {!sources.length ? <p role="status">Nog geen complete en actuele eigen bronproducten beschikbaar.
       Kies een weekmenu, importeer je eigen winkelbron en controleer iedere SKU en verpakking.</p> : <>
       <div className="private-reviewed-products__controls">
-        <label>Winkel <select value={store} onChange={event => setStore(event.target.value as 'all' | OwnStore)}>
+        <label>Winkel <select value={store} onChange={event => {
+          const next = event.target.value as 'all' | OwnStore
+          setStore(next)
+          if (next !== 'all' && order === 'priceGap') setOrder('source')
+        }}>
           <option value="all">Beide winkels</option>
           {shops.map(shop => <option value={shop} key={shop}>{shop}</option>)}
         </select></label>
@@ -203,6 +218,8 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOp
           <option value="source">Oorspronkelijke bronvolgorde</option>
           <option value="unitPrice">Eenheidsprijs laag naar hoog</option>
           <option value="lineTotal">Weekregelbedrag laag naar hoog</option>
+          {store === 'all' && <option value="priceGap"
+            disabled={paired.status !== 'comparable'}>Grootste prijsverschil per ingrediënt</option>}
         </select></label>
         <label>Zoek eigen product <input type="search" value={query}
           onChange={event => setQuery(event.target.value)} maxLength={120} placeholder="Product, SKU of ingrediënt" /></label>
@@ -245,11 +262,6 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOp
           </section>
         })}
       </div>
-      {store === 'all' && currentReviewed && <PrivateReviewedTwoStoreTable reviewed={currentReviewed}
-        search={search} unitFilter={unitFilter} order={order} budget={budget}
-        onOpenComparison={onOpenComparison} onOpenList={onOpenList}
-        onOpenMixedRoute={onOpenMixedRoute} onChooseRouteLine={onChooseRouteLine}
-        checked={checked} />}
       <p role="status">{visible.length} van {sources.length} bevestigde productregels.
         {' '}{ordered.filter(row => isChecked(row.shop, row.line)).length}
         {' '}van de getoonde artikelen staan op afgevinkt in je lijst.</p>
@@ -278,6 +290,11 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOp
         {store === 'all' ? 'Open mijn gecontroleerde boodschappenlijst' : `Open mijn ${store}-boodschappenlijst`}
       </button>
     </>}
+    {store === 'all' && <PrivateReviewedTwoStoreTable reviewed={reviewed ?? emptyReviewed}
+      search={search} unitFilter={unitFilter} order={order} budget={budget}
+      onOpenComparison={onOpenComparison} onOpenList={onOpenList}
+      onOpenMixedRoute={onOpenMixedRoute} onChooseRouteLine={onChooseRouteLine}
+      checked={checked} />}
     <button type="button" onClick={onOpenComparison}>Open prijsinvoer en productmatching</button>
     <small>Ontbrekende of verlopen bronproducten krijgen nooit een verzonnen prijs.</small>
   </section>

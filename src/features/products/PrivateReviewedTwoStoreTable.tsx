@@ -1,3 +1,6 @@
+import { useRef, useState } from 'react'
+import { ownStoreWeekComparison } from '../planner/ownStoreBudgetComparison.ts'
+import { observedInstant } from '../../domain/offlineReviewedImport.ts'
 import type { BasketTraceLine } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import { privatePackUnitRate, privateUnitPrice } from '../comparison/privateUnitPrice.ts'
@@ -19,7 +22,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   reviewed: PrivateReviewedBaskets
   search: string
   unitFilter: 'all' | 'kg' | 'liter' | 'stuk'
-  order: 'source' | 'unitPrice' | 'lineTotal'
+  order: 'source' | 'unitPrice' | 'lineTotal' | 'priceGap'
   budget: number
   onOpenComparison: () => void
   onOpenList: (store: OwnStore) => void
@@ -27,6 +30,83 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   onChooseRouteLine: (choice: Omit<PrivateRouteChoice, 'serial'>) => void
   checked: Readonly<Record<string, boolean>>
 }) {
+  const reviewedRef = useRef(reviewed)
+  reviewedRef.current = reviewed
+  const [receiptMessage, setReceiptMessage] = useState('')
+  const [shopAdvantage, setShopAdvantage] = useState<'all' | 'plus' | 'deka' | 'equal'>('all')
+  async function downloadSingle(shop: OwnStore, kind: 'csv' | 'txt') {
+    const origin = freshReviewedBaskets(reviewedRef.current, reviewedRef.current.planKey, Date.now())
+    const receipt = origin?.stores[shop]
+    if (!receipt || !origin) {
+      setReceiptMessage('Geen geldige eigen ' + shop + '-bron om te bewaren.')
+      return
+    }
+    try {
+      const content = kind === 'csv'
+        ? (await import('../shopping-list/privateSourceShoppingCsv.ts'))
+          .privateSingleStoreShoppingCsv({
+            basket: receipt.basket, observedAt: receipt.observedAt,
+            done: new Set(receipt.basket.lines.filter(line => line.status === 'matched' &&
+              checked[privatePhysicalShoppingTick(origin.planKey, shop, receipt.basket.store.id, line)])
+              .map(line => line.id)),
+          })
+        : (await import('../shopping-list/privateSingleStoreShoppingText.ts'))
+          .privateSingleStoreShoppingText({ basket: receipt.basket, observedAt: receipt.observedAt })
+      const latest = freshReviewedBaskets(reviewedRef.current,
+        reviewedRef.current.planKey, Date.now())
+      if (latest?.planKey !== origin.planKey || latest?.stores[shop] !== receipt)
+        throw Error('De bron is tijdens voorbereiden veranderd.')
+      const url = URL.createObjectURL(new Blob([content], {
+        type: kind === 'csv' ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8',
+      }))
+      try {
+        const a = document.createElement('a')
+        a.href = url
+        a.download = 'supa-eigen-' + shop.toLowerCase() + '-weekmand.' + kind
+        document.body.append(a)
+        try { a.click() } finally { a.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setReceiptMessage(shop + ': eigen volledig weekmandje bewaard. Andere winkelprijs blijft onbekend.')
+    } catch {
+      setReceiptMessage('Download van eigen ' + shop + '-mand mislukt. Herzie de bron.')
+    }
+  }
+  async function downloadReceipt(kind: 'csv' | 'txt') {
+    // Keep the display and export on the same admitted original physical
+    // demand. Await lazy receipt code before rechecking source expiry.
+    const initial = freshReviewedBaskets(reviewedRef.current,
+      reviewedRef.current.planKey, Date.now())
+    try {
+      const exports = await import('../planner/downloadOwnStoreComparison.ts')
+      const current = freshReviewedBaskets(reviewedRef.current,
+        reviewedRef.current.planKey, Date.now())
+      if (!current || !initial || current.planKey !== initial.planKey ||
+          current.stores.PLUS !== initial.stores.PLUS ||
+          current.stores.DekaMarkt !== initial.stores.DekaMarkt) {
+        setReceiptMessage('Bronnen gewijzigd tijdens voorbereiden. Start opnieuw.')
+        return
+      }
+      const comparison = ownStoreWeekComparison(current)
+      if (!current?.stores.PLUS || !current.stores.DekaMarkt ||
+          !privateReviewedPairWithin24Hours(current.stores.PLUS, current.stores.DekaMarkt) ||
+          comparison.status !== 'comparable') {
+        setReceiptMessage('De originele winkelopnames zijn niet meer samen vergelijkbaar. Controleer ze opnieuw in Vergelijk.')
+        return
+      }
+      if (kind === 'csv') {
+        exports.downloadOwnStoreCsv(current, comparison)
+      } else {
+        const text = exports.printableOwnStoreComparison(comparison, {
+          PLUS: current.stores.PLUS.observedAt,
+          DekaMarkt: current.stores.DekaMarkt.observedAt,
+        })
+        exports.downloadOwnStoreText(text)
+      }
+      setReceiptMessage('Privé-overzicht gemaakt uit de twee volledige, actuele eigen winkelmandjes.')
+    } catch {
+      setReceiptMessage('Het privé-overzicht kon niet worden gemaakt. Je winkelbronnen blijven ongewijzigd.')
+    }
+  }
   const exactBudget = validCustomWeekBudgetEuros(budget)
   const budgetCents = exactBudget === null ? null : Math.round(exactBudget * 100)
   const budgetComparison = (totalCents: number) => budgetCents === null ? null :
@@ -59,6 +139,10 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   if (!comparable || !plus || !deka) {
     const missing = (['PLUS', 'DekaMarkt'] as const).filter(store => !fresh?.stores[store])
     const gap = !!plus && !!deka && !privateReviewedPairWithin24Hours(plus, deka)
+    const plusMoment = plus ? observedInstant(plus.observedAt) : null
+    const dekaMoment = deka ? observedInstant(deka.observedAt) : null
+    const older: OwnStore | null = gap && plusMoment && dekaMoment
+      ? (plusMoment.ns < dekaMoment.ns ? 'PLUS' : 'DekaMarkt') : null
     return <section className="private-reviewed-products__paired" aria-label="Winkelvergelijking van eigen artikelen">
       <h3>Vergelijk PLUS met DekaMarkt</h3>
       <div className="private-reviewed-products__source-coverage">
@@ -75,18 +159,28 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
               <button type="button" onClick={() => openCheckedStoreList(shop)}>
                 Bekijk mijn {shop}-boodschappenlijst
               </button>
+              <button type="button" onClick={() => { void downloadSingle(shop, 'csv') }}>
+                Bewaar mijn {shop}-weekmand (CSV)
+              </button>
+              <button type="button" onClick={() => { void downloadSingle(shop, 'txt') }}>
+                Bewaar mijn {shop}-lijst (TXT)
+              </button>
             </> : <>
               <strong>Prijs onbekend</strong>
-              <small>Geen volledige, actuele en door jou gecontroleerde eigen opname.</small>
+              <small>{reviewed.stores[shop]
+                ? 'Je eerdere eigen opname is verlopen of niet meer bruikbaar. Herzie deze bron.'
+                : 'Nog geen volledige, actuele en persoonlijk gecontroleerde eigen opname.'}</small>
             </>}
           </article>
         })}
       </div>
       <p role="status">{gap
-        ? 'Beide eigen winkelmandjes bestaan, maar de waarnemingen liggen meer dan 24 uur uiteen. Herzie de oudere opname; er is nog geen geldig prijsverschil.'
+        ? 'Je eigen PLUS- en DekaMarkt-opnames liggen meer dan 24 uur uiteen. Herzie ' +
+          (older ?? 'de oudste winkelbron') + ' voor een controleerbaar bronpaar; een prijsverschil blijft onbekend.'
         : missing.length > 0
           ? missing.join(' en ') + ' heeft nog geen volledig bruikbare eigen prijsopname. Vul de brongegevens aan voordat Supa een prijsverschil toont.'
           : 'Het bestaande bronpaar is nog niet betrouwbaar vergelijkbaar voor hetzelfde fysieke weekmandje. Controleer de productkoppelingen opnieuw.'}</p>
+      {receiptMessage && <p role="status">{receiptMessage}</p>}
       <button type="button" onClick={onOpenComparison}>Open bronimport en productmatching</button>
       <small>Geen kassagarantie of onafhankelijk bewezen besparing. Een onbekende prijs is niet nul.</small>
     </section>
@@ -113,7 +207,16 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         productSearchText(value).includes(search))) return []
     return [{ plus: line, deka: alternate }]
   })
-  if (order !== 'source') rows.sort((a, b) => {
+  const advantaged = rows.filter(({ plus: first, deka: second }) =>
+    shopAdvantage === 'all' ||
+    (shopAdvantage === 'plus' && first.lineTotalCents < second.lineTotalCents) ||
+    (shopAdvantage === 'deka' && second.lineTotalCents < first.lineTotalCents) ||
+    (shopAdvantage === 'equal' && first.lineTotalCents === second.lineTotalCents))
+  if (order !== 'source') advantaged.sort((a, b) => {
+    if (order === 'priceGap') return (
+      Math.abs(b.plus.lineTotalCents - b.deka.lineTotalCents) -
+      Math.abs(a.plus.lineTotalCents - a.deka.lineTotalCents)
+    )
     if (order === 'lineTotal') return (
       Math.min(a.plus.lineTotalCents, a.deka.lineTotalCents) -
       Math.min(b.plus.lineTotalCents, b.deka.lineTotalCents)
@@ -128,6 +231,12 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
     return Math.min(rate(a.plus)!.centsPerUnit, rate(a.deka)!.centsPerUnit) -
       Math.min(rate(b.plus)!.centsPerUnit, rate(b.deka)!.centsPerUnit)
   })
+  // This is a navigation aid, not a savings claim. Only visible, paired,
+  // wholly priced ingredient lines contribute to the difference overview.
+  const changed = advantaged.filter(row => row.plus.lineTotalCents !== row.deka.lineTotalCents)
+  const largest = changed.length ? [...changed].sort((a, b) =>
+    Math.abs(b.plus.lineTotalCents - b.deka.lineTotalCents) -
+    Math.abs(a.plus.lineTotalCents - a.deka.lineTotalCents))[0] : null
   const mix = createMixedStoreShoppingPlan(plus.basket, deka.basket)
   const splitTrip = !!mix && mix.lines.some(line => line.store === 'PLUS') &&
     mix.lines.some(line => line.store === 'DekaMarkt')
@@ -141,6 +250,19 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
     const intent = currentPrivateRouteChoice(reviewed, ingredientId, store, Date.now())
     if (!intent) { onOpenComparison(); return }
     onChooseRouteLine(intent)
+  }
+  function unitPriceWarning(first: Matched, second: Matched): string | null {
+    const a = rate(first)
+    const b = rate(second)
+    if (!a || !b || a.unit !== b.unit ||
+        a.centsPerUnit === b.centsPerUnit ||
+        first.lineTotalCents === second.lineTotalCents) return null
+    const cheaperUnit: OwnStore = a.centsPerUnit < b.centsPerUnit ? 'PLUS' : 'DekaMarkt'
+    const cheaperWeek: OwnStore = first.lineTotalCents < second.lineTotalCents
+      ? 'PLUS' : 'DekaMarkt'
+    return cheaperUnit === cheaperWeek ? null
+      : cheaperUnit + ' heeft de lagere indicatieve prijs per ' + a.unit +
+        ', maar ' + cheaperWeek + ' kost minder aan HELE verpakkingen voor jouw weekvraag.'
   }
   const product = (line: Matched, store: OwnStore) => <div className="private-reviewed-products__paired-option">
     <strong>{store}</strong>
@@ -165,6 +287,38 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         of een berekening van werkelijk afgerekende producten.</small>
     </div>}
     <strong role="status">{leader}</strong>
+    <div className="private-reviewed-products__receipt-actions">
+      <button type="button" onClick={() => { void downloadReceipt('csv') }}>
+        Download volledige PLUS/Deka-prijsvergelijking (CSV)
+      </button>
+      <button type="button" onClick={() => { void downloadReceipt('txt') }}>
+        Bewaar leesbaar winkeloverzicht (TXT)
+      </button>
+      <small>Beide downloads bevatten het originele complete weekmandje en
+        bronmomenten, onafhankelijk van je zoekfilter. Alleen privé; geen kassagarantie,
+        openbare besparingsclaim of nieuwe winkelbronimport.</small>
+      {receiptMessage && <p role="status">{receiptMessage}</p>}
+    </div>
+    <div className="private-reviewed-products__advantage-filter"
+      role="group" aria-label="Filter persoonlijk gecontroleerde regelprijzen per winkel">
+      {([
+        ['all', 'Beide winkels'],
+        ['plus', 'Alleen PLUS goedkoper'],
+        ['deka', 'Alleen DekaMarkt goedkoper'],
+        ['equal', 'Zelfde hele-pakprijs'],
+      ] as const).map(([value, label]) => <button key={value} type="button"
+        aria-pressed={shopAdvantage === value}
+        onClick={() => setShopAdvantage(value)}>{label}</button>)}
+    </div>
+    <div className="private-reviewed-products__difference-focus" aria-label="Prijsverschil per ingrediënt">
+      <strong>{changed.length} van {advantaged.length} geselecteerde ingrediënten verschillen in hele-pakprijs.</strong>
+      {largest ? <p>Grootste zichtbaar verschil: <strong>{largest.plus.ingredientLabel}</strong> · {' '}
+        {money.format(Math.abs(largest.plus.lineTotalCents - largest.deka.lineTotalCents) / 100)} goedkoper bij {' '}
+        {largest.plus.lineTotalCents < largest.deka.lineTotalCents ? 'PLUS' : 'DekaMarkt'}.
+      </p> : <p>Geen verschillende hele-pakprijzen in deze selectie.</p>}
+      <small>Dit overzicht volgt de zoek- en eenheidsfilters; de mandtotalen en
+        goedkoopste winkel hierboven blijven gebaseerd op alle originele weekartikelen.</small>
+    </div>
     {mix && <div className="private-reviewed-products__route-preview">
       <h4>Goedkoopste originele artikelen combineren</h4>
       <p>Productkosten met hele verpakkingen: <strong>{money.format(mix.totalCents / 100)}</strong></p>
@@ -181,11 +335,11 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
     <small>Jouw gecontroleerde PLUS-bron: {plus.observedAt}. DekaMarkt-bron: {deka.observedAt}.
       Geen kassagarantie of onafhankelijk bewezen besparing; oorspronkelijke producten en
       prijzen kunnen veranderen.</small>
-    <p role="status">{rows.length} van {plus.basket.lines.length} vergelijkbare ingrediënten
+    <p role="status">{advantaged.length} van {plus.basket.lines.length} vergelijkbare ingrediënten
       bij je zoek-, eenheids- en sorteerselectie. Alle mandtotalen hierboven blijven
       gebaseerd op het volledige weekmenu, niet alleen de gefilterde producten.</p>
     <div className="private-reviewed-products__paired-rows">
-      {rows.map(({ plus: first, deka: second }) => <article key={first.id}>
+      {advantaged.map(({ plus: first, deka: second }) => <article key={first.id}>
         <h4>{first.ingredientLabel} · {first.requirement.amount} {first.requirement.unit}</h4>
         <div className="private-reviewed-products__paired-options">
           {product(first, 'PLUS')}{product(second, 'DekaMarkt')}
@@ -195,6 +349,11 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
           : (first.lineTotalCents < second.lineTotalCents ? 'PLUS' : 'DekaMarkt') + ' is ' +
             money.format(Math.abs(first.lineTotalCents - second.lineTotalCents) / 100) +
             ' voordeliger voor dit ingrediënt.'}</p>
+        {unitPriceWarning(first, second) && <p className="private-reviewed-products__unit-caveat">
+          {unitPriceWarning(first, second)}
+          {' '}Supa rekent het winkelmandje met de werkelijk benodigde hele pakken,
+          nooit alleen met de indicatieve eenheidsprijs.
+        </p>}
         <div className="private-reviewed-products__ingredient-route-actions"
           aria-label={'Kies winkel voor ' + first.ingredientLabel}>
           <button type="button" onClick={() => chooseIngredientStore(first.id, 'PLUS')}>
@@ -205,7 +364,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
           </button>
         </div>
       </article>)}
-      {!rows.length && <p>Geen vergelijkbare artikelen passen bij je zoekopdracht of eenheidsfilter.</p>}
+      {!advantaged.length && <p>Geen vergelijkbare artikelen passen bij je zoek-, eenheids- of winkelvoordeelfilter.</p>}
     </div>
     <button type="button" onClick={() => openCheckedStoreList(cheapest)}>Open het goedkoopste volledige winkelmandje ({cheapest}) in Lijst</button>
   </section>
