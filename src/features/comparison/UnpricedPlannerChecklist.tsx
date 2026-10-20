@@ -231,6 +231,34 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPric
     }
   }
 
+  /** Share the original exact, unpriced CSV as a local file on supported
+   * phones. Missing SKU/prices remain blank; there is no remote Supa upload. */
+  async function shareUnpricedCsv() {
+    if (error || !items.length) return
+    const expectedDemand = demandIdentity
+    try {
+      const { exportUnpricedPlannerCsv } = await import('./unpricedPlannerCsv.ts')
+      if (currentDemand.current !== expectedDemand) return
+      const csv = '\\uFEFF' + exportUnpricedPlannerCsv(items, checked, openOnly)
+      const filename = openOnly ? 'supa-planner-nog-te-kopen-ongeprijsd.csv' :
+        'supa-planner-weekmandje-ongeprijsd.csv'
+      const file = new File([csv], filename, { type: 'text/csv;charset=utf-8' })
+      if (typeof navigator.share === 'function' &&
+          typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'Supa · eigen ongeprijsde weekboodschappen' })
+        if (currentDemand.current === expectedDemand)
+          setBackupMessage('Je oorspronkelijke ongeprijsde CSV is gedeeld via de gekozen app.')
+        return
+      }
+      if (currentDemand.current === expectedDemand) await downloadUnpricedCsv()
+    } catch (cause) {
+      if (cause instanceof DOMException && cause.name === 'AbortError') return
+      if (currentDemand.current === expectedDemand) {
+        setBackupMessage('CSV delen is niet beschikbaar op dit apparaat. Gebruik Download weekboodschappen (CSV).')
+      }
+    }
+  }
+
   function downloadUnpricedList() {
     if (error || !items.length) return
     const url = URL.createObjectURL(new Blob([shoppingText()], { type: 'text/plain;charset=utf-8' }))
@@ -322,6 +350,9 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPric
             </button>
             <button type="button" className="ghost-button" onClick={() => void downloadUnpricedCsv()}>
               Download weekboodschappen (CSV)
+            </button>
+            <button type="button" className="ghost-button" onClick={() => void shareUnpricedCsv()}>
+              Deel ongeprijsde CSV met een andere app
             </button>
             <button type="button" className="ghost-button" onClick={openWithCurrentDemand}>
               Neem exact weekmenu mee naar privévergelijker
