@@ -98,7 +98,7 @@ export function PlannerTwoStoreCoverage({
     const current = cellFor(nextAction.store, nextAction.need.id,
       safeProgress, safeReviewed, latest, Date.now())
     if (current.kind === 'ready' || current.kind === 'reviewed') return
-    if (current.kind === 'source' || current.kind === 'expired') {
+    if (current.kind === 'source' || current.kind === 'expired' || current.kind === 'missing') {
       onOpenComparison()
     } else {
       onReviewIngredient(nextAction.store, nextAction.need.id)
@@ -190,7 +190,7 @@ export function PlannerTwoStoreCoverage({
               {' '}{nextAction.need.label}: {nextAction.cell.text.toLowerCase()}.
               De originele bron en de productcontrole blijven verplicht.</p>
             <button type="button" className="ghost-button" onClick={openNextAction}>
-              {nextAction.cell.kind === 'source' || nextAction.cell.kind === 'expired'
+              {nextAction.cell.kind === 'source' || nextAction.cell.kind === 'expired' || nextAction.cell.kind === 'missing'
                 ? 'Open originele ' + nextAction.store + '-bronimport'
                 : 'Controleer ' + nextAction.need.label + ' bij ' + nextAction.store}
             </button>
@@ -263,10 +263,10 @@ export function PlannerTwoStoreCoverage({
               <span data-status={cell.kind}>{cell.text}</span>
               {cell.kind !== 'ready' && cell.kind !== 'reviewed' && <button
                 type="button" onClick={() =>
-                  cell.kind === 'source' || cell.kind === 'expired'
+                  cell.kind === 'source' || cell.kind === 'expired' || cell.kind === 'missing'
                     ? onOpenComparison() : onReviewIngredient(store, need.id)}>
                 {cell.kind === 'source' ? 'Importeer bron' : cell.kind === 'expired'
-                  ? 'Vernieuw bron' : 'Bekijk oorspronkelijke SKU'}
+                  ? 'Vernieuw bron' : cell.kind === 'missing' ? 'Voeg origineel bronproduct toe' : 'Bekijk oorspronkelijke SKU'}
               </button>}
             </section>
           })}
