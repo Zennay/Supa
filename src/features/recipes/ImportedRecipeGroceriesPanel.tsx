@@ -150,7 +150,12 @@ export function ImportedRecipeGroceriesPanel({
   // Same source-identity + complete flag as the authoritative offline engine.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [variantInputKey, result?.complete])
-  const plannerReadyForSelection = allPlannerReady && !(result?.identityConflicts.length ?? 0)
+  // A valid individual recipe is not sufficient for a combined shopping
+  // week: identical physical identities can overflow after aggregation.
+  // The ordinary Planner must not accept a bundle that the canonical
+  // private basket engine already rejects as unsafe or incomplete.
+  const plannerReadyForSelection = allPlannerReady && !!result?.complete &&
+    privateTransfer.ready
   // Persist ONLY explicit downloaded checkmarks. Bind them to selected recipe
   // identities, exact current physical amounts and original review warnings.
   // Positional numeric line keys alone are never enough to restore ticks.
@@ -220,7 +225,9 @@ export function ImportedRecipeGroceriesPanel({
   const planSelected = (destination: 'planner' | 'list' | 'basket') => {
     setFeedback('')
     if (!plannerAssignments.length || !plannerReadyForSelection || !plannerDaysDistinct) {
-      setFeedback('Kies maximaal zeven recepten met gecontroleerde ingrediënten, originele porties en ieder een andere weekdag. Bewaar afwijkende porties eerst als eigen receptvariant.')
+      setFeedback('Kies maximaal zeven recepten met gecontroleerde ingrediënten, originele porties en ieder een andere weekdag. ' +
+        'De gezamenlijke fysieke weekvraag moet ook volledig geldig zijn. ' +
+        (privateTransfer.reason || 'Bewaar afwijkende porties eerst als eigen receptvariant.'))
       return
     }
     const summary = plannerAssignments.map(row =>
@@ -714,9 +721,11 @@ export function ImportedRecipeGroceriesPanel({
             over verschillende dagen in de gewone Planner zetten. De privévergelijker
             kan apart maximaal 14 recepten in één fysiek mandje verwerken.</p>}
         {!plannerReadyForSelection && !!selected.length &&
-          <p role="status">Eén of meer recepten zijn nog niet klaar voor Planner
-            of hebben hier aangepaste porties. Controleer het recept en bewaar
-            gewenste andere porties eerst als eigen variant.</p>}
+          <p role="status">Eén of meer recepten zijn nog niet klaar voor Planner,
+            hebben hier aangepaste porties of vormen samen een onvolledige fysieke weekvraag.
+            Controleer het recept en bewaar gewenste andere porties eerst als eigen variant.
+            {privateTransfer.reason && <> Reden: {privateTransfer.reason}</>}
+            De ongeprijsde boodschappenlijst blijft bruikbaar.</p>}
         <div className="recipe-backup-panel__actions">
           <button type="button" disabled={!plannerReadyForSelection || !plannerAssignments.length || !plannerDaysDistinct}
             onClick={() => planSelected('planner')}>Plan alle gekozen recepten</button>
