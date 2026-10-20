@@ -443,3 +443,13 @@ border-radius:10px;padding:.65rem;scroll-margin-top:1.25rem}
 @media(max-width:640px) { .offline-price-workbench__coverage-filters { grid-template-columns:minmax(0,1fr); } }
 
 .offline-price-workbench__confirmed-unit { display:block; margin-top:.45rem; font-weight:650; color:#27543a; line-height:1.4; }
+
+/* One actionable lane per store; this never promotes partial prices to totals. */
+.offline-price-workbench__store-progress { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.9rem; margin:1rem 0; }
+.offline-price-workbench__store-progress section { min-width:0; border:1px solid #bdd2c4; border-radius:12px; padding:1rem; background:#f6faf7; display:grid; gap:.65rem; align-content:start; }
+.offline-price-workbench__store-progress h5 { margin:0; font-size:1rem; }
+.offline-price-workbench__store-progress progress { display:block; width:100%; height:14px; accent-color:#1e714c; }
+.offline-price-workbench__store-progress p { margin:0; font-size:.9rem; line-height:1.4; }
+.offline-price-workbench__store-progress-actions { display:flex; gap:.55rem; flex-wrap:wrap; }
+.offline-price-workbench__store-progress-actions button { min-height:44px; flex:1; }
+@media(max-width:650px) { .offline-price-workbench__store-progress { grid-template-columns:minmax(0,1fr); } }

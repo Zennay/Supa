@@ -2081,6 +2081,30 @@ export function OfflineReviewedWorkbench({
     coverageRows.filter(row => olderPairCapture === store ||
       row[store].status !== 'Persoonlijk bevestigd').length,
   ])) as Record<(typeof stores)[number], number>
+  const storeCoverageProgress = stores.map(store => {
+    const confirmed = coverageRows.filter(row => row[store].status === 'Persoonlijk bevestigd').length
+    const pending = coverageRows.filter(row => row[store].status !== 'Persoonlijk bevestigd')
+    const older = olderPairCapture === store
+    const source = imported?.captures[store]
+    const recapture = older || !source || pending.some(row =>
+      row[store].status === 'Opname verlopen of toekomstig')
+    const actionable = pending.find(row => row[store].canReview &&
+      (row[store].status === 'SKU/verpakking ontbreekt' ||
+       row[store].status === 'Product, verpakking en prijs controleren'))
+    return { store, confirmed, total: coverageRows.length, pending: pending.length,
+      older, recapture, actionable }
+  })
+  function openNextCoverageStep(store: typeof stores[number]) {
+    const progress = storeCoverageProgress.find(item => item.store === store)
+    if (!progress) return
+    if (progress.recapture) {
+      document.getElementById('supa-own-price-import')?.scrollIntoView({
+        behavior: 'smooth', block: 'start',
+      })
+      return
+    }
+    if (progress.actionable) goToReviewRow(store, progress.actionable.id)
+  }
   const normalizedCoverageSearch = searchableSourceText(coverageSearch)
   const visibleCoverageRows = coverageRows.filter(row => {
     if (coverageScope === 'open' && !openCoverageRows.includes(row)) return false
@@ -2922,6 +2946,30 @@ export function OfflineReviewedWorkbench({
                     Planner-vraag voor beide winkels; onvolledige of oude prijzen leveren geen winnaar.</p>
                   <p>{openCoverageRows.length} van {coverageRows.length} ingrediënten
                     hebben nog een ontbrekende bron, verlopen opname of niet-bevestigde productregel.</p>
+                  <div className="offline-price-workbench__store-progress" aria-label="Voortgang per supermarkt">
+                    {storeCoverageProgress.map(item => <section key={item.store}>
+                      <h5>{item.store}: {item.confirmed} van {item.total} ingrediëntregels bevestigd</h5>
+                      <progress max={Math.max(1, item.total)} value={item.confirmed}
+                        aria-label={item.store + ' gecontroleerde ingrediëntregels'} />
+                      <p>{item.older ? 'De opname van deze winkel moet opnieuw binnen 24 uur met de andere winkel worden gepaard.' :
+                        item.recapture ? 'Een eigen bron ontbreekt of is verlopen: laad een werkelijke nieuwe bronopname.' :
+                        item.pending ? item.pending + ' artikelen ontbreken of wachten op je productcontrole.' :
+                        'Alle afzonderlijke artikelregels zijn bevestigd. Dit is nog geen onafhankelijke veldvalidatie.'}</p>
+                      <div className="offline-price-workbench__store-progress-actions">
+                        <button type="button" className="ghost-button"
+                          disabled={!item.recapture && !item.actionable}
+                          onClick={() => openNextCoverageStep(item.store)}>
+                          {item.recapture ? 'Ga naar bronimport voor ' + item.store :
+                            item.actionable ? 'Open eerstvolgende ' + item.store + '-productcontrole' :
+                            'Geen productcontrole meer open'}
+                        </button>
+                        <button type="button" className="ghost-button"
+                          onClick={() => { setCoverageScope(item.store); setCoverageSearch('') }}>
+                          Toon open {item.store}-regels
+                        </button>
+                      </div>
+                    </section>)}
+                  </div>
                   <p>Nieuw bronbewijs nodig? Download per winkel uitsluitend de ontbrekende
                     of verlopen fysieke Planner-producten als lege CSV met bijpassende
                     regelnummergids. Alleen nog te bevestigen bestaande SKU’s blijven buiten deze lijst.</p>
