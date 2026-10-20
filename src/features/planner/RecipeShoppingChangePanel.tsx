@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { recipeShoppingChangeText, type RecipeShoppingChange } from './recipeShoppingChange.ts'
 import { makeBlankPlannerCaptureCsv } from '../comparison/plannerPriceCaptureSheet.ts'
 import { makePlannerCaptureGuide } from '../comparison/plannerPriceCaptureGuide.ts'
+import { nextWeekPhysicalItems, nextWeekPhysicalListText } from './recipeNextWeekList.ts'
 
 /** Source-free physical shopping preview; no SKU or stored retailer price. */
 export function RecipeShoppingChangePanel({ preview, day }: {
@@ -10,6 +11,7 @@ export function RecipeShoppingChangePanel({ preview, day }: {
 }) {
   const [notice, setNotice] = useState('')
   const [showCopy, setShowCopy] = useState(false)
+  const [showFullCopy, setShowFullCopy] = useState(false)
   if (preview.status !== 'ready') return <section className="recipe-reuse-preview-shopping"
     aria-label="Boodschappenwijziging niet beschikbaar">
     <h4>Nieuwe boodschappen nog niet betrouwbaar</h4>
@@ -18,6 +20,8 @@ export function RecipeShoppingChangePanel({ preview, day }: {
   </section>
   // Capture the narrowed immutable week demand before nested download callbacks.
   const nextNeeds = preview.nextNeeds
+  const completeWeek = nextWeekPhysicalItems(preview)
+  function getFullText() { return nextWeekPhysicalListText(preview, day) }
   const added = preview.changes.filter(line => line.kind === 'added').length
   const removed = preview.changes.filter(line => line.kind === 'removed').length
   const updated = preview.changes.filter(line => line.kind === 'changed').length
@@ -61,6 +65,33 @@ export function RecipeShoppingChangePanel({ preview, day }: {
       setNotice(cause instanceof Error ? cause.message : 'Kan het broninvulblad niet maken.')
     }
   }
+  function downloadFullWeek() {
+    try {
+      const url = URL.createObjectURL(new Blob([getFullText()], { type: 'text/plain;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-voorstel-volledige-weekboodschappen.txt'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setNotice('De volledige voorgestelde weeklijst is ongeprijsd lokaal opgeslagen.')
+    } catch {
+      setNotice('Download mislukt. Selecteer de volledige lijst hieronder om zelf te kopiëren.')
+      setShowFullCopy(true)
+    }
+  }
+  async function copyFullWeek() {
+    try {
+      const output = getFullText()
+      if (!navigator.clipboard?.writeText) throw new Error('Klembord niet beschikbaar')
+      await navigator.clipboard.writeText(output)
+      setNotice('Volledige voorgestelde weeklijst gekopieerd, zonder winkelprijzen.')
+    } catch {
+      setNotice('Kopiëren niet beschikbaar. Selecteer hieronder de volledige lijst.')
+      setShowFullCopy(true)
+    }
+  }
   async function copy() {
     try {
       const output = getText()
@@ -89,10 +120,23 @@ export function RecipeShoppingChangePanel({ preview, day }: {
           <span>{line.before ?? 'Niet nodig'} → {line.after ?? 'Niet nodig'}</span>
         </li>)}
       </ul>}
+    <details className="recipe-reuse-preview-shopping__full">
+      <summary>Bekijk volledige nieuwe weeklijst ({completeWeek.length} ingrediënten)</summary>
+      <p>Alle actieve dagen samen; dit is je voorgestelde fysieke behoefte, niet alleen de wijziging.</p>
+      {completeWeek.length === 0 ? <p>Geen fysieke ingrediënten nodig.</p> :
+        <ul className="recipe-reuse-preview-shopping__rows">
+          {completeWeek.map(item => <li key={item.id}>
+            <strong>{item.label}</strong>
+            <span>{String(item.amount).replace('.', ',')} {item.unit === 'piece' ? 'stuks' : item.unit}</span>
+          </li>)}
+        </ul>}
+    </details>
     <p><strong>Prijsverschil nog onbekend.</strong> Na je receptkeuze moeten
       de volledige fysieke mandjes en oorspronkelijke PLUS/Deka-SKU’s opnieuw
       worden gecontroleerd. Oude productmatches zijn geen geldige nieuwe vergelijking.</p>
     <div className="recipe-reuse-preview-shopping__actions">
+      <button type="button" className="ghost-button" onClick={downloadFullWeek}>Download volledige weeklijst (TXT)</button>
+      <button type="button" className="ghost-button" onClick={() => void copyFullWeek()}>Kopieer volledige weeklijst</button>
       <button type="button" className="ghost-button" onClick={download}>Download wijziging (TXT)</button>
       <button type="button" className="ghost-button" onClick={() => void copy()}>Kopieer wijziging</button>
       <button type="button" className="ghost-button" onClick={() => downloadCapture('csv')}>
@@ -106,6 +150,10 @@ export function RecipeShoppingChangePanel({ preview, day }: {
       voorgestelde weekmenu. Kies het recept eerst en vul uitsluitend echt waargenomen
       brongegevens in voordat je de CSV via Vergelijk importeert.</small>
     {notice && <p role="status" aria-live="polite">{notice}</p>}
+    {showFullCopy && <label>Volledige voorgestelde weeklijst zelf kopiëren (zonder prijzen)
+      <textarea readOnly rows={Math.min(completeWeek.length + 7, 16)}
+        value={getFullText()} onFocus={event => event.currentTarget.select()} />
+    </label>}
     {showCopy && <label>Zelf kopiëren (zonder prijzen)
       <textarea readOnly rows={Math.min(preview.changes.length + 7, 16)}
         value={getText()} onFocus={event => event.currentTarget.select()} />
