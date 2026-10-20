@@ -109,6 +109,7 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
     (note.store === 'Algemeen' || note.store === store) &&
     typeof note.label === 'string' && note.label.trim().length > 0 &&
     note.label.length <= 140 && typeof note.done === 'boolean')
+  const visibleOwnNotes = remainingOnly ? ownNotes.filter(note => !note.done) : ownNotes
   const textList = [
     'Supa · ' + store + ' · privé gecontroleerd boodschappenlijstje',
     'Eigen bronopname: ' + readable(capture.observedAt),
@@ -117,8 +118,8 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
     'Nog op lijst volgens eigen bron: ' + exactEuro.formatCents(remainingCents),
     ...visibleLines.map(line => (checked[tick(line)] ? '☑ ' : '☐ ') + label(line)),
     ...(remainingOnly && visibleLines.length === 0 ? ['Alle geprijsde regels afgevinkt.'] : []),
-    ...(ownNotes.length ? ['', 'EIGEN EXTRA BOODSCHAPPEN — prijs onbekend, buiten winkelmandtotaal',
-      ...ownNotes.filter(note => !remainingOnly || !note.done).map(note =>
+    ...(visibleOwnNotes.length ? ['', 'EIGEN EXTRA BOODSCHAPPEN — prijs onbekend, buiten winkelmandtotaal',
+      ...visibleOwnNotes.map(note =>
         (note.done ? '☑ ' : '☐ ') + readable(note.label) + ' [' + note.store + '] · ongeprijsd'),
     ] : []),
     'Privébron. Geen actuele kassagarantie of publieke besparingsclaim.',
@@ -536,8 +537,9 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
         </button>
         <button type="button" onClick={downloadList}>Download eigen boodschappenlijst (TXT)</button>
         {ownNotes.length > 0 && <p className="disclaimer" role="status">
-          Deze TXT- en deeltekst bevat ook {ownNotes.length} eigen ongeprijsde {ownNotes.length === 1 ? 'boodschap' : 'boodschappen'}
-          voor {store}. Ze tellen niet mee voor winkelbedragen, besparingen of CSV-/HTML-bronrapporten.
+          Deze TXT- en deeltekst bevat {visibleOwnNotes.length} eigen ongeprijsde {visibleOwnNotes.length === 1 ? 'boodschap' : 'boodschappen'}
+          voor {store}{remainingOnly ? ' die nog niet zijn afgevinkt' : ''}.
+          Ze tellen niet mee voor winkelbedragen, besparingen of CSV-/HTML-bronrapporten.
         </p>}
         <button type="button" onClick={() => { void downloadStoreWithExtras() }}>
           Download winkelmand + mijn bewaarde extra boodschappen (TXT)

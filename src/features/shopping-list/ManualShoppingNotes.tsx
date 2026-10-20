@@ -292,7 +292,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
         Annuleer import
       </button>
     </div>}
-    {exportVisible && <label>Kopieer mijn ongeprijsde boodschappen
+    {exportVisible && visible.length > 0 && <label>Kopieer mijn ongeprijsde boodschappen
       <textarea rows={Math.min(selected.length + 6, 15)} readOnly value={exportText}
         onFocus={event => event.currentTarget.select()} /></label>}
     <p role="status" aria-live="polite">{message}</p>
