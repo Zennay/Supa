@@ -162,3 +162,10 @@
   min-height: 44px; font-weight: 680; cursor: pointer; }
 .recipe-collection-preview__select input { width: 20px; height: 20px; accent-color: #005135; }
 .recipe-collection-preview__item details summary { min-height: 32px; }
+
+/* A real import leads directly to the existing Planner / List / source flow. */
+.recipe-collection-result { display: grid; gap: 12px; border-top: 1px solid #d0decf; padding-top: 16px; }
+.recipe-collection-result h3 { margin: 0; font-size: 1.06rem; }
+.recipe-collection-result__recipe { display: grid; gap: 8px; padding: 12px;
+  border: 1px solid #c2d5c6; border-radius: 12px; background: #fff; }
+.recipe-collection-result__recipe strong { overflow-wrap: anywhere; }

@@ -120,6 +120,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const [collectionText, setCollectionText] = useState('')
   const [collectionExportBatch, setCollectionExportBatch] = useState(0)
   const [collectionSelected, setCollectionSelected] = useState<number[]>([])
+  const [lastImportedIds, setLastImportedIds] = useState<string[]>([])
   const [collectionPreview, setCollectionPreview] = useState<{
     source: string; libraryRaw: string | null; recipes: UserRecipeDraft[]; alreadyPresent: number
   } | null>(null)
@@ -159,6 +160,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       setBackupBusy(false)
       setBackupPreview(null)
       setCollectionPreview(null)
+      setLastImportedIds([])
       setLibrary(next)
       const editing = editingBaseline.current
       if (editing && JSON.stringify(next.recipes.find(recipe => recipe.id === editing.id) ?? null) !== editing.raw) {
@@ -574,6 +576,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       if (library.recipes.length + recipes.length > 100)
         throw new Error('Je kunt maximaal 100 eigen recepten bewaren. Maak eerst ruimte in je receptenlijst.')
       setCollectionSelected(recipes.map((_, index) => index))
+      setLastImportedIds([])
       setCollectionPreview({ source: collectionText, libraryRaw: library.raw, recipes, alreadyPresent })
       setCollectionMessage(recipes.length + ' nieuwe recepten lokaal herkend; ' + alreadyPresent + ' al aanwezig of dubbel. Controleer de hoeveelheden en bevestig zelf.')
     } catch (cause) {
@@ -597,6 +600,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       const next = saveRecipeLibrary(window.localStorage, library,
         [...additions, ...library.recipes])
       setLibrary(next)
+      setLastImportedIds(additions.map(recipe => recipe.id))
       setCollectionPreview(null); setCollectionText('')
       setFilter('own'); setQuery('')
       window.dispatchEvent(new Event('supa-recipes-changed'))
@@ -865,6 +869,41 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
             <button type="button" onClick={() => setCollectionPreview(null)}>Annuleer</button>
           </div>
         </div>}
+      {lastImportedIds.length > 0 && !library.error &&
+        <section className="recipe-collection-result" aria-label="Nieuwe recepten direct plannen">
+          <h3>Je nieuwe recepten gebruiken</h3>
+          <p>Plan een recept op een gekozen dag en open direct je ongeprijsde lijst of
+            de bestaande winkelbronimport. Eerdere winkelprijzen worden niet hergebruikt.</p>
+          <label className="recipe-collection-label">Dag in Planner
+            <select value={plannerDay} onChange={event => setPlannerDay(event.currentTarget.value)}>
+              {m2InitialPlan.map(meal => <option key={meal.day} value={meal.day}>{meal.day}</option>)}
+            </select>
+          </label>
+          {lastImportedIds.map(id => {
+            const recipe = library.recipes.find(item => item.id === id)
+            if (!recipe) return null
+            const ready = !!toPlannerRecipe(recipe)
+            return <div className="recipe-collection-result__recipe" key={id}>
+              <strong>{recipe.title}</strong>
+              {ready ? <div className="recipe-backup-panel__actions">
+                <button type="button" onClick={() => planOwnRecipe(recipe, 'planner')}>
+                  Plan op {plannerDay}
+                </button>
+                <button type="button" onClick={() => planOwnRecipe(recipe, 'list')}>
+                  Plan en open Lijst
+                </button>
+                <button type="button" onClick={() => planOwnRecipe(recipe, 'basket')}>
+                  Plan en vergelijk eigen winkelprijzen
+                </button>
+              </div> : <div className="recipe-backup-panel__actions">
+                <small>Corrigeer eerst de bronwaarschuwingen, eenheden of gedeeltelijke stuks.</small>
+                <button type="button" onClick={() => openSavedRecipeEditor(recipe)}>
+                  Corrigeer {recipe.title}
+                </button>
+              </div>}
+            </div>
+          })}
+        </section>}
       <small>Download maximaal 15 al gecontroleerde recepten per Markdownbestand. Grotere
         verzamelingen kun je in opeenvolgende batches exporteren. Recepten met openstaande
         bron- of hoeveelheidswaarschuwingen of oorspronkelijke bronlinks neem je veilig mee via
