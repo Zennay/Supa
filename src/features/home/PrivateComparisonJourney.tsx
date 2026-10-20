@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
-import { privateProgressPricePairs, privateProgressProductRows } from '../products/privateProgressProductRows.ts'
+import { privateKnownPricePairs, privateProgressProductRows } from '../products/privateProgressProductRows.ts'
 import { euro } from '../../lib/money.ts'
 import {
   privateReviewedPairWithin24Hours, freshReviewedBaskets,
@@ -56,14 +56,20 @@ export function PrivateComparisonJourney({
   // The workbench emits partial source rows via captureProgress, never as a
   // falsely complete reviewed basket. Reuse the same admission logic used by
   // Planner and Producten for per-ingredient source prices.
-  const partialPairs = ready ? [] : [
-    ...privateProgressPricePairs(progress, nowMs).map(({ one, other }) => ({
-      id: one.ingredientId, name: one.ingredientLabel,
-      amount: one.requiredAmount, unit: one.requiredUnit,
-      plusPacks: one.packagesNeeded, dekaPacks: other.packagesNeeded,
-      plusCents: one.lineTotalCents, dekaCents: other.lineTotalCents,
-    })),
-  ]
+  const admittedPartialRows = privateProgressProductRows(progress, nowMs)
+  const originalNeeds = new Map(admittedPartialRows.map(({ line }) =>
+    [line.ingredientId, line]))
+  const partialPairs = ready ? [] : privateKnownPricePairs(progress, reviewed, nowMs)
+    .flatMap(pair => {
+      const need = originalNeeds.get(pair.ingredientId)
+      if (!need) return []
+      return [{
+        id: pair.ingredientId, name: need.ingredientLabel,
+        amount: need.requiredAmount, unit: need.requiredUnit,
+        plusPacks: pair.plusPacks, dekaPacks: pair.dekaPacks,
+        plusCents: pair.plusCents, dekaCents: pair.dekaCents,
+      }]
+    })
   // A complete reviewed basket may be available independently of the current
   // progress snapshot (e.g. during a tab restoration), but do not double show.
   if (!ready && partialPairs.length === 0) {
@@ -73,8 +79,7 @@ export function PrivateComparisonJourney({
       plusCents: one.lineTotalCents, dekaCents: other.lineTotalCents,
     })))
   }
-  const availablePartialProducts = progress
-    ? privateProgressProductRows(progress, nowMs).length : 0
+  const availablePartialProducts = admittedPartialRows.length
   const hasAnySource = singleReady || stores.some(store =>
     !!progress?.stores[store] || !!reviewed?.stores[store])
 

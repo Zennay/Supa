@@ -5,7 +5,7 @@ import type {
 } from '../comparison/privateReviewedBasketBridge.ts'
 import { productSearchText } from './productSearchText.ts'
 import {
-  privateProgressProductRows, privateProgressPricePairs,
+  privateProgressProductRows, privateKnownPricePairs,
   type PrivateProgressProductRow,
 } from './privateProgressProductRows.ts'
 
@@ -38,9 +38,10 @@ export function PrivatePartialProductCards({
   // in the ordinary complete-catalog grid. Never display a duplicate card.
   const rows = all.filter(row => !reviewed?.stores[row.store])
   if (!rows.length) return null
-  const paired = privateProgressPricePairs(progress, now)
+  const paired = privateKnownPricePairs(progress, reviewed, now)
+  const pairById = new Map(paired.map(pair => [pair.ingredientId, pair]))
   const differences = new Map(paired.map(pair =>
-    [pair.one.ingredientId, pair.difference]))
+    [pair.ingredientId, pair.difference]))
   const rate = (row: PrivateProgressProductRow) => privatePackUnitRate({
     amount: row.line.packAmount, unit: row.line.packUnit,
     count: row.line.packCount, priceCents: row.line.pricePerPackCents,
@@ -81,7 +82,14 @@ export function PrivatePartialProductCards({
     <p>Deze oorspronkelijke SKU’s, hoeveelheden en pakprijzen zijn al gecontroleerd,
       maar minimaal één volledig winkelmandje ontbreekt nog.
       <strong> Het totale mandbedrag en de goedkoopste winkel zijn onbekend.</strong>
-      {' '}Alle bedragen hieronder gelden alleen voor de genoemde fysieke ingrediëntregel.</p>
+      {' '}Alle bedragen hieronder gelden alleen voor de genoemde fysieke ingrediëntregel.
+      {' '}Ook als de andere winkel al een volledig mandje heeft, verschijnt alleen een
+      individueel verschil wanneer dezelfde hoeveelheid binnen 24 uur echt is bevestigd.</p>
+    {paired.length > 0 && <p role="status">
+      Voor {paired.length} fysieke {paired.length === 1 ? 'ingrediëntregel is' : 'ingrediëntregels zijn'}
+      {' '}bij beide winkels gecontroleerde hele-pakprijzen bekend. Dit geeft nog geen
+      vergelijking van het volledige weekmandje.
+    </p>}
     <div className="private-reviewed-products__controls">
       <label>Winkel <select value={store}
         onChange={event => setStore(event.currentTarget.value as typeof store)}>
@@ -115,7 +123,8 @@ export function PrivatePartialProductCards({
       {ordered.map(row => {
         const line = row.line
         const displayRate = rate(row)
-        const difference = differences.get(line.ingredientId)
+        const comparison = pairById.get(line.ingredientId)
+        const difference = comparison?.difference
         return <article key={JSON.stringify([row.store, row.observedAt,
           line.ingredientId, line.productId])}>
           <small>{row.store} · originele bron {row.observedAt}</small>
@@ -131,15 +140,22 @@ export function PrivatePartialProductCards({
               'Eenheidsprijs onbekend'}</small>
           <small>{line.review === 'manual' ? 'Zelf bevestigd in de huidige bronreview' :
             'Automatisch toegelaten productmatch in de lokale bronreview'}</small>
-          {difference !== undefined && <p
-            className="private-reviewed-products__card-difference">
-            {difference === 0 ? 'Zelfde hele-pakprijs voor dit ingrediënt bij beide winkels.' :
+          {comparison && difference !== undefined && <div
+            className="private-reviewed-products__card-difference" role="note">
+            <strong>Dezelfde fysieke hoeveelheid bij twee winkels</strong>
+            <p>PLUS · {comparison.plusPacks} hele pakken ·
+              {' '}{money.format(comparison.plusCents / 100)}<br />
+              DekaMarkt · {comparison.dekaPacks} hele pakken ·
+              {' '}{money.format(comparison.dekaCents / 100)}</p>
+            <strong>{difference === 0 ? 'Gelijke prijs voor dit ingrediënt.' :
               money.format(Math.abs(difference) / 100) +
               ' lagere hele-pakkosten bij ' +
-              (difference > 0 ? 'PLUS' : 'DekaMarkt') +
-              ' voor alleen dit ingrediënt.'}
-            {' '}Geen uitspraak over de totale weekmand.
-          </p>}
+              (difference > 0 ? 'PLUS' : 'DekaMarkt') + ' voor alleen deze regel.'}</strong>
+            <small>Beide oorspronkelijke winkelmomenten maximaal 24 uur uiteen.
+              {' '}{comparison.basis === 'complete-and-partial'
+                ? 'Andere winkel volledig; deze winkel nog niet. ' : ''}
+              Geen compleet mandverschil of onafhankelijke besparingsclaim.</small>
+          </div>}
           <button type="button" onClick={() => review(row)}>
             Bekijk originele match of herzie bronproduct
           </button>

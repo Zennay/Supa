@@ -6,7 +6,7 @@ import {
   type OwnStore, type PrivateCaptureProgress, type PrivateReviewedBaskets,
 } from '../comparison/privateReviewedBasketBridge.ts'
 import { confirmedPartialBasket } from '../planner/confirmedPartialBasket.ts'
-import { privateProgressPricePairs } from '../products/privateProgressProductRows.ts'
+import { privateKnownPricePairs } from '../products/privateProgressProductRows.ts'
 import { privatePartialShoppingExport } from './privatePartialShoppingExport.ts'
 import { privatePartialPhysicalShoppingTick } from './privatePhysicalShoppingTick.ts'
 import './partialReviewedShoppingList.css'
@@ -56,8 +56,8 @@ export function PartialReviewedShoppingList({
   // Information only: compare identical physical demand at TWO current,
   // individually admitted original capture instants. A delta never changes
   // this store's checked shopping task or creates a whole-basket winner.
-  const pairByIngredient = new Map(privateProgressPricePairs(progress, now).map(
-    pair => [pair.one.ingredientId, pair]))
+  const pairByIngredient = new Map(privateKnownPricePairs(progress, complete, now).map(
+    pair => [pair.ingredientId, pair]))
   const identity = capture && progress ? JSON.stringify([
     progress.planKey, store, capture.observedAt,
     rows.map(row => [
@@ -226,19 +226,22 @@ export function PartialReviewedShoppingList({
         {pairByIngredient.has(line.ingredientId) && (() => {
           const pair = pairByIngredient.get(line.ingredientId)!
           const otherShop = store === 'PLUS' ? 'DekaMarkt' : 'PLUS'
-          const other = store === 'PLUS' ? pair.other : pair.one
-          const own = store === 'PLUS' ? pair.one : pair.other
-          const difference = own.lineTotalCents - other.lineTotalCents
+          const otherPacks = store === 'PLUS' ? pair.dekaPacks : pair.plusPacks
+          const otherCents = store === 'PLUS' ? pair.dekaCents : pair.plusCents
+          const ownCents = store === 'PLUS' ? pair.plusCents : pair.dekaCents
+          const difference = ownCents - otherCents
           return <p className="supa-partial-shop__individual-delta">
-            <small>{otherShop}: {other.packagesNeeded} hele pakken ·
-              {' '}{exactEuro.formatCents(other.lineTotalCents)} voor dezelfde hoeveelheid.
+            <small>{otherShop}: {otherPacks} hele pakken ·
+              {' '}{exactEuro.formatCents(otherCents)} voor dezelfde hoeveelheid.
               {' '}Eigen bronprijs, geen kassagarantie.</small>
             <strong>{difference === 0
               ? 'Gelijke hele-pakprijs voor dit ingrediënt.'
               : exactEuro.formatCents(Math.abs(difference)) +
                 ' lagere hele-pakkosten bij ' +
                 (difference > 0 ? otherShop : store) + ' voor alleen deze regel.'}</strong>
-            <small>Andere ingrediënten blijven onbekend. Dit is geen
+            <small>{pair.basis === 'complete-and-partial'
+              ? 'De andere winkel heeft een compleet gecontroleerd mandje; jouw winkel nog niet. '
+              : ''}Andere ingrediënten blijven onbekend. Dit is geen
               besparing op het volledige winkelmandje.</small>
           </p>
         })()}

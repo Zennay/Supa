@@ -1,7 +1,8 @@
 import { observedInstant } from '../../domain/offlineReviewedImport.ts'
 import { confirmedPartialBasket } from '../planner/confirmedPartialBasket.ts'
 import {
-  recentOwnCaptureInstant, type OwnStore, type PrivateCaptureProgress,
+  recentOwnCaptureInstant, freshReviewedBaskets, type OwnStore, type PrivateCaptureProgress,
+  type PrivateReviewedBaskets,
   type PrivateReviewedSourceLine,
 } from '../comparison/privateReviewedBasketBridge.ts'
 
@@ -69,4 +70,82 @@ export function privateProgressPricePairs(
     const difference = other.lineTotalCents - one.lineTotalCents
     return Number.isSafeInteger(difference) ? [{ one, other, difference }] : []
   })
+}
+
+
+/** Same physical ingredient, two independently confirmed own-source prices.
+ * An incomplete store can provide a line delta but never a full-basket winner.
+ */
+export type PrivateKnownPricePair = {
+  ingredientId: string
+  plusCents: number
+  dekaCents: number
+  plusPacks: number
+  dekaPacks: number
+  difference: number
+  basis: 'partial-pair' | 'complete-and-partial'
+}
+
+export function privateKnownPricePairs(
+  progress: PrivateCaptureProgress | null,
+  reviewed: PrivateReviewedBaskets | null,
+  now: number,
+): PrivateKnownPricePair[] {
+  if (!progress || !Number.isSafeInteger(now) ||
+      (reviewed && progress.planKey !== reviewed.planKey)) return []
+  const result = new Map<string, PrivateKnownPricePair>()
+  const complete = freshReviewedBaskets(reviewed, progress.planKey, now)
+  // When one store is already fully reviewed, compare against that ORIGINAL
+  // admitted receipt. An older progress snapshot must not compete with it.
+  if (!complete?.stores.PLUS && !complete?.stores.DekaMarkt)
+  for (const pair of privateProgressPricePairs(progress, now)) {
+    result.set(pair.one.ingredientId, {
+      ingredientId: pair.one.ingredientId,
+      plusCents: pair.one.lineTotalCents,
+      dekaCents: pair.other.lineTotalCents,
+      plusPacks: pair.one.packagesNeeded,
+      dekaPacks: pair.other.packagesNeeded,
+      difference: pair.difference,
+      basis: 'partial-pair',
+    })
+  }
+  if (!complete) return [...result.values()]
+  const partialRows = privateProgressProductRows(progress, now)
+  for (const completeStore of shops) {
+    const receipt = complete.stores[completeStore]
+    const otherStore: OwnStore = completeStore === 'PLUS' ? 'DekaMarkt' : 'PLUS'
+    const partialCapture = progress.stores[otherStore]
+    if (!receipt || complete.stores[otherStore] || !partialCapture ||
+        partialCapture.demandLineCount !== receipt.basket.lines.length) continue
+    // Preserve nanosecond precision: an original time just outside 24h
+    // cannot be laundered through Date.parse millisecond rounding.
+    const left = observedInstant(receipt.observedAt)
+    const right = observedInstant(partialCapture.observedAt)
+    if (!left || !right || left.ms !== receipt.capturedMs ||
+        (left.ns >= right.ns ? left.ns - right.ns : right.ns - left.ns) >
+          86_400_000_000_000n) continue
+    const completeLines = new Map(receipt.basket.lines.map(line => [line.id, line]))
+    for (const { store, line } of partialRows) {
+      if (store !== otherStore) continue
+      const original = completeLines.get(line.ingredientId)
+      if (!original || original.status !== 'matched' ||
+          original.ingredientLabel !== line.ingredientLabel ||
+          original.requirement.amount !== line.requiredAmount ||
+          original.requirement.unit !== line.requiredUnit) continue
+      const plusCents = completeStore === 'PLUS'
+        ? original.lineTotalCents : line.lineTotalCents
+      const dekaCents = completeStore === 'DekaMarkt'
+        ? original.lineTotalCents : line.lineTotalCents
+      const difference = dekaCents - plusCents
+      if (!Number.isSafeInteger(difference)) continue
+      result.set(line.ingredientId, {
+        ingredientId: line.ingredientId,
+        plusCents, dekaCents,
+        plusPacks: completeStore === 'PLUS' ? original.packs : line.packagesNeeded,
+        dekaPacks: completeStore === 'DekaMarkt' ? original.packs : line.packagesNeeded,
+        difference, basis: 'complete-and-partial',
+      })
+    }
+  }
+  return [...result.values()]
 }
