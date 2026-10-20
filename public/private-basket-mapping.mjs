@@ -60,6 +60,36 @@ const priceStatus = document.querySelector('#price-status')
 const add = document.querySelector('#add')
 let captures = null
 let nextId = 1
+let ownPriceExpiryTimer = null
+function refreshOwnPriceLabels() {
+  updateCoverage()
+  for (const row of lines.querySelectorAll('.ingredient')) {
+    for (const store of stores) {
+      const select = row.querySelector('[data-store="' + store + '"]')
+      if (select?.value) updateSelect(select, store, row.querySelector('.unit').value)
+    }
+  }
+}
+function scheduleOwnPriceExpiry() {
+  if (ownPriceExpiryTimer !== null) window.clearTimeout(ownPriceExpiryTimer)
+  ownPriceExpiryTimer = null
+  if (!captures) return
+  const nowNs = BigInt(Date.now()) * 1000000n
+  const upcoming = stores.map(store => captures[store]
+    ? observedNs(captures[store].observedAt) : null)
+    .filter(time => time !== null && time <= nowNs && time + WEEK_NS >= nowNs)
+    .map(time => time + WEEK_NS)
+  if (!upcoming.length) return
+  const deadline = upcoming.reduce((minimum, time) => time < minimum ? time : minimum)
+  const durationMs = Math.max(100, Math.ceil(Number((deadline - nowNs) / 1000000n)) + 100)
+  ownPriceExpiryTimer = window.setTimeout(() => {
+    ownPriceExpiryTimer = null
+    refreshOwnPriceLabels()
+  }, durationMs)
+}
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) refreshOwnPriceLabels()
+})
 
 const classify = (unit) => ['g', 'kg'].includes(unit) ? 'weight'
   : ['ml', 'l'].includes(unit) ? 'volume' : unit === 'piece' ? 'count' : null
@@ -178,6 +208,9 @@ function availableProducts(store, unit) {
 }
 
 function updateCoverage() {
+  // Avoid leaving an apparently price-ready old source visible in an idle tab:
+  // the original observation itself determines when the source expires.
+  scheduleOwnPriceExpiry()
   const rows = Array.from(lines.querySelectorAll('.ingredient'))
   if (!rows.length) {
     coverage.textContent = 'Nog geen ingrediënten in de fysieke mandvraag.'
