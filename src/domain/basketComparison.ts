@@ -60,13 +60,17 @@ function canonicalStoreIdentity(value: unknown): value is string {
   return validIdentity(value) && value === value.trim()
 }
 
-function supportedBasketLine(line: unknown): line is BasketTraceLine {
-  if (line === null || typeof line !== 'object' || !('status' in line)) {
-    return false
-  }
+function isObjectContainer(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
 
-  const status = (line as { status?: unknown }).status
-  return status === 'matched' || status === 'unresolved'
+function supportedBasketLine(line: unknown): line is BasketTraceLine {
+  if (!isObjectContainer(line) || !('status' in line)) return false
+  if (line.status === 'unresolved') return true
+  if (line.status !== 'matched') return false
+  // Original physical quantity and package must exist before economics
+  // accesses their fields. A malformed imported record is NOT a priced row.
+  return isObjectContainer(line.requirement) && isObjectContainer(line.pack)
 }
 
 function basketLines(basket: OneStoreBasket): BasketTraceLine[] {
@@ -269,13 +273,20 @@ function samePhysicalDemand(
     calculateDecimalPackCount([right], { amount: left.amount, unit: left.unit }) === 1
 }
 
-export function compareFullBaskets({
-  baseline,
-  candidate,
-}: {
-  baseline: OneStoreBasket
-  candidate: OneStoreBasket
-}): BasketComparison {
+/** Reuse the validated source-only container guard from #419 (#417/#420).
+ * Explicit SUPA errors for invalid request containers; valid but inconsistent
+ * physical/economic rows still yield the canonical unknown/no-savings result.
+ */
+function requiredBasket(value: unknown, label: 'baseline' | 'candidate'): OneStoreBasket {
+  if (!isObjectContainer(value)) throw new Error(label + ' basket container invalid')
+  if (!isObjectContainer(value.store)) throw new Error(label + ' basket store container invalid')
+  return value as unknown as OneStoreBasket
+}
+
+export function compareFullBaskets(input: unknown): BasketComparison {
+  if (!isObjectContainer(input)) throw new Error('Basket comparison input invalid')
+  const baseline = requiredBasket(input.baseline, 'baseline')
+  const candidate = requiredBasket(input.candidate, 'candidate')
   const reasons = [
     ...inspectBasket('baseline', baseline),
     ...inspectBasket('candidate', candidate),
