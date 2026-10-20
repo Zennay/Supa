@@ -511,6 +511,9 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
     openOwnPriceImport()
   }
   const livePrivateReviewed = freshReviewedBaskets(privateReviewed, privatePlanKey, sourceNowMs)
+  const hasOwnProductCapture = !!livePrivateReviewed ||
+    (privateCaptureProgress?.planKey === privatePlanKey &&
+      (!!privateCaptureProgress.stores.PLUS || !!privateCaptureProgress.stores.DekaMarkt))
   const preferredPrivateBasket = livePrivateReviewed?.stores[preferredOwnStore] ??
     livePrivateReviewed?.stores.PLUS ?? livePrivateReviewed?.stores.DekaMarkt
 
@@ -737,14 +740,24 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         {(tab === 'home' || tab === 'recipes') && <HiFiHome view={tab}
           onNavigate={navigate} activeDays={activeDays}
           addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />}
-        {tab === 'products' && <details className="supa-product-archive">
-          <summary>Oude ontwerpvoorbeelden en historische bronkaarten tonen (geen actuele prijzen)</summary>
-          <p>Alleen de persoonlijk bevestigde bronartikelen hierboven tellen mee in
-            de prijsvergelijking, budgetten en winkelroute. Deze voorbeelden zijn
-            geen supermarktvoorraad of actuele aanbiedingen.</p>
-          <HiFiHome view="products" onNavigate={navigate} activeDays={activeDays}
-            addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />
-        </details>}
+        {tab === 'products' && (hasOwnProductCapture
+          ? <details className="supa-product-archive">
+              <summary>Oude Figma-voorbeelden bekijken · prijzen zijn demo</summary>
+              <p>Deze ontwerpen zijn geen actuele winkelprijzen of geautoriseerde aanbiedingen.
+                Alleen jouw hierboven persoonlijk bevestigde bronregels tellen mee.</p>
+              <HiFiHome view="products" onNavigate={navigate} activeDays={activeDays}
+                addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />
+            </details>
+          : <section className="supa-product-archive supa-product-archive--visible"
+              aria-label="Figma-productoverzicht zonder actuele prijzen">
+              <h2>Producten ontdekken · ontwerpvoorbeelden</h2>
+              <p>Er is nog geen eigen gecontroleerde winkelbron. Je kunt hier het originele
+                Supa-productontwerp verkennen, zoeken, sorteren en artikelen ongeprijsd
+                aan Lijst toevoegen. Voor actuele prijzen gebruik je de bronimport hierboven.
+                Alle getoonde voorbeeldprijzen en aanbiedingen zijn demo, geen live data.</p>
+              <HiFiHome view="products" onNavigate={navigate} activeDays={activeDays}
+                addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />
+            </section>)}
         {!isHiFiView && <nav className="hifi-utilities" aria-label="Vergelijken en meten"><button onClick={() => navigate('basket')}>Mand</button><button onClick={() => navigate('observe')}>Meten</button></nav>}
 
         {productSelectionWarning && (tab === 'list' || tab === 'products') && (
