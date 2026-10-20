@@ -31,6 +31,7 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
   const [unitFilter, setUnitFilter] = useState<'all' | 'kg' | 'liter' | 'stuk'>('all')
   const [order, setOrder] = useState<'source' | 'unitPrice' | 'lineTotal' | 'priceGap'>('source')
   const [checkMessage, setCheckMessage] = useState('')
+  const [shoppingFilter, setShoppingFilter] = useState<'all' | 'open' | 'done'>('all')
   const [nowMs, setNowMs] = useState(() => Date.now())
   useEffect(() => {
     const refresh = () => setNowMs(Date.now())
@@ -63,9 +64,16 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
     amount: line.pack.amount, unit: line.pack.unit, count: line.pack.count,
     priceCents: line.pricePerPackCents,
   })
+  const isChecked = (shop: OwnStore, line: Matched) => {
+    const capture = currentReviewed?.stores[shop]
+    return !!capture && checked[
+      privatePhysicalShoppingTick(reviewed!.planKey, shop, capture.basket.store.id, line)] === true
+  }
   const visible = sources.filter(row =>
     (store === 'all' || row.shop === store) &&
     (unitFilter === 'all' || rate(row.line)?.unit === unitFilter) &&
+    (shoppingFilter === 'all' || (shoppingFilter === 'done') ===
+      isChecked(row.shop, row.line)) &&
     (!search || [row.line.productName, row.line.productId, row.line.ingredientLabel]
       .some(value => productSearchText(value).includes(search))))
   // Price/kg cannot meaningfully be compared to price/litre/piece. Keep
@@ -81,11 +89,6 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
         ? a.line.lineTotalCents - b.line.lineTotalCents
       : group(a.line) - group(b.line) ||
         (rate(a.line)?.centsPerUnit ?? Infinity) - (rate(b.line)?.centsPerUnit ?? Infinity))
-  const isChecked = (shop: OwnStore, line: Matched) => {
-    const capture = currentReviewed?.stores[shop]
-    return !!capture && checked[
-      privatePhysicalShoppingTick(reviewed!.planKey, shop, capture.basket.store.id, line)] === true
-  }
   const toggleChecked = (shop: OwnStore, line: Matched) => {
     const current = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
     if (!current?.stores[shop] || !current.stores[shop].basket.lines.includes(line)) {
@@ -146,6 +149,16 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
         </select></label>
         <label>Zoek eigen product <input type="search" value={query}
           onChange={event => setQuery(event.target.value)} maxLength={120} placeholder="Product, SKU of ingrediënt" /></label>
+      </div>
+      <div role="group" className="private-reviewed-products__shopping-filter"
+        aria-label="Filter eigen boodschappen op afvinkstatus">
+        {([
+          ['all', 'Alle originele artikelen'],
+          ['open', 'Alleen nog te kopen'],
+          ['done', 'Alleen afgevinkt'],
+        ] as const).map(([value, label]) => <button type="button" key={value}
+          aria-pressed={shoppingFilter === value}
+          onClick={() => setShoppingFilter(value)}>{label}</button>)}
       </div>
       <div className="private-reviewed-products__progress" aria-label="Mijn nog te kopen artikelen per winkel">
         {shops.filter(shop => store === 'all' || store === shop).map(shop => {
@@ -208,7 +221,8 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
             'Vink dit artikel af op mijn ' + shop + '-lijst'}
         </button>
       </article>)}</div>
-      {!visible.length && <p>Geen producten gevonden voor deze selectie.</p>}
+      {!visible.length && <p role="status">Geen producten gevonden voor deze selectie.
+        {shoppingFilter !== 'all' && ' Schakel naar alle originele artikelen om de volledige lijst te zien.'}</p>}
       <button type="button" onClick={openCurrentCheckedList}>
         {store === 'all' ? 'Open mijn gecontroleerde boodschappenlijst' : `Open mijn ${store}-boodschappenlijst`}
       </button>

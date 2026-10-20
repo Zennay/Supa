@@ -100,3 +100,9 @@ background:#e7f4eb;color:#255336;font-weight:650}
 .private-reviewed-products__manual-copy textarea{width:100%;box-sizing:border-box;
   resize:vertical;min-height:140px;padding:.7rem;border-radius:8px;
   font:13px/1.5 ui-monospace,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+
+.private-reviewed-products__shopping-filter{display:flex;gap:.55rem;flex-wrap:wrap;
+  padding:.7rem;background:#edf5ee;border:1px solid #cbdccb;border-radius:12px}
+.private-reviewed-products__shopping-filter button{flex:1 1 160px}
+.private-reviewed-products__shopping-filter button[aria-pressed=true]{background:#dbefdf;
+  border-color:#236d4d;font-weight:700;color:#204c32}

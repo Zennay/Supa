@@ -59,6 +59,15 @@ Er wordt geen tweede winkelprijs of besparing verzonnen.
 
 ## Volledig prijsrapport bewaren, printen of mobiel meenemen
 
+**Producten → Mijn echte bronartikelen** heeft voor rechtmatig ingevoerde,
+door jezelf beoordeelde SKU's nu ook de winkelvloerfilters
+**Alle originele artikelen**, **Alleen nog te kopen** en **Alleen
+afgevinkt**. Je kunt ze combineren met de bestaande winkel-, zoek-,
+eenheids- en sorteerfilters. De kaartvinkjes blijven per exact
+oorspronkelijk winkelartikel bruikbaar; de complete mandprijzen,
+twee-winkelvergelijking en export bevatten ongeacht de zichtfilter
+altijd hun volledige oorspronkelijke fysieke vraag.
+
 Zowel bij één beschikbare winkel als bij twee volledig vergelijkbare winkels
 toont Producten nu per oorspronkelijke winkelbron het aantal afgevinkte
 producten en de *nog op de lijst* openstaande hele-pakkosten. De volledige
