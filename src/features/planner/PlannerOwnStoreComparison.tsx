@@ -432,6 +432,31 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
               {' '}Dit is {exactEuro.formatCents(summary.mixedRoute.possibleProductDifferenceCents)}
               {' '}lager dan één complete winkel <strong>vóór</strong> extra reiskosten.
               Het netto voordeel is zonder eigen winkelstopkosten onbekend.</p>}
+          {summary.mixedRoute?.requiresTwoStops && <div className="own-store-planner__route-choice" aria-label="Mijn voordeligste winkelroute">
+            <label>Extra kosten voor een tweede winkelstop (€)
+              <input type="text" inputMode="decimal" maxLength={9}
+                placeholder="Bijvoorbeeld 2,50" value={shownCost}
+                onChange={event => setSecondStopCost({ key: costSourceKey, raw: event.currentTarget.value })} />
+            </label>
+            {!shownCost.trim() ? <p role="status">Vul jouw extra bezoekkosten in om te beoordelen of twee winkels voordeliger zijn.</p>
+              : parsedSecondStopCents === null || mixedNetDifferenceCents === null
+                ? <p role="alert">Vul € 0,00 tot € 1.000,00 in, met maximaal twee decimalen.</p>
+                : mixedNetDifferenceCents > 0n
+                  ? <div role="status"><strong>Twee winkels kunnen goedkoper zijn.</strong>
+                      <p>Na jouw extra stopkosten resteert {exactEuro.formatCents(mixedNetDifferenceCents)} productvoordeel.
+                        Controleer jouw gekozen route en overige kosten in de Lijst.</p>
+                      <button type="button" className="ghost-button" onClick={openCurrentMixedRoute}>Bekijk gecombineerde route</button>
+                    </div>
+                  : <div role="status"><strong>Eén winkel is minstens zo voordelig.</strong>
+                      <p>De combinatie is {mixedNetDifferenceCents === 0n ? 'even duur' :
+                        exactEuro.formatCents(-mixedNetDifferenceCents) + ' duurder'} inclusief jouw extra stopkosten.</p>
+                      <button type="button" className="ghost-button"
+                        onClick={() => openConfirmedStoreList(summary.cheapest ?? selected)}>
+                        Open complete lijst bij {summary.cheapest ?? selected}
+                      </button>
+                    </div>}
+            <small>Alleen jouw gecontroleerde productprijzen en opgegeven kosten. Geen kassagarantie of reistijdwaardering.</small>
+          </div>}
           <div className="own-store-planner__overview-actions">
             <button type="button" className="ghost-button"
               onClick={() => openConfirmedStoreList(summary.cheapest ?? selected)}>
@@ -783,12 +808,7 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
                     Het werkelijke voordeel is onbekend zolang reistijd of extra kosten niet zijn ingevuld.</>
                 : <> Deze selectie past bij één winkel; een tweede winkelstop is niet nodig.</>}</p>
             {summary.mixedRoute.requiresTwoStops && <div className="own-store-planner__second-stop">
-              <label>Extra kosten tweede winkelstop (€)
-                <input type="text" inputMode="decimal" maxLength={9}
-                  placeholder="Bijvoorbeeld 2,50" value={shownCost}
-                  onChange={event => setSecondStopCost({ key: costSourceKey, raw: event.currentTarget.value })} />
-              </label>
-              <p>Jouw eigen omrij-/parkeerscenario. Zonder ingevulde kosten is het
+              <p>Vul bovenaan jouw eigen omrij-/parkeerkosten in. Zonder die kosten is het
                 netto voordeel onbekend. Dit is geen kassaprijs- of besparingsbewijs.</p>
               <p className="own-store-planner__break-even">
                 <strong>Wanneer loont die tweede winkelstop?</strong>{' '}

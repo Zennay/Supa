@@ -347,3 +347,10 @@
 }
 
 .own-store-planner__break-even { border-left: 3px solid #407958; padding: .65rem .8rem; background: #fff; overflow-wrap: anywhere; }
+
+.own-store-planner__route-choice { display: grid; gap: .5rem; margin: 1rem 0; padding: 1rem; border: 1px solid #b9d5c2; border-radius: 12px; background: #f0f6f1; }
+.own-store-planner__route-choice label { display: grid; gap: .4rem; max-width: 340px; font-weight: 650; }
+.own-store-planner__route-choice input { width: 100%; min-height: 44px; box-sizing: border-box; padding: .6rem; border: 1px solid #789687; border-radius: 8px; font: inherit; }
+.own-store-planner__route-choice input:focus-visible { outline: 3px solid #246b50; outline-offset: 2px; }
+.own-store-planner__route-choice p { margin: .35rem 0; line-height: 1.45; }
+.own-store-planner__route-choice button { min-height: 44px; text-align: left; }
