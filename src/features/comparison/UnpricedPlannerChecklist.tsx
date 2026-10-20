@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../domain/basket.ts'
+import { groupShoppingByRecipe } from '../shopping-list/shoppingRecipeGroups.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { exportUnpricedProgress, importUnpricedProgress, unpricedProgressMaxBytes, unpricedProgressStorageKey } from './unpricedPlannerProgress.ts'
 import { exportPrivatePlannerWeek } from './exportPrivatePlannerWeek.ts'
@@ -102,6 +103,7 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPric
 
   const completed = items.filter(item => checked[itemKey(item)]).length
   const visible = items.filter(item => !openOnly || !checked[itemKey(item)])
+  const recipeGroups = groupShoppingByRecipe(visible, plan, recipes, activeDays)
   const copyKey = JSON.stringify([demandIdentity, checked, openOnly])
   const copy = prepared?.key === copyKey ? prepared.text : null
 
@@ -212,15 +214,17 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPric
 
   return (
     <section className="unpriced-planner-checklist" aria-label="Mijn ongeprijsde Planner-boodschappenlijst">
-      <div className="unpriced-planner-checklist__intro">
-        <span className="eyebrow">Direct uit jouw Planner · geen supermarkt nodig</span>
-        <h3>Mijn weekboodschappen zonder winkelprijzen</h3>
-        <p>Dezelfde samengestelde hoeveelheden als in de mandvergelijking,
-          zonder een winkel of prijs te verzinnen. Ook bruikbaar zolang echte winkeldata ontbreken.
-          Vinkjes blijven lokaal beschikbaar zolang dit browsertabblad open is,
-          ook bij herladen van dit browsertabblad. Afvinkingen worden alleen in je eigen tabopslag bewaard;
-          je kunt ze privé downloaden en op een ander apparaat voor exact hetzelfde weekmenu herstellen.
-          Download ook de TXT-lijst om een eigen leesbaar overzicht handmatig in de privévergelijker te importeren.</p>
+      <div className="unpriced-planner-checklist__intro" data-figma-node="3342:4815">
+        <span className="eyebrow">Jouw geplande recepten · zonder winkelprijzen</span>
+        <h3>Boodschappenlijst</h3>
+        <p>Alle ingrediënten van jouw week, fysiek samengevoegd en per recept geordend.
+          Gedeelde ingrediënten verschijnen slechts één keer. Onbekende prijzen blijven onbekend.</p>
+        <details className="unpriced-planner-checklist__privacy">
+          <summary>Opslag en privacy van mijn lijst</summary>
+          <p>Vinkjes blijven in dit browsertabblad, ook na herladen. Met een privé-back-up
+            kun je ze alleen voor exact dezelfde week op een ander apparaat herstellen.
+            Er worden geen winkelproducten of prijzen verzonnen.</p>
+        </details>
       </div>
       {unresolvedPieces.length > 0 && <div className="attention-card" role="status">
         <strong>{unresolvedPieces.length} stukhoeveelheid(en) vragen controle</strong>
@@ -241,6 +245,12 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPric
             <label><input type="checkbox" checked={openOnly}
               onChange={event => setOpenOnly(event.currentTarget.checked)} />
               Alleen nog te kopen</label>
+            {onOpenPriceImport && <button type="button" className="ghost-button"
+              onClick={onOpenPriceImport}>Vergelijk met eigen PLUS/Deka-prijzen</button>}
+          </div>
+          <details className="unpriced-planner-checklist__advanced">
+            <summary>Deel, exporteer of herstel mijn lijst</summary>
+            <div className="unpriced-planner-checklist__actions">
             <button type="button" className="ghost-button" onClick={() => {
               if (completed === items.length) return
               if (!window.confirm('Alle ongeprijsde ingrediënten in je huidige weeklijst afvinken?')) return
@@ -276,29 +286,44 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPric
             <button type="button" className="ghost-button" onClick={() => void downloadUnpricedCsv()}>
               Download weekboodschappen (CSV)
             </button>
-            {onOpenPriceImport && <button type="button" className="ghost-button" onClick={onOpenPriceImport}>
-              Vergelijk mijn weekmandje met eigen PLUS/Deka-prijzen
-            </button>}
             <button type="button" className="ghost-button" onClick={openWithCurrentDemand}>
               Neem exact weekmenu mee naar privévergelijker
             </button>
             <a className="ghost-button" href={`${import.meta.env.BASE_URL}private-basket-mapping.html`} target="_blank" rel="noopener noreferrer">
               Open privévergelijker voor mijn TXT-lijst
             </a>
-          </div>
+            </div>
+          </details>
           {backupMessage && <p role="status" className="unpriced-planner-checklist__note">{backupMessage}</p>}
-          <div className="unpriced-planner-checklist__rows">
-            {visible.length ? visible.map(item => (
-              <label key={itemKey(item)} className="unpriced-planner-checklist__item">
-                <input type="checkbox" checked={Boolean(checked[itemKey(item)])}
-                  onChange={event => {
-                    const selected = event.currentTarget.checked
-                    const key = itemKey(item)
-                    setProgress({ identity: demandIdentity, checked: { ...checked, [key]: selected } })
-                  setPrepared(null)
-                  }} />
-                <span><strong>{item.label}</strong><small>{quantity(item)}</small></span>
-              </label>
+          <div className="unpriced-planner-checklist__rows" aria-label="Boodschappen per gepland recept">
+            {visible.length ? recipeGroups.map(group => (
+              <section key={group.key} className="unpriced-planner-checklist__recipe-group"
+                aria-label={group.title}>
+                <header className="unpriced-planner-checklist__group-title">
+                  <h4>{group.title}</h4>
+                  <span>{group.lines.length} {group.lines.length === 1 ? 'ingrediënt' : 'ingrediënten'}</span>
+                </header>
+                {group.lines.map(item => (
+                  <label key={itemKey(item)} className="unpriced-planner-checklist__item">
+                    <input type="checkbox" checked={Boolean(checked[itemKey(item)])}
+                      onChange={event => {
+                        const selected = event.currentTarget.checked
+                        const key = itemKey(item)
+                        setProgress({ identity: demandIdentity, checked: { ...checked, [key]: selected } })
+                        setPrepared(null)
+                      }} />
+                    <span className="unpriced-planner-checklist__thumb" aria-hidden="true">
+                      {item.label.trim().slice(0, 1).toLocaleUpperCase('nl') || '•'}
+                    </span>
+                    <span className="unpriced-planner-checklist__item-copy">
+                      <strong>{item.label}</strong><small>{quantity(item)}</small>
+                    </span>
+                    <span className="unpriced-planner-checklist__price" aria-label="Geen winkelprijs bekend">
+                      —
+                    </span>
+                  </label>
+                ))}
+              </section>
             )) : <p role="status">Alle boodschappen afgevinkt voor deze week.</p>}
           </div>
           {copy !== null && <div className="unpriced-planner-checklist__copy">

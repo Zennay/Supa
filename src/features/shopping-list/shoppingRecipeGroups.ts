@@ -1,10 +1,10 @@
 import type { BasketTraceLine, RecipeWithIngredients } from '../../domain/basket'
 import type { PlannedMeal } from '../../domain/types'
 
-export type ShoppingRecipeGroup = {
+export type ShoppingRecipeGroup<T extends { id: string } = BasketTraceLine> = {
   key: string
   title: string
-  lines: BasketTraceLine[]
+  lines: T[]
 }
 
 /**
@@ -12,12 +12,12 @@ export type ShoppingRecipeGroup = {
  * recipe that uses them. No basket calculations, checked IDs or export order
  * are changed; the original source basket remains authoritative.
  */
-export function groupShoppingByRecipe(
-  lines: readonly BasketTraceLine[],
+export function groupShoppingByRecipe<T extends { id: string }>(
+  lines: readonly T[],
   plan?: readonly PlannedMeal[],
   recipes?: readonly RecipeWithIngredients[],
   activeDays?: readonly string[],
-): ShoppingRecipeGroup[] {
+): ShoppingRecipeGroup<T>[] {
   if (!Array.isArray(lines)) return []
   if (!Array.isArray(plan) || !Array.isArray(recipes) || !Array.isArray(activeDays)) {
     return [{ key: 'all', title: 'Jouw boodschappen', lines: [...lines] }]
@@ -26,7 +26,7 @@ export function groupShoppingByRecipe(
   const active = new Set(activeDays)
   const recipeById = new Map(recipes.map(recipe => [recipe.id, recipe]))
   const recipeForIngredient = new Map<string, string>()
-  const groups = new Map<string, ShoppingRecipeGroup>()
+  const groups = new Map<string, ShoppingRecipeGroup<T>>()
 
   for (const meal of plan) {
     if (!active.has(meal.day)) continue
