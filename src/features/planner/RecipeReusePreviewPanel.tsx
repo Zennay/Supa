@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { PlannedMeal } from '../../domain/types.ts'
 import type { RecipeWithIngredients } from '../../domain/basket.ts'
 import { previewRecipeReuseChange } from '../../domain/ingredientReusePreview.ts'
@@ -21,6 +21,7 @@ export function RecipeReusePreviewPanel({
   onChooseRecipe,
   onOpenComparison,
   onOpenList,
+  onImportSourceFiles,
 }: {
   plannedMeals: PlannedMeal[]
   activeDays: string[]
@@ -28,10 +29,40 @@ export function RecipeReusePreviewPanel({
   onChooseRecipe: (day: string, recipeId: string) => void
   onOpenComparison: () => void
   onOpenList: () => void
+  onImportSourceFiles: (files: File[]) => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const [requestedDay, setRequestedDay] = useState<string | null>(null)
   const [requestedRecipe, setRequestedRecipe] = useState<string | null>(null)
+  const [importNotice, setImportNotice] = useState('')
+  const [pendingImport, setPendingImport] = useState<{
+    files: File[]
+    beforePlan: string
+    expectedPlan: string
+    activeDays: string
+    recipes: string
+  } | null>(null)
+  const currentPlan = JSON.stringify(plannedMeals)
+  const currentDays = JSON.stringify(activeDays)
+  const currentRecipes = JSON.stringify(recipes.map(recipe => [recipe.id, recipe.ingredients]))
+  useEffect(() => {
+    if (!pendingImport) return
+    if (pendingImport.activeDays !== currentDays ||
+        pendingImport.recipes !== currentRecipes ||
+        (currentPlan !== pendingImport.expectedPlan && currentPlan !== pendingImport.beforePlan)) {
+      setPendingImport(null)
+      setImportNotice('Het weekmenu is veranderd. Kies de bronbestanden opnieuw voor je actuele planning.')
+      return
+    }
+    // Source files must be handed to the existing canonical importer ONLY
+    // after App has installed the newly selected recipe and planKey. Doing
+    // this in the file-input handler would bind evidence to the old week.
+    if (currentPlan === pendingImport.expectedPlan) {
+      setPendingImport(null)
+      onImportSourceFiles(pendingImport.files)
+    }
+  }, [pendingImport, currentPlan, currentDays, currentRecipes, onImportSourceFiles])
+
 
   if (!Array.isArray(plannedMeals) || !Array.isArray(activeDays) ||
       !Array.isArray(recipes) || activeDays.length === 0 || recipes.length < 2) {
@@ -81,6 +112,30 @@ export function RecipeReusePreviewPanel({
     if (nextScreen === 'list') onOpenList()
   }
 
+  function chooseAndImport(files: File[]) {
+    setImportNotice('')
+    if (!files.length) return // Closing the file picker never alters a recipe.
+    if (!canApply) {
+      setImportNotice('Het voorstel is gewijzigd of de fysieke hoeveelheden zijn onzeker. Controleer de recepten eerst.')
+      return
+    }
+    if (files.length > 2 || files.some(file => file.size < 1 || file.size > 256_000)) {
+      setImportNotice('Kies maximaal twee gevulde bronbestanden van elk maximaal 256 kB.')
+      return
+    }
+    const expectedPlan = JSON.stringify(plannedMeals.map(meal =>
+      meal.day === day ? { ...meal, recipeId } : { ...meal }))
+    if (expectedPlan === currentPlan) {
+      setImportNotice('Je receptvoorstel is niet gewijzigd. Gebruik de bestaande bronimport in Vergelijk.')
+      return
+    }
+    setPendingImport({
+      files, beforePlan: currentPlan, expectedPlan,
+      activeDays: currentDays, recipes: currentRecipes,
+    })
+    onChooseRecipe(day, recipeId)
+    setExpanded(false)
+  }
   return (
     <section className="recipe-reuse-preview-panel" aria-label="Een ander recept bekijken">
       <button
@@ -92,6 +147,8 @@ export function RecipeReusePreviewPanel({
       >
         {expanded ? 'Verberg receptvoorbeeld' : 'Bekijk een ander recept zonder te wijzigen'}
       </button>
+      {importNotice && <p role="status" aria-live="polite">{importNotice}</p>}
+      {pendingImport && <p role="status">Nieuw recept verwerken; daarna opent de bestaande bronimport…</p>}
       {expanded && (
         <div id="recipe-reuse-preview-content" className="recipe-reuse-preview-content">
           <div className="recipe-reuse-preview-fields">
@@ -136,6 +193,19 @@ export function RecipeReusePreviewPanel({
               onClick={() => apply('compare')}>
               Kies recept en controleer PLUS/Deka-prijzen
             </button>
+            <label className="recipe-reuse-preview-import">
+              <strong>Kies recept en importeer mijn eigen PLUS/Deka-bronopnames</strong>
+              <small>De nieuwe weekplanning wordt pas gekozen zodra je bestanden selecteert.
+                Bij annuleren verandert er niets. Daarna openen de bestaande broncontrole,
+                productmatching en volledige twee-winkelvergelijking; prijzen worden niet automatisch bevestigd.</small>
+              <input type="file" multiple
+                accept=".csv,.tsv,.txt,.json,text/csv,text/plain,text/tab-separated-values,application/json"
+                onChange={event => {
+                  const files = Array.from(event.currentTarget.files ?? [])
+                  event.currentTarget.value = ''
+                  chooseAndImport(files)
+                }} />
+            </label>
             <button type="button" className="recipe-reuse-preview-apply"
               onClick={() => apply('list')}>
               Kies recept en open Boodschappenlijst
