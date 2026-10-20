@@ -18,6 +18,11 @@ export function ownRecipeAsMarkdown(recipe: SavedRecipe): string {
       recipe.ingredients.some(item => item.reviewReason)) {
     throw new Error('Dit recept heeft openstaande bron- of hoeveelheidscontroles. Gebruik de volledige JSON-back-up om de waarschuwingen te behouden.')
   }
+  // Plain Markdown cannot represent the original public attribution or exact
+  // source-link identity. For sourced recipes, keep the lossless JSON backup.
+  if (recipe.source === 'url' || recipe.sourceUrl !== null) {
+    throw new Error('Dit recept bevat een originele bronlink die Markdown niet kan bewaren. Gebruik de volledige JSON-back-up voor behoud van bronvermelding.')
+  }
   // Newlines and invisible controls inside an imported field could otherwise
   // create new Markdown sections and an apparent extra physical ingredient.
   const line = (value: string) => {

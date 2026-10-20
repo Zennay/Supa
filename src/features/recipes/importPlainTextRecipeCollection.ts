@@ -13,9 +13,6 @@ export function importPlainTextRecipeCollection(raw: string): UserRecipeDraft[] 
     throw new Error('Kies een lokaal receptenbestand van maximaal 500 kB.')
   }
   const parts = raw.replace(/\r\n?/gu, '\n').split(/^---[ \t]*$/gmu)
-  if (parts.length < 2) {
-    throw new Error('Gebruik voor meerdere recepten een aparte regel met --- tussen elk recept.')
-  }
   if (parts.length > 15 || parts.some(part => !part.trim())) {
     throw new Error('Importeer maximaal 15 volledige recepten. Laat geen lege recepten tussen de scheidingsregels.')
   }

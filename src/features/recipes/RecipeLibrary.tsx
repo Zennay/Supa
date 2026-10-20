@@ -867,8 +867,8 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
         </div>}
       <small>Download maximaal 15 al gecontroleerde recepten per Markdownbestand. Grotere
         verzamelingen kun je in opeenvolgende batches exporteren. Recepten met openstaande
-        bron- of hoeveelheidswaarschuwingen neem je veilig mee via
-        de volledige JSON-back-up hieronder; zo verdwijnen controlepunten niet ongemerkt.</small>
+        bron- of hoeveelheidswaarschuwingen of oorspronkelijke bronlinks neem je veilig mee via
+        de volledige JSON-back-up hieronder; zo verdwijnen controlepunten en bronvermeldingen niet ongemerkt.</small>
       {collectionError && <p role="alert" className="recipe-error">{collectionError}</p>}
       {collectionMessage && <p role="status">{collectionMessage}</p>}
     </section>
