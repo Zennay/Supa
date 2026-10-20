@@ -332,6 +332,42 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
     return null
   })()
 
+  async function downloadPairedStoreRecapture(kind: 'csv' | 'csv-excel' | 'guide') {
+    if (!preview || preview.raw !== draft) return
+    const original = preview
+    const ticket = revision.current
+    try {
+      const { privatePairedStoreRecaptureCsv, privatePairedStoreRecaptureGuide } =
+        await import('./privateFullStoreRecapture.ts')
+      if (ticket !== revision.current || original.raw !== draft) return
+      const current = parseOfflinePriceSnapshots(original.normalized, Date.now())
+      const plus = current.captures.PLUS
+      const deka = current.captures.DekaMarkt
+      if (!plus || !deka)
+        throw new Error('Voor het gezamenlijke invulblad zijn twee oorspronkelijke winkelopnames nodig.')
+      const content = kind === 'guide'
+        ? privatePairedStoreRecaptureGuide(plus, deka)
+        : privatePairedStoreRecaptureCsv(plus, deka, kind === 'csv-excel' ? ';' : ',')
+      const url = URL.createObjectURL(new Blob([content], {
+        type: kind === 'guide' ? 'text/plain;charset=utf-8' : 'text/csv;charset=utf-8',
+      }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = kind === 'guide'
+          ? 'supa-plus-deka-nieuwe-winkelopnames-uitleg.txt'
+          : 'supa-plus-deka-twee-winkels-echt-opnieuw-opnemen.csv'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      if (ticket === revision.current) setMessage(
+        'Nieuwe PLUS én DekaMarkt-invoer voorbereid. Oude bedragen en tijden zijn leeg; vul beide echte bronmomenten en productgegevens volledig opnieuw in.')
+    } catch (cause) {
+      if (ticket === revision.current) setMessage(cause instanceof Error ? cause.message :
+        'Het gecombineerde lege bronblad kon niet worden gemaakt.')
+    }
+  }
+
   async function downloadFullStoreRecapture(store: 'PLUS' | 'DekaMarkt',
     kind: 'csv' | 'csv-excel' | 'guide') {
     if (!preview || preview.raw !== draft) return
@@ -609,6 +645,27 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
             </div>
           </section>
         })}
+        {preview.data.captures.PLUS && preview.data.captures.DekaMarkt &&
+          <div className="supa-planner-source-paste__recapture">
+            <strong>Beide winkels echt opnieuw vastleggen in één spreadsheet</strong>
+            <p>Een samenhangend invulblad voor de oorspronkelijke PLUS- én
+              DekaMarkt-artikelcodes. Oude winkelmomenten, pakprijzen,
+              beschikbaarheid en verpakkingen zijn bewust leeg. Gebruik
+              alleen nieuw waargenomen prijzen; daarna controleert Vergelijk
+              beide volledige fysieke mandjes voor een eventueel prijsverschil.</p>
+            <button type="button" className="ghost-button"
+              onClick={() => void downloadPairedStoreRecapture('csv')}>
+              Maak nieuwe PLUS + DekaMarkt-CSV met lege prijsvelden
+            </button>
+            <button type="button" className="ghost-button"
+              onClick={() => void downloadPairedStoreRecapture('csv-excel')}>
+              Beide winkels in spreadsheet-CSV (puntkomma)
+            </button>
+            <button type="button" className="ghost-button"
+              onClick={() => void downloadPairedStoreRecapture('guide')}>
+              Stappen voor beide winkelopnames (TXT)
+            </button>
+          </div>}
         <p>{!liveAdmission?.currentEnough
           ? 'Oude of toekomstige bron. Vernieuw je werkelijke waarnemingen.'
           : preview.data.pairedWithin24h
