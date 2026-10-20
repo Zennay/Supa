@@ -231,7 +231,7 @@ export function previewOwnStoreCsv(text) {
       unavailableProducts: capture.products.filter(p => !p.available || p.priceCents === null).length,
       // Display only. These are the user's original, canonically admitted
       // local source fields, NOT independently verified retailer facts.
-      previewProducts: capture.products.slice(0, 12).map(p => ({
+      previewProducts: capture.products.map(p => ({
         id: p.id, name: p.name, packAmount: p.packAmount, packUnit: p.packUnit,
         packCount: p.packCount ?? 1, priceCents: p.priceCents, available: p.available,
       })),

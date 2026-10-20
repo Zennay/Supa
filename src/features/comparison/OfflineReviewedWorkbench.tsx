@@ -372,6 +372,7 @@ export function OfflineReviewedWorkbench({
 
   const [weekExportMessage, setWeekExportMessage] = useState('')
   const [captureSheetStore, setCaptureSheetStore] = useState<'both' | CaptureStore>('both')
+  const [capturePreviewShown, setCapturePreviewShown] = useState<Record<CaptureStore, number>>({ PLUS: 20, DekaMarkt: 20 })
   const [capturePreview, setCapturePreview] = useState<{
     files: File[]; week: string
     stores: CapturePreviewStore[]
@@ -425,6 +426,7 @@ export function OfflineReviewedWorkbench({
     if (files.length === 0) return
     const version = ++importRevision.current
     setCapturePreview(null)
+    setCapturePreviewShown({ PLUS: 20, DekaMarkt: 20 })
     setBusy(true)
     try {
       if (files.length > 2) throw Error('Kies maximaal twee eigen CSV-bestanden.')
@@ -2251,7 +2253,7 @@ export function OfflineReviewedWorkbench({
                   <p>Oorspronkelijk ingevoerd bronmoment:
                     {' '}<time>{store.observedAt}</time>. Nog géén match- of herkomstbevestiging.</p>
                   <ul>
-                    {store.previewProducts.map(product => {
+                    {store.previewProducts.slice(0, capturePreviewShown[store.retailer]).map(product => {
                       const rate = privatePackUnitRate({
                         amount: product.packAmount, unit: product.packUnit,
                         count: product.packCount,
@@ -2268,10 +2270,15 @@ export function OfflineReviewedWorkbench({
                       </li>
                     })}
                   </ul>
-                  {store.enteredProducts > store.previewProducts.length && (
-                    <p className="disclaimer">Nog
-                      {' '}{store.enteredProducts - store.previewProducts.length}
-                      {' '}ingevulde bronartikelen; na overname per product te beoordelen.</p>
+                  {capturePreviewShown[store.retailer] < store.previewProducts.length && (
+                    <button type="button" className="ghost-button" disabled={busy}
+                      onClick={() => setCapturePreviewShown(current => ({ ...current,
+                        [store.retailer]: Math.min(store.previewProducts.length,
+                          current[store.retailer] + 20),
+                      }))}>
+                      Toon volgende bronartikelen ({Math.min(capturePreviewShown[store.retailer], store.previewProducts.length)}
+                      {' '}van {store.previewProducts.length} zichtbaar)
+                    </button>
                   )}
                 </details>
               ))}
