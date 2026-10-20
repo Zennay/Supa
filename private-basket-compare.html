@@ -20,6 +20,14 @@ button:disabled{opacity:.5;cursor:not-allowed}.nav{background:#e2eee6;color:#174
 small{color:#587566}strong{color:#164d33}
 @media(max-width:650px){.grid{grid-template-columns:1fr}section{padding:14px}}
 @media print{#budget-euros,#budget-label{display:none!important}body{background:white}.inputs,.nav,button{display:none!important}section{border:0;break-inside:avoid}}
+.store-coverage{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding:15px;background:#f7faf6;border:1px solid #d2e0d5;border-radius:12px;margin:14px 0}
+.coverage-shop{display:grid;min-width:0;gap:7px}.coverage-shop label{margin:0;font-size:14px}
+.coverage-shop progress{width:100%;height:16px;accent-color:#17643e}
+.coverage-actions{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+.coverage-actions a{min-height:40px;display:inline-flex;align-items:center}
+.coverage-actions button{margin:0}
+@media(max-width:650px){.store-coverage{grid-template-columns:1fr}}
+@media print{.coverage-actions{display:none!important}}
 #trip-items{display:grid;gap:9px;margin:14px 0}
 #trip .trip-line{display:flex;align-items:flex-start;gap:12px;border:1px solid #d6e0d4;border-radius:11px;background:#fafdfa;padding:13px;font-weight:500}
 #trip input[type=checkbox]{width:1.35rem;height:1.35rem;min-width:1.35rem;margin:3px 0 0;accent-color:#17643e}
@@ -59,6 +67,27 @@ publieke besparingsclaim. Datumvoorwaarden worden pas bij het klikken opnieuw be
 <section id="result" hidden aria-label="Privé vergelijking">
 <h2>Mandjes naast elkaar</h2>
 <div id="summary" class="notice" role="status"></div>
+<div class="store-coverage" aria-label="Bruikbare recente prijsdekking van beide eigen winkelmandjes">
+  <div class="coverage-shop">
+    <label for="coverage-plus"><strong>PLUS</strong> · <span id="coverage-plus-text">Nog geen complete eigen prijsregels</span></label>
+    <progress id="coverage-plus" value="0" max="1"></progress>
+  </div>
+  <div class="coverage-shop">
+    <label for="coverage-deka"><strong>DekaMarkt</strong> · <span id="coverage-deka-text">Nog geen complete eigen prijsregels</span></label>
+    <progress id="coverage-deka" value="0" max="1"></progress>
+  </div>
+  <p class="hint" style="grid-column:1/-1;margin:0">Alleen recente, fysiek compleet gematchte eigen bronregels tellen mee. Pas bij twee volledige, tijdig gekoppelde bronnen kan een prijsverschil worden vastgesteld.</p>
+  <nav class="coverage-actions" aria-label="Eigen ontbrekende winkelprijzen aanvullen">
+    <a href="#inputs-title">Open nieuwe eigen bronbestanden</a>
+    <a href="./private-basket-mapping.html#manual-observations">Ga naar handmatige eigen winkelwaarnemingen</a>
+    <a href="#next-actions">Bekijk ontbrekende regels</a>
+  </nav>
+  <div class="coverage-actions">
+    <button id="blank-plus-recapture" type="button">Leeg PLUS-heropnameblad (CSV)</button>
+    <button id="blank-deka-recapture" type="button">Leeg DekaMarkt-heropnameblad (CSV)</button>
+  </div>
+  <small style="grid-column:1/-1">De nieuwe bestanden bevatten geen SKU, tijdstip, verpakking of prijzen. Maak een volledige nieuwe eigen winkelopname voor exact dezelfde fysieke vraag.</small>
+</div>
 <div id="budget-panel" style="padding:12px;margin-top:12px;border:1px solid #d6e0d4;border-radius:10px">
 <label id="budget-label" for="budget-euros">Optioneel: eigen budget voor dit hele mandje (€)</label>
 <input id="budget-euros" type="text" inputmode="decimal" placeholder="Bijv. 50,00" maxlength="12" style="width:160px;max-width:100%" autocomplete="off">
