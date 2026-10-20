@@ -290,7 +290,7 @@ export function LocalTwoStorePriceEditor({
   // Do not leave a provisional pair visible forever in a long-running tab.
   // This only updates advisory UI, never revives or admits source evidence.
   useEffect(() => {
-    if (!open || sourceSelection !== 'both') return
+    if (!open) return
     const refresh = () => setPricePreviewNow(Date.now())
     refresh()
     const timer = window.setInterval(refresh, 60_000)
@@ -299,7 +299,7 @@ export function LocalTwoStorePriceEditor({
       window.clearInterval(timer)
       document.removeEventListener('visibilitychange', refresh)
     }
-  }, [open, sourceSelection])
+  }, [open])
 
   const [rows, setRows] = useState<Record<string, ProductDraft>>({})
   const [capturedAt, setCapturedAt] = useState<Record<OfflineRetailer, string>>({ PLUS: '', DekaMarkt: '' })
@@ -340,6 +340,23 @@ export function LocalTwoStorePriceEditor({
     // Re-observe the older source, never merely give it a newer timestamp.
     recaptureStores.add(plusObserved < dekaObserved ? 'PLUS' : 'DekaMarkt')
   }
+  // A completed product draft is not a complete fieldwork plan when its real
+  // observation time is missing, impossible, future-dated or incompatible.
+  // These are *instructions to the user*, never substitute source evidence.
+  const pendingCaptureTimes = selectedStores.flatMap(store => {
+    const local = capturedAt[store]
+    const original = timestampWithOffset(local)
+    if (!original) return [{ store, instruction: local
+      ? 'Controleer het onmogelijke of dubbelzinnige Nederlandse bronmoment.'
+      : 'Noteer het echte lokale winkelmoment, zonder een tijd te verzinnen.' }]
+    if (pricePreviewNow - Date.parse(original) < -300_000) return [{
+      store, instruction: 'Opname ligt in de toekomst; corrigeer alleen aan de hand van de echte bron.',
+    }]
+    if (recaptureStores.has(store)) return [{
+      store, instruction: 'Oude of ongepaarde opname: bezoek de winkel opnieuw en verifieer originele prijs en voorraad.',
+    }]
+    return []
+  })
   const activeNeeds = needs.filter(item => item.label.trim() && item.query.trim())
   // Count the SAME physical ingredient needs with two complete provisional
   // price entries. No partial total or store winner may be inferred from this.
@@ -368,7 +385,8 @@ export function LocalTwoStorePriceEditor({
   ])
   const openCaptureIdentity = JSON.stringify([selectedPlanFingerprint, sourceSelection,
     openCaptureTasks.map(task => [task.store, task.need.id, task.need.label,
-      task.need.amount, task.need.unit, task.status, task.needsFreshObservation])])
+      task.need.amount, task.need.unit, task.status, task.needsFreshObservation]),
+    pendingCaptureTimes.map(task => [task.store, task.instruction])])
   const latestOpenCaptureIdentity = useRef(openCaptureIdentity)
   latestOpenCaptureIdentity.current = openCaptureIdentity
   const selectableOpenCaptureText = preparedOpenCaptureCopy?.identity === openCaptureIdentity
@@ -563,10 +581,11 @@ export function LocalTwoStorePriceEditor({
     const printable = (value: string) =>
       value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim().slice(0, 180)
     const rows = [
-        'Supa · nog te verzamelen eigen winkelproducten voor dit exacte Planner-weekmenu',
+        'Supa · openstaande persoonlijke winkelcontroles voor dit exacte Planner-weekmenu',
         'Dit is een ongeprijsde werklijst, geen winkelbron, voorraadbevestiging of prijsbewijs.',
         'Gebruik uitsluitend eigen rechtmatig verkregen producten, echte opnamemomenten en echte pakprijzen.',
         '',
+        ...pendingCaptureTimes.map(task => '[ ] ' + task.store + ': BRONMOMENT — ' + task.instruction),
         ...openCaptureTasks.map(item => [
           '[ ] ' + item.store + ': ' + printable(item.need.label) +
             ' · nodig ' + (item.need.amount === null ? 'hoeveelheid controleren' :
@@ -588,7 +607,7 @@ export function LocalTwoStorePriceEditor({
   }
 
   function downloadOpenCaptureTasks() {
-    if (!openCaptureTasks.length) return
+    if (!openCaptureTasks.length && !pendingCaptureTimes.length) return
     try {
       const output = openCaptureTasksText()
       const url = URL.createObjectURL(new Blob([output], {
@@ -608,7 +627,7 @@ export function LocalTwoStorePriceEditor({
   }
 
   async function copyOpenCaptureTasks() {
-    if (!openCaptureTasks.length) return
+    if (!openCaptureTasks.length && !pendingCaptureTimes.length) return
     const identity = openCaptureIdentity
     try {
       const output = openCaptureTasksText()
@@ -1002,6 +1021,10 @@ export function LocalTwoStorePriceEditor({
           <button type="button" className="ghost-button" onClick={downloadUnfinishedDraft}>
             Download onvoltooid invulconcept (JSON)
           </button>
+          {sourceSelection !== 'both' && activeNeeds.length > 0 && pendingCaptureTimes.length > 0 &&
+            <button type="button" className="ghost-button" onClick={downloadOpenCaptureTasks}>
+              Download ontbrekende {sourceSelection}-bronmomentcontrole (TXT)
+            </button>}
           <label>Herstel een eigen onvoltooid invulconcept
             <input type="file" accept=".json,application/json"
               onChange={event => {
@@ -1052,18 +1075,27 @@ export function LocalTwoStorePriceEditor({
               Vernieuw de originele bron voor {Array.from(recaptureStores).join(' en ')}:
               {' '}eerder ingevoerde pakprijzen mogen niet onder een nieuw bronmoment worden hergebruikt.
             </small>}
-            {openCaptureTasks.length > 0 && <button type="button" className="ghost-button"
+            {pendingCaptureTimes.length > 0 && <div role="alert">
+              <small>Ook nog te controleren: {pendingCaptureTimes.map(task => task.store).join(' en ')}-bronmoment.
+                Een volledig ingevulde productregel vervangt geen geldige winkelopname.</small>
+              <button type="button" className="ghost-button" onClick={() => {
+                const target = document.getElementById(`own-captured-at-${pendingCaptureTimes[0].store}`)
+                target?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                target?.focus({ preventScroll: true })
+              }}>Controleer eerst het ontbrekende winkelmoment</button>
+            </div>}
+            {openCaptureTasks.length + pendingCaptureTimes.length > 0 && <button type="button" className="ghost-button"
               onClick={downloadOpenCaptureTasks}>
-              Download {openCaptureTasks.length} openstaande winkelcontroles (zonder prijzen)
+              Download {openCaptureTasks.length + pendingCaptureTimes.length} openstaande winkelcontroles (zonder prijzen)
             </button>}
-            {openCaptureTasks.length > 0 && <button type="button" className="ghost-button"
+            {openCaptureTasks.length + pendingCaptureTimes.length > 0 && <button type="button" className="ghost-button"
               onClick={() => void copyOpenCaptureTasks()}>
               Kopieer mijn openstaande winkelcontroles (mobiel)
             </button>}
             {selectableOpenCaptureText !== null && <label>
               Selecteer mijn privéwerklijst voor de winkel
               <textarea readOnly value={selectableOpenCaptureText}
-                rows={Math.min(openCaptureTasks.length * 2 + 5, 12)}
+                rows={Math.min((openCaptureTasks.length + pendingCaptureTimes.length) * 2 + 5, 12)}
                 onFocus={event => event.currentTarget.select()}
                 aria-label="Kopieer openstaande persoonlijke winkelcontroles zonder prijzen" />
             </label>}
@@ -1168,7 +1200,8 @@ export function LocalTwoStorePriceEditor({
             ))}
           </datalist>
           <label className="offline-manual-editor__time">Wanneer zijn deze producten echt waargenomen? (Nederlandse tijd)
-            <input type="datetime-local" value={capturedAt[store]} onChange={e => changeTimestamp(store, e.target.value)} />
+            <input id={`own-captured-at-${store}`} type="datetime-local" value={capturedAt[store]}
+              onChange={e => changeTimestamp(store, e.target.value)} />
             <small role="status">{captureTimeAdvice(capturedAt[store])}</small>
             <small>Pas je een eerder ingevuld bronmoment aan, dan worden de
               oude prijs en beschikbaarheidsbevestiging van alleen deze winkel
