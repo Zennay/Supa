@@ -116,7 +116,8 @@ export function ManualStoreComparison({
       setImportText('')
       setImportMessage(imported.legacyWithoutPackCount
         ? 'Oude zeskoloms Supa-tabel geladen. Producten, eenheden en prijzen zijn bewaard. ' +
-          'Vul nu bij iedere winkelregel het werkelijke multipack-aantal in; pas daarna ' +
+          'Controleer opnieuw of de oude hoeveelheid de inhoud per eenheid of de totale multipack inhield. ' +
+          'Vul bij iedere winkelregel het echte multipack-aantal in; pas daarna ' +
           'kan een volledig rekenkundig mandverschil verschijnen.'
         : 'Tabel geladen op dit apparaat; controleer de echte multipack-inhoud en verpakkingenaantallen.')
     } catch (error) {
@@ -132,7 +133,10 @@ export function ManualStoreComparison({
         <p>
           Vergelijk exact dezelfde geplande ingrediënten bij PLUS en DekaMarkt.
           Vul per winkel het <strong>gekozen product, de inhoud per eenheid, het aantal eenheden in de multipack en de prijs van de hele multipack</strong> in.
-          Supa berekent hoeveel hele verpakkingen nodig zijn; er worden geen winkelprijzen verzonnen of opgehaald.
+          Supa berekent hoeveel hele multipacks nodig zijn; er worden geen winkelprijzen verzonnen of opgehaald.
+          Verschillende ingrediënten kunnen dezelfde echte winkel-SKU delen, maar deze losse rekenhulp kent geen
+          geverifieerde SKU-identiteiten en kan gedeelde verpakkingen dus niet samenvoegen. Gebruik de eigen
+          bronimport hierboven voor het volledige fysieke mandje.
         </p>
         <p className="manual-compare__notice">
           Alleen privéberekening op basis van jouw invoer. Geen geverifieerde winkelprijzen,
@@ -242,8 +246,9 @@ export function ManualStoreComparison({
                         </div>
                         <p className="manual-compare__row-result" aria-live="polite">
                           {state.state === 'complete'
-                            ? `${state.packs} hele verpakking(en) × ${quote?.packCount} eenheid/eenvoudige pack ` +
-                              `(${quote?.packAmount} ${UNIT_LABEL[quote?.packUnit ?? ''] ?? quote?.packUnit}) = ${exactEuro.formatCents(state.lineCents!)}`
+                            ? `${state.packs} hele multipack(s) nodig · per multipack ${quote?.packCount} × ` +
+                              `${quote?.packAmount} ${UNIT_LABEL[quote?.packUnit ?? ''] ?? quote?.packUnit} ` +
+                              `· te kopen totaal ${exactEuro.formatCents(state.lineCents!)}`
                             : state.state === 'invalid'
                               ? 'Controleer product, verpakking, eenheid en prijs.'
                               : 'Nog geen prijsberekening.'}
