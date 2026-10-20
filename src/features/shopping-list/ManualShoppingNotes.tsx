@@ -28,6 +28,8 @@ export function ManualShoppingNotes({ notes, setNotes }: {
   const [exportVisible, setExportVisible] = useState(false)
   const [message, setMessage] = useState('')
   const [lastRemoved, setLastRemoved] = useState<{ note: UnpricedShoppingNote; index: number } | null>(null)
+  const [pendingCleared, setPendingCleared] = useState<UnpricedShoppingNote[] | null>(null)
+  const [lastCleared, setLastCleared] = useState<Array<{ note: UnpricedShoppingNote; index: number }> | null>(null)
   const [editing, setEditing] = useState<{ id: string; initialLabel: string;
     initialStore: UnpricedShoppingNote['store']; label: string;
     store: UnpricedShoppingNote['store'] } | null>(null)
@@ -307,6 +309,51 @@ export function ManualShoppingNotes({ notes, setNotes }: {
   const visibleIds = new Set(visible.map(note => note.id))
   const remainingVisible = visible.filter(note => !note.done).length
   const completedVisible = visible.length - remainingVisible
+  function confirmClearCompleted() {
+    if (!pendingCleared?.length) return
+    const originals = pendingCleared.map(item => ({
+      note: item, index: notes.findIndex(current => current.id === item.id),
+    }))
+    if (originals.some(({ note, index }) => index < 0 ||
+        !notes[index].done || notes[index].label !== note.label ||
+        notes[index].store !== note.store)) {
+      setPendingCleared(null)
+      setMessage('Boodschappen zijn ondertussen veranderd. Bekijk de huidige afvinkingen opnieuw.')
+      return
+    }
+    const ids = new Set(pendingCleared.map(item => item.id))
+    setNotes(current => {
+      if (originals.some(({ note }) => !current.some(item => item.id === note.id &&
+          item.done && item.label === note.label && item.store === note.store))) return current
+      return current.filter(item => !ids.has(item.id))
+    })
+    setLastCleared(originals)
+    setPendingCleared(null)
+    setMessage(originals.length + ' afgeronde eigen boodschappen uit de actieve lijst gehaald. Herstel mogelijk; geen geprijsde regels gewijzigd.')
+  }
+  function undoCleared() {
+    if (!lastCleared?.length) return
+    const ids = new Set(lastCleared.map(item => item.note.id))
+    const labels = new Set(notes.map(item => duplicateKey(item.store, item.label)))
+    if (notes.length + lastCleared.length > 100 ||
+        notes.some(item => ids.has(item.id)) ||
+        lastCleared.some(({ note }) => labels.has(duplicateKey(note.store, note.label)))) {
+      setMessage('Herstellen kan niet: er zijn nieuwe conflicterende artikelen of de lijst is vol.')
+      return
+    }
+    setNotes(current => {
+      const currentKeys = new Set(current.map(item => duplicateKey(item.store, item.label)))
+      if (current.length + lastCleared.length > 100 ||
+          current.some(item => ids.has(item.id)) ||
+          lastCleared.some(({ note }) => currentKeys.has(duplicateKey(note.store, note.label)))) return current
+      const next = [...current]
+      for (const { note, index } of [...lastCleared].sort((a, b) => a.index - b.index))
+        next.splice(Math.min(index, next.length), 0, note)
+      return next
+    })
+    setLastCleared(null)
+    setMessage('Afgeronde boodschappen teruggezet op hun oorspronkelijke plek, met oorspronkelijke vinkjes.')
+  }
   function markVisible(done: boolean) {
     if (visibleIds.size === 0) return
     setNotes(current => current.map(item => visibleIds.has(item.id) && item.done !== done
@@ -461,6 +508,28 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       </button>
       <small>Alleen de huidige winkel- en open-filterselectie. Geen prijzen of bronmomenten wijzigen.</small>
     </div>
+    <section className="manual-shopping-notes__finish-trip" aria-label="Afgeronde persoonlijke boodschappen opruimen">
+      <strong>Winkelronde afronden</strong>
+      <p>Verwijder alleen de zichtbare afgevinkte eigen artikelen als je klaar bent.
+        Niet-afgevinkte boodschappen, recepten, Planner en originele supermarktprijzen blijven staan.
+        Zet 'Alleen open' eerst uit om gekochte artikelen zichtbaar te maken.</p>
+      <button type="button" disabled={completedVisible === 0}
+        onClick={() => setPendingCleared(visible.filter(item => item.done))}>
+        Ruim {completedVisible} zichtbare gekochte eigen artikelen op…
+      </button>
+      {pendingCleared && <div role="group" className="manual-shopping-notes__clear-confirm"
+        aria-label="Bevestig het opruimen van persoonlijke boodschappen">
+        <p>{pendingCleared.length} eigen artikelen verdwijnen uit de actieve lijst;
+          dit verandert geen enkele bronprijs en wordt pas uitgevoerd na je bevestiging.</p>
+        <p>{pendingCleared.slice(0, 5).map(item => item.label).join(' · ')}
+          {pendingCleared.length > 5 ? ' · en ' + (pendingCleared.length - 5) + ' andere' : ''}</p>
+        <button type="button" onClick={confirmClearCompleted}>Ja, ruim deze afgeronde items op</button>
+        <button type="button" onClick={() => setPendingCleared(null)}>Annuleer</button>
+      </div>}
+      {lastCleared && <button type="button" onClick={undoCleared}>
+        Herstel laatste {lastCleared.length} opgeruimde artikelen
+      </button>}
+    </section>
     <nav className="manual-shopping-notes__trip-nav" aria-label="Mijn persoonlijke winkelroute">
       <strong>Winkelroute · alleen mijn eigen ongeprijsde artikelen</strong>
       <div className="manual-shopping-notes__trip-nav-stores">

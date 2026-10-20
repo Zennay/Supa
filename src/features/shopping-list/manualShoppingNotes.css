@@ -64,3 +64,9 @@
 .manual-shopping-notes__trip-nav > button { justify-self:start; }
 .manual-shopping-notes__trip-nav button:disabled { opacity:.55; cursor:not-allowed; }
 .manual-shopping-notes__group:focus { outline:3px solid #236d4d; outline-offset:3px; }
+
+.manual-shopping-notes__finish-trip { display:grid; justify-items:start; gap:.65rem; padding:1rem; border:1px solid #bfd6c6; border-radius:12px; background:#f8faf6; }
+.manual-shopping-notes__finish-trip p { margin:0; overflow-wrap:anywhere; }
+.manual-shopping-notes__clear-confirm { display:flex; flex-wrap:wrap; gap:.65rem; align-items:center; padding:1rem; border:1px solid #e0c89c; border-radius:10px; background:#fff8e8; }
+.manual-shopping-notes__clear-confirm p { flex-basis:100%; }
+.manual-shopping-notes__finish-trip button:disabled { opacity:.55; cursor:not-allowed; }
