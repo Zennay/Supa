@@ -230,6 +230,23 @@ export function ManualStoreComparison({
                     )
                   })}
                 </div>
+                {row.quotes.PLUS.state === 'complete' &&
+                  row.quotes.DekaMarkt.state === 'complete' &&
+                  row.quotes.PLUS.lineCents !== null &&
+                  row.quotes.DekaMarkt.lineCents !== null && (
+                  <p className="manual-compare__row-result" role="status">
+                    <strong>Rekenkundig verschil voor dit ingrediënt:</strong>{' '}
+                    {row.quotes.PLUS.lineCents === row.quotes.DekaMarkt.lineCents
+                      ? 'beide zelf ingevoerde winkelregels kosten evenveel.'
+                      : (row.quotes.PLUS.lineCents > row.quotes.DekaMarkt.lineCents
+                        ? 'DekaMarkt ' : 'PLUS ') +
+                        exactEuro.formatCents(Math.abs(
+                          row.quotes.PLUS.lineCents - row.quotes.DekaMarkt.lineCents
+                        )) + ' lager dan de andere winkelregel.'}
+                    {' '}Controleer zelf of de gekozen winkelproducten werkelijk gelijkwaardig zijn;
+                    dit is geen onafhankelijk geverifieerd winkelprijs- of besparingsbewijs.
+                  </p>
+                )}
               </article>
             ))}
           </div>
