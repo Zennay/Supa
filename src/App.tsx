@@ -17,7 +17,11 @@ const ManualShoppingNotes = lazy(async () => {
   const module = await import('./features/shopping-list/ManualShoppingNotes.tsx')
   return { default: module.ManualShoppingNotes }
 })
-import { PrivateSourceShoppingList } from './features/shopping-list/PrivateSourceShoppingList.tsx'
+// Load the reviewed shopping route only when a real complete source exists.
+const PrivateSourceShoppingList = lazy(async () => {
+  const module = await import('./features/shopping-list/PrivateSourceShoppingList.tsx')
+  return { default: module.PrivateSourceShoppingList }
+})
 import './features/shopping-list/listSourceFilePicker.css'
 const PartialReviewedShoppingList = lazy(async () => {
   const module = await import('./features/shopping-list/PartialReviewedShoppingList.tsx')
@@ -30,7 +34,11 @@ const PrivateReviewedProductCatalog = lazy(async () => {
   const module = await import('./features/products/PrivateReviewedProductCatalog.tsx')
   return { default: module.PrivateReviewedProductCatalog }
 })
-import { UnpricedPlannerChecklist } from './features/comparison/UnpricedPlannerChecklist.tsx'
+// Unpriced checklist is useful without retailer data, but not on Home.
+const UnpricedPlannerChecklist = lazy(async () => {
+  const module = await import('./features/comparison/UnpricedPlannerChecklist.tsx')
+  return { default: module.UnpricedPlannerChecklist }
+})
 const OwnExtraGroceries = lazy(async () => {
   const module = await import('./features/comparison/OwnExtraGroceries.tsx')
   return { default: module.OwnExtraGroceries }
@@ -929,11 +937,13 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         {visitedList && !livePrivateReviewed && (
           <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
             <section className="screen" aria-label="Boodschappenlijst uit mijn eigen weekmenu">
+              <Suspense fallback={<p role="status">Mijn Planner-boodschappen laden…</p>}>
               <UnpricedPlannerChecklist plan={plannedMeals} recipes={recipes} activeDays={activeDays}
                 manualNotes={manualShoppingNotes}
                 onToggleManualNote={id => setManualShoppingNotes(previous => previous.map(note =>
                   note.id === id ? { ...note, done: !note.done } : note))}
                 onOpenPriceImport={openOwnPriceImport} onOpenRecipes={() => navigate('recipes')} />
+              </Suspense>
               {tab === 'list' && (designProductIds.length > 0
                 ? <section aria-label="Mijn expliciet toegevoegde producten">
                     <h3>Mijn toegevoegde producten · apart van receptboodschappen</h3>
@@ -953,6 +963,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         )}
         {livePrivateReviewed && (
           <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
+            <Suspense fallback={<p role="status">Mijn gecontroleerde winkellijst laden…</p>}>
             <PrivateSourceShoppingList reviewed={livePrivateReviewed} budget={budget}
               checked={privateShoppingTicks} setChecked={setPrivateShoppingTicks}
               plan={plannedMeals} recipes={recipes} activeDays={activeDays}
@@ -961,6 +972,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               onOpenComparison={openOwnPriceImport} routeOpenSignal={mixedRouteOpenSignal}
               routeChoice={privateRouteChoice}
               routeCostIntent={mixedCostIntent} />
+            </Suspense>
           </div>
         )}
         {visitedList && (
