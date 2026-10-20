@@ -1,0 +1,5 @@
+# SUPA design-to-code: use Figma's official remote MCP endpoint.
+# Authentication is completed per user through the Codex/Figma OAuth flow.
+# This project configuration is loaded for trusted Codex workspaces.
+[mcp_servers.figma]
+url = "https://mcp.figma.com/mcp"
