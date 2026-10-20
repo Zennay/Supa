@@ -596,6 +596,89 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       }
     }
 
+    async function downloadPartialPrint() {
+      const original = freshReviewedBaskets(reviewedRef.current,
+        reviewedRef.current.planKey, Date.now())
+      const left = original?.stores.PLUS
+      const right = original?.stores.DekaMarkt
+      if (!original || original.planKey !== reviewed.planKey ||
+          (left ?? null) !== (plus ?? null) || (right ?? null) !== (deka ?? null)) {
+        setReceiptMessage('Je winkelbron of weekmenu is gewijzigd. Maak het afdrukoverzicht opnieuw.')
+        return
+      }
+      if (left && right && !samePartialPhysicalDemand(left.basket, right.basket)) {
+        setReceiptMessage('Deze twee bronnen hebben niet dezelfde fysieke vraag. Vergelijk ze eerst met één weekmenu.')
+        return
+      }
+      const physical = left?.basket.lines ?? right?.basket.lines ?? []
+      if (!physical.length || physical.length > 200) {
+        setReceiptMessage('Geen veilige originele ingrediëntlijst voor een privé-afdruk.')
+        return
+      }
+      const header = ['ingredient_id', 'ingredient', 'benodigd', 'eenheid',
+        ...(['PLUS', 'DekaMarkt'] as const).flatMap(store =>
+          ['status', 'bronmoment', 'productcode', 'product', 'hele_pakken',
+            'pakinhoud', 'pakeenheid', 'stuks_per_verpakking', 'pakprijs_cent',
+            'regel_cent', 'eenheidsprijs'].map(field => store + '_' + field)),
+        'Deka_minus_PLUS_cent', 'betekenis']
+      const rows = [header]
+      for (const need of physical) {
+        const shopCell = (store: OwnStore) => {
+          const receipt = original.stores[store]
+          const line = receipt?.basket.lines.find(item => item.id === need.id)
+          if (!receipt || line?.status !== 'matched') {
+            return { price: null as number | null, values: [
+              receipt ? 'Geen gecontroleerde prijs' : 'Geen bron',
+              receipt?.observedAt ?? '', ...new Array<string>(9).fill(''),
+            ] }
+          }
+          return { price: line.lineTotalCents as number | null, values: [
+            'Bevestigde eigen bron', receipt.observedAt, line.productId,
+            line.productName, String(line.packs), String(line.pack.amount),
+            line.pack.unit, String(line.pack.count), String(line.pricePerPackCents),
+            String(line.lineTotalCents), privateUnitPrice(line) ?? '',
+          ] }
+        }
+        const a = shopCell('PLUS')
+        const b = shopCell('DekaMarkt')
+        const delta = a.price !== null && b.price !== null
+          ? b.price - a.price : null
+        rows.push([need.id, need.ingredientLabel,
+          need.requirement.amount === null ? '' : String(need.requirement.amount),
+          need.requirement.unit, ...a.values, ...b.values,
+          delta !== null && Number.isSafeInteger(delta) ? String(delta) : '',
+          delta === null ? 'Prijsverschil onbekend' : 'Eigen gecontroleerde regelprijzen'])
+      }
+      try {
+        const { partialReviewedPricePrintHtml } =
+          await import('../comparison/partialReviewedPrintHtml.ts')
+        const current = freshReviewedBaskets(reviewedRef.current,
+          reviewedRef.current.planKey, Date.now())
+        if (!current || current.planKey !== original.planKey ||
+            (current.stores.PLUS ?? null) !== (left ?? null) ||
+            (current.stores.DekaMarkt ?? null) !== (right ?? null)) {
+          setReceiptMessage('De bron is tijdens voorbereiden veranderd of verlopen. Maak het overzicht opnieuw.')
+          return
+        }
+        const html = partialReviewedPricePrintHtml(rows)
+        if (new TextEncoder().encode(html).length > 512_000) {
+          setReceiptMessage('Het offline afdrukoverzicht is te groot.')
+          return
+        }
+        const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
+        try {
+          const link = document.createElement('a')
+          link.href = url
+          link.download = 'supa-eigen-gedeeltelijke-winkelprijzen.html'
+          document.body.append(link)
+          try { link.click() } finally { link.remove() }
+        } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+        setReceiptMessage('Scriptvrij lokaal afdrukoverzicht opgeslagen. Onbekende prijzen blijven onbekend.')
+      } catch {
+        setReceiptMessage('De privé-afdruk is niet beschikbaar. Je oorspronkelijke bron blijft intact.')
+      }
+    }
+
     function preparePartialCopy() {
       const latest = freshReviewedBaskets(reviewedRef.current,
         reviewedRef.current.planKey, Date.now())
@@ -759,6 +842,10 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
           </article>)}
         </div>
       </details>}
+      {(partialPairs.length > 0 || unresolvedByStore.length > 0) &&
+        <button type="button" onClick={() => { void downloadPartialPrint() }}>
+          Bewaar gecontroleerde en ontbrekende winkelregels als offline afdruk (HTML)
+        </button>}
       {(partialPairs.length > 0 || unresolvedByStore.length > 0) &&
         <button type="button" onClick={preparePartialCopy}>
           Toon mijn onvolledige winkelvergelijking als tekst om zelf te kopiëren
