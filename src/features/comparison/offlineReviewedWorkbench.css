@@ -307,6 +307,20 @@ border-radius:10px;padding:.65rem;scroll-margin-top:1.25rem}
 .offline-manual-editor__pair-stores button[data-capture-status="priced"] { border-left:4px solid #447d5d; }
 .offline-manual-editor__pair-stores button[data-capture-status="unavailable"] { border-left:4px solid #a87936; }
 .offline-manual-editor__pair-stores button[data-capture-status="incompatible"] { border-left:4px solid #aa493f; }
+.offline-manual-editor__pair-provisional {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: .3rem;
+  padding: .65rem .8rem;
+  border: 1px dashed #bccdbb;
+  border-radius: .65rem;
+  background: #fff;
+  min-width: 0;
+  font-size: .87rem;
+  overflow-wrap: anywhere;
+}
+.offline-manual-editor__pair-provisional > small { color: #4e6253; line-height: 1.45; }
+.offline-manual-editor__pair-provisional > strong { font-size: .97rem; }
 @media(max-width:620px) { .offline-manual-editor__pair-row { grid-template-columns:1fr; gap:.35rem; } }
 
 .mixed-store-route__extras { margin-top:1rem; padding:1rem; border:1px solid #bdd3bd; border-radius:.7rem; background:#f9fcf8; }
