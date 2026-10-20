@@ -4,6 +4,7 @@ import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import { privatePackUnitRate, privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import { PrivateReviewedTwoStoreTable } from './PrivateReviewedTwoStoreTable.tsx'
 import { ownStoreWeekComparison } from '../planner/ownStoreBudgetComparison.ts'
+import { currentPrivateRouteChoice } from '../comparison/privateRouteChoice.ts'
 import { productSearchText } from './productSearchText.ts'
 import { privatePriceAgeNotice } from '../comparison/privatePriceAgeNotice.ts'
 import { privatePhysicalShoppingTick } from '../shopping-list/privatePhysicalShoppingTick.ts'
@@ -127,6 +128,16 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOp
     const capture = currentReviewed?.stores[shop]
     return !!capture && checked[
       privatePhysicalShoppingTick(reviewed!.planKey, shop, capture.basket.store.id, line)] === true
+  }
+  function chooseProductInRoute(shop: OwnStore, line: Matched) {
+    // Original paired SKU identity and source age are checked again at click.
+    const intent = currentPrivateRouteChoice(reviewed, line.id, shop, Date.now())
+    if (!intent) {
+      setCheckMessage('De eigen winkelbronnen zijn verlopen of niet vergelijkbaar. ' +
+        'Herzie de originele bronnen voordat je een winkel kiest.')
+      return
+    }
+    onChooseRouteLine(intent)
   }
   const toggleChecked = (shop: OwnStore, line: Matched) => {
     const current = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
@@ -349,6 +360,11 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOp
         {priceDifferenceForProduct(shop, line) && <p className="private-reviewed-products__card-difference">
           {priceDifferenceForProduct(shop, line)}
         </p>}
+        {signedDeltaById.has(line.id) && <button type="button"
+          className="private-reviewed-products__route-choice"
+          onClick={() => chooseProductInRoute(shop, line)}>
+          Kies dit {shop}-artikel voor mijn gecombineerde route
+        </button>}
         <button type="button" className="private-reviewed-products__checked-action"
           aria-pressed={isChecked(shop, line)}
           onClick={() => toggleChecked(shop, line)}>

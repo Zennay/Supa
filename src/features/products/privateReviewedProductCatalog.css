@@ -103,3 +103,6 @@ border-radius:9px;padding:.65rem}
 .private-reviewed-products__card-difference{padding:.65rem .75rem;border-radius:8px;
 background:#e7f4eb;border:1px solid #c0d3c2;color:#255336;font-weight:600;
 line-height:1.45}
+
+.private-reviewed-products__route-choice{font-weight:650;border-color:#236d4d!important;
+background:#e7f4eb!important}
