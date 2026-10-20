@@ -489,11 +489,12 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   }, [preferences])
 
   useEffect(() => {
-    // The export belongs to one exact plan snapshot; don't keep a stale draft
-    // visible after the user changes the plan or budget.
+    // A copy and its success message both belong to the exact visible share
+    // snapshot, including the selected recipe's title/time/servings. Unrelated
+    // library edits or inactive-day choices must not erase valid copy text.
     setManualWeekCopy(null)
     setWeekCopyMessage('')
-  }, [preferences])
+  }, [shareSourceKey])
 
   const prepareWeekPlanCopy = () => {
     try {
