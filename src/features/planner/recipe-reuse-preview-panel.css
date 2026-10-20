@@ -116,3 +116,30 @@
 @media (max-width: 480px) {
   .recipe-reuse-preview-shopping__actions > button { flex: 1 1 100%; }
 }
+
+/* Full proposed basket is distinct from the delta and stays available
+   without source prices, reviewer decisions or external network access. */
+.recipe-reuse-preview-shopping__full {
+  border: 1px solid var(--border, #d9dfd7);
+  border-radius: .7rem;
+  padding: .65rem .8rem;
+  min-width: 0;
+}
+.recipe-reuse-preview-shopping__full summary {
+  cursor: pointer;
+  font-weight: 700;
+  min-height: 44px;
+  align-content: center;
+}
+.recipe-reuse-preview-shopping__full summary:focus-visible {
+  outline: 3px solid currentColor;
+  outline-offset: 3px;
+}
+.recipe-reuse-preview-shopping__full[open] {
+  display: grid;
+  gap: .5rem;
+}
+.recipe-reuse-preview-shopping__full li {
+  align-items: center;
+  justify-content: space-between;
+}
