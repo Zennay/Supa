@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { ownStoreWeekComparison } from '../planner/ownStoreBudgetComparison.ts'
 import { observedInstant } from '../../domain/offlineReviewedImport.ts'
 import type { BasketTraceLine } from '../../domain/basket.ts'
@@ -30,14 +30,62 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   onChooseRouteLine: (choice: Omit<PrivateRouteChoice, 'serial'>) => void
   checked: Readonly<Record<string, boolean>>
 }) {
+  const reviewedRef = useRef(reviewed)
+  reviewedRef.current = reviewed
   const [receiptMessage, setReceiptMessage] = useState('')
   const [shopAdvantage, setShopAdvantage] = useState<'all' | 'plus' | 'deka' | 'equal'>('all')
+  async function downloadSingle(shop: OwnStore, kind: 'csv' | 'txt') {
+    const origin = freshReviewedBaskets(reviewedRef.current, reviewedRef.current.planKey, Date.now())
+    const receipt = origin?.stores[shop]
+    if (!receipt || !origin) {
+      setReceiptMessage('Geen geldige eigen ' + shop + '-bron om te bewaren.')
+      return
+    }
+    try {
+      const content = kind === 'csv'
+        ? (await import('../shopping-list/privateSourceShoppingCsv.ts'))
+          .privateSingleStoreShoppingCsv({
+            basket: receipt.basket, observedAt: receipt.observedAt,
+            done: new Set(receipt.basket.lines.filter(line => line.status === 'matched' &&
+              checked[privatePhysicalShoppingTick(origin.planKey, shop, receipt.basket.store.id, line)])
+              .map(line => line.id)),
+          })
+        : (await import('../shopping-list/privateSingleStoreShoppingText.ts'))
+          .privateSingleStoreShoppingText({ basket: receipt.basket, observedAt: receipt.observedAt })
+      const latest = freshReviewedBaskets(reviewedRef.current,
+        reviewedRef.current.planKey, Date.now())
+      if (latest?.planKey !== origin.planKey || latest?.stores[shop] !== receipt)
+        throw Error('De bron is tijdens voorbereiden veranderd.')
+      const url = URL.createObjectURL(new Blob([content], {
+        type: kind === 'csv' ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8',
+      }))
+      try {
+        const a = document.createElement('a')
+        a.href = url
+        a.download = 'supa-eigen-' + shop.toLowerCase() + '-weekmand.' + kind
+        document.body.append(a)
+        try { a.click() } finally { a.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setReceiptMessage(shop + ': eigen volledig weekmandje bewaard. Andere winkelprijs blijft onbekend.')
+    } catch {
+      setReceiptMessage('Download van eigen ' + shop + '-mand mislukt. Herzie de bron.')
+    }
+  }
   async function downloadReceipt(kind: 'csv' | 'txt') {
     // Keep the display and export on the same admitted original physical
     // demand. Await lazy receipt code before rechecking source expiry.
+    const initial = freshReviewedBaskets(reviewedRef.current,
+      reviewedRef.current.planKey, Date.now())
     try {
       const exports = await import('../planner/downloadOwnStoreComparison.ts')
-      const current = freshReviewedBaskets(reviewed, reviewed.planKey, Date.now())
+      const current = freshReviewedBaskets(reviewedRef.current,
+        reviewedRef.current.planKey, Date.now())
+      if (!current || !initial || current.planKey !== initial.planKey ||
+          current.stores.PLUS !== initial.stores.PLUS ||
+          current.stores.DekaMarkt !== initial.stores.DekaMarkt) {
+        setReceiptMessage('Bronnen gewijzigd tijdens voorbereiden. Start opnieuw.')
+        return
+      }
       const comparison = ownStoreWeekComparison(current)
       if (!current?.stores.PLUS || !current.stores.DekaMarkt ||
           !privateReviewedPairWithin24Hours(current.stores.PLUS, current.stores.DekaMarkt) ||
@@ -111,6 +159,12 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
               <button type="button" onClick={() => openCheckedStoreList(shop)}>
                 Bekijk mijn {shop}-boodschappenlijst
               </button>
+              <button type="button" onClick={() => { void downloadSingle(shop, 'csv') }}>
+                Bewaar mijn {shop}-weekmand (CSV)
+              </button>
+              <button type="button" onClick={() => { void downloadSingle(shop, 'txt') }}>
+                Bewaar mijn {shop}-lijst (TXT)
+              </button>
             </> : <>
               <strong>Prijs onbekend</strong>
               <small>{reviewed.stores[shop]
@@ -126,6 +180,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         : missing.length > 0
           ? missing.join(' en ') + ' heeft nog geen volledig bruikbare eigen prijsopname. Vul de brongegevens aan voordat Supa een prijsverschil toont.'
           : 'Het bestaande bronpaar is nog niet betrouwbaar vergelijkbaar voor hetzelfde fysieke weekmandje. Controleer de productkoppelingen opnieuw.'}</p>
+      {receiptMessage && <p role="status">{receiptMessage}</p>}
       <button type="button" onClick={onOpenComparison}>Open bronimport en productmatching</button>
       <small>Geen kassagarantie of onafhankelijk bewezen besparing. Een onbekende prijs is niet nul.</small>
     </section>
