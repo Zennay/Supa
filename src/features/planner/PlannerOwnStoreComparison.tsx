@@ -279,13 +279,13 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       }
       // Never expose a printable fallback when original reviewed sources have
       // expired during an asynchronous clipboard permission prompt.
-      const current = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
-      if (current?.stores.PLUS !== currentAtCopy.stores.PLUS ||
-          current?.stores.DekaMarkt !== currentAtCopy.stores.DekaMarkt ||
-          ownStoreWeekComparison(current).status !== 'comparable') {
+      const currentFallback = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
+      if (currentFallback?.stores.PLUS !== currentAtCopy.stores.PLUS ||
+          currentFallback?.stores.DekaMarkt !== currentAtCopy.stores.DekaMarkt ||
+          ownStoreWeekComparison(currentFallback).status !== 'comparable') {
         throw Error('Originele bronprijzen verlopen tijdens kopiëren.')
       }
-      setCopyableComparison({ plus: current.stores.PLUS, deka: current.stores.DekaMarkt,
+      setCopyableComparison({ plus: currentAtCopy.stores.PLUS, deka: currentAtCopy.stores.DekaMarkt,
         costRaw: shownCost, text: content })
       setDownloadMessage('Klembordtoegang ontbreekt. Selecteer de actuele privévergelijking hieronder en kopieer handmatig.')
     } catch {
