@@ -2397,7 +2397,8 @@ export function OfflineReviewedWorkbench({
             ))}</ol>
           </details>
         )}
-        <section className="offline-price-workbench__input offline-price-workbench__capture-review"
+        <section id="supa-price-sheet-review"
+          className="offline-price-workbench__input offline-price-workbench__capture-review"
           aria-label="Eigen ingevuld prijsblad eerst controleren">
           <label>Controleer één ingevuld CSV-prijsblad of twee aparte winkelbladen vóór import
             <input type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" multiple
@@ -2591,6 +2592,13 @@ export function OfflineReviewedWorkbench({
         plan={plan} recipes={recipes} activeDays={activeDays}
         reviewedRecaptureSeeds={reviewedRecaptureSeeds}
         onGenerated={acceptManualSource}
+        onPreviewSourceFiles={files => {
+          void previewFilledCsv(files).then(() => {
+            document.getElementById('supa-price-sheet-review')?.scrollIntoView({
+              behavior: 'smooth', block: 'start',
+            })
+          })
+        }}
         onEdit={() => {
           // Cancel in-flight file admission or stale preview; editing a draft
           // does not revoke a separately accepted and reviewed source.

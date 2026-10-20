@@ -259,6 +259,7 @@ type Props = {
   activeDays: string[]
   onGenerated: (json: string) => void
   onEdit: () => void
+  onPreviewSourceFiles: (files: File[]) => void
   reviewedRecaptureSeeds?: Record<string, ReviewedRecaptureSeed>
 }
 /**
@@ -266,7 +267,7 @@ type Props = {
  * licensed catalog, attestation, retailer permission, or independent evidence.
  */
 export function LocalTwoStorePriceEditor({
-  plan, recipes, activeDays, onGenerated, onEdit, reviewedRecaptureSeeds = {},
+  plan, recipes, activeDays, onGenerated, onEdit, onPreviewSourceFiles, reviewedRecaptureSeeds = {},
 }: Props) {
   const [open, setOpen] = useState(false)
   const [onlyOpenRows, setOnlyOpenRows] = useState(false)
@@ -1062,6 +1063,28 @@ export function LocalTwoStorePriceEditor({
             onClick={() => void downloadPersonalCaptureKit('paper')}>
             Download printbaar PLUS/Deka-veldformulier (HTML)
           </button>
+          <label>Gevuld PLUS/Deka-prijsblad veilig controleren en importeren
+            <input type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" multiple
+              disabled={!activeNeeds.length}
+              onChange={event => {
+                const files = Array.from(event.currentTarget.files ?? [])
+                event.currentTarget.value = ''
+                if (!files.length) return
+                if (files.length > 2 || files.some(file => !file.size || file.size > 256000)) {
+                  setDraftStatus('Kies maximaal twee niet-lege eigen CSV-bestanden van elk maximaal 256 kB.')
+                  return
+                }
+                // The existing parent workbench has a full source preview,
+                // exact physical matcher and an explicit user acceptance step.
+                // Never bypass it by converting the sheet straight into draft prices.
+                setDraftStatus('Bekijk eerst de eigen bronregels en voorlopige matches in de controle boven dit formulier. Nog niets is overgenomen.')
+                onPreviewSourceFiles(files)
+              }} />
+            <small>Na downloaden en invullen: dezelfde week, echte broncodes, verpakkingen,
+              beschikbaarheid, prijzen en tijdstippen. SUPA toont eerst de bestaande
+              bron- en matchvoorinzage; je beslist daarna pas of je importeert.
+              Ook één ingevulde winkel is toegestaan.</small>
+          </label>
           {sourceSelection !== 'both' && activeNeeds.length > 0 && pendingCaptureTimes.length > 0 &&
             <button type="button" className="ghost-button" onClick={downloadOpenCaptureTasks}>
               Download ontbrekende {sourceSelection}-bronmomentcontrole (TXT)
