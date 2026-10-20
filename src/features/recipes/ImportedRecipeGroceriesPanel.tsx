@@ -503,6 +503,7 @@ export function ImportedRecipeGroceriesPanel({
         </div>
       </section>
       <div className="recipe-backup-panel__actions">
+        <button type="button" onClick={() => void copyGroceries()}>Kopieer gezamenlijke lijst (mobiel)</button>
         <button type="button" onClick={exportText}>Download gezamenlijke lijst (TXT)</button>
         <button type="button" onClick={downloadChecks}>
           Bewaar mijn afvinkingen (JSON)
@@ -536,6 +537,14 @@ export function ImportedRecipeGroceriesPanel({
       </a>}
       {list.lines.length > 80 && <small>De veilige CSV-export ondersteunt maximaal
         80 regels. Gebruik de complete TXT-lijst, of selecteer minder recepten.</small>}
+      {manualCopy?.key === currentCopyKey && <label
+        className="recipe-collection-groceries__mobile-copy">
+        Selecteer en kopieer mijn volledige, ongeprijsde boodschappenlijst
+        <textarea rows={12} readOnly value={manualCopy.text}
+          onFocus={event => {
+            if (latestCopyKey.current === manualCopy.key) event.currentTarget.select()
+          }} />
+      </label>}
       {feedback && <p role="status">{feedback}</p>}
       <small>Dit is uitsluitend een persoonlijke, ongeprijsde lijst. Vinkjes blijven
         op dit scherm totdat je zelf een back-up downloadt en later herstelt.

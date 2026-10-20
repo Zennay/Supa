@@ -259,3 +259,8 @@
   padding:9px; margin:5px 0; overflow-wrap:anywhere; }
 .recipe-collection-groceries__variant summary { cursor:pointer; font-weight:700; }
 .recipe-collection-groceries__variant ul { padding-left:22px; }
+
+/* Clipboard permission is not guaranteed in installed PWAs and mobile browsers. */
+.recipe-collection-groceries__mobile-copy { display: grid; gap: .55rem; width: 100%; margin: 1rem 0; font-weight: 650; }
+.recipe-collection-groceries__mobile-copy textarea { box-sizing: border-box; width: 100%; max-width: 100%; min-height: 150px; padding: .7rem; border: 1px solid #83988a; border-radius: 8px; font: inherit; overflow-wrap: anywhere; }
+.recipe-collection-groceries__mobile-copy textarea:focus-visible { outline: 3px solid #317d52; outline-offset: 2px; }
