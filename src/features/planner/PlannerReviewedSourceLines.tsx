@@ -8,10 +8,11 @@ const shops: OwnStore[] = ['PLUS', 'DekaMarkt']
 
 /** Individual admitted SKU facts only. Never a complete basket authority. */
 export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient,
-  hasCompleteComparison = false }: {
+  hasCompleteComparison = false, onOpenComparison }: {
   progress: PrivateCaptureProgress | null
   now: number
   onReviewIngredient: (store: OwnStore, ingredientId: string) => void
+  onOpenComparison: () => void
   hasCompleteComparison?: boolean
 }) {
   const [query, setQuery] = useState('')
@@ -26,13 +27,13 @@ export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient,
     if (!source?.fresh || !recentOwnCaptureInstant(source.observedAt, now)) return []
     return (source.confirmedSourceLines ?? []).map(line => ({ store, line }))
   })
-  if (entries.length === 0) return null
   const plus = progress.stores.PLUS
   const deka = progress.stores.DekaMarkt
   const expiredStoreNames = shops.filter(store => {
     const capture = progress.stores[store]
     return capture && (!capture.fresh || !recentOwnCaptureInstant(capture.observedAt, now))
   })
+  if (entries.length === 0 && expiredStoreNames.length === 0) return null
   const first = plus && observedInstant(plus.observedAt)
   const second = deka && observedInstant(deka.observedAt)
   const gap = first && second
@@ -154,6 +155,10 @@ export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient,
       vernieuw eerst de oorspronkelijke winkelbron in Vergelijk. Onbekende
       prijzen blijven onbekend.
     </p>}
+    {expiredStoreNames.length > 0 && <button type="button" className="ghost-button"
+      onClick={onOpenComparison}>
+      Vernieuw mijn eigen {expiredStoreNames.join(' en ')}-winkelbron in Vergelijk
+    </button>}
     {pairs.length > 0 && <section className="supa-reviewed-source-lines__peek"
       aria-label="Voorlopige prijsverschillen op bevestigde productregels">
       <header>
@@ -189,7 +194,7 @@ export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient,
       </button>
       {exportMessage && <p role="status" aria-live="polite">{exportMessage}</p>}
     </section>}
-    <details className="supa-reviewed-source-lines" open={expanded}
+    {entries.length > 0 && <details className="supa-reviewed-source-lines" open={expanded}
     onToggle={event => setExpanded(event.currentTarget.open)}>
     <summary>{entries.length} gekoppelde bronproducten en eenheidsprijzen bekijken</summary>
     {expanded && <>
@@ -256,6 +261,6 @@ export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient,
         </article>)}
       </div>
     </>}
-    </details>
+    </details>}
   </div>
 }
