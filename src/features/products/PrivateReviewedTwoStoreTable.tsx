@@ -30,6 +30,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   checked: Readonly<Record<string, boolean>>
 }) {
   const [receiptMessage, setReceiptMessage] = useState('')
+  const [shopAdvantage, setShopAdvantage] = useState<'all' | 'plus' | 'deka' | 'equal'>('all')
   async function downloadReceipt(kind: 'csv' | 'txt') {
     // Keep the display and export on the same admitted original physical
     // demand. Await lazy receipt code before rechecking source expiry.
@@ -143,7 +144,12 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         productSearchText(value).includes(search))) return []
     return [{ plus: line, deka: alternate }]
   })
-  if (order !== 'source') rows.sort((a, b) => {
+  const advantaged = rows.filter(({ plus: first, deka: second }) =>
+    shopAdvantage === 'all' ||
+    (shopAdvantage === 'plus' && first.lineTotalCents < second.lineTotalCents) ||
+    (shopAdvantage === 'deka' && second.lineTotalCents < first.lineTotalCents) ||
+    (shopAdvantage === 'equal' && first.lineTotalCents === second.lineTotalCents))
+  if (order !== 'source') advantaged.sort((a, b) => {
     if (order === 'priceGap') return (
       Math.abs(b.plus.lineTotalCents - b.deka.lineTotalCents) -
       Math.abs(a.plus.lineTotalCents - a.deka.lineTotalCents)
@@ -164,7 +170,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   })
   // This is a navigation aid, not a savings claim. Only visible, paired,
   // wholly priced ingredient lines contribute to the difference overview.
-  const changed = rows.filter(row => row.plus.lineTotalCents !== row.deka.lineTotalCents)
+  const changed = advantaged.filter(row => row.plus.lineTotalCents !== row.deka.lineTotalCents)
   const largest = changed.length ? [...changed].sort((a, b) =>
     Math.abs(b.plus.lineTotalCents - b.deka.lineTotalCents) -
     Math.abs(a.plus.lineTotalCents - a.deka.lineTotalCents))[0] : null
@@ -217,8 +223,19 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         openbare besparingsclaim of nieuwe winkelbronimport.</small>
       {receiptMessage && <p role="status">{receiptMessage}</p>}
     </div>
+    <div className="private-reviewed-products__advantage-filter"
+      role="group" aria-label="Filter persoonlijk gecontroleerde regelprijzen per winkel">
+      {([
+        ['all', 'Beide winkels'],
+        ['plus', 'Alleen PLUS goedkoper'],
+        ['deka', 'Alleen DekaMarkt goedkoper'],
+        ['equal', 'Zelfde hele-pakprijs'],
+      ] as const).map(([value, label]) => <button key={value} type="button"
+        aria-pressed={shopAdvantage === value}
+        onClick={() => setShopAdvantage(value)}>{label}</button>)}
+    </div>
     <div className="private-reviewed-products__difference-focus" aria-label="Prijsverschil per ingrediënt">
-      <strong>{changed.length} van {rows.length} zichtbare ingrediënten verschillen in hele-pakprijs.</strong>
+      <strong>{changed.length} van {advantaged.length} geselecteerde ingrediënten verschillen in hele-pakprijs.</strong>
       {largest ? <p>Grootste zichtbaar verschil: <strong>{largest.plus.ingredientLabel}</strong> · {' '}
         {money.format(Math.abs(largest.plus.lineTotalCents - largest.deka.lineTotalCents) / 100)} goedkoper bij {' '}
         {largest.plus.lineTotalCents < largest.deka.lineTotalCents ? 'PLUS' : 'DekaMarkt'}.
@@ -242,11 +259,11 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
     <small>Jouw gecontroleerde PLUS-bron: {plus.observedAt}. DekaMarkt-bron: {deka.observedAt}.
       Geen kassagarantie of onafhankelijk bewezen besparing; oorspronkelijke producten en
       prijzen kunnen veranderen.</small>
-    <p role="status">{rows.length} van {plus.basket.lines.length} vergelijkbare ingrediënten
+    <p role="status">{advantaged.length} van {plus.basket.lines.length} vergelijkbare ingrediënten
       bij je zoek-, eenheids- en sorteerselectie. Alle mandtotalen hierboven blijven
       gebaseerd op het volledige weekmenu, niet alleen de gefilterde producten.</p>
     <div className="private-reviewed-products__paired-rows">
-      {rows.map(({ plus: first, deka: second }) => <article key={first.id}>
+      {advantaged.map(({ plus: first, deka: second }) => <article key={first.id}>
         <h4>{first.ingredientLabel} · {first.requirement.amount} {first.requirement.unit}</h4>
         <div className="private-reviewed-products__paired-options">
           {product(first, 'PLUS')}{product(second, 'DekaMarkt')}
@@ -266,7 +283,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
           </button>
         </div>
       </article>)}
-      {!rows.length && <p>Geen vergelijkbare artikelen passen bij je zoekopdracht of eenheidsfilter.</p>}
+      {!advantaged.length && <p>Geen vergelijkbare artikelen passen bij je zoek-, eenheids- of winkelvoordeelfilter.</p>}
     </div>
     <button type="button" onClick={() => openCheckedStoreList(cheapest)}>Open het goedkoopste volledige winkelmandje ({cheapest}) in Lijst</button>
   </section>
