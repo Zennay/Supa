@@ -411,6 +411,14 @@ export function PrivateComparisonJourney({
         const confirmed = source?.basket.matchedLineCount ??
           (fresh ? partial?.reviewedLineCount : 0) ?? 0
         const next = !complete && fresh ? partial?.nextIngredientId : null
+        const pendingNeeds = !complete && fresh && partial ? [
+          ...partial.awaitingReviewIngredients.map(item => ({
+            ...item, reason: 'Product of verpakking nog persoonlijk bevestigen',
+          })),
+          ...partial.missingIngredients.map(item => ({
+            ...item, reason: 'Nog geen passend, bevestigd bronartikel',
+          })),
+        ] : []
         return <div key={store} className="private-comparison-journey__shop">
           <strong>{store}</strong>
           <span>{complete
@@ -430,6 +438,26 @@ export function PrivateComparisonJourney({
               complete ? 'Bekijk bevestigde artikelen' :
                 outdated ? 'Vernieuw bronopname' : 'Voeg eigen bronprijzen toe'}
           </button>
+          {pendingNeeds.length > 0 && <details
+            className="private-comparison-journey__review-queue">
+            <summary>{pendingNeeds.length} openstaande ingrediënten bij {store}</summary>
+            <p>Deze regels zijn nog niet volledig geprijsd en tellen daarom
+              niet mee als een volledig winkelmandje.</p>
+            <ul>{pendingNeeds.map((need, index) => <li
+              key={JSON.stringify([store, need.id, index])}>
+              <div>
+                <strong>{need.label}</strong>
+                <small>{need.amount !== null && need.amount !== undefined &&
+                  Number.isFinite(need.amount) && need.amount > 0
+                    ? need.amount + ' ' + (need.unit ?? 'eenheid')
+                    : 'Hoeveelheid nog controleren'}</small>
+                <small>{need.reason}</small>
+              </div>
+              <button type="button" onClick={() => onReview(store, need.id)}>
+                Controleer dit ingrediënt
+              </button>
+            </li>)}</ul>
+          </details>}
         </div>
       })}
     </div>
