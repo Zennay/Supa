@@ -3,7 +3,10 @@ import type { PlannedMeal, Recipe } from '../../domain/types'
 import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../domain/basket.ts'
 import { buildIngredientReuseInsight } from '../../domain/ingredientReuse.ts'
 import { IngredientReuseCard } from './IngredientReuseCard.tsx'
-import { RecipeReusePreviewPanel } from './RecipeReusePreviewPanel.tsx'
+// Previewing a proposed replacement is optional: do not pull its entire
+// physical shopping and retailer capture-sheet toolchain into app startup.
+const RecipeReusePreviewPanel = lazy(() => import('./RecipeReusePreviewPanel.tsx')
+  .then(module => ({ default: module.RecipeReusePreviewPanel })))
 import { assessPlannerBudget, getBudgetState } from '../../domain/planner'
 import { euro } from '../../lib/money'
 import { RecipePriceExplanation } from './RecipePriceExplanation'
@@ -361,6 +364,7 @@ export function PlannerView({
 
       {hasIngredientData && <IngredientReuseCard insight={reuseInsight} />}
       {hasIngredientData && (
+        <Suspense fallback={<p role="status" aria-live="polite">Receptwissel en volledige weeklijst laden…</p>}>
         <RecipeReusePreviewPanel
           plannedMeals={plannedMeals}
           activeDays={activeDays}
@@ -369,6 +373,7 @@ export function PlannerView({
           onOpenComparison={onOpenComparison}
           onOpenList={onOpenShoppingList}
         />
+        </Suspense>
       )}
 
       <div className="insight-card">
