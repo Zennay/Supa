@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { readRecipeLibrary, type SavedRecipe } from './recipeLibrary.ts'
 import { toPlannerRecipe } from './plannerRecipes.ts'
 import { scaleOwnRecipe } from './scaleOwnRecipe.ts'
@@ -10,6 +10,11 @@ import { exportOwnRecipeChecklistCsv } from './recipeShoppingCsv.ts'
 import { exportCombinedRecipesPrivateWeek } from './exportCombinedRecipesPrivateWeek.ts'
 import { exportUnpricedProgress, importUnpricedProgress, unpricedProgressMaxBytes, unpricedProgressStorageKey } from '../comparison/unpricedPlannerProgress.ts'
 import { exportRecipeBundleSelection, importRecipeBundleSelection, recipeBundleMaxBytes } from './recipeBundleSelection.ts'
+
+const RecipeWeekCookingMode = lazy(async () => {
+  const module = await import('./RecipeWeekCookingMode.tsx')
+  return { default: module.RecipeWeekCookingMode }
+})
 
 // UI-only discovery, never a synonym mapping or verified retailer-product match.
 function searchableIngredient(value: string): string {
@@ -51,6 +56,7 @@ export function ImportedRecipeGroceriesPanel({
   const [reuseFirst, setReuseFirst] = useState(false)
   const [startDay, setStartDay] = useState(m2InitialPlan[0].day)
   const [captureTarget, setCaptureTarget] = useState<'both' | 'PLUS' | 'DekaMarkt'>('both')
+  const [showCookingMode, setShowCookingMode] = useState(false)
   const [copyableCaptureGuide, setCopyableCaptureGuide] = useState<{ identity: string; target: string; text: string } | null>(null)
   const [capturePreview, setCapturePreview] = useState<{
     key: string; rows: { csvRow: number; store: string; id: string;
@@ -933,6 +939,19 @@ export function ImportedRecipeGroceriesPanel({
             Download weekboodschappen met receptbijdragen per dag (TXT)
           </button>
         </div>
+        <div className="recipe-backup-panel__actions">
+          <button type="button" className="ghost-button"
+            disabled={!plannerReadyForSelection || !plannerAssignments.length || !plannerDaysDistinct}
+            aria-expanded={showCookingMode}
+            onClick={() => setShowCookingMode(current => !current)}>
+            {showCookingMode ? 'Sluit kookmodus' : 'Start kookmodus voor deze week'}
+          </button>
+        </div>
+        {showCookingMode && plannerReadyForSelection && plannerDaysDistinct &&
+          <Suspense fallback={<p role="status">Kookmodus openen…</p>}>
+            <RecipeWeekCookingMode key={plannerExportKey} assignments={plannerAssignments}
+              recipes={selected} days={plannerDays} />
+          </Suspense>}
       </section>
       <section className="recipe-collection-groceries__week"
         aria-label="Mijn receptenkeuze privé bewaren of herstellen">
