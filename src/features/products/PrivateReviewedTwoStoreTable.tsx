@@ -20,6 +20,13 @@ type Matched = Extract<BasketTraceLine, { status: 'matched' }>
 type OwnStore = 'PLUS' | 'DekaMarkt'
 const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 
+function privateCheckedSignature(ticks: Readonly<Record<string, boolean>>): string {
+  // Only positive physical ticks affect export content. Sort for deterministic
+  // identity regardless of object construction or unrelated false entries.
+  return Object.entries(ticks).filter(([, marked]) => marked === true)
+    .map(([key]) => key).sort().join('\n')
+}
+
 /** Both sides are the exact SAME human-reviewed physical weekly demand.
  * No independent source authorization, live pricing or retail claim is implied.
  */
@@ -40,9 +47,9 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   const [receiptMessage, setReceiptMessage] = useState('')
   // Manual-copy text contains checkbox state; invalidate it if the shopper
   // changes any original line after generating the displayed private text.
-  const checkedSignature = Object.entries(checked)
-    .filter(([, selected]) => selected === true)
-    .map(([id]) => id).sort().join('\n')
+  const checkedRef = useRef(checked)
+  checkedRef.current = checked
+  const checkedSignature = privateCheckedSignature(checked)
   const [manualCopy, setManualCopy] = useState<{
     text: string
     label: string
@@ -63,6 +70,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   async function downloadSingle(shop: OwnStore, kind: 'csv' | 'txt' | 'html' | 'open-txt') {
     const origin = freshReviewedBaskets(reviewedRef.current, reviewedRef.current.planKey, Date.now())
     const receipt = origin?.stores[shop]
+    const initialCheckedSignature = checkedSignature
     if (!receipt || !origin) {
       setReceiptMessage('Geen geldige eigen ' + shop + '-bron om te bewaren.')
       return
@@ -93,6 +101,10 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         reviewedRef.current.planKey, Date.now())
       if (latest?.planKey !== origin.planKey || latest?.stores[shop] !== receipt)
         throw Error('De bron is tijdens voorbereiden veranderd.')
+      if (privateCheckedSignature(checkedRef.current) !== initialCheckedSignature) {
+        setReceiptMessage('De afvinkstatus is tijdens voorbereiden gewijzigd. Maak de export opnieuw.')
+        return
+      }
       const url = URL.createObjectURL(new Blob([content], {
         type: kind === 'csv' ? 'text/csv;charset=utf-8' : kind === 'html' ? 'text/html;charset=utf-8' : 'text/plain;charset=utf-8',
       }))
@@ -151,6 +163,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
     // demand. Await lazy receipt code before rechecking source expiry.
     const initial = freshReviewedBaskets(reviewedRef.current,
       reviewedRef.current.planKey, Date.now())
+    const initialCheckedSignature = checkedSignature
     try {
       const exports = await import('../planner/downloadOwnStoreComparison.ts')
       const print = kind === 'html' ? await import('./privateTwoStorePrintableHtml.ts') : null
@@ -160,6 +173,10 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
           current.stores.PLUS !== initial.stores.PLUS ||
           current.stores.DekaMarkt !== initial.stores.DekaMarkt) {
         setReceiptMessage('Bronnen gewijzigd tijdens voorbereiden. Start opnieuw.')
+        return
+      }
+      if (privateCheckedSignature(checkedRef.current) !== initialCheckedSignature) {
+        setReceiptMessage('De boodschappenstatus wijzigde tijdens voorbereiden. Maak je export opnieuw.')
         return
       }
       const comparison = ownStoreWeekComparison(current)

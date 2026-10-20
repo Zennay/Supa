@@ -115,6 +115,12 @@ De TXT-/selecteerbare kopieertekst neemt nu ook de oorspronkelijke afvinkstatus 
 de winkelprijzen blijven altijd de volledige originele fysieke mand, niet alleen de nog
 open boodschappen. Afvinken is geen betalingsbewijs.
 
+Tijdens asynchroon laden van de lokale CSV-/HTML-/TXT-export wordt de
+afvinkstatus opnieuw vergeleken vlak voordat de download start.
+Als iemand intussen een origineel artikel heeft afgevinkt of teruggezet,
+vraagt Supa de export opnieuw aan te maken in plaats van een
+verouderde boodschappenlijst stilzwijgend op te slaan.
+
 Een weergegeven selecteerbare privétekst is een momentopname van
 de originele winkelbronnen én de afvinkstatus op dat moment. Zodra je
 een boodschappenartikel (ook bij de andere winkel) afvinkt of terugzet,
