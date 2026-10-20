@@ -10,8 +10,10 @@ import { productSearchText } from './productSearchText.ts'
 import { currentPrivateRouteChoice } from '../comparison/privateRouteChoice.ts'
 import { createMixedStoreShoppingPlan } from '../comparison/mixedStoreShoppingPlan.ts'
 import { validCustomWeekBudgetEuros } from '../planner/customWeekBudget.ts'
+import { parsePrivateExtraVisitCostCents } from '../comparison/privateExtraVisitCost.ts'
+import { euro as exactEuro } from '../../lib/money.ts'
 import { privatePhysicalShoppingTick } from '../shopping-list/privatePhysicalShoppingTick.ts'
-import { freshReviewedBaskets, privateReviewedPairWithin24Hours, type PrivateReviewedBaskets, type PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
+import { freshReviewedBaskets, privateReviewedPairWithin24Hours, type PrivateReviewedBasket, type PrivateReviewedBaskets, type PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
 
 type Matched = Extract<BasketTraceLine, { status: 'matched' }>
 type OwnStore = 'PLUS' | 'DekaMarkt'
@@ -36,6 +38,14 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   reviewedRef.current = reviewed
   const [receiptMessage, setReceiptMessage] = useState('')
   const [shopAdvantage, setShopAdvantage] = useState<'all' | 'plus' | 'deka' | 'equal'>('all')
+  // A personal travel-cost scenario is bound to the exact ORIGINAL source
+  // objects, never inherited by a reimported price or another Planner week.
+  const [visitScenario, setVisitScenario] = useState<{
+    planKey: string
+    plus: PrivateReviewedBasket
+    deka: PrivateReviewedBasket
+    raw: string
+  } | null>(null)
   async function downloadSingle(shop: OwnStore, kind: 'csv' | 'txt' | 'html' | 'open-txt') {
     const origin = freshReviewedBaskets(reviewedRef.current, reviewedRef.current.planKey, Date.now())
     const receipt = origin?.stores[shop]
@@ -443,6 +453,20 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   const mix = createMixedStoreShoppingPlan(plus.basket, deka.basket)
   const splitTrip = !!mix && mix.lines.some(line => line.store === 'PLUS') &&
     mix.lines.some(line => line.store === 'DekaMarkt')
+  const currentVisitCost = visitScenario?.planKey === reviewed.planKey &&
+    visitScenario.plus === plus && visitScenario.deka === deka
+    ? visitScenario.raw : ''
+  const extraVisitCostCents = currentVisitCost.trim()
+    ? parsePrivateExtraVisitCostCents(currentVisitCost) : null
+  const extraVisitCostInvalid = currentVisitCost.trim() !== '' &&
+    extraVisitCostCents === null
+  const mixedWithVisitCents = splitTrip && mix && extraVisitCostCents !== null
+    ? BigInt(mix.totalCents) + BigInt(extraVisitCostCents) : null
+
+  const mixedNetCents = mixedWithVisitCents === null ? null
+    : BigInt(Math.min(plus.basket.totalCents, deka.basket.totalCents)) -
+      mixedWithVisitCents
+
   const wholeCheapestCents = Math.min(plus.basket.totalCents, deka.basket.totalCents)
   const delta = deka.basket.totalCents - plus.basket.totalCents
   const cheapest: OwnStore = delta >= 0 ? 'PLUS' : 'DekaMarkt'
@@ -555,8 +579,43 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         <strong>{money.format(wholeCheapestCents - mix.totalCents >= 0
           ? (wholeCheapestCents - mix.totalCents) / 100 : 0)}</strong></p>
       <small>{splitTrip
-        ? 'Twee winkels nodig. Extra reis-, parkeer- en tijdkosten zijn onbekend totdat je ze zelf invult. Netto voordeel wordt hier niet geclaimd.'
+        ? extraVisitCostCents === null
+          ? 'Twee winkels nodig. Zonder jouw extra winkelstopkosten is het netto verschil onbekend.'
+          : 'Twee winkels nodig. Jouw ingevoerde extra stopkosten zijn hieronder verwerkt; reistijd en overige kosten blijven onbekend.'
         : 'Voor deze goedkoopste productroute is slechts één winkel nodig; er is geen tweede winkelstop.'}</small>
+      {splitTrip && <div className="private-reviewed-products__trip-cost">
+        <label>Mijn extra kosten voor een tweede winkelstop (€)
+          <input type="text" inputMode="decimal" maxLength={9}
+            placeholder="Bijv. 2,50" value={currentVisitCost}
+            onChange={event => setVisitScenario({
+              planKey: reviewed.planKey, plus, deka, raw: event.currentTarget.value,
+            })} />
+        </label>
+        {extraVisitCostInvalid && <p role="alert">Voer een bedrag tussen € 0,00
+          en € 1.000,00 in met maximaal twee decimalen.</p>}
+        {!extraVisitCostInvalid && mixedWithVisitCents === null &&
+          <p>Netto verschil onbekend totdat je jouw extra winkelstopkosten invult.
+            Reistijd en niet-opgegeven kosten zijn niet meegenomen.</p>}
+        {mixedWithVisitCents !== null && mixedNetCents !== null && <>
+          <p role="status">Twee winkelstops inclusief jouw opgegeven extra kosten:
+            {' '}<strong>{exactEuro.formatCents(mixedWithVisitCents)}</strong>.
+            {' '}{mixedNetCents > 0n
+              ? exactEuro.formatCents(mixedNetCents) + ' goedkoper dan één volledige winkel.'
+              : mixedNetCents === 0n
+                ? 'Even duur als één volledige winkel.'
+                : 'Eén volledige winkel is ' + exactEuro.formatCents(-mixedNetCents) +
+                  ' goedkoper.'}</p>
+          {budgetCents !== null && <p>Ten opzichte van jouw Planner-weekbudget:
+            {' '}{mixedWithVisitCents > BigInt(budgetCents)
+              ? exactEuro.formatCents(mixedWithVisitCents - BigInt(budgetCents)) +
+                ' boven budget.'
+              : exactEuro.formatCents(BigInt(budgetCents) - mixedWithVisitCents) +
+                ' binnen budget.'}</p>}
+          <small>Persoonlijke scenario-inschatting op basis van hele originele
+            verpakkingen, zonder reistijd, extra aankopen of kassagarantie.
+            Deze invoer wordt niet als bronprijs of bewijs opgeslagen.</small>
+        </>}
+      </div>}
       <button type="button" onClick={openCheckedMixedRoute}>
         Open mijn gecombineerde route en eigen extra bezoekkosten
       </button>

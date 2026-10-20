@@ -73,6 +73,19 @@ de oorspronkelijke complete bron. Als alles is afgevinkt meldt de lijst
 expliciet dat er niets meer openstaat. De originele brondata, complete
 winkelmandtotalen en bevestigde productmatching worden nooit aangepast.
 
+Bij een volledig geaccepteerde twee-winkelvergelijking kan Producten
+de eerder vastgestelde bruto productkosten van een gecombineerde route
+ook **met jouw zelf ingevulde extra kosten voor de tweede winkelstop**
+doorrekenen. Het bestaande strikte kostenformaat (€ 0,00–€ 1.000,00,
+maximaal twee decimalen) wordt hergebruikt. Zonder geldige invoer
+blijft het netto verschil onbekend, en reistijd of andere niet-opgegeven
+kosten zijn nooit als nul aangenomen. De invoer geldt uitsluitend
+voor precies die bronopnames en dat Planner-weekmandje: na
+herimport of wijziging wordt het bedrag niet op een nieuwe bron
+toegepast. Bij openen van de uitgebreide route moet je de extra kosten
+zelf opnieuw bevestigen; de snelle Producten-inschatting wordt niet
+als winkelprijs, kassabedrag of bewijs opgeslagen.
+
 Ook nadat beide volledige winkelbronnen vergelijkbaar zijn, blijft in
 **Producten → Zelfde weekmandje → Ik ga naar één winkel** de zelfstandige
 PLUS- of DekaMarkt-weeklijst bereikbaar. Je kunt elk winkelmandje afzonderlijk

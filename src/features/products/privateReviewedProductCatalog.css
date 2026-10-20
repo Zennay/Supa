@@ -85,3 +85,11 @@ background:#e7f4eb;color:#255336;font-weight:650}
 .private-reviewed-products__shop-progress progress{width:100%;height:12px;accent-color:#27734c}
 .private-reviewed-products__shop-progress strong{font-size:1rem}
 .private-reviewed-products__shop-progress small{line-height:1.45}
+
+.private-reviewed-products__trip-cost{display:grid;gap:.55rem;padding:1rem;
+  border:1px solid #b8d0bd;border-radius:12px;background:#fff}
+.private-reviewed-products__trip-cost label{display:grid;gap:.3rem;font-weight:650}
+.private-reviewed-products__trip-cost input{max-width:220px}
+.private-reviewed-products__trip-cost p{line-height:1.5}
+.private-reviewed-products__trip-cost [role=alert]{color:#8b3b23;font-weight:650}
+.private-reviewed-products__trip-cost small{line-height:1.45}
