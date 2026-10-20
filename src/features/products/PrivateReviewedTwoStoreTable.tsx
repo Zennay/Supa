@@ -355,7 +355,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       setReceiptMessage('Geen geldige ontbrekende ingrediënten om te bewaren. Open de broninvoer.')
       return
     }
-    const clean = (value: string) => value.replace(/[\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]/gu, ' ').trim()
+    const clean = (value: string) => value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim()
     const content = [
       'SUPA · onvolledige eigen winkelbron · ' + shop,
       'Bronmoment: ' + clean(source.observedAt),
@@ -367,7 +367,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
           line.requirement.amount + ' ' + line.requirement.unit) + ' · prijs onbekend'),
       '',
       'Eigen zoeklijst, geen actuele winkelprijs of bronautorisatie.',
-    ].join('\\n') + '\\n'
+    ].join('\n') + '\n'
     if (new TextEncoder().encode(content).length > 256_000) {
       setReceiptMessage('De zoeklijst is te groot voor een veilige lokale download.')
       return
