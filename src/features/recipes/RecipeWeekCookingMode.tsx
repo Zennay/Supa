@@ -37,6 +37,9 @@ export function RecipeWeekCookingMode({
   const [finishedSteps, setFinishedSteps] = useState<Record<string, number[]>>({})
   const [prepared, setPrepared] = useState<Record<string, string[]>>({})
   const [message, setMessage] = useState('')
+  const progressIdentity = JSON.stringify([finishedSteps, prepared])
+  const latestProgressIdentity = useRef(progressIdentity)
+  latestProgressIdentity.current = progressIdentity
   const snapshot = selected ? JSON.stringify([current.day, selected]) : ''
   const doneSteps = new Set(finishedSteps[snapshot] ?? [])
   const doneIngredients = new Set(prepared[snapshot] ?? [])
@@ -64,12 +67,17 @@ export function RecipeWeekCookingMode({
   }))
   async function downloadCookingProgress() {
     const expected = weekIdentity
+    const expectedProgress = progressIdentity
     try {
       const { exportRecipeCookingProgress } =
         await import('./recipeCookingProgress.ts')
-      if (latestWeekIdentity.current !== expected)
-        throw Error('Het gekozen weekmenu is gewijzigd. Download opnieuw.')
+      if (latestWeekIdentity.current !== expected ||
+          latestProgressIdentity.current !== expectedProgress)
+        throw Error('Je weekmenu of kookafvinkingen zijn tijdens de download gewijzigd. Download opnieuw.')
       const json = exportRecipeCookingProgress(assignments, recipes, finishedSteps, prepared)
+      if (latestWeekIdentity.current !== expected ||
+          latestProgressIdentity.current !== expectedProgress)
+        throw Error('Je kookafvinkingen zijn veranderd. Download de actuele voortgang opnieuw.')
       const url = URL.createObjectURL(new Blob([json], { type: 'application/json;charset=utf-8' }))
       try {
         const link = document.createElement('a')
