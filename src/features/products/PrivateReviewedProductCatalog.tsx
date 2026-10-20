@@ -1,17 +1,24 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import type { BasketTraceLine } from '../../domain/basket.ts'
+import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import { privatePackUnitRate, privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import { PrivateReviewedTwoStoreTable } from './PrivateReviewedTwoStoreTable.tsx'
 import { productSearchText } from './productSearchText.ts'
 import { privatePriceAgeNotice } from '../comparison/privatePriceAgeNotice.ts'
 import { privatePhysicalShoppingTick } from '../shopping-list/privatePhysicalShoppingTick.ts'
-import { freshReviewedBaskets, recentOwnCaptureInstant } from '../comparison/privateReviewedBasketBridge.ts'
+import { freshReviewedBaskets, recentOwnCaptureInstant, privateReviewedPairWithin24Hours } from '../comparison/privateReviewedBasketBridge.ts'
 import type { OwnStore, PrivateCaptureProgress, PrivateReviewedBaskets, PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
 import './privateReviewedProductCatalog.css'
 
 const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const shops: OwnStore[] = ['PLUS', 'DekaMarkt']
 type Matched = Extract<BasketTraceLine, { status: 'matched' }>
+// Reuse the Planner's admitted partial-source rows and same-demand pairing.
+// Its formatter never converts incomplete sources into whole-basket totals.
+const PlannerReviewedSourceLines = lazy(async () => {
+  const module = await import('../planner/PlannerReviewedSourceLines.tsx')
+  return { default: module.PlannerReviewedSourceLines }
+})
 
 /** Read-only personally reviewed basket sources, never an inferred live catalog. */
 export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOpenComparison, onOpenList, onOpenMixedRoute, onChooseRouteLine, onReviewIngredient, onImportSourceFiles, fileWarning, checked, onToggleChecked }: {
@@ -49,6 +56,11 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOp
   const currentReviewed = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', nowMs)
   const hasExpiredSource = shops.some(shop =>
     !!reviewed?.stores[shop] && !currentReviewed?.stores[shop])
+  const fullPlus = currentReviewed?.stores.PLUS
+  const fullDeka = currentReviewed?.stores.DekaMarkt
+  const fullPairReady = !!fullPlus && !!fullDeka &&
+    privateReviewedPairWithin24Hours(fullPlus, fullDeka) &&
+    compareFullBaskets({ baseline: fullPlus.basket, candidate: fullDeka.basket }).claimable
   // Partial observations are guidance; they are NEVER complete priced baskets.
   // The parent passes progress scoped to exactly the current physical week.
   const currentProgress = progress?.planKey === reviewed?.planKey || !reviewed
@@ -161,6 +173,12 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOp
         </article>
       })}
     </div>
+    {currentProgress && !fullPairReady && <Suspense fallback={<p role="status">
+      Bevestigde losse bronartikelen laden…</p>}>
+      <PlannerReviewedSourceLines progress={currentProgress} now={nowMs}
+        onOpenComparison={onOpenComparison} onReviewIngredient={onReviewIngredient}
+        hasCompleteComparison={fullPairReady} />
+    </Suspense>}
     {hasExpiredSource && <p role="status" className="private-reviewed-products__age">
       Eén of beide eerdere winkelopnames zijn verlopen of niet meer bruikbaar.
       De bijbehorende prijzen zijn verborgen. Herzie de originele bron in Vergelijk;
