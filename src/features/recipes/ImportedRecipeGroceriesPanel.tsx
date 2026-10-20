@@ -117,6 +117,8 @@ export function ImportedRecipeGroceriesPanel({
     new Set(plannerAssignments.map(assignment => assignment.day)).size === plannerAssignments.length
   const variantInputKey = JSON.stringify(selected.map(recipe =>
     [recipe, Object.hasOwn(portionsById, recipe.id) ? portionsById[recipe.id] : recipe.servings]))
+  const latestVariantInputKey = useRef(variantInputKey)
+  latestVariantInputKey.current = variantInputKey
   useEffect(() => setVariantPreview(null), [variantInputKey])
   const signature = JSON.stringify(selected.map(recipe => [
     recipe.id, portionsById[recipe.id] ?? recipe.servings, recipe.servings,
@@ -273,6 +275,28 @@ export function ImportedRecipeGroceriesPanel({
     } catch (cause) {
       setFeedback(cause instanceof Error ? cause.message :
         'Het complete weekmenu kon niet veilig worden geëxporteerd.')
+    }
+  }
+  async function downloadPrintableRecipeWeek() {
+    setFeedback('')
+    const expected = variantInputKey
+    try {
+      if (!plannerReadyForSelection || !plannerDaysDistinct ||
+        plannerAssignments.length === 0 || !list?.canCopy)
+        throw new Error('Controleer eerst alle recepten en unieke weekdagen.')
+      requireLatestOwnedRecipes()
+      const { exportRecipeWeekPrint } = await import('./exportRecipeWeekPrint.ts')
+      if (expected !== latestVariantInputKey.current)
+        throw new Error('Recepten of porties zijn intussen veranderd. Maak het plan opnieuw.')
+      requireLatestOwnedRecipes()
+      const html = exportRecipeWeekPrint(plannerAssignments, selected, plannerDays, list)
+      savePrivateFile('supa-conceptweekmenu-met-recepten.html', html,
+        'text/html;charset=utf-8')
+      setFeedback('Het printbare conceptweekmenu met bereidingen en volledige ongeprijsde lijst is lokaal gedownload. ' +
+        'Open de HTML op je apparaat om te printen. De gewone Planner is niet gewijzigd.')
+    } catch (cause) {
+      setFeedback(cause instanceof Error ? cause.message :
+        'Het printbare weekmenu kon niet veilig worden gemaakt.')
     }
   }
   const changedPortions = selected.filter(recipe =>
@@ -867,6 +891,11 @@ export function ImportedRecipeGroceriesPanel({
             disabled={!plannerReadyForSelection || !plannerAssignments.length || !plannerDaysDistinct}
             onClick={downloadPlanWithGroceries}>
             Download conceptweekmenu + volledige boodschappen (TXT)
+          </button>
+          <button type="button" className="ghost-button"
+            disabled={!plannerReadyForSelection || !plannerAssignments.length || !plannerDaysDistinct}
+            onClick={() => void downloadPrintableRecipeWeek()}>
+            Download printbaar weekmenu + bereidingsstappen (HTML)
           </button>
         </div>
       </section>
