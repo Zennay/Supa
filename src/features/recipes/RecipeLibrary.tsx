@@ -127,7 +127,9 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
   const [collectionSelected, setCollectionSelected] = useState<number[]>([])
   const [lastImportedIds, setLastImportedIds] = useState<string[]>([])
   const [groceryOpen, setGroceryOpen] = useState(false)
-  const [lastBulkImport, setLastBulkImport] = useState<{ afterRaw: string; ids: string[] } | null>(null)
+  const [lastBulkImport, setLastBulkImport] = useState<{
+    afterRaw: string; ids: string[]; kind: 'import' | 'variants'
+  } | null>(null)
   const [confirmBulkUndo, setConfirmBulkUndo] = useState(false)
   const [collectionPreview, setCollectionPreview] = useState<{
     source: string; format: 'plain' | 'jsonld' | 'html' | 'links'; libraryRaw: string | null; recipes: UserRecipeDraft[]; alreadyPresent: number
@@ -386,6 +388,14 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     const next = saveRecipeLibrary(window.localStorage, library,
       [...additions, ...library.recipes])
     setLibrary(next)
+    if (next.raw !== null) setLastBulkImport({
+      afterRaw: next.raw, ids: additions.map(recipe => recipe.id), kind: 'variants',
+    })
+    setConfirmBulkUndo(false)
+    setCollectionError('')
+    setCollectionMessage(additions.length + ' nieuwe portievarianten gezamenlijk bewaard. ' +
+      'De originele recepten en winkelprijzen zijn ongewijzigd. ' +
+      'Je kunt de laatste variantenbatch terugdraaien zolang ze niet zijn ingepland.')
     window.dispatchEvent(new Event('supa-recipes-changed'))
     return additions.map(recipe => {
       const saved = next.recipes.find(item => item.id === recipe.id)
@@ -698,7 +708,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       setLibrary(next)
       setLastImportedIds(additions.map(recipe => recipe.id))
       setGroceryOpen(true)
-      if (next.raw !== null) setLastBulkImport({ afterRaw: next.raw, ids: additions.map(recipe => recipe.id) })
+      if (next.raw !== null) setLastBulkImport({ afterRaw: next.raw, ids: additions.map(recipe => recipe.id), kind: 'import' })
       setConfirmBulkUndo(false)
       setCollectionPreview(null); setCollectionText('')
       setFilter('own'); setQuery('')
@@ -728,7 +738,8 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       setLibrary(next); setLastImportedIds([])
       setLastBulkImport(null); setConfirmBulkUndo(false)
       window.dispatchEvent(new Event('supa-recipes-changed'))
-      setCollectionMessage('De laatste bulkimport is in één keer teruggedraaid. Eerdere eigen recepten zijn behouden.')
+      setCollectionMessage('De laatste ' + (lastBulkImport.kind === 'variants' ? 'portievariantenbatch' : 'bulkimport') +
+        ' is in één keer teruggedraaid. Eerdere eigen recepten zijn behouden.')
     } catch (cause) {
       setCollectionError(cause instanceof Error ? cause.message : 'De import kon niet worden teruggedraaid.')
       setConfirmBulkUndo(false)
@@ -1076,15 +1087,17 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       {lastBulkImport && library.raw === lastBulkImport.afterRaw &&
         <div className="recipe-collection-undo" aria-label="Laatste bulkimport terugdraaien">
           {confirmBulkUndo ? <>
-            <strong>Alle {lastBulkImport.ids.length} zojuist geïmporteerde recepten verwijderen?</strong>
+            <strong>Alle {lastBulkImport.ids.length} zojuist {lastBulkImport.kind === 'variants'
+              ? 'gemaakte portievarianten' : 'geïmporteerde recepten'} verwijderen?</strong>
             <p>Bestaande recepten blijven bewaard. Is één van deze recepten gepland,
-              dan weigert Supa de verwijdering en blijft je volledige import staan.</p>
+              dan weigert Supa de verwijdering en blijft de volledige batch staan.</p>
             <div className="recipe-backup-panel__actions">
-              <button type="button" onClick={undoLastBulkRecipeImport}>Bevestig: draai import terug</button>
+              <button type="button" onClick={undoLastBulkRecipeImport}>Bevestig: draai batch terug</button>
               <button type="button" onClick={() => setConfirmBulkUndo(false)}>Annuleer</button>
             </div>
           </> : <button type="button" className="ghost-button" onClick={() => setConfirmBulkUndo(true)}>
-            Maak de laatste import van {lastBulkImport.ids.length} recepten ongedaan
+            Maak de laatste {lastBulkImport.kind === 'variants' ? 'portievariantenbatch' : 'receptenimport'}
+            {' '}van {lastBulkImport.ids.length} recepten ongedaan
           </button>}
         </div>}
       <small>Download maximaal 15 al gecontroleerde recepten per Markdownbestand. Grotere
