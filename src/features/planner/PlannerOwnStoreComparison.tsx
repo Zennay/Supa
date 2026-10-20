@@ -52,6 +52,12 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
     text: string
   } | null>(null)
 
+  const [copyableComparison, setCopyableComparison] = useState<{
+    plus: NonNullable<PrivateReviewedBaskets['stores']['PLUS']>
+    deka: NonNullable<PrivateReviewedBaskets['stores']['DekaMarkt']>
+    costRaw: string
+    text: string
+  } | null>(null)
   const [directImportMessage, setDirectImportMessage] = useState('')
   const [directDropActive, setDirectDropActive] = useState(false)
   function takeOwnSourceFiles(files: File[]) {
@@ -235,6 +241,7 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
   }
   async function copyPrivateComparison() {
     setDownloadMessage('')
+    setCopyableComparison(null)
     try {
       // A price can cross the seven-day boundary while this tab stays open.
       // Clipboard emission is a new action: re-admit both original sources
@@ -243,10 +250,6 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       const fresh = ownStoreWeekComparison(current)
       if (!current?.stores.PLUS || !current.stores.DekaMarkt || fresh.status !== 'comparable') {
         throw new Error('De winkelprijzen zijn verlopen of niet volledig gecontroleerd. Herzie eerst de originele bronnen.')
-      }
-      if (!navigator.clipboard?.writeText) {
-        setDownloadMessage('Kopiëren is hier niet beschikbaar. Gebruik de TXT-download voor dezelfde privévergelijking.')
-        return
       }
       // Read the clock again immediately before the clipboard operation.
       const latest = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
@@ -267,10 +270,26 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
         PLUS: currentAtCopy.stores.PLUS.observedAt,
         DekaMarkt: currentAtCopy.stores.DekaMarkt.observedAt,
       }, shownCost.trim() ? parsedSecondStopCents : null)
-      await navigator.clipboard.writeText(content)
-      setDownloadMessage('Eigen PLUS/Deka-weekvergelijking met bronmomenten en originele SKU’s gekopieerd. Deel alleen bewust je privébrondata.')
+      if (navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(content)
+          setDownloadMessage('Eigen PLUS/Deka-weekvergelijking met bronmomenten en originele SKU’s gekopieerd. Deel alleen bewust je privébrondata.')
+          return
+        } catch { /* Browsers can deny clipboard access, including on mobile. */ }
+      }
+      // Never expose a printable fallback when original reviewed sources have
+      // expired during an asynchronous clipboard permission prompt.
+      const current = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
+      if (current?.stores.PLUS !== currentAtCopy.stores.PLUS ||
+          current?.stores.DekaMarkt !== currentAtCopy.stores.DekaMarkt ||
+          ownStoreWeekComparison(current).status !== 'comparable') {
+        throw Error('Originele bronprijzen verlopen tijdens kopiëren.')
+      }
+      setCopyableComparison({ plus: current.stores.PLUS, deka: current.stores.DekaMarkt,
+        costRaw: shownCost, text: content })
+      setDownloadMessage('Klembordtoegang ontbreekt. Selecteer de actuele privévergelijking hieronder en kopieer handmatig.')
     } catch {
-      setDownloadMessage('Kopiëren is mislukt of niet toegestaan door je browser. Gebruik de TXT-download en controleer je originele winkelbronnen.')
+      setDownloadMessage('Deze vergelijking of de ingevulde kosten zijn ongeldig of verlopen. Controleer je eigen bronnen en kosten, of download opnieuw.')
     }
   }
   async function downloadPrivateCsv() {
@@ -858,6 +877,35 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
               : 'De fysieke hoeveelheden, verpakkingen of mandregels zijn niet gelijkwaardig bevestigd. Herzie de matches in Vergelijk.'}</p>
           <button type="button" className="ghost-button" onClick={onOpenComparison}>Vul ontbrekende brongegevens aan</button>
         </div> : null}
+    {copyableComparison && summary.status === 'comparable' &&
+      copyableComparison.plus === currentSources?.stores.PLUS &&
+      copyableComparison.deka === currentSources?.stores.DekaMarkt &&
+      copyableComparison.costRaw === shownCost &&
+      <label className="own-store-planner__copy-fallback">
+        Privé PLUS/Deka-prijsvergelijking met jouw eigen kosten: selecteer en kopieer
+        <textarea readOnly rows={12} value={copyableComparison.text}
+          onFocus={event => {
+            const current = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
+            if (current?.stores.PLUS !== copyableComparison.plus ||
+                current?.stores.DekaMarkt !== copyableComparison.deka ||
+                ownStoreWeekComparison(current).status !== 'comparable') {
+              setCopyableComparison(null)
+              setDownloadMessage('Bronopnames zijn verlopen: herzie originele winkelprijzen voor je deelt.')
+              return
+            }
+            event.currentTarget.select()
+          }}
+          onCopy={event => {
+            const current = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
+            if (current?.stores.PLUS !== copyableComparison.plus ||
+                current?.stores.DekaMarkt !== copyableComparison.deka ||
+                ownStoreWeekComparison(current).status !== 'comparable') {
+              event.preventDefault()
+              setCopyableComparison(null)
+              setDownloadMessage('Je bronopnames zijn verouderd: kopiëren geannuleerd.')
+            }
+          }} />
+      </label>}
     {downloadMessage && <p role="status" aria-live="polite">{downloadMessage}</p>}
   </section>
 }
