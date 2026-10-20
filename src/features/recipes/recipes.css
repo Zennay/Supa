@@ -236,3 +236,12 @@
 .recipe-collection-groceries__week .recipe-backup-panel__actions button:disabled {
   opacity:.55; cursor:not-allowed;
 }
+
+.recipe-collection-groceries__order { padding:12px; background:#fff; border:1px solid #c8ddce; border-radius:12px; }
+.recipe-collection-groceries__order ol { display:grid; gap:5px; margin:8px 0 0; padding-left:25px; }
+.recipe-collection-groceries__order li { padding:5px 0; }
+.recipe-collection-groceries__order li > span { display:inline-block; max-width:70%; overflow-wrap:anywhere; }
+.recipe-collection-groceries__order li > div { float:right; display:flex; gap:5px; }
+.recipe-collection-groceries__order button { min-width:35px; min-height:35px; border:1px solid #aac5b4;
+  background:#eff7f2; border-radius:8px; cursor:pointer; }
+.recipe-collection-groceries__order button:disabled { opacity:.35; cursor:not-allowed; }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { SavedRecipe } from './recipeLibrary.ts'
 import { toPlannerRecipe } from './plannerRecipes.ts'
 import { m2InitialPlan } from '../../data/m2Fixture.ts'
@@ -39,7 +39,28 @@ export function ImportedRecipeGroceriesPanel({
   const [checked, setChecked] = useState<Record<string, boolean>>({})
   const [pendingOnly, setPendingOnly] = useState(false)
   const [feedback, setFeedback] = useState('')
-  const selected = recipes.filter(recipe => selectedIds.includes(recipe.id))
+  // Preserve the actual user's selection order rather than imposing the
+  // library's saved-at order on the day plan and combined recipe exports.
+  const selected = selectedIds.flatMap(id => {
+    const recipe = recipes.find(item => item.id === id)
+    return recipe ? [recipe] : []
+  })
+  const incomingBatch = recentIds.join('\u001f')
+  const lastImportedBatch = useRef(incomingBatch)
+  useEffect(() => {
+    if (lastImportedBatch.current === incomingBatch) return
+    lastImportedBatch.current = incomingBatch
+    const available = [...new Set(recentIds)].filter(id =>
+      recipes.some(recipe => recipe.id === id)).slice(0, 15)
+    if (available.length) {
+      // A just-confirmed multi-recipe import should immediately display
+      // THOSE new recipes, not an unrelated previously-selected basket.
+      setSelectedIds(available)
+      setPortionsById({})
+      setChecked({})
+      setFeedback('Nieuwe recepten geselecteerd voor één ongeprijsde lijst.')
+    }
+  }, [incomingBatch, recentIds, recipes])
   const allPlannerReady = selected.length > 0 && selected.every(recipe =>
     !!toPlannerRecipe(recipe) && (Object.hasOwn(portionsById, recipe.id)
       ? portionsById[recipe.id] === recipe.servings : true))
@@ -71,6 +92,17 @@ export function ImportedRecipeGroceriesPanel({
     setSelectedIds(current => include
       ? [...new Set([...current, id])]
       : current.filter(value => value !== id))
+    setChecked({}); setFeedback('')
+  }
+  const moveRecipe = (id: string, direction: -1 | 1) => {
+    setSelectedIds(current => {
+      const index = current.indexOf(id)
+      const nextIndex = index + direction
+      if (index < 0 || nextIndex < 0 || nextIndex >= current.length) return current
+      const reordered = [...current]
+      ;[reordered[index], reordered[nextIndex]] = [reordered[nextIndex], reordered[index]]
+      return reordered
+    })
     setChecked({}); setFeedback('')
   }
   const search = query.trim().normalize('NFKC').toLocaleLowerCase('nl')
@@ -152,6 +184,21 @@ export function ImportedRecipeGroceriesPanel({
     </label>
     <small>{selected.length} van {recipes.length} recepten gekozen (maximaal 15).
       Met zoeken worden gekozen recepten niet ongemerkt verwijderd.</small>
+    {selected.length > 1 && <div className="recipe-collection-groceries__order"
+      role="group" aria-label="Volgorde van gekozen recepten">
+      <strong>Volgorde voor het weekmenu en de gecombineerde lijst</strong>
+      <ol>{selected.map((recipe, index) => <li key={recipe.id}>
+        <span>{recipe.title}</span>
+        <div>
+          <button type="button" disabled={index === 0}
+            aria-label={'Verplaats ' + recipe.title + ' omhoog'}
+            onClick={() => moveRecipe(recipe.id, -1)}>↑</button>
+          <button type="button" disabled={index === selected.length - 1}
+            aria-label={'Verplaats ' + recipe.title + ' omlaag'}
+            onClick={() => moveRecipe(recipe.id, 1)}>↓</button>
+        </div>
+      </li>)}</ol>
+    </div>}
     <div className="recipe-collection-groceries__recipes" role="group" aria-label="Recepten combineren">
       {visibleRecipes.map(recipe => <div key={recipe.id}
         className="recipe-collection-groceries__recipe">
