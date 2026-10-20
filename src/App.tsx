@@ -530,7 +530,8 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       </header>}
 
       <div className="content">
-        {(tab === 'planner' || tab === 'list') && unavailableSelections.length > 0 && (
+        {(['planner', 'list', 'basket', 'products'] as const).some(view => view === tab) &&
+          unavailableSelections.length > 0 && (
           <section className="attention-card" role="status" aria-live="polite">
             <strong>{unavailableSelections.length} receptkeuze(s) niet meer beschikbaar</strong>
             <p>
@@ -542,9 +543,15 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               Alle oude productmatches en eigen winkelprijzen voor een ander
               weekmenu blijven buiten de huidige prijsberekening.
             </p>
-            <button type="button" onClick={acceptMissingRecipeReplacements}>
-              Bewaar deze standaardrecepten in mijn weekmenu
-            </button>
+            <div className="week-share-actions">
+              <button type="button" onClick={acceptMissingRecipeReplacements}>
+                Bewaar deze standaardrecepten in mijn weekmenu
+              </button>
+              {tab !== 'planner' && <button type="button" className="ghost-button"
+                onClick={() => navigate('planner')}>
+                Bekijk de aangepaste week in Planner
+              </button>}
+            </div>
             {planRepairMessage && <p role="alert">{planRepairMessage}</p>}
           </section>
         )}
