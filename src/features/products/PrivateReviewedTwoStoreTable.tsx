@@ -61,6 +61,8 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
             .privateOneStorePrintableHtml({
               basket: receipt.basket, observedAt: receipt.observedAt,
               planKey: origin.planKey, checked,
+              budgetCents: validCustomWeekBudgetEuros(budget) === null ? null :
+                Math.round(Number(validCustomWeekBudgetEuros(budget)) * 100),
             })
       const latest = freshReviewedBaskets(reviewedRef.current,
         reviewedRef.current.planKey, Date.now())
@@ -178,7 +180,8 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
             DekaMarkt: current.stores.DekaMarkt.basket.store.id,
           },
           checked,
-        })
+        }, validCustomWeekBudgetEuros(budget) === null ? null :
+          Math.round(Number(validCustomWeekBudgetEuros(budget)) * 100))
         // The paired sources must still be current after formatting.
         const final = freshReviewedBaskets(reviewedRef.current,
           reviewedRef.current.planKey, Date.now())

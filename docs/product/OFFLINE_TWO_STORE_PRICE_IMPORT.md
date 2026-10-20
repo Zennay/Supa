@@ -66,6 +66,10 @@ hun bronmomenten maximaal 24 uur uiteen liggen, verschijnen in **Producten**
 de complete PLUS/DekaMarkt-weekmandjes. Dezelfde canonieke hele-pakkenvergelijking
 levert de bedragen, de goedkopere winkel en de verschillen per ingrediënt.
 
+In de offline HTML-afdrukken toont Supa ook het ingestelde Planner-weekbudget
+(alleen bij een geldig bedrag) en hoeveel het originele volledige mandje erboven
+of eronder ligt. Afgevinkte bedragen zijn niet de betaalde kassasom.
+
 De TXT-/klembord-/deeltekst neemt nu ook de oorspronkelijke afvinkstatus per winkel over;
 de winkelprijzen blijven altijd de volledige originele fysieke mand, niet alleen de nog
 open boodschappen. Afvinken is geen betalingsbewijs.

@@ -18,6 +18,7 @@ export function privateOneStorePrintableHtml(input: {
   observedAt: string
   planKey: string
   checked: Readonly<Record<string, boolean>>
+  budgetCents?: number | null
 }): string {
   const { basket, observedAt, planKey, checked } = input
   if (basket.store.id !== 'PLUS' && basket.store.id !== 'DekaMarkt')
@@ -48,6 +49,16 @@ export function privateOneStorePrintableHtml(input: {
       '</small><strong>' + escape(euro.format(line.lineTotalCents / 100)) +
       ' voor je weekvraag</strong></td></tr>'
   }).join('')
+  const budgetCents = input.budgetCents
+  const budget = Number.isSafeInteger(budgetCents) && budgetCents !== null &&
+    budgetCents !== undefined && budgetCents >= 0
+    ? '<section><h2>Mijn Planner-weekbudget</h2><p>Weekbudget: ' +
+      escape(euro.format(budgetCents / 100)) + '</p><p><strong>' +
+      (basket.totalCents > budgetCents
+        ? escape(euro.format((basket.totalCents - budgetCents) / 100)) + ' boven budget'
+        : escape(euro.format((budgetCents - basket.totalCents) / 100)) + ' binnen budget') +
+      '</strong> voor je volledige originele mandje. Dit is geen kassabedrag.</p></section>'
+    : ''
   const remaining = basket.lines.reduce((sum, line) =>
     line.status === 'matched' && !done.has(line.id) ? sum + line.lineTotalCents : sum, 0)
   return '<!doctype html><html lang="nl"><head><meta charset="utf-8">' +
@@ -68,7 +79,7 @@ export function privateOneStorePrintableHtml(input: {
     '<p><small>Eigen bronmoment: ' + escape(observedAt) + '. ' +
     'Alleen persoonlijk gecontroleerde artikelen. De andere winkelprijs is ' +
     'niet afgeleid; een prijsverschil of besparing is onbekend.</small></p>' +
-    '<table><thead><tr><th>Status</th><th>Ingrediënt</th><th>Origineel product</th>' +
+    budget + '<table><thead><tr><th>Status</th><th>Ingrediënt</th><th>Origineel product</th>' +
     '<th>Hele verpakkingsprijs</th></tr></thead><tbody>' + rows +
     '</tbody></table><p><small>Alleen lokaal geaccepteerde bronregels. ' +
     'Geen kassagarantie, onafhankelijke winkelvalidatie of retailerrechten.' +

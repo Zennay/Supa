@@ -15,6 +15,7 @@ export function privateTwoStorePrintableHtml(
     storeIds: { PLUS: string; DekaMarkt: string }
     checked: Readonly<Record<string, boolean>>
   },
+  budgetCents: number | null = null,
 ): string {
   const esc = (value: string): string => value.replace(/&/gu, '&amp;')
     .replace(/</gu, '&lt;').replace(/>/gu, '&gt;')
@@ -48,6 +49,20 @@ export function privateTwoStorePrintableHtml(
     ? comparison.cheapest + ' is ' + money.format(comparison.differenceCents / 100) +
       ' goedkoper voor het volledige mandje met hele verpakkingen.'
     : 'Beide complete mandjes hebben dezelfde prijs.'
+  const budget = Number.isSafeInteger(budgetCents) && budgetCents !== null &&
+    budgetCents >= 0
+    ? '<section><h2>Planner-weekbudget</h2><p>Ingesteld: ' +
+      euro(budgetCents) + '</p><p>PLUS: ' +
+      (comparison.plusCents > budgetCents
+        ? euro(comparison.plusCents - budgetCents) + ' boven budget'
+        : euro(budgetCents - comparison.plusCents) + ' binnen budget') +
+      ' · DekaMarkt: ' +
+      (comparison.dekaCents > budgetCents
+        ? euro(comparison.dekaCents - budgetCents) + ' boven budget'
+        : euro(budgetCents - comparison.dekaCents) + ' binnen budget') +
+      '.</p><small>Alleen het complete oorspronkelijke weekmandje; niet je '
+      + 'afgevinkte aankopen of werkelijk kassabedrag.</small></section>'
+    : ''
   const route = comparison.mixedRoute
   const extra = route
     ? '<section><h2>Zelfgekozen combinatie</h2><p>Laagste productkosten bij ' +
@@ -83,7 +98,8 @@ export function privateTwoStorePrintableHtml(
     '<p><strong>' + esc(winner) + '</strong></p>' +
     '<p><small>Eigen PLUS-bronmoment: ' + esc(moments.PLUS) +
     '<br>Eigen DekaMarkt-bronmoment: ' + esc(moments.DekaMarkt) +
-    '</small></p></section><section><h2>Dezelfde fysieke weekvraag per ingrediënt</h2>' +
+    '</small></p></section>' + budget +
+    '<section><h2>Dezelfde fysieke weekvraag per ingrediënt</h2>' +
     '<table><thead><tr><th>Ingrediënt</th><th>PLUS</th><th>DekaMarkt</th>' +
     '<th>Hele-pakverschil</th></tr></thead><tbody>' + lines + '</tbody></table></section>' +
     extra + '<p><small>Volledige eigen bronmomenten moeten binnen 24 uur vallen en ' +
