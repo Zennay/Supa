@@ -621,6 +621,47 @@ export function OfflineReviewedWorkbench({
     }
   }
 
+  async function downloadMissingPreviewCsv(delimiter: ',' | ';') {
+    if (!currentPreview || busy) return
+    const preview = currentPreview
+    const week = captureWeek
+    const revision = importRevision.current
+    try {
+      const needs = {
+        PLUS: missingPreviewCaptureNeeds('PLUS', Date.now()),
+        DekaMarkt: missingPreviewCaptureNeeds('DekaMarkt', Date.now()),
+      }
+      if (!needs.PLUS.length && !needs.DekaMarkt.length)
+        throw Error('Geen ontbrekende bronartikelen voor een nieuw invulblad.')
+      // Canonical nine-column CSV producer: its SKU, amount, availability,
+      // observedAt and price cells deliberately stay UNOBSERVED.
+      const { selectiveTwoStoreCaptureCsv } = await import('../planner/selectiveTwoStoreCapture.ts')
+      if (revision !== importRevision.current || week !== captureWeekRef.current ||
+          latestCapturePreview.current !== preview ||
+          JSON.stringify(needs) !== JSON.stringify({
+            PLUS: missingPreviewCaptureNeeds('PLUS', Date.now()),
+            DekaMarkt: missingPreviewCaptureNeeds('DekaMarkt', Date.now()),
+          })) throw Error('De opnames of weekbehoeften zijn gewijzigd. Maak het actuele blad opnieuw.')
+      const content = selectiveTwoStoreCaptureCsv(needs, delimiter)
+      const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-ontbrekende-plus-deka-' +
+          (delimiter === ';' ? 'spreadsheet' : 'import') + '.csv'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setWeekExportMessage('Leeg origineel invulblad voor ' + needs.PLUS.length +
+        ' PLUS- en ' + needs.DekaMarkt.length +
+        ' DekaMarkt-artikelen opgeslagen. Vul uitsluitend echte SKU, verpakking, prijs, ' +
+        'beschikbaarheid en bronmoment in; importeer daarna opnieuw in Vergelijk.')
+    } catch (error) {
+      setWeekExportMessage(error instanceof Error ? error.message :
+        'Kon het ontbrekende invul-CSV niet veilig maken.')
+    }
+  }
+
   async function shareMissingFromPreview(action: 'copy' | 'share') {
     if (!currentPreview || busy) return
     setPortableMissingGuide(null)
@@ -2633,6 +2674,14 @@ export function OfflineReviewedWorkbench({
                   <button type="button" className="ghost-button" disabled={busy}
                     onClick={downloadMissingFromPreview}>
                     Download alleen ontbrekende winkelproducten (TXT)
+                  </button>
+                  <button type="button" className="ghost-button" disabled={busy}
+                    onClick={() => { void downloadMissingPreviewCsv(';') }}>
+                    Download Excel-invulblad voor ontbrekende PLUS/Deka (CSV)
+                  </button>
+                  <button type="button" className="ghost-button" disabled={busy}
+                    onClick={() => { void downloadMissingPreviewCsv(',') }}>
+                    Download import-CSV voor ontbrekende PLUS/Deka
                   </button>
                   <button type="button" className="ghost-button" disabled={busy}
                     onClick={() => { void shareMissingFromPreview('copy') }}>
