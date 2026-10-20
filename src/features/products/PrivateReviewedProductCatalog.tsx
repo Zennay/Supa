@@ -266,6 +266,14 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOp
                     }
                     onReviewIngredient(shop, item.id)
                   }}>Controleer dit artikel</button>
+                  {item.task === 'Ontbrekende bronprijs' && <button type="button" onClick={() => {
+                    if (!recentOwnCaptureInstant(partial!.observedAt, Date.now())) {
+                      setCheckMessage('Bronopname verlopen; herzie het oorspronkelijke product.')
+                      return
+                    }
+                    const message = onAddMissingToOwnList(shop, [{ id: item.id, label: item.label }])
+                    if (message) setCheckMessage(message)
+                  }}>Bewaar alleen dit ingrediënt ongeprijsd op Lijst</button>}
                 </li>)}</ul>
                 {queued.length > 4 && <button type="button"
                   aria-expanded={expandedMatchShop === shop}
