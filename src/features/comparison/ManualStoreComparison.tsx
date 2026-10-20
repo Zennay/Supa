@@ -18,7 +18,7 @@ import './manualStoreComparison.css'
 const UNIT_LABEL: Record<string, string> = {
   g: 'gram', kg: 'kg', ml: 'ml', l: 'liter', piece: 'stuks',
 }
-const tableHeader = 'ingredientId\twinkel\tproduct\tverpakking\teenheid\tprijs'
+const tableHeader = 'ingredientId\twinkel\tproduct\tverpakking\teenheid\tmultipackAantal\tprijs'
 function safeTableCell(value: string) {
   // The plain TSV route must guard the same invisible-prefix and NFKC
   // spreadsheet formula cases as the existing private CSV exports.
@@ -36,6 +36,7 @@ function tabularData(needs: readonly ManualNeed[], entries: ManualEntries): stri
         safeTableCell(quote?.product ?? ''),
         safeTableCell(quote?.packAmount ?? ''),
         quote?.packUnit ?? '',
+        safeTableCell(quote?.packCount ?? ''),
         safeTableCell(quote?.price ?? ''),
       ].join('\t')
     })),
@@ -51,17 +52,18 @@ function readPastedTable(text: string, needs: readonly ManualNeed[]): ManualEntr
   const used = new Set<string>()
   for (const line of lines.slice(1)) {
     const cells = line.split('\t')
-    if (cells.length !== 6) throw new Error('Gebruik zes tabgescheiden kolommen.')
-    const [id, shop, product, packAmount, unit, price] = cells
+    if (cells.length !== 7) throw new Error('Gebruik zeven tabgescheiden kolommen inclusief het aantal eenheden per multipack.')
+    const [id, shop, product, packAmount, unit, packCount, price] = cells
     if (!expected.has(id) || (shop !== 'PLUS' && shop !== 'DekaMarkt') ||
         (unit !== '' && !manualCompatibleUnits(expected.get(id)!.unit).includes(unit as Exclude<ManualQuote['packUnit'], ''>)) ||
-        product.length > 160 || packAmount.length > 32 || price.length > 20) {
+        product.length > 160 || packAmount.length > 32 || price.length > 20 ||
+        (packCount !== '' && !/^(?:[1-9]\d{0,2}|1000)$/.test(packCount))) {
       throw new Error('De tabel bevat een onbekend product, winkel of eenheid.')
     }
     const key = manualQuoteKey(shop as ManualRetailer, id)
     if (used.has(key)) throw new Error('Dubbele productregel voor een winkel.')
     used.add(key)
-    entries[key] = { product, packAmount, packUnit: unit as ManualQuote['packUnit'], price }
+    entries[key] = { product, packAmount, packUnit: unit as ManualQuote['packUnit'], packCount, price }
   }
   return entries
 }
@@ -90,7 +92,7 @@ export function ManualStoreComparison({
     const key = manualQuoteKey(store, need.ingredientId)
     setEntries(previous => {
       const quote = previous[key] ?? {
-        product: '', packAmount: '', packUnit: '', price: '',
+        product: '', packAmount: '', packUnit: '', packCount: '', price: '',
       }
       return { ...previous, [key]: { ...quote, [field]: value } }
     })
@@ -114,7 +116,7 @@ export function ManualStoreComparison({
         <h2>{header}</h2>
         <p>
           Vergelijk exact dezelfde geplande ingrediënten bij PLUS en DekaMarkt.
-          Vul per winkel het <strong>gekozen product, de verpakkingsgrootte en de prijs</strong> in.
+          Vul per winkel het <strong>gekozen product, de inhoud per eenheid, het aantal eenheden in de multipack en de prijs van de hele multipack</strong> in.
           Supa berekent hoeveel hele verpakkingen nodig zijn; er worden geen winkelprijzen verzonnen of opgehaald.
         </p>
         <p className="manual-compare__notice">
@@ -163,7 +165,7 @@ export function ManualStoreComparison({
           </div>
           {showTable && (
             <div className="manual-compare__table">
-              <p>Kopieer de eerste tabel naar Excel of een spreadsheet, vul product, verpakking en prijs in en plak de volledige tabel terug. Gebruik tabgescheiden kolommen; eenheden en ingrediënten moeten overeenkomen.</p>
+              <p>Kopieer de eerste tabel naar Excel of een spreadsheet. Vul product, fysieke hoeveelheid per eenheid, het aantal eenheden per multipack en de prijs van de hele multipack in. Plak daarna de volledige tabgescheiden tabel terug; eenheden en ingrediënten moeten overeenkomen.</p>
               <label>Huidige tabel
                 <textarea readOnly rows={7} value={tabularData(needs, entries)}
                   onFocus={event => event.currentTarget.select()} />
@@ -211,7 +213,13 @@ export function ManualStoreComparison({
                               ))}
                             </select>
                           </label>
-                          <label>Prijs per verpakking (€)
+                          <label>Eenheden per geprijsde multipack
+                            <input type="number" inputMode="numeric" min="1" max="1000" step="1"
+                              placeholder="Bijv. 3 voor 3 × 200 g"
+                              value={quote?.packCount ?? ''}
+                              onChange={event => setQuote(row, shop, 'packCount', event.target.value)} />
+                          </label>
+                          <label>Prijs voor de hele multipack (€)
                             <input type="text" inputMode="decimal" maxLength={20} placeholder="bijv. 1,79"
                               value={quote?.price ?? ''}
                               onChange={event => setQuote(row, shop, 'price', event.target.value)} />
