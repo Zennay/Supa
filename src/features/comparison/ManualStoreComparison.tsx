@@ -1,5 +1,5 @@
 import { euro as exactEuro } from '../../lib/money.ts'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ManualLine } from '../../domain/manualStoreComparison.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../domain/basket.ts'
@@ -14,6 +14,7 @@ import {
   type ManualRetailer,
 } from '../../domain/manualStoreComparison.ts'
 import { manualTripCoverage, privateManualShoppingTripText } from './privateManualShoppingTrip.ts'
+import { readPrivateManualSession, savePrivateManualSession, clearPrivateManualSession } from './privateManualCompareSession.ts'
 import './manualStoreComparison.css'
 
 const UNIT_LABEL: Record<string, string> = {
@@ -119,9 +120,23 @@ export function ManualStoreComparison({
     try { return aggregatePlanIngredients(plan, recipes, activeDays) }
     catch { return [] }
   }, [plan, recipes, activeDays])
-  const [entries, setEntries] = useState<ManualEntries>({})
-  const [entriesDemandSignature, setEntriesDemandSignature] = useState<string | null>(null)
-  const [recordedNeeds, setRecordedNeeds] = useState<readonly ManualNeed[]>([])
+  // Keep unsaved work when the user switches between Planner and Vergelijk.
+  // This is RAM only, scoped to this browser tab; no device storage consent is implied.
+  const [initialSession] = useState(readPrivateManualSession)
+  const [entries, setEntries] = useState<ManualEntries>(() => initialSession?.entries ?? {})
+  const [entriesDemandSignature, setEntriesDemandSignature] = useState<string | null>(
+    () => initialSession?.demandSignature ?? null,
+  )
+  const [recordedNeeds, setRecordedNeeds] = useState<readonly ManualNeed[]>(
+    () => initialSession?.recordedNeeds ?? [],
+  )
+  useEffect(() => {
+    if (Object.keys(entries).length === 0) {
+      clearPrivateManualSession()
+    } else {
+      savePrivateManualSession({ entries, demandSignature: entriesDemandSignature, recordedNeeds })
+    }
+  }, [entries, entriesDemandSignature, recordedNeeds])
   const [importText, setImportText] = useState('')
   const [importMessage, setImportMessage] = useState('')
   const [showTable, setShowTable] = useState(false)
@@ -345,6 +360,8 @@ export function ManualStoreComparison({
           Alleen privéberekening op basis van jouw invoer. Geen geverifieerde winkelprijzen,
           voorraad, productgelijkheid of bewezen besparing. Invoer wordt niet naar een server verzonden.
           Zonder volledige gegevens voor beide winkels tonen we geen totaal of prijsverschil.
+          Conceptinvoer blijft tijdelijk in het geheugen van dit tabblad tijdens navigeren;
+          sluit je het tabblad, dan is die invoer weg tenzij je zelf een TSV-bestand downloadt.
         </p>
       </div>
 
@@ -372,6 +389,7 @@ export function ManualStoreComparison({
       {!summary ? (
         <p role="status" className="attention-card">
           Kies eerst geldige maaltijden in je planner. Dan verschijnen hier de benodigde ingrediënten.
+          Eventuele oude eigen winkelinvoer blijft alleen in dit browsertabblad beschikbaar tot je deze wist.
         </p>
       ) : (
         <>
