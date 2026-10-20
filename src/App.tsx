@@ -12,6 +12,11 @@ const BasketView = lazy(async () => {
   return { default: module.BasketView }
 })
 import { ShoppingListView } from './features/shopping-list/ShoppingListView'
+import type { UnpricedShoppingNote } from './features/shopping-list/ManualShoppingNotes.tsx'
+const ManualShoppingNotes = lazy(async () => {
+  const module = await import('./features/shopping-list/ManualShoppingNotes.tsx')
+  return { default: module.ManualShoppingNotes }
+})
 import { PrivateSourceShoppingList } from './features/shopping-list/PrivateSourceShoppingList.tsx'
 import './features/shopping-list/listSourceFilePicker.css'
 const PartialReviewedShoppingList = lazy(async () => {
@@ -158,6 +163,8 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [ownPriceImportSignal, setOwnPriceImportSignal] = useState(0)
   const [incomingPriceFiles, setIncomingPriceFiles] = useState<PrivateSourceFileHandoff | null>(null)
   const [listSourceFileWarning, setListSourceFileWarning] = useState('')
+  // Separate, explicitly unpriced human notes. Never counted in shop totals.
+  const [manualShoppingNotes, setManualShoppingNotes] = useState<UnpricedShoppingNote[]>([])
   const nextPriceFileSerial = useRef(0)
   const [privateReviewed, setPrivateReviewed] = useState<PrivateReviewedBaskets | null>(null)
   const [privateCaptureProgress, setPrivateCaptureProgress] = useState<PrivateCaptureProgress | null>(null)
@@ -941,6 +948,15 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
                 }}
               />
             </Suspense>
+          </div>
+        )}
+        {visitedList && (
+          <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
+            <section className="screen" aria-label="Eigen artikelen naast je boodschappenlijst">
+              <Suspense fallback={<p role="status">Eigen ongeprijsde boodschappen laden…</p>}>
+                <ManualShoppingNotes notes={manualShoppingNotes} setNotes={setManualShoppingNotes} />
+              </Suspense>
+            </section>
           </div>
         )}
         {tab === 'list' && livePrivateReviewed && designProductIds.length > 0 && (
