@@ -72,6 +72,15 @@ function provenanceMatches(source, observation) {
 function ingestSafeReviewedEvidence(record) {
   // Internal only: record already detached at the public entrypoint.
   const { key, parser } = validatedInput(record)
+  // The product adapters must never classify a fictional future-dated capture
+  // as historical price evidence. Apply the same conservative 60s physical
+  // clock tolerance already used by catalog/offers to ALL six source kinds.
+  // An absent/unparseable clock cannot authorize an archived observation.
+  const capturedAt = record.source.capturedAt
+  const capturedMs = typeof capturedAt === 'string' ? Date.parse(capturedAt) : NaN
+  if (!Number.isFinite(capturedMs) || capturedMs > Date.now() + 60_000) {
+    return { key, accepted: false, reason: 'invalid-or-future-capture', observations: [] }
+  }
   let parsed
   try {
     parsed = parser(record)
