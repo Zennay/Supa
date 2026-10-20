@@ -1,0 +1,18 @@
+[Unit]
+Description=Supa owned HTTPS echo origin (local-only, requires trusted reverse proxy)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Supa
+ExecStart=/usr/bin/env node %h/Supa/scripts/retailer-proxy-owned-echo.mjs
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=read-only
+ProtectSystem=strict
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=default.target
