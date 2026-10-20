@@ -94,7 +94,12 @@ function evaluatedQuote(need: ManualNeed, quote: ManualQuote | undefined) {
   if (need.amount === null || !Number.isFinite(need.amount) || need.amount <= 0 ||
       name.length < 2 || name.length > 160 || /[\u0000-\u001f\u007f]/u.test(name) ||
       !unitsFor(need.unit).includes(quote.packUnit as MatchUnit) ||
-      amount === null || count === null || cents === null) {
+      amount === null || count === null || cents === null ||
+      // An indivisible item cannot form a valid fractional shopping demand
+      // or a fractional physical pack, even if decimal arithmetic could round
+      // the resulting number of packages up.
+      (need.unit === 'piece' && !Number.isSafeInteger(need.amount)) ||
+      (quote.packUnit === 'piece' && !Number.isSafeInteger(amount))) {
     return { state: 'invalid' as const, packs: null, lineCents: null, unitPriceCents: null }
   }
   const packs = calculateDecimalPackCount(

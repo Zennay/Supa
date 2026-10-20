@@ -584,7 +584,13 @@ export function ManualStoreComparison({
                               `${quote?.packAmount} ${UNIT_LABEL[quote?.packUnit ?? ''] ?? quote?.packUnit} ` +
                               `· te kopen totaal ${exactEuro.formatCents(state.lineCents!)}`
                             : state.state === 'invalid'
-                              ? 'Controleer product, verpakking, eenheid en prijs.'
+                              ? row.requiredUnit === 'piece' && row.requiredAmount !== null &&
+                                !Number.isSafeInteger(row.requiredAmount) ||
+                                quote?.packUnit === 'piece' && quote.packAmount.trim() !== '' &&
+                                Number.isFinite(Number(quote.packAmount.replace(',', '.'))) &&
+                                !Number.isSafeInteger(Number(quote.packAmount.replace(',', '.')))
+                                ? 'Stuks moeten hele aantallen zijn. Corrigeer de receptvraag of de fysieke verpakking.'
+                                : 'Controleer product, verpakking, eenheid en prijs.'
                               : 'Nog geen prijsberekening.'}
                           {state.state === 'complete' && state.unitPriceCents !== null &&
                             ` · ${exactEuro.formatCents(state.unitPriceCents)} per ${row.requiredUnit === 'piece' ? 'stuk' : row.requiredUnit === 'g' || row.requiredUnit === 'kg' ? 'kg' : 'liter'}`}
