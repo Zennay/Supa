@@ -34,7 +34,9 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   const reviewedRef = useRef(reviewed)
   reviewedRef.current = reviewed
   const [receiptMessage, setReceiptMessage] = useState('')
-  const [extraStopCost, setExtraStopCost] = useState('')
+  // Temporary trip costs belong to ONE original physical basket pair.
+  // Never carry a previous week's travel scenario into newly imported prices.
+  const [costIntent, setCostIntent] = useState<{ pair: string; raw: string } | null>(null)
   const [shopAdvantage, setShopAdvantage] = useState<'all' | 'plus' | 'deka' | 'equal'>('all')
   async function downloadSingle(shop: OwnStore, kind: 'csv' | 'txt') {
     const origin = freshReviewedBaskets(reviewedRef.current, reviewedRef.current.planKey, Date.now())
@@ -249,6 +251,10 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   const splitTrip = !!mix && mix.lines.some(line => line.store === 'PLUS') &&
     mix.lines.some(line => line.store === 'DekaMarkt')
   // Private user-entered scenario, not an observed retailer price.
+  const pairKey = JSON.stringify([
+    reviewed.planKey, plus.observedAt, deka.observedAt, plus.basket, deka.basket,
+  ])
+  const extraStopCost = costIntent?.pair === pairKey ? costIntent.raw : ''
   const costCents = splitTrip ? parsePrivateExtraVisitCostCents(extraStopCost.trim()) : null
   const costInvalid = splitTrip && extraStopCost.trim() !== '' && costCents === null
   const tripTotalCents = splitTrip && costCents !== null && mix
@@ -346,7 +352,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         <label>Zelf opgegeven extra kosten van tweede winkelstop (€)
           <input type="text" inputMode="decimal" maxLength={9}
             placeholder="Bijv. 2,50 · leeg = onbekend" value={extraStopCost}
-            onChange={event => setExtraStopCost(event.currentTarget.value)} />
+            onChange={event => setCostIntent({ pair: pairKey, raw: event.currentTarget.value })} />
         </label>
         {costInvalid && <p role="alert">Voer € 0,00–€ 1.000,00 in, met maximaal twee decimalen.</p>}
         {tripTotalCents === null
