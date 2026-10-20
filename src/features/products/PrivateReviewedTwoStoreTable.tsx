@@ -36,7 +36,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   reviewedRef.current = reviewed
   const [receiptMessage, setReceiptMessage] = useState('')
   const [shopAdvantage, setShopAdvantage] = useState<'all' | 'plus' | 'deka' | 'equal'>('all')
-  async function downloadSingle(shop: OwnStore, kind: 'csv' | 'txt' | 'html') {
+  async function downloadSingle(shop: OwnStore, kind: 'csv' | 'txt' | 'html' | 'open-txt') {
     const origin = freshReviewedBaskets(reviewedRef.current, reviewedRef.current.planKey, Date.now())
     const receipt = origin?.stores[shop]
     if (!receipt || !origin) {
@@ -53,9 +53,10 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
             basket: receipt.basket, observedAt: receipt.observedAt,
             done,
           })
-         : kind === 'txt'
+         : kind === 'txt' || kind === 'open-txt'
           ? privateSingleStoreShoppingText({
               basket: receipt.basket, observedAt: receipt.observedAt, done,
+              onlyOpen: kind === 'open-txt',
             })
           : (await import('./privateOneStorePrintableHtml.ts'))
             .privateOneStorePrintableHtml({
@@ -74,21 +75,24 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       try {
         const a = document.createElement('a')
         a.href = url
-        a.download = 'supa-eigen-' + shop.toLowerCase() + '-weekmand.' + kind
+        a.download = 'supa-eigen-' + shop.toLowerCase() +
+          (kind === 'open-txt' ? '-nog-te-kopen.txt' : '-weekmand.' + kind)
         document.body.append(a)
         try { a.click() } finally { a.remove() }
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
       const paired = !!latest?.stores.PLUS && !!latest.stores.DekaMarkt &&
         privateReviewedPairWithin24Hours(latest.stores.PLUS, latest.stores.DekaMarkt) &&
         ownStoreWeekComparison(latest).status === 'comparable'
-      setReceiptMessage(shop + ': eigen volledig weekmandje bewaard. ' +
+      setReceiptMessage(shop + (kind === 'open-txt'
+        ? ': alleen open artikelen bewaard. '
+        : ': eigen volledig weekmandje bewaard. ') +
         (paired ? 'Ook de tweede winkel heeft een afzonderlijke, complete bron.' :
           'Een compleet prijsverschil met de andere winkel is nog niet beschikbaar.'))
     } catch {
       setReceiptMessage('Download van eigen ' + shop + '-mand mislukt. Herzie de bron.')
     }
   }
-  async function handoffSingle(shop: OwnStore, action: 'copy' | 'share') {
+  async function handoffSingle(shop: OwnStore, action: 'copy' | 'share' | 'copy-open') {
     const current = freshReviewedBaskets(reviewedRef.current,
       reviewedRef.current.planKey, Date.now())
     const source = current?.stores[shop]
@@ -104,18 +108,21 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       // clipboard/native share. No implicit upload or retailer fetch.
       const body = privateSingleStoreShoppingText({
         basket: source.basket, observedAt: source.observedAt, done,
+        onlyOpen: action === 'copy-open',
       })
       const latest = freshReviewedBaskets(reviewedRef.current,
         reviewedRef.current.planKey, Date.now())
       if (latest?.stores[shop] !== source || latest.planKey !== current.planKey)
         throw Error('Eigen winkelbron is veranderd.')
-      if (action === 'copy') {
+      if (action === 'copy' || action === 'copy-open') {
         if (!navigator.clipboard?.writeText) {
           setReceiptMessage('Klembord niet beschikbaar. Download je eigen winkel-TXT.')
           return
         }
         await navigator.clipboard.writeText(body)
-        setReceiptMessage(shop + ': eigen lijst inclusief afvinkingen gekopieerd.')
+        setReceiptMessage(shop + (action === 'copy-open'
+          ? ': alleen nog te kopen gekopieerd.'
+          : ': eigen lijst inclusief afvinkingen gekopieerd.'))
       } else {
         if (!navigator.share) {
           setReceiptMessage('Delen niet beschikbaar. Download je eigen winkel-TXT.')
@@ -322,11 +329,17 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
               <button type="button" onClick={() => { void downloadSingle(shop, 'txt') }}>
                 Bewaar mijn {shop}-lijst (TXT)
               </button>
+              <button type="button" onClick={() => { void downloadSingle(shop, 'open-txt') }}>
+                Bewaar alleen nog te kopen bij {shop} (TXT)
+              </button>
               <button type="button" onClick={() => { void downloadSingle(shop, 'html') }}>
                 Print mijn {shop}-weekmand (HTML)
               </button>
               <button type="button" onClick={() => { void handoffSingle(shop, 'copy') }}>
                 Kopieer mijn {shop}-lijst inclusief afvinkingen
+              </button>
+              <button type="button" onClick={() => { void handoffSingle(shop, 'copy-open') }}>
+                Kopieer alleen nog te kopen bij {shop}
               </button>
               <button type="button" onClick={() => { void handoffSingle(shop, 'share') }}>
                 Deel mijn {shop}-lijst via apparaat

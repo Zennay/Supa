@@ -66,6 +66,13 @@ producten en de *nog op de lijst* openstaande hele-pakkosten. De volledige
 mandtotalen blijven onveranderd: dit openstaande bedrag is geen kassabedrag
 en afvinken is geen prijs- of betalingsbewijs.
 
+Gebruik **Bewaar alleen nog te kopen (TXT)** of **Kopieer alleen nog te
+kopen** voor een compacte persoonlijke winkelroute. Deze tekst bevat
+alleen originele nog niet afgevinkte productregels en de prijscontext van
+de oorspronkelijke complete bron. Als alles is afgevinkt meldt de lijst
+expliciet dat er niets meer openstaat. De originele brondata, complete
+winkelmandtotalen en bevestigde productmatching worden nooit aangepast.
+
 Ook nadat beide volledige winkelbronnen vergelijkbaar zijn, blijft in
 **Producten → Zelfde weekmandje → Ik ga naar één winkel** de zelfstandige
 PLUS- of DekaMarkt-weeklijst bereikbaar. Je kunt elk winkelmandje afzonderlijk
