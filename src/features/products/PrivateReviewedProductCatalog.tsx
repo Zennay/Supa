@@ -223,8 +223,8 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, captureNeeds
         onImport={onImportSourceFiles}
         onRecapture={() => onOpenComparison()}
         onReviewIngredient={onReviewIngredient}
-        hasDemand={true}
-        needs={[]} />
+        hasDemand={captureNeeds.length > 0}
+        needs={captureNeeds} />
     </Suspense>}
     <div className="private-reviewed-products__pending" aria-label="Brondekking en openstaande productmatches">
       {shops.map(shop => {
