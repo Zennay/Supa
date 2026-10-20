@@ -132,3 +132,16 @@ background:#e7f4eb;color:#255336;font-weight:650}
 }
 .private-reviewed-products__missing li { padding:.25rem 0; }
 .private-reviewed-products__missing button { margin-top:.4rem; width:100%; }
+
+
+/* The shopper can still recover missing SKU / price inputs when every match
+   is unresolved; the whole basket must not appear as a zero-euro basket. */
+.private-reviewed-products__missing-empty {
+  display:grid;
+  gap:.75rem;
+  padding:.9rem;
+  border:1px solid #d8bb80;
+  border-radius:12px;
+  background:#fffaf1;
+}
+.private-reviewed-products__missing-empty > p { margin:0; }
