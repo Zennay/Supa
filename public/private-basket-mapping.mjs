@@ -299,6 +299,9 @@ function updateSelect(select, store, unit) {
     select.add(option)
   }
   select.value = kept ? kept.id : ''
+  // Remember the previous human choice so a later SKU change can refresh
+  // the feedback on BOTH rows that shared that SKU, not only the edited one.
+  select.dataset.lastChoice = select.value
   const chosenProduct = all.find(product => product.id === select.value)
   row.querySelector('[data-matches-store="' + store + '"]').textContent =
     String(filtered.length) + ' waargenomen eigen bronartikelen met compatibele eenheidsfamilie; ' +
@@ -409,7 +412,18 @@ function addIngredient(restored = null) {
     storesGrid.append(box)
     filter.addEventListener('input', () => updateSelect(select, store, unit.value))
     select.addEventListener('change', () => {
+      const previous = select.dataset.lastChoice || ''
+      const chosen = select.value
       updateSelect(select, store, unit.value)
+      // Recompute affected historical/current siblings after a user resolves
+      // or creates a duplicate SKU. Never move the other user's selection.
+      if (previous || chosen) for (const sibling of lines.querySelectorAll('.ingredient')) {
+        if (sibling === row) continue
+        const siblingSelect = sibling.querySelector('[data-store="' + store + '"]')
+        if (siblingSelect && ((previous && siblingSelect.value === previous) ||
+            (chosen && siblingSelect.value === chosen)))
+          updateSelect(siblingSelect, store, sibling.querySelector('.unit').value)
+      }
       updateCoverage()
     })
   }
