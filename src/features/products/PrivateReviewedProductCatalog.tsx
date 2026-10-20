@@ -8,7 +8,7 @@ import { currentPrivateRouteChoice } from '../comparison/privateRouteChoice.ts'
 import { productSearchText } from './productSearchText.ts'
 import { privatePriceAgeNotice } from '../comparison/privatePriceAgeNotice.ts'
 import { privatePhysicalShoppingTick } from '../shopping-list/privatePhysicalShoppingTick.ts'
-import { freshReviewedBaskets, recentOwnCaptureInstant, privateReviewedPairWithin24Hours } from '../comparison/privateReviewedBasketBridge.ts'
+import { freshReviewedBaskets, recentOwnCaptureInstant, privateReviewedPairWithin24Hours, partialReviewedLinePairs } from '../comparison/privateReviewedBasketBridge.ts'
 import type { OwnStore, PrivateCaptureProgress, PrivateReviewedBaskets, PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
 import './privateReviewedProductCatalog.css'
 
@@ -86,21 +86,29 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOp
   // One canonical physical basket comparison for the two-store cards too:
   // never rank a missing or unpaired price as if it were a valid difference.
   const paired = ownStoreWeekComparison(currentReviewed)
-  const gapById = new Map<string, number>(paired.status === 'comparable'
-    ? paired.lines.map(line => [line.id, Math.abs(line.deltaCents)])
-    : [])
+  // Individual original whole-pack prices can be compared even when another
+  // ingredient is unresolved. Never treat this as a complete-basket winner.
+  const partialPairs = paired.status === 'comparable' ? [] :
+    partialReviewedLinePairs(fullPlus, fullDeka)
+  const canCompareIndividualLines = paired.status === 'comparable' || partialPairs.length > 0
   const signedDeltaById = new Map<string, number>(paired.status === 'comparable'
     ? paired.lines.map(line => [line.id, line.deltaCents])
     : [])
+  const visibleDeltaById = paired.status === 'comparable' ? signedDeltaById :
+    new Map(partialPairs.map(({ plus, deka }) =>
+      [plus.id, deka.lineTotalCents - plus.lineTotalCents]))
+  const gapById = new Map([...visibleDeltaById].map(([id, delta]) => [id, Math.abs(delta)]))
   function priceDifferenceForProduct(shop: OwnStore, line: Matched): string | null {
-    const delta = signedDeltaById.get(line.id)
+    const delta = visibleDeltaById.get(line.id)
     if (delta === undefined) return null
-    if (delta === 0) return 'Zelfde hele-verpakkingenprijs bij PLUS en DekaMarkt.'
+    const scope = paired.status === 'comparable' ? '' :
+      ' voor dit ene ingrediënt; totaal weekmandje onbekend'
+    if (delta === 0) return 'Zelfde hele-verpakkingenprijs bij PLUS en DekaMarkt' + scope + '.'
     const against = shop === 'PLUS' ? 'DekaMarkt' : 'PLUS'
     const ownMinusOther = shop === 'PLUS' ? -delta : delta
     return money.format(Math.abs(ownMinusOther) / 100) +
       (ownMinusOther < 0 ? ' goedkoper dan bij ' : ' duurder dan bij ') +
-      against + ' voor exact dezelfde fysieke weekvraag.'
+      against + ' voor exact dezelfde fysieke ingrediëntvraag' + scope + '.'
   }
   const search = productSearchText(query.trim())
   const rate = (line: Matched) => privatePackUnitRate({
@@ -117,7 +125,7 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOp
   // while weekly whole-pack costs remain the authoritative budget calculation.
   const group = (line: Matched) =>
     ({ kg: 0, liter: 1, stuk: 2 } as Record<string, number>)[rate(line)?.unit ?? ''] ?? 3
-  const ordered = order === 'source' || (order === 'priceGap' && paired.status !== 'comparable')
+  const ordered = order === 'source' || (order === 'priceGap' && !canCompareIndividualLines)
     ? visible : [...visible].sort((a, b) =>
     order === 'priceGap'
       ? (gapById.get(b.line.id) ?? -1) - (gapById.get(a.line.id) ?? -1)
@@ -334,7 +342,7 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOp
           <option value="unitPrice">Eenheidsprijs laag naar hoog</option>
           <option value="lineTotal">Weekregelbedrag laag naar hoog</option>
           {store === 'all' && <option value="priceGap"
-            disabled={paired.status !== 'comparable'}>Grootste prijsverschil per ingrediënt</option>}
+            disabled={!canCompareIndividualLines}>Grootste bekende hele-pakprijsverschil</option>}
         </select></label>
         <label>Zoek eigen product <input type="search" value={query}
           onChange={event => setQuery(event.target.value)} maxLength={120} placeholder="Product, SKU of ingrediënt" /></label>
@@ -352,20 +360,33 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOp
           const done = lines.filter(line => isChecked(shop, line)).length
           const remaining = lines.filter(line => !isChecked(shop, line))
             .reduce((sum, line) => sum + line.lineTotalCents, 0)
+          const unresolved = capture.basket.lines.filter(line => line.status === 'unresolved')
+          const complete = unresolved.length === 0 && lines.length > 0 &&
+            capture.basket.unresolvedLineCount === 0 &&
+            capture.basket.matchedLineCount === capture.basket.lines.length
           return <section key={shop}>
             <h3>{shop}</h3>
             <p><strong>{done} van {lines.length}</strong> producten afgevinkt</p>
             <progress value={done} max={lines.length}
               aria-label={'Voortgang originele ' + shop + '-boodschappen'} />
-            <strong>Nog op mijn lijst: {money.format(remaining / 100)}</strong>
+            <strong>{complete ? 'Nog op mijn lijst' : 'Bekende nog te kopen pakprijzen'}:
+              {' '}{money.format(remaining / 100)}</strong>
+            {!complete && <p role="status" className="private-reviewed-products__age">
+              <strong>Volledige mandprijs onbekend.</strong>
+              {' '}{unresolved.length} van {capture.basket.lines.length} fysieke
+              ingrediënten hebben nog geen bevestigde prijs of productmatch.
+              De som hierboven omvat uitsluitend al bekende hele verpakkingen.
+            </p>}
             {privatePriceAgeNotice(capture.capturedMs, nowMs) && (
               <small role="status" className="private-reviewed-products__age">
                 {privatePriceAgeNotice(capture.capturedMs, nowMs)}
               </small>
             )}
-            <small>Oorspronkelijk volledig mandje: {
-              money.format(capture.basket.totalCents / 100)}.
-              Dit zijn nog niet-afgevinkte productbedragen, geen betaalbewijs.</small>
+            <small>{complete ? 'Oorspronkelijk volledig mandje' : 'Oorspronkelijk bekend geprijsd deel'}:
+              {' '}{money.format(capture.basket.totalCents / 100)}.
+              {complete ? ' Volledig volgens jouw gecontroleerde eigen bron.' :
+                ' Andere ingrediënten hebben nog geen prijs; dit is geen mandtotaal.'}
+              {' '}Geen betaalbewijs.</small>
             <button type="button" onClick={() => {
               const current = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
               if (current?.stores[shop] !== capture) {
