@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { matchIngredient, type MatchUnit } from '../../domain/matching.ts'
+import { productSearchText } from '../products/productSearchText.ts'
 import { calculateDecimalPackCount } from '../../domain/decimalPackArithmetic.ts'
 import type { OfflinePriceSnapshots, OfflineRetailer, OfflineStoreProduct } from '../../domain/offlineReviewedImport.ts'
 import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
@@ -228,13 +229,13 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
   const largestPairedReview = [...previewRows].sort((a, b) =>
     Math.abs(candidateLineGap(b)!) - Math.abs(candidateLineGap(a)!))[0]
   const selectedStores = storeFilter === 'both' ? stores : [storeFilter]
-  const term = search.trim().normalize('NFKC').toLocaleLowerCase('nl')
+  const term = productSearchText(search.trim())
   const filtered = (onlyMissing ? missing : coverage).filter(line => {
     if (term && ![
       line.need.label, line.need.id,
       ...stores.flatMap(store => [line.suggestions[store]?.name, line.suggestions[store]?.sku,
         line.unpricedHints[store]?.name, line.unpricedHints[store]?.sku]),
-    ].some(value => value?.normalize('NFKC').toLocaleLowerCase('nl').includes(term))) return false
+    ].some(value => value && productSearchText(value).includes(term))) return false
     if (actionFilter === 'choose-sku') return selectedStores.some(store => line.manualReview[store])
     if (actionFilter === 'fix-source') return selectedStores.some(store =>
       !!line.unpricedHints[store])
