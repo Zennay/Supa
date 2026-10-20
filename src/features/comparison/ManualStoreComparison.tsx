@@ -19,6 +19,7 @@ const UNIT_LABEL: Record<string, string> = {
   g: 'gram', kg: 'kg', ml: 'ml', l: 'liter', piece: 'stuks',
 }
 const tableHeader = 'ingredientId\twinkel\tproduct\tverpakking\teenheid\tmultipackAantal\tprijs'
+const legacyTableHeader = 'ingredientId\twinkel\tproduct\tverpakking\teenheid\tprijs'
 function safeTableCell(value: string) {
   // The plain TSV route must guard the same invisible-prefix and NFKC
   // spreadsheet formula cases as the existing private CSV exports.
@@ -42,18 +43,28 @@ function tabularData(needs: readonly ManualNeed[], entries: ManualEntries): stri
     })),
   ].join('\n')
 }
-function readPastedTable(text: string, needs: readonly ManualNeed[]): ManualEntries {
+function readPastedTable(text: string, needs: readonly ManualNeed[]): {
+  entries: ManualEntries; legacyWithoutPackCount: boolean
+} {
   const lines = text.replace(/\r\n/g, '\n').replace(/\n$/u, '').split('\n')
-  if (lines[0] !== tableHeader || lines.length !== 1 + needs.length * 2) {
-    throw new Error('De tabel heeft niet alle PLUS- en DekaMarkt-regels.')
+  const legacyWithoutPackCount = lines[0] === legacyTableHeader
+  if ((!legacyWithoutPackCount && lines[0] !== tableHeader) ||
+      lines.length !== 1 + needs.length * 2) {
+    throw new Error('De tabel moet alle PLUS- en DekaMarkt-regels bevatten; gebruik een zes- of zevenkoloms Supa-blad.')
   }
   const expected = new Map(needs.map(need => [need.id, need]))
   const entries: ManualEntries = Object.create(null) as ManualEntries
   const used = new Set<string>()
   for (const line of lines.slice(1)) {
     const cells = line.split('\t')
-    if (cells.length !== 7) throw new Error('Gebruik zeven tabgescheiden kolommen inclusief het aantal eenheden per multipack.')
-    const [id, shop, product, packAmount, unit, packCount, price] = cells
+    if (cells.length !== (legacyWithoutPackCount ? 6 : 7)) {
+      throw new Error('Gebruik uitsluitend de oorspronkelijke Supa-kolommen; geen regels samenvoegen.')
+    }
+    // Older six-column Supa exports had no multi-pack observation.
+    // Restore their actual product, unit and price, but NEVER infer count=1.
+    const [id, shop, product, packAmount, unit, packCount, price] = legacyWithoutPackCount
+      ? [cells[0], cells[1], cells[2], cells[3], cells[4], '', cells[5]]
+      : cells
     if (!expected.has(id) || (shop !== 'PLUS' && shop !== 'DekaMarkt') ||
         (unit !== '' && !manualCompatibleUnits(expected.get(id)!.unit).includes(unit as Exclude<ManualQuote['packUnit'], ''>)) ||
         product.length > 160 || packAmount.length > 32 || price.length > 20 ||
@@ -65,7 +76,7 @@ function readPastedTable(text: string, needs: readonly ManualNeed[]): ManualEntr
     used.add(key)
     entries[key] = { product, packAmount, packUnit: unit as ManualQuote['packUnit'], packCount, price }
   }
-  return entries
+  return { entries, legacyWithoutPackCount }
 }
 
 export function ManualStoreComparison({
@@ -100,10 +111,14 @@ export function ManualStoreComparison({
   function applyTable() {
     try {
       const imported = readPastedTable(importText, needs)
-      setEntries(imported)
+      setEntries(imported.entries)
       setShowTable(false)
       setImportText('')
-      setImportMessage('Tabel geladen op dit apparaat; controleer de berekende verpakkingenaantallen.')
+      setImportMessage(imported.legacyWithoutPackCount
+        ? 'Oude zeskoloms Supa-tabel geladen. Producten, eenheden en prijzen zijn bewaard. ' +
+          'Vul nu bij iedere winkelregel het werkelijke multipack-aantal in; pas daarna ' +
+          'kan een volledig rekenkundig mandverschil verschijnen.'
+        : 'Tabel geladen op dit apparaat; controleer de echte multipack-inhoud en verpakkingenaantallen.')
     } catch (error) {
       setImportMessage(error instanceof Error ? error.message : 'Tabel niet herkend.')
     }
@@ -227,7 +242,8 @@ export function ManualStoreComparison({
                         </div>
                         <p className="manual-compare__row-result" aria-live="polite">
                           {state.state === 'complete'
-                            ? `${state.packs} × verpakking = ${exactEuro.formatCents(state.lineCents!)}`
+                            ? `${state.packs} hele verpakking(en) × ${quote?.packCount} eenheid/eenvoudige pack ` +
+                              `(${quote?.packAmount} ${UNIT_LABEL[quote?.packUnit ?? ''] ?? quote?.packUnit}) = ${exactEuro.formatCents(state.lineCents!)}`
                             : state.state === 'invalid'
                               ? 'Controleer product, verpakking, eenheid en prijs.'
                               : 'Nog geen prijsberekening.'}
