@@ -211,6 +211,19 @@ export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
     return { original, label, query: label.toLocaleLowerCase('nl'), amount: null, unit: null,
       reviewReason: 'Een deel van een stuk: kies bewust een heel aantal stuks' }
   }
+  // Do not accidentally turn "1 kg rijst en 250 g boter" into 1 kg
+  // "rijst en 250 g boter". Those are two distinct physical shopping needs,
+  // unlike "1 kg en 250 g rijst" which the same-family parser sums above.
+  // Retain the original line for explicit ingredient splitting.
+  const secondIngredient = /(?:[,;]|\s+(?:en|and|met|with|plus)\s+)((?:\d+\s+)?\d+\/\d+|\d+\s?[½¼¾⅓⅔⅛⅜⅝⅞]|\d+(?:[.,]\d+)?|[½¼¾⅓⅔⅛⅜⅝⅞])\s*([^\s,;]+)(?:\s+|$)/giu
+  let extra: RegExpExecArray | null
+  while ((extra = secondIngredient.exec(label)) !== null) {
+    if (units[extra[2].toLowerCase()]) {
+      return { original, label: original, query: original.toLocaleLowerCase('nl'),
+        amount: null, unit: null,
+        reviewReason: 'Meerdere verschillende ingrediënten in één regel: splits ze voor een complete boodschappenlijst' }
+    }
+  }
   return { original, label, query: label.toLocaleLowerCase('nl'), amount: normalized, unit, reviewReason: null }
 }
 
