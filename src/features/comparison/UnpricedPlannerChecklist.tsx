@@ -105,6 +105,8 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPric
   const visible = items.filter(item => !openOnly || !checked[itemKey(item)])
   const recipeGroups = groupShoppingByRecipe(visible, plan, recipes, activeDays)
   const copyKey = JSON.stringify([demandIdentity, checked, openOnly])
+  const activeCopyKey = useRef(copyKey)
+  activeCopyKey.current = copyKey
   const copy = prepared?.key === copyKey ? prepared.text : null
 
   const shoppingText = () => [
@@ -212,9 +214,12 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPric
 
   async function downloadUnpricedCsv() {
     if (error || !items.length) return
+    const expectedCopyKey = copyKey
     try {
       // Keep the spreadsheet exporter out of the ordinary offline-list bundle.
       const { exportUnpricedPlannerCsv } = await import('./unpricedPlannerCsv.ts')
+      if (currentDemand.current !== demandIdentity || activeCopyKey.current !== expectedCopyKey)
+        throw new Error('Het weekmenu of de afvinkingen zijn gewijzigd. Maak een nieuwe CSV.')
       const csv = exportUnpricedPlannerCsv(items, checked, openOnly)
       const url = URL.createObjectURL(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' }))
       try {
@@ -236,9 +241,13 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPric
   async function shareUnpricedCsv() {
     if (error || !items.length) return
     const expectedDemand = demandIdentity
+    const expectedCopyKey = copyKey
     try {
       const { exportUnpricedPlannerCsv } = await import('./unpricedPlannerCsv.ts')
-      if (currentDemand.current !== expectedDemand) return
+      if (currentDemand.current !== expectedDemand || activeCopyKey.current !== expectedCopyKey) {
+        setBackupMessage('Je weekmenu of vinkjes zijn veranderd. Gebruik de bijgewerkte CSV.')
+        return
+      }
       const csv = '\\uFEFF' + exportUnpricedPlannerCsv(items, checked, openOnly)
       const filename = openOnly ? 'supa-planner-nog-te-kopen-ongeprijsd.csv' :
         'supa-planner-weekmandje-ongeprijsd.csv'
@@ -250,7 +259,8 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPric
           setBackupMessage('Je oorspronkelijke ongeprijsde CSV is gedeeld via de gekozen app.')
         return
       }
-      if (currentDemand.current === expectedDemand) await downloadUnpricedCsv()
+      if (currentDemand.current === expectedDemand && activeCopyKey.current === expectedCopyKey)
+        await downloadUnpricedCsv()
     } catch (cause) {
       if (cause instanceof DOMException && cause.name === 'AbortError') return
       if (currentDemand.current === expectedDemand) {
