@@ -106,3 +106,29 @@ background:#e7f4eb;color:#255336;font-weight:650}
 .private-reviewed-products__shopping-filter button{flex:1 1 160px}
 .private-reviewed-products__shopping-filter button[aria-pressed=true]{background:#dbefdf;
   border-color:#236d4d;font-weight:700;color:#204c32}
+
+
+/* Missing physical products are not zero-priced items: keep the incomplete
+   weekly basket's unresolved ingredient list visible next to known costs. */
+.private-reviewed-products__missing {
+  padding:.8rem;
+  background:#fff9ee;
+  border:1px solid #d8bb80;
+  border-radius:10px;
+  min-width:0;
+}
+.private-reviewed-products__missing summary {
+  min-height:44px;
+  cursor:pointer;
+  font-weight:650;
+  align-content:center;
+}
+.private-reviewed-products__missing ul {
+  padding-left:1.3rem;
+  margin:.65rem 0;
+  max-height:260px;
+  overflow:auto;
+  overflow-wrap:anywhere;
+}
+.private-reviewed-products__missing li { padding:.25rem 0; }
+.private-reviewed-products__missing button { margin-top:.4rem; width:100%; }
