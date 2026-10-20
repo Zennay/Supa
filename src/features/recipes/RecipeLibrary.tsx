@@ -540,19 +540,33 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       setCollectionError(cause instanceof Error ? cause.message : 'Exporteren is niet gelukt.')
     }
   }
-  async function loadPlainRecipeCollection(file?: File) {
-    if (!file) return
+  async function loadPlainRecipeCollection(files: File[]) {
+    if (!files.length) return
     const revision = ++collectionReadVersion.current
     setCollectionError(''); setCollectionMessage(''); setCollectionPreview(null)
     try {
-      if (!file.size || file.size > 500_000) throw new Error('Het tekstbestand mag maximaal 500 kB bevatten.')
-      const content = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      if (files.length > 15 || files.some(file => !file.size || file.size > 500_000) ||
+          files.reduce((bytes, file) => bytes + file.size, 0) > 500_000)
+        throw new Error('Kies maximaal 15 gevulde tekstbestanden, samen maximaal 500 kB.')
+      const decoder = new TextDecoder('utf-8', { fatal: true })
+      const sources: string[] = []
+      for (const file of files) {
+        if (revision !== collectionReadVersion.current) return
+        if (!/\.(?:txt|md)$/iu.test(file.name))
+          throw new Error('Alleen eigen .txt- en .md-receptbestanden kunnen lokaal worden geïmporteerd.')
+        const content = decoder.decode(await file.arrayBuffer()).replace(/^\uFEFF/u, '').trim()
+        if (!content) throw new Error('Eén van de gekozen receptbestanden is leeg.')
+        sources.push(content)
+      }
       if (revision !== collectionReadVersion.current) return
-      setCollectionText(content)
-      setCollectionMessage('Tekst lokaal geladen. Controleer alle recepten vóór het bewaren.')
+      const combined = sources.join('\n---\n')
+      if (new TextEncoder().encode(combined).length > 500_000)
+        throw new Error('De verzamelde recepten zijn groter dan 500 kB.')
+      setCollectionText(combined)
+      setCollectionMessage(files.length + ' lokale tekstbestanden gelezen. Controleer de afzonderlijke recepten en originele hoeveelheden vóór import.')
     } catch (cause) {
       if (revision === collectionReadVersion.current)
-        setCollectionError(cause instanceof Error ? cause.message : 'Kon dit receptenbestand niet lezen.')
+        setCollectionError(cause instanceof Error ? cause.message : 'Kon deze receptbestanden niet lezen.')
     }
   }
   function previewPlainRecipeCollection() {
@@ -789,10 +803,11 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       <p>Plak eigen recepten of een lokaal Markdownbestand. Scheid recepten met een regel
         <code> --- </code>. De recepten blijven privé en ongeprijsd; onzekere
         ingrediënten moeten vóór gebruik in Planner worden gecorrigeerd.</p>
-      <label className="recipe-collection-label">Importeer .txt of .md (maximaal 500 kB)
-        <input type="file" accept=".txt,.md,text/plain,text/markdown"
+      <label className="recipe-collection-label">Importeer één of meerdere .txt/.md-bestanden (samen maximaal 500 kB)
+        <input type="file" multiple accept=".txt,.md,text/plain,text/markdown"
           onChange={event => {
-            void loadPlainRecipeCollection(event.currentTarget.files?.[0]); event.currentTarget.value = ''
+            const files = Array.from(event.currentTarget.files ?? [])
+            void loadPlainRecipeCollection(files); event.currentTarget.value = ''
           }} />
       </label>
       <label className="recipe-collection-label">Meerdere recepten (titel, Ingrediënten:, Bereiding:)
