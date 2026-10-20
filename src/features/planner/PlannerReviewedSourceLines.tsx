@@ -19,6 +19,7 @@ export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient,
   const [shop, setShop] = useState<'both' | OwnStore>('both')
   const [expanded, setExpanded] = useState(false)
   const [exportMessage, setExportMessage] = useState('')
+  const [pairCopyFallback, setPairCopyFallback] = useState<{ source: PrivateCaptureProgress; csv: string } | null>(null)
   const latestEvidence = useRef(progress)
   latestEvidence.current = progress
   if (!progress) return null
@@ -58,6 +59,8 @@ export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient,
       return Number.isSafeInteger(difference) ? [{ one, other, difference }] : []
     }).sort((a, b) => Math.abs(b.difference) - Math.abs(a.difference))
     : []
+  const pairCopy = pairCopyFallback?.source === progress && bothFresh && pairs.length > 0
+    ? pairCopyFallback.csv : null
   const search = query.trim().normalize('NFKC').toLocaleLowerCase('nl')
   const shown = entries.filter(({ store, line }) =>
     (shop === 'both' || shop === store) &&
@@ -94,6 +97,45 @@ export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient,
       setExportMessage('Bevestigde productregels met originele SKU’s en regelverschillen als privé-CSV opgeslagen. Geen volledig mandtotaal.')
     } catch (error) {
       setExportMessage(error instanceof Error ? error.message : 'Voorlopige productregels exporteren lukt niet.')
+    }
+  }
+
+  async function copyPairedCsv() {
+    setExportMessage('')
+    setPairCopyFallback(null)
+    try {
+      const original = progress
+      if (!plus || !deka || !pairedTime || !bothFresh || !pairs.length)
+        throw new Error('Er zijn geen twee actuele, controleerbare bronproducten om te kopiëren.')
+      const { privatePairedSourceCsv } = await import('./privatePairedSourceCsv.ts')
+      // Slow imports and tab changes must never keep an expired or superseded
+      // pair alive. The copied text preserves original SKU and capture time.
+      if (latestEvidence.current !== original ||
+          !recentOwnCaptureInstant(plus.observedAt, Date.now()) ||
+          !recentOwnCaptureInstant(deka.observedAt, Date.now()))
+        throw new Error('De bron is gewijzigd of verlopen. Bekijk eerst de huidige winkelopname.')
+      const csv = privatePairedSourceCsv(pairs, {
+        PLUS: plus.observedAt, DekaMarkt: deka.observedAt,
+      })
+      if (!navigator.clipboard?.writeText)
+        throw new Error('Klembord niet beschikbaar; selecteer de privé-CSV hieronder.')
+      await navigator.clipboard.writeText(csv)
+      setExportMessage('Eigen oorspronkelijke PLUS/Deka-bronproducten als privé-CSV gekopieerd. Deel ze alleen bewust; dit is geen volledig mandtotaal.')
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('Klembord niet beschikbaar')) {
+        const { privatePairedSourceCsv } = await import('./privatePairedSourceCsv.ts')
+        if (latestEvidence.current === progress && bothFresh && pairs.length > 0 &&
+            plus && deka && recentOwnCaptureInstant(plus.observedAt, Date.now()) &&
+            recentOwnCaptureInstant(deka.observedAt, Date.now())) {
+          setPairCopyFallback({ source: progress, csv: privatePairedSourceCsv(pairs, {
+            PLUS: plus.observedAt, DekaMarkt: deka.observedAt,
+          }) })
+          setExportMessage('Automatisch kopiëren ontbreekt. Selecteer hieronder je eigen privé-CSV.')
+          return
+        }
+      }
+      setExportMessage(error instanceof Error ? error.message :
+        'Bronproducten kopiëren is niet beschikbaar. Download de privé-CSV.')
     }
   }
 
@@ -189,6 +231,13 @@ export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient,
       </div>
       {pairs.length > 3 && <small>En {pairs.length - 3} andere controleerbare
         regelverschillen. De totale winkelprijs blijft onbekend tot beide mandjes compleet zijn.</small>}
+      <button type="button" className="ghost-button" onClick={() => void copyPairedCsv()}>
+        Kopieer originele PLUS/Deka-productregels (CSV)
+      </button>
+      {pairCopy && <label>Handmatig kopiëren van je eigen originele bronproducten
+        <textarea readOnly rows={Math.min(pairs.length + 3, 12)} value={pairCopy}
+          onFocus={event => event.currentTarget.select()} />
+      </label>}
       <button type="button" className="ghost-button" onClick={() => void downloadPairedCsv()}>
         Download gecontroleerde PLUS/Deka-productregels (CSV)
       </button>
