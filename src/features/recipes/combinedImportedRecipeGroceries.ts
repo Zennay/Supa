@@ -44,9 +44,10 @@ export function combinedImportedRecipeGroceries(recipes: readonly SavedRecipe[])
       const complete = ready && !item.needsReview && item.amount !== null &&
         item.unit !== null && Number.isFinite(item.amount) && item.amount > 0
       const label = typeof item.label === 'string' ? item.label.trim() : ''
-      const groupKey = complete && label
-        ? JSON.stringify([label.normalize('NFKC').toLocaleLowerCase('nl'), item.unit])
-        : null
+      // Mirror the canonical Planner ingredient identity, NOT a display
+      // label that may be spelled the same for physically different items.
+      const groupKey = complete && typeof item.query === 'string' && item.query.trim()
+        ? JSON.stringify([item.query, item.unit]) : null
       const prior = groupKey ? groups.get(groupKey) : null
       if (prior) {
         const total = sumDecimalAmounts([prior.amount!, item.amount!])
@@ -65,6 +66,7 @@ export function combinedImportedRecipeGroceries(recipes: readonly SavedRecipe[])
       const line: OwnRecipeChecklistLine = {
         key: String(lines.length),
         label: label || recipe.title,
+        query: groupKey ? item.query : undefined,
         amount: complete ? item.amount : null,
         unit: complete ? item.unit : null,
         needsReview: !complete,

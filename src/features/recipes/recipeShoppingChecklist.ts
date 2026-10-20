@@ -5,6 +5,8 @@ import { sumDecimalAmounts } from '../../domain/decimalPackArithmetic.ts'
 export type OwnRecipeChecklistLine = {
   key: string
   label: string
+  /** Exact canonical matching identity; never merge groceries by display label. */
+  query?: string
   amount: number | null
   unit: 'g' | 'ml' | 'piece' | null
   needsReview: boolean
@@ -89,6 +91,7 @@ export function ownRecipeShoppingChecklist(recipe: SavedRecipe, portions: number
     const line: OwnRecipeChecklistLine = {
       key: String(lines.length),
       label,
+      query: verified ? ingredient.query : undefined,
       amount: verified ? scaled : null,
       unit: verified ? ingredient.unit : null,
       needsReview: !verified,
