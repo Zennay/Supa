@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { freshReviewedBaskets, recentOwnCaptureInstant, type PrivateCaptureProgress, type PrivateReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
 import type { CaptureStore } from '../comparison/plannerPriceCaptureSheet.ts'
 import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
@@ -14,12 +14,32 @@ export function PlannerMissingCapturePanel({ captureNeeds, captureProgress, revi
   onOpenComparison: () => void
 }) {
   const [localMessage, setLocalMessage] = useState('')
+  // Partial imported captures can exist with NO fully reviewed basket. In
+  // that state App's priced-basket freshness interval is not running.
+  // Recheck the real clock here so the missing-source sheet cannot continue
+  // to show expired product rows as usable in a long-open mobile session.
+  const [sourceClock, setSourceClock] = useState(() => Date.now())
+  useEffect(() => {
+    const refresh = () => setSourceClock(Date.now())
+    refresh()
+    const timer = window.setInterval(refresh, 60_000)
+    const ifVisible = () => {
+      if (document.visibilityState !== 'hidden') refresh()
+    }
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', ifVisible)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', ifVisible)
+    }
+  }, [now])
   const [copyableMissingGuide, setCopyableMissingGuide] = useState<{
     store: CaptureStore | 'both'; text: string; fingerprint: string
   } | null>(null)
   // Existing SKU reviews are not fresh source captures. Only missing physical
   // source candidates require this deliberately blank partial input sheet.
-  const missingCaptureFor = (store: CaptureStore, at = now): PlannerCaptureGuideNeed[] => {
+  const missingCaptureFor = (store: CaptureStore, at = sourceClock): PlannerCaptureGuideNeed[] => {
     if (freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', at)?.stores[store]) return []
     const progress = captureProgress?.stores[store]
     if (!progress || !progress.fresh ||
@@ -35,7 +55,7 @@ export function PlannerMissingCapturePanel({ captureNeeds, captureProgress, revi
     // A long-open phone tab can cross a 7-day source deadline without a
     // source-file edit. A previously selectable partial guide must then be
     // invalidated and replaced by the entire expired retailer's needs.
-    stores.map(store => [store, missingCaptureFor(store, now).map(need => need.id)]),
+    stores.map(store => [store, missingCaptureFor(store, sourceClock).map(need => need.id)]),
   ])
   const latestCaptureFingerprint = useRef(captureFingerprint)
   latestCaptureFingerprint.current = captureFingerprint
