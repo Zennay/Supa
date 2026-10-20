@@ -2216,7 +2216,7 @@ export function OfflineReviewedWorkbench({
     } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
   }
 
-  async function downloadReviewedIngredientLedger() {
+  async function downloadReviewedIngredientLedger(format: 'csv' | 'html' = 'csv') {
     if (!imported || !basketPair || !coverageRows.length) return
     const sourceRevision = importRevision.current
     const originalSource = text
@@ -2270,14 +2270,28 @@ export function OfflineReviewedWorkbench({
       const csv = '\uFEFF' + rows.map(row => row.map((cell, index) =>
         literalCsv(cell, index === rows[0].length - 2)).join(';')).join('\r\n') + '\r\n'
       if (new TextEncoder().encode(csv).length > 256000) throw Error('Bestand te groot')
-      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+      const content = format === 'html'
+        ? (await import('./partialReviewedPrintHtml.ts')).partialReviewedPricePrintHtml(rows)
+        : csv
+      if (sourceRevision !== importRevision.current ||
+          originalSource !== currentActiveSource.current ||
+          originalPlan !== captureWeekRef.current)
+        throw Error('Bron of week tijdens export veranderd')
+      if (new TextEncoder().encode(content).length > 512000) throw Error('Bestand te groot')
+      const url = URL.createObjectURL(new Blob([content], {
+        type: format === 'html' ? 'text/html;charset=utf-8' : 'text/csv;charset=utf-8',
+      }))
       try {
         const link = document.createElement('a')
-        link.href = url; link.download = 'supa-prive-deelprijzen-gecontroleerd.csv'
+        link.href = url
+        link.download = format === 'html' ? 'supa-mijn-prive-prijzen-afdrukken.html' :
+          'supa-prive-deelprijzen-gecontroleerd.csv'
         document.body.append(link)
         try { link.click() } finally { link.remove() }
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
-      setCoverageMessage('Eigen bevestigde regelprijzen als werkblad gedownload. Leeg betekent onbekend, nooit gratis. Geen totaal of publieke besparingsclaim.')
+      setCoverageMessage('Eigen bevestigde bronprijzen als privé ' +
+        (format === 'html' ? 'afdrukoverzicht' : 'CSV-werkblad') +
+        ' gedownload. Onbekend blijft onbekend; geen totaal of besparingsclaim.')
     } catch {
       setCoverageMessage('Prijswerkblad niet beschikbaar; vorige brondata en beoordelingen blijven intact.')
     }
@@ -3004,6 +3018,11 @@ export function OfflineReviewedWorkbench({
                       disabled={!imported || !basketPair || coverageRows.length === 0}
                       onClick={() => void downloadReviewedIngredientLedger()}>
                       Download bevestigde regelprijzen + onbekende regels (CSV)
+                    </button>
+                    <button className="ghost-button" type="button"
+                      disabled={!imported || !basketPair || coverageRows.length === 0}
+                      onClick={() => void downloadReviewedIngredientLedger('html')}>
+                      Download offline leesbaar prijsblad (HTML)
                     </button>
                   </div>
                   <p className="disclaimer">Privé-werkblad, geen bronimport: alleen actuele
