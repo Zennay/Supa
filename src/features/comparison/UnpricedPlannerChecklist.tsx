@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../domain/basket.ts'
 import { groupShoppingByRecipe } from '../shopping-list/shoppingRecipeGroups.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
+import type { UnpricedShoppingNote } from '../shopping-list/ManualShoppingNotes.tsx'
 import { exportUnpricedProgress, importUnpricedProgress, unpricedProgressMaxBytes, unpricedProgressStorageKey } from './unpricedPlannerProgress.ts'
 import { exportPrivatePlannerWeek } from './exportPrivatePlannerWeek.ts'
 import { exportUnpricedPlannerCsv } from './unpricedPlannerCsv.ts'
@@ -11,6 +12,7 @@ type ChecklistProps = {
   plan: PlannedMeal[]
   recipes: RecipeWithIngredients[]
   activeDays: string[]
+  manualNotes?: readonly UnpricedShoppingNote[]
   onOpenPriceImport?: () => void
   onOpenRecipes?: () => void
 }
@@ -35,7 +37,7 @@ const portableQuantity = (item: DemandRow) =>
  * The exact physical week demand, independent of either supermarket.
  * No sample product, inferred SKU, price, license or retailer observation.
  */
-export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPriceImport, onOpenRecipes }: ChecklistProps) {
+export function UnpricedPlannerChecklist({ plan, recipes, activeDays, manualNotes = [], onOpenPriceImport, onOpenRecipes }: ChecklistProps) {
   const [progress, setProgress] = useState<{ identity: string; checked: Record<string, boolean> }>({ identity: '', checked: {} })
   const [backupMessage, setBackupMessage] = useState('')
   const currentDemand = useRef('')
@@ -105,7 +107,16 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPric
   const completed = items.filter(item => checked[itemKey(item)]).length
   const visible = items.filter(item => !openOnly || !checked[itemKey(item)])
   const recipeGroups = groupShoppingByRecipe(visible, plan, recipes, activeDays)
-  const copyKey = JSON.stringify([demandIdentity, checked, openOnly])
+  const handwritten = manualNotes.filter(note =>
+    note && typeof note.id === 'string' && typeof note.label === 'string' &&
+    note.label.length > 0 && note.label.length <= 140 &&
+    ['Algemeen', 'PLUS', 'DekaMarkt'].includes(note.store) &&
+    typeof note.done === 'boolean')
+  const visibleHandwritten = handwritten.filter(note => !openOnly || !note.done)
+  const safeHandwritten = (label: string) => label
+    .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim()
+  const copyKey = JSON.stringify([demandIdentity, checked, openOnly,
+    handwritten.map(note => [note.id, note.label, note.store, note.done])])
   const activeCopyKey = useRef(copyKey)
   activeCopyKey.current = copyKey
   const copy = prepared?.key === copyKey ? prepared.text : null
@@ -117,7 +128,11 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPric
     ...(visible.length ? visible.map(item =>
       (checked[itemKey(item)] ? '☑ ' : '☐ ') + item.label + ' · ' + portableQuantity(item)) :
       ['Alle boodschappen zijn afgevinkt.']),
-    'Geen supermarktproduct of actuele prijs gekoppeld.',
+    ...(visibleHandwritten.length ? ['', 'ZELF TOEGEVOEGDE BOODSCHAPPEN — niet in het Planner-mandje',
+      ...visibleHandwritten.map(note => (note.done ? '☑ ' : '☐ ') +
+        safeHandwritten(note.label) + ' [' + note.store + '] · prijs onbekend'),
+    ] : []),
+    'Geen supermarktproduct of actuele prijs gekoppeld. Handmatige artikelen blijven buiten het Planner- en winkelmandtotaal.',
   ].join('\n')
 
   function prepareCopy() {
