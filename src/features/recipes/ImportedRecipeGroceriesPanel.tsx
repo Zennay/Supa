@@ -78,7 +78,9 @@ export function ImportedRecipeGroceriesPanel({
   const signature = JSON.stringify(selected.map(recipe => [
     recipe.id, portionsById[recipe.id] ?? recipe.servings, recipe.servings,
     recipe.minutes, recipe.warnings,
-    recipe.ingredients.map(item => [item.original, item.amount, item.unit, item.reviewReason]),
+    recipe.ingredients.map(item => [
+      item.original, item.label, item.query, item.amount, item.unit, item.reviewReason,
+    ]),
   ]))
   useEffect(() => { setChecked({}); setFeedback('') }, [signature])
   const result = selected.length
@@ -250,7 +252,12 @@ export function ImportedRecipeGroceriesPanel({
             }} />
           <span>{line.needsReview
             ? line.original + ' — hoeveelheid controleren'
-            : line.amount + ' ' + (line.unit === 'piece' ? 'stuks' : line.unit) + ' ' + line.label}</span>
+            : line.amount + ' ' + (line.unit === 'piece' ? 'stuks' : line.unit) + ' ' + line.label}
+            {!line.needsReview && line.query && line.query !== line.label.toLocaleLowerCase('nl') &&
+              <small className="recipe-collection-groceries__query">
+                {' '}Zoekterm voor winkelmatching: {line.query}
+              </small>}
+          </span>
         </label>
         {(result!.contributorsByLine[line.key]?.length ?? 0) > 1 && <details className="recipe-collection-groceries__sources">
           <summary>Bekijk de hoeveelheden per recept ({result!.contributorsByLine[line.key].length})</summary>
@@ -260,7 +267,8 @@ export function ImportedRecipeGroceriesPanel({
               {source.amount === null || source.unit === null
                 ? 'Hoeveelheid nog controleren'
                 : source.amount + ' ' + (source.unit === 'piece' ? 'stuks' : source.unit)}
-              <small> · Origineel: {source.original}</small>
+              <small> · Ingrediënt: {source.ingredientLabel}
+                {' '}· Origineel: {source.original}</small>
               <button type="button" onClick={() => {
                 const sourceRecipe = recipes.find(recipe => recipe.id === source.recipeId)
                 if (sourceRecipe) onEdit(sourceRecipe)
