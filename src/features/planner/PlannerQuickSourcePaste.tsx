@@ -332,6 +332,40 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
     return null
   })()
 
+  async function downloadFullStoreRecapture(store: 'PLUS' | 'DekaMarkt',
+    kind: 'csv' | 'csv-excel' | 'guide') {
+    if (!preview || preview.raw !== draft) return
+    const original = preview
+    const ticket = revision.current
+    try {
+      const { privateFullStoreRecaptureCsv, privateFullStoreRecaptureGuide } =
+        await import('./privateFullStoreRecapture.ts')
+      if (ticket !== revision.current || original.raw !== draft) return
+      const current = parseOfflinePriceSnapshots(original.normalized, Date.now())
+      const source = current.captures[store]
+      if (!source) throw new Error(store + ': geen oorspronkelijke winkelopname beschikbaar.')
+      const content = kind === 'guide'
+        ? privateFullStoreRecaptureGuide(source)
+        : privateFullStoreRecaptureCsv(source, kind === 'csv-excel' ? ';' : ',')
+      const url = URL.createObjectURL(new Blob([content], {
+        type: kind === 'guide' ? 'text/plain;charset=utf-8' : 'text/csv;charset=utf-8',
+      }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-' + store.toLowerCase() +
+          (kind === 'guide' ? '-nieuwe-bronopname-uitleg.txt' : '-hele-winkel-opnieuw-opnemen.csv')
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      if (ticket === revision.current) setMessage(store +
+        ': nieuw invulblad met originele SKU/naam, maar ZONDER oude prijzen, voorraad, verpakking of opnametijd. Vul uitsluitend echte nieuwe waarnemingen in.')
+    } catch (cause) {
+      if (ticket === revision.current) setMessage(cause instanceof Error ? cause.message :
+        'Volledige nieuwe winkelopname kon niet worden voorbereid.')
+    }
+  }
+
   function downloadCurrentSourceRepairList(store: 'PLUS' | 'DekaMarkt') {
     if (!preview || preview.raw !== draft) return
     try {
@@ -552,6 +586,27 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
                 onClick={() => downloadCurrentSourceRepairList(store)}>
                 Download {store}-controles voor originele ontbrekende SKU-data (TXT)
               </button>}
+            <div className="supa-planner-source-paste__recapture">
+              <strong>Nieuwe volledige {store}-bronopname (niet ingevuld)</strong>
+              <p>Dit invulblad bewaart alleen oorspronkelijke artikelcodes en namen als
+                herkenningshulp. Alle oudere prijzen, verpakkingen, beschikbaarheid en
+                observatietijden zijn leeg. Vul dezelfde werkelijke nieuwe tijd en
+                de opnieuw waargenomen gegevens in; de bestaande import weigert
+                onvoltooide bronregels. Maak de héle winkelopname opnieuw als je
+                deze winkel wilt vervangen.</p>
+              <button type="button" className="ghost-button"
+                onClick={() => void downloadFullStoreRecapture(store, 'csv')}>
+                Nieuwe {store}-bronopname als invulbare CSV
+              </button>
+              <button type="button" className="ghost-button"
+                onClick={() => void downloadFullStoreRecapture(store, 'csv-excel')}>
+                Spreadsheet CSV (puntkomma)
+              </button>
+              <button type="button" className="ghost-button"
+                onClick={() => void downloadFullStoreRecapture(store, 'guide')}>
+                Stappen voor nieuwe bronopname (TXT)
+              </button>
+            </div>
           </section>
         })}
         <p>{!liveAdmission?.currentEnough
