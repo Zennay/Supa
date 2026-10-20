@@ -34,8 +34,14 @@ export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient,
   const gap = first && second
     ? (first.ns >= second.ns ? first.ns - second.ns : second.ns - first.ns) : null
   const pairedTime = gap !== null && gap <= 86_400_000_000_000n
+  // One store can cross the seven-day boundary while the other is still
+  // fresh (even with a <=24h capture gap). A partial product row does not
+  // make the older store's unexpired source valid again.
+  const bothFresh = !!plus?.fresh && !!deka?.fresh &&
+    recentOwnCaptureInstant(plus.observedAt, now) &&
+    recentOwnCaptureInstant(deka.observedAt, now)
   const right = new Map((deka?.confirmedSourceLines ?? []).map(line => [line.ingredientId, line]))
-  const pairs = !hasCompleteComparison && pairedTime &&
+  const pairs = !hasCompleteComparison && pairedTime && bothFresh &&
     entries.some(entry => entry.store === 'PLUS') &&
     entries.some(entry => entry.store === 'DekaMarkt')
     ? (plus?.confirmedSourceLines ?? []).flatMap(one => {
