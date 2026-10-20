@@ -8,7 +8,6 @@ const HEADER = [
   'retailer', 'observedAt', 'id', 'name', 'packAmount',
   'packUnit', 'packCount', 'priceCents', 'available',
 ] as const
-const SUPPORTED_UNITS = new Set(['g', 'kg', 'ml', 'l', 'piece'])
 const STORES = ['PLUS', 'DekaMarkt'] as const
 const quote = (value: string) => '"' + value.replaceAll('"', '""') + '"'
 
@@ -39,10 +38,12 @@ export function makeBlankPlannerCaptureCsv(
   const rows: string[] = [HEADER.map(quote).join(delimiter)]
   for (const retailer of selectedStores) {
     for (const need of needs) {
-      // Unit hints are not recorded retailer packaging. Unknown stays empty.
-      const packUnit = SUPPORTED_UNITS.has(need.unit) ? need.unit : ''
+      // Planner's ingredient unit is not a verified retailer package unit.
+      // Even when the week needs grams, a retailer may sell kg, pieces or
+      // another physical pack. Leave every source-derived field blank until
+      // the user actually observes the original package and price.
       rows.push([
-        retailer, '', '', '', '', packUnit, '', '', 'false',
+        retailer, '', '', '', '', '', '', '', 'false',
       ].map(quote).join(delimiter))
     }
   }
