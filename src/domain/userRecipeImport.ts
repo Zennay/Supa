@@ -94,6 +94,9 @@ const units: Record<string, { unit: MetricUnit; factor: number }> = {
   'g': { unit: 'g', factor: 1 }, 'gr': { unit: 'g', factor: 1 },
   'gram': { unit: 'g', factor: 1 }, 'grams': { unit: 'g', factor: 1 },
   'grammen': { unit: 'g', factor: 1 },
+  // Dutch metric 'ons' denotes exactly 100 g. Do not infer 'pond':
+  // English pounds and Dutch colloquial pounds are not interchangeable.
+  'ons': { unit: 'g', factor: 100 },
   'kg': { unit: 'g', factor: 1000 }, 'kilogram': { unit: 'g', factor: 1000 },
   'kilograms': { unit: 'g', factor: 1000 }, 'kilogrammen': { unit: 'g', factor: 1000 },
   'ml': { unit: 'ml', factor: 1 }, 'milliliter': { unit: 'ml', factor: 1 },
@@ -106,6 +109,8 @@ const units: Record<string, { unit: MetricUnit; factor: number }> = {
   'liters': { unit: 'ml', factor: 1000 }, 'litre': { unit: 'ml', factor: 1000 },
   'stuks': { unit: 'piece', factor: 1 }, 'stuk': { unit: 'piece', factor: 1 }, 'piece': { unit: 'piece', factor: 1 },
   'pieces': { unit: 'piece', factor: 1 }, 'pcs': { unit: 'piece', factor: 1 },
+  'st': { unit: 'piece', factor: 1 }, 'st.': { unit: 'piece', factor: 1 },
+  'pc': { unit: 'piece', factor: 1 },
   'oz': { unit: 'g', factor: 28.349523125 }, 'ounce': { unit: 'g', factor: 28.349523125 },
   'ounces': { unit: 'g', factor: 28.349523125 }, 'lb': { unit: 'g', factor: 453.59237 },
   'lbs': { unit: 'g', factor: 453.59237 }, 'pound': { unit: 'g', factor: 453.59237 },
