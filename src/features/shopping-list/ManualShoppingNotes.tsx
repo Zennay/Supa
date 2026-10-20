@@ -143,15 +143,20 @@ export function ManualShoppingNotes({ notes, setNotes }: {
     event.preventDefault()
     // Human-authored lines, not supermarket product identities or price data.
     const parsed = bulkDraft.split(/\r?\n/u)
-      .map(line => safeLabel(line.replace(/^(?:[-*•]\s+|☐\s+|\d{1,3}[.)]\s+)/u, '')))
-      .filter(Boolean)
-    if (!parsed.length || parsed.some(line => line.length > 140) || parsed.length > 100) {
+      .map(source => {
+        const row = source.replace(/^(?:[-*•]\s+|\d{1,3}[.)]\s+)/u, '')
+        const done = /^(?:☑|\[[xX]\])(?:\s|$)/u.test(row)
+        const label = safeLabel(row.replace(/^(?:☑|☐|\[[xX ]\])\s*/u, ''))
+        return { label, done }
+      })
+      .filter(item => item.label.length > 0)
+    if (!parsed.length || parsed.some(item => item.label.length > 140) || parsed.length > 100) {
       setMessage('Controleer de geplakte lijst: maximaal 100 regels van 140 tekens.')
       return
     }
     const seen = new Set(notes.map(item => duplicateKey(item.store, item.label)))
-    const distinct = parsed.filter(label => {
-      const key = duplicateKey(store, label)
+    const distinct = parsed.filter(item => {
+      const key = duplicateKey(store, item.label)
       if (seen.has(key)) return false
       seen.add(key)
       return true
@@ -160,8 +165,8 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       setMessage('Je lijst heeft ruimte voor maximaal 100 verschillende artikelen. Er is niets toegevoegd.')
       return
     }
-    const added = distinct.map(label => ({
-      id: 'own-note-' + crypto.randomUUID(), label, store, done: false,
+    const added = distinct.map(item => ({
+      id: 'own-note-' + crypto.randomUUID(), label: item.label, store, done: item.done,
     }))
     setNotes(current => {
       const existing = new Set(current.map(item => duplicateKey(item.store, item.label)))
@@ -247,9 +252,10 @@ export function ManualShoppingNotes({ notes, setNotes }: {
     <details className="manual-shopping-notes__bulk">
       <summary>Plak meerdere boodschappen tegelijk</summary>
       <form onSubmit={addBulk}>
-        <p>Eén eigen artikel per regel, eventueel voorafgegaan door een opsommingsteken.
-          Alle regels gaan naar de hierboven gekozen winkellijst ({store}).
-          Geen productmatching of automatische prijzen.</p>
+        <p>Eén eigen artikel per regel. Opsommingstekens en originele vinkjes
+          (☐, ☑, [ ] of [x]) worden herkend; al afgevinkte artikelen blijven afgevinkt.
+          Alle regels gaan naar {store}; dubbele artikelen worden overgeslagen,
+          zonder bestaande vinkjes of prijzen te wijzigen.</p>
         <label>Je ongeprijsde boodschappen
           <textarea rows={5} maxLength={15000} value={bulkDraft}
             placeholder={'Vuilniszakken\nAfwasmiddel\nToiletpapier'}
