@@ -93,8 +93,8 @@ export function PrivateComparisonJourney({
           recentOwnCaptureInstant(partial.observedAt, nowMs))
         const outdated = (!!reviewed?.stores[store] && !source) ||
           (!!partial && !fresh)
-        const total = partial?.demandLineCount ?? source?.basket.lines.length ?? 0
-        const confirmed = partial?.reviewedLineCount ?? source?.basket.matchedLineCount ?? 0
+        const total = source?.basket.lines.length ?? partial?.demandLineCount ?? 0
+        const confirmed = source?.basket.matchedLineCount ?? partial?.reviewedLineCount ?? 0
         const next = !complete && fresh ? partial?.nextIngredientId : null
         return <div key={store} className="private-comparison-journey__shop">
           <strong>{store}</strong>
@@ -109,7 +109,8 @@ export function PrivateComparisonJourney({
             <small>{Math.min(total, Math.max(0, confirmed))} van {total} ingrediënten gecontroleerd</small>
           </>}
           <button type="button" className="private-comparison-journey__link"
-            onClick={() => next ? onReview(store, next) : onOpenImport()}>
+            onClick={() => next ? onReview(store, next)
+              : complete ? onOpenProducts() : onOpenImport()}>
             {next ? 'Controleer volgend bronartikel' :
               complete ? 'Bekijk bevestigde artikelen' :
                 outdated ? 'Vernieuw bronopname' : 'Voeg eigen bronprijzen toe'}
@@ -167,7 +168,10 @@ export function PrivateComparisonJourney({
     <div className="private-comparison-journey__actions">
       <button type="button" onClick={onOpenPlanner}>Open weekplanner</button>
       <button type="button" onClick={onOpenImport}>Importeer of controleer prijzen</button>
-      {singleReady && <button type="button" onClick={onOpenList}>Bekijk mijn echte winkellijst</button>}
+      {hasAnySource && <button type="button" onClick={onOpenProducts}>
+        Bekijk bronproducten en ontbrekende matches
+      </button>}
+      {singleReady && <button type="button" onClick={onOpenList}>Bekijk mijn eigen winkellijst</button>}
     </div>
     <small>Geen fictieve prijzen, automatische retaileropvraging of publieke besparingsclaim.
       Ontbrekende en verlopen bronprijzen blijven onbekend.</small>
