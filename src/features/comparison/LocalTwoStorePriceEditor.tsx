@@ -269,6 +269,7 @@ type Props = {
   activeDays: string[]
   onGenerated: (json: string) => void
   onEdit: () => void
+  onPreviewSourceFiles: (files: File[]) => void
   reviewedRecaptureSeeds?: Record<string, ReviewedRecaptureSeed>
 }
 /**
@@ -276,7 +277,7 @@ type Props = {
  * licensed catalog, attestation, retailer permission, or independent evidence.
  */
 export function LocalTwoStorePriceEditor({
-  plan, recipes, activeDays, onGenerated, onEdit, reviewedRecaptureSeeds = {},
+  plan, recipes, activeDays, onGenerated, onEdit, onPreviewSourceFiles, reviewedRecaptureSeeds = {},
 }: Props) {
   const [open, setOpen] = useState(false)
   const [onlyOpenRows, setOnlyOpenRows] = useState(false)
@@ -880,6 +881,58 @@ export function LocalTwoStorePriceEditor({
     }
   }
 
+  // The exact selected Planner demand can be taken into a shop without
+  // granting any retailer-source identity to an unobserved ingredient.
+  // Reuse the established capture-sheet and inert HTML format, rather than
+  // creating another import protocol or storing provisional prices.
+  async function downloadPersonalCaptureKit(kind: 'csv' | 'paper') {
+    const fingerprint = selectedPlanFingerprint
+    const chosenStores = [...selectedStores]
+    const selectedNeeds = activeNeeds.map(need => ({
+      id: need.id, label: need.label, amount: need.amount,
+      unit: need.unit, query: need.query,
+    }))
+    try {
+      if (selectedNeeds.length === 0 || selectedNeeds.length > 200) {
+        throw new Error('Kies een weekmenu met maximaal 200 verschillende ingrediënten.')
+      }
+      const content = kind === 'csv'
+        ? (await import('./plannerPriceCaptureSheet.ts'))
+            .makeBlankPlannerCaptureCsv(selectedNeeds, chosenStores, ';')
+        : (await import('./plannerPriceCapturePrint.ts'))
+            .makePrintablePlannerCaptureHtml(selectedNeeds, chosenStores)
+      if (currentPlanFingerprint.current !== fingerprint) {
+        setDraftStatus('Het weekmenu veranderde. Download het actuele invulblad opnieuw.')
+        return
+      }
+      if (new TextEncoder().encode(content).length > 800000) {
+        throw new Error('Het persoonlijke formulier is te groot. Kies minder ingrediënten.')
+      }
+      const url = URL.createObjectURL(new Blob([content], {
+        type: kind === 'csv' ? 'text/csv;charset=utf-8' : 'text/html;charset=utf-8',
+      }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = kind === 'csv'
+          ? 'supa-eigen-plus-deka-leeg-prijsopnameblad.csv'
+          : 'supa-eigen-plus-deka-printbaar-veldformulier.html'
+        link.style.display = 'none'
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        setDraftStatus(kind === 'csv'
+          ? 'Leeg persoonlijk winkel-CSV gedownload. Originele productcodes, bronmomenten en prijzen moet je zelf werkelijk vastleggen.'
+          : 'Printbaar persoonlijk veldformulier gedownload. Open dit lokaal en druk af; het is geen winkelprijsbron.')
+      } finally {
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+      }
+    } catch (error) {
+      setDraftStatus(error instanceof Error ? error.message
+        : 'Kon het persoonlijke invulblad niet lokaal maken.')
+    }
+  }
+
   // Portable *unfinished form*, not an admitted retailer price snapshot.
   // The two formats intentionally cannot be mistaken for one another.
   function downloadUnfinishedDraft() {
@@ -1021,6 +1074,36 @@ export function LocalTwoStorePriceEditor({
           <button type="button" className="ghost-button" onClick={downloadUnfinishedDraft}>
             Download onvoltooid invulconcept (JSON)
           </button>
+          <button type="button" className="ghost-button" disabled={!activeNeeds.length}
+            onClick={() => void downloadPersonalCaptureKit('csv')}>
+            Download leeg winkelprijsblad (CSV)
+          </button>
+          <button type="button" className="ghost-button" disabled={!activeNeeds.length}
+            onClick={() => void downloadPersonalCaptureKit('paper')}>
+            Download printbaar PLUS/Deka-veldformulier (HTML)
+          </button>
+          <label>Gevuld PLUS/Deka-prijsblad veilig controleren en importeren
+            <input type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" multiple
+              disabled={!activeNeeds.length}
+              onChange={event => {
+                const files = Array.from(event.currentTarget.files ?? [])
+                event.currentTarget.value = ''
+                if (!files.length) return
+                if (files.length > 2 || files.some(file => !file.size || file.size > 256000)) {
+                  setDraftStatus('Kies maximaal twee niet-lege eigen CSV-bestanden van elk maximaal 256 kB.')
+                  return
+                }
+                // The existing parent workbench has a full source preview,
+                // exact physical matcher and an explicit user acceptance step.
+                // Never bypass it by converting the sheet straight into draft prices.
+                setDraftStatus('Bekijk eerst de eigen bronregels en voorlopige matches in de controle boven dit formulier. Nog niets is overgenomen.')
+                onPreviewSourceFiles(files)
+              }} />
+            <small>Na downloaden en invullen: dezelfde week, echte broncodes, verpakkingen,
+              beschikbaarheid, prijzen en tijdstippen. SUPA toont eerst de bestaande
+              bron- en matchvoorinzage; je beslist daarna pas of je importeert.
+              Ook één ingevulde winkel is toegestaan.</small>
+          </label>
           {sourceSelection !== 'both' && activeNeeds.length > 0 && pendingCaptureTimes.length > 0 &&
             <button type="button" className="ghost-button" onClick={downloadOpenCaptureTasks}>
               Download ontbrekende {sourceSelection}-bronmomentcontrole (TXT)
