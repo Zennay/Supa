@@ -56,6 +56,11 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
   // One canonical physical basket comparison for the two-store cards too:
   // never rank a missing or unpaired price as if it were a valid difference.
   const paired = ownStoreWeekComparison(currentReviewed)
+  // Never default a shopper to PLUS when the canonical whole-pack comparison
+  // says DekaMarkt is cheaper. With two unpaired sources there is no winner.
+  const oneStore = paired.available.length === 1 ? paired.available[0] : null
+  const listSuggestion = paired.status === 'comparable'
+    ? (paired.cheapest ?? 'PLUS') : oneStore
   const gapById = new Map<string, number>(paired.status === 'comparable'
     ? paired.lines.map(line => [line.id, Math.abs(line.deltaCents)])
     : [])
@@ -100,16 +105,29 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
       ' aangepast. Dit is geen goedkeuring van de prijs of betaalbevestiging.')
   }
   function openCurrentCheckedList() {
-    // This action can be pressed after the seven-day price window expires.
-    // Never navigate as though a stale source still certifies a priced list.
+    // Recheck source age and same-physical-demand matching at click time.
     const latest = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
-    const chosen = store === 'all'
-      ? latest?.stores.PLUS ? 'PLUS' : latest?.stores.DekaMarkt ? 'DekaMarkt' : null
-      : latest?.stores[store] ? store : null
+    const comparison = ownStoreWeekComparison(latest)
+    let chosen: OwnStore | null = null
+    if (store !== 'all') {
+      chosen = latest?.stores[store] ? store : null
+    } else if (comparison.status === 'comparable') {
+      chosen = comparison.cheapest ?? 'PLUS'
+    } else if (comparison.available.length === 1) {
+      chosen = comparison.available[0]
+    } else if (comparison.available.length === 2) {
+      setCheckMessage('Beide winkelbronnen zijn niet voor hetzelfde complete mandje ' +
+        'vergelijkbaar. Kies expliciet PLUS of DekaMarkt om één lijst te openen.')
+      return
+    }
     if (!chosen) {
       setCheckMessage('Deze eigen bron is verlopen of gewijzigd. Controleer de originele winkelopname in Vergelijk.')
       return
     }
+    setCheckMessage(store === 'all' && comparison.status === 'comparable'
+      ? 'Open ' + chosen + ' op basis van de laagste oorspronkelijke hele-pakkentotaalprijs. ' +
+        'Geen kassagarantie of bewezen netto besparing.'
+      : 'Open je eigen gecontroleerde winkelmandje bij ' + chosen + '.')
     onOpenList(chosen)
   }
   return <section className="private-reviewed-products" aria-label="Mijn persoonlijk gecontroleerde winkelproducten">
@@ -224,7 +242,12 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
       {!visible.length && <p role="status">Geen producten gevonden voor deze selectie.
         {shoppingFilter !== 'all' && ' Schakel naar alle originele artikelen om de volledige lijst te zien.'}</p>}
       <button type="button" onClick={openCurrentCheckedList}>
-        {store === 'all' ? 'Open mijn gecontroleerde boodschappenlijst' : `Open mijn ${store}-boodschappenlijst`}
+        {store !== 'all' ? `Open mijn ${store}-boodschappenlijst`
+          : paired.status === 'comparable'
+            ? 'Open goedkoopste complete winkel (' + listSuggestion + ')'
+            : listSuggestion
+              ? 'Open beschikbare winkel (' + listSuggestion + ')'
+              : 'Kies eerst een winkel voor de boodschappenlijst'}
       </button>
     </>}
     {store === 'all' && <PrivateReviewedTwoStoreTable reviewed={reviewed ?? emptyReviewed}

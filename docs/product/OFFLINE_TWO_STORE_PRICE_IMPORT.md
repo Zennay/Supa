@@ -59,6 +59,16 @@ Er wordt geen tweede winkelprijs of besparing verzonnen.
 
 ## Volledig prijsrapport bewaren, printen of mobiel meenemen
 
+Op **Producten → Mijn echte bronartikelen → Open boodschappenlijst**
+kiest Supa bij een volledig, vers en fysiek identiek twee-winkelmandje
+de winkel met de laagste **oorspronkelijke hele-verpakkingsprijs**.
+Bij gelijkstand is PLUS slechts een neutrale tie-breaker. Staat maar
+één actuele eigen winkelbron klaar, dan opent uitsluitend die winkel.
+Bij twee niet-vergelijkbare bronopnames wordt nooit stilzwijgend PLUS
+gekozen: selecteer eerst zelf de winkel. De bronleeftijd en fysieke
+vergelijkbaarheid worden op het moment van doorklikken opnieuw beoordeeld.
+Dit is geen garantie van het kassabedrag of de netto ritkosten.
+
 **Producten → Mijn echte bronartikelen** heeft voor rechtmatig ingevoerde,
 door jezelf beoordeelde SKU's nu ook de winkelvloerfilters
 **Alle originele artikelen**, **Alleen nog te kopen** en **Alleen
