@@ -27,7 +27,7 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
   const [store, setStore] = useState<'all' | OwnStore>('all')
   const [query, setQuery] = useState('')
   const [unitFilter, setUnitFilter] = useState<'all' | 'kg' | 'liter' | 'stuk'>('all')
-  const [order, setOrder] = useState<'source' | 'unitPrice' | 'lineTotal'>('source')
+  const [order, setOrder] = useState<'source' | 'unitPrice' | 'lineTotal' | 'priceGap'>('source')
   const [checkMessage, setCheckMessage] = useState('')
   const [nowMs, setNowMs] = useState(() => Date.now())
   useEffect(() => {
@@ -65,7 +65,7 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
   // while weekly whole-pack costs remain the authoritative budget calculation.
   const group = (line: Matched) =>
     ({ kg: 0, liter: 1, stuk: 2 } as Record<string, number>)[rate(line)?.unit ?? ''] ?? 3
-  const ordered = order === 'source' ? visible : [...visible].sort((a, b) =>
+  const ordered = order === 'source' || order === 'priceGap' ? visible : [...visible].sort((a, b) =>
     order === 'lineTotal'
       ? a.line.lineTotalCents - b.line.lineTotalCents
       : group(a.line) - group(b.line) ||
@@ -110,7 +110,11 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
     {!sources.length ? <p role="status">Nog geen complete en actuele eigen bronproducten beschikbaar.
       Kies een weekmenu, importeer je eigen winkelbron en controleer iedere SKU en verpakking.</p> : <>
       <div className="private-reviewed-products__controls">
-        <label>Winkel <select value={store} onChange={event => setStore(event.target.value as 'all' | OwnStore)}>
+        <label>Winkel <select value={store} onChange={event => {
+          const next = event.target.value as 'all' | OwnStore
+          setStore(next)
+          if (next !== 'all' && order === 'priceGap') setOrder('source')
+        }}>
           <option value="all">Beide winkels</option>
           {shops.map(shop => <option value={shop} key={shop}>{shop}</option>)}
         </select></label>
@@ -126,6 +130,7 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
           <option value="source">Oorspronkelijke bronvolgorde</option>
           <option value="unitPrice">Eenheidsprijs laag naar hoog</option>
           <option value="lineTotal">Weekregelbedrag laag naar hoog</option>
+          {store === 'all' && <option value="priceGap">Grootste prijsverschil per ingrediënt</option>}
         </select></label>
         <label>Zoek eigen product <input type="search" value={query}
           onChange={event => setQuery(event.target.value)} maxLength={120} placeholder="Product, SKU of ingrediënt" /></label>

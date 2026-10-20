@@ -19,7 +19,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   reviewed: PrivateReviewedBaskets
   search: string
   unitFilter: 'all' | 'kg' | 'liter' | 'stuk'
-  order: 'source' | 'unitPrice' | 'lineTotal'
+  order: 'source' | 'unitPrice' | 'lineTotal' | 'priceGap'
   budget: number
   onOpenComparison: () => void
   onOpenList: (store: OwnStore) => void
@@ -114,6 +114,10 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
     return [{ plus: line, deka: alternate }]
   })
   if (order !== 'source') rows.sort((a, b) => {
+    if (order === 'priceGap') return (
+      Math.abs(b.plus.lineTotalCents - b.deka.lineTotalCents) -
+      Math.abs(a.plus.lineTotalCents - a.deka.lineTotalCents)
+    )
     if (order === 'lineTotal') return (
       Math.min(a.plus.lineTotalCents, a.deka.lineTotalCents) -
       Math.min(b.plus.lineTotalCents, b.deka.lineTotalCents)
@@ -128,6 +132,12 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
     return Math.min(rate(a.plus)!.centsPerUnit, rate(a.deka)!.centsPerUnit) -
       Math.min(rate(b.plus)!.centsPerUnit, rate(b.deka)!.centsPerUnit)
   })
+  // This is a navigation aid, not a savings claim. Only visible, paired,
+  // wholly priced ingredient lines contribute to the difference overview.
+  const changed = rows.filter(row => row.plus.lineTotalCents !== row.deka.lineTotalCents)
+  const largest = changed.length ? [...changed].sort((a, b) =>
+    Math.abs(b.plus.lineTotalCents - b.deka.lineTotalCents) -
+    Math.abs(a.plus.lineTotalCents - a.deka.lineTotalCents))[0] : null
   const mix = createMixedStoreShoppingPlan(plus.basket, deka.basket)
   const splitTrip = !!mix && mix.lines.some(line => line.store === 'PLUS') &&
     mix.lines.some(line => line.store === 'DekaMarkt')
@@ -165,6 +175,15 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         of een berekening van werkelijk afgerekende producten.</small>
     </div>}
     <strong role="status">{leader}</strong>
+    <div className="private-reviewed-products__difference-focus" aria-label="Prijsverschil per ingrediënt">
+      <strong>{changed.length} van {rows.length} zichtbare ingrediënten verschillen in hele-pakprijs.</strong>
+      {largest ? <p>Grootste zichtbaar verschil: <strong>{largest.plus.ingredientLabel}</strong> · {' '}
+        {money.format(Math.abs(largest.plus.lineTotalCents - largest.deka.lineTotalCents))} goedkoper bij {' '}
+        {largest.plus.lineTotalCents < largest.deka.lineTotalCents ? 'PLUS' : 'DekaMarkt'}.
+      </p> : <p>Geen verschillende hele-pakprijzen in deze selectie.</p>}
+      <small>Dit overzicht volgt de zoek- en eenheidsfilters; de mandtotalen en
+        goedkoopste winkel hierboven blijven gebaseerd op alle originele weekartikelen.</small>
+    </div>
     {mix && <div className="private-reviewed-products__route-preview">
       <h4>Goedkoopste originele artikelen combineren</h4>
       <p>Productkosten met hele verpakkingen: <strong>{money.format(mix.totalCents / 100)}</strong></p>
