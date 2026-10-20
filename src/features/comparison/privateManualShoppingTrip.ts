@@ -75,9 +75,14 @@ export function privateManualShoppingTripText(
       `| ${line.state === 'invalid' ? 'ingevulde gegevens corrigeren' : 'prijs/product ontbreekt'}`)
   }
   if (!coverage.unresolved) rows.push('(alle regels hebben eigen ingevulde prijzen)')
-  rows.push('', `ALLEEN BEKENDE REGELS: ${euro.formatCents(coverage.knownSubtotalCents)} ` +
-    '(deelbedrag; GEEN winkelmandtotaal).',
-    'Geen winkelbesparing of volledig mandverschil vastgesteld; producten en prijzen opnieuw controleren.')
+  if (coverage.unresolved === 0 && coverage.known === comparison.rows.length) {
+    rows.push('', `VOLLEDIG EIGEN BEREKEND WINKELMANDJE: ${euro.formatCents(coverage.knownSubtotalCents)}`,
+      'Gebaseerd op eigen ingevoerde product- en hele-verpakkingsprijzen; NIET geverifieerd.')
+  } else {
+    rows.push('', `ALLEEN BEKENDE REGELS: ${euro.formatCents(coverage.knownSubtotalCents)}`,
+      '(deelbedrag; GEEN volledig winkelmandtotaal; ontbrekende artikelen nog niet meegerekend).')
+  }
+  rows.push('Geen winkelbesparing of twee-winkelverschil vastgesteld; producten en prijzen opnieuw controleren.')
   const result = rows.join('\n') + '\n'
   if (new TextEncoder().encode(result).length > 128000) {
     throw new Error('De persoonlijke boodschappenlijst is te groot.')

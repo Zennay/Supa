@@ -423,8 +423,16 @@ export function ManualStoreComparison({
             <div className="manual-compare__totals">
               {MANUAL_RETAILERS.map(shop => (
                 <div key={shop}><span>{shop}</span><strong>
-                  {summary.totals[shop] === null ? 'Nog niet compleet' : exactEuro.formatCents(summary.totals[shop]!)}
-                </strong></div>
+                  {(() => {
+                    const storeCoverage = tripCoverage.find(value => value.store === shop)
+                    return storeCoverage && storeCoverage.unresolved === 0 && storeCoverage.known === needs.length
+                      ? exactEuro.formatCents(storeCoverage.knownSubtotalCents)
+                      : 'Nog niet compleet'
+                  })()}
+                </strong>
+                <small>{tripCoverage.find(value => value.store === shop)?.unresolved === 0
+                  ? 'Volledig zelf berekend; winkelprijzen/producten niet gecontroleerd.'
+                  : 'Onbekende producten ontbreken in het totaal.'}</small></div>
               ))}
             </div>
             {summary.fullBasket && summary.deltaCents !== null ? (
