@@ -430,7 +430,7 @@ export function OfflineReviewedWorkbench({
     setBusy(true)
     try {
       if (files.length > 2) throw Error('Kies maximaal twee eigen CSV-bestanden.')
-      const converterUrl = '/offline-two-store-csv.mjs'
+      const converterUrl = `${import.meta.env.BASE_URL}offline-two-store-csv.mjs`
       const module: unknown = await import(/* @vite-ignore */ converterUrl)
       if (!module || typeof module !== 'object' ||
         !('previewOwnStoreCsv' in module) || typeof module.previewOwnStoreCsv !== 'function' ||
