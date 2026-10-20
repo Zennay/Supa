@@ -13,6 +13,7 @@ import type { PlannedMeal } from '../../domain/types.ts'
 import { parseOfflinePriceSnapshots, type OfflineRetailer } from '../../domain/offlineReviewedImport.ts'
 
 type Unit = 'g' | 'kg' | 'ml' | 'l' | 'piece'
+type DraftUnit = Unit | ''
 export type ReviewedRecaptureSeed = {
   sourceId: string
   name: string
@@ -24,7 +25,7 @@ type ProductDraft = {
   sourceId?: string
   name: string
   packAmount: string
-  packUnit: Unit
+  packUnit: DraftUnit
   packCount: string
   priceEuros: string
   available: boolean
@@ -32,8 +33,10 @@ type ProductDraft = {
 }
 const stores: OfflineRetailer[] = ['PLUS', 'DekaMarkt']
 const supportedUnits: Unit[] = ['g', 'kg', 'ml', 'l', 'piece']
-const emptyDraft = (unit: string): ProductDraft => ({
-  sourceId: '', name: '', packAmount: '', packUnit: supportedUnits.includes(unit as Unit) ? unit as Unit : 'g',
+const emptyDraft = (_ingredientUnit: string): ProductDraft => ({
+  // The recipe's requested quantity never establishes a retailer's physical
+  // pack unit. The shopper must explicitly choose the observed source unit.
+  sourceId: '', name: '', packAmount: '', packUnit: '',
   packCount: '1', priceEuros: '', available: false, availabilityReviewed: false,
 })
 const key = (store: OfflineRetailer, ingredientId: string) => JSON.stringify([store, ingredientId])
@@ -103,7 +106,8 @@ function isCompleteOwnPriceDraft(row: ProductDraft): boolean {
     /[\p{L}\p{N}]/u.test(id) &&
     !/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/u.test(id) &&
     row.name.trim().length > 0 && row.name === row.name.trim() &&
-    amount !== null && (row.packUnit !== 'piece' || Number.isSafeInteger(amount)) &&
+    amount !== null && supportedUnits.includes(row.packUnit as Unit) &&
+    (row.packUnit !== 'piece' || Number.isSafeInteger(amount)) &&
     /^\d{1,4}$/.test(row.packCount) && Number.isSafeInteger(count) && count >= 1 && count <= 1000 &&
     eurosToCents(row.priceEuros.trim()) !== null
 }
@@ -117,7 +121,7 @@ function isReviewedUnavailableDraft(row: ProductDraft): boolean {
     /[\p{L}\p{N}]/u.test(id) &&
     !/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/u.test(id) &&
     row.name.trim().length > 0 && row.name === row.name.trim() &&
-    !row.priceEuros.trim() &&
+    !row.priceEuros.trim() && supportedUnits.includes(row.packUnit as Unit) &&
     (row.packAmount.trim().length === 0 || (amount !== null &&
       (row.packUnit !== 'piece' || Number.isSafeInteger(amount)))) &&
     /^\d{1,4}$/.test(row.packCount) && Number.isSafeInteger(count) && count >= 1 && count <= 1000
@@ -130,8 +134,8 @@ const isEnteredOwnCapture = (row: ProductDraft) =>
 function hasPartialOwnCapture(row: ProductDraft): boolean {
   return !isEnteredOwnCapture(row) && Boolean(
     (row.sourceId ?? '').trim() || row.name.trim() ||
-    row.packAmount.trim() || row.priceEuros.trim() ||
-    row.available || row.availabilityReviewed,
+    row.packAmount.trim() || row.packUnit !== '' || row.packCount !== '1' ||
+    row.priceEuros.trim() || row.available || row.availabilityReviewed,
   )
 }
 
@@ -156,13 +160,13 @@ function currentDraftPackMath(row: ProductDraft,
   const count = Number(row.packCount)
   const packs = calculateDecimalPackCount(
     [{ amount: need.amount, unit: need.unit }],
-    { amount: packAmount, unit: row.packUnit, count },
+    { amount: packAmount, unit: row.packUnit as Unit, count },
   )
   if (packs === null || !Number.isSafeInteger(packs) || packs <= 0) return null
   const total = packs * priceCents
   if (!Number.isSafeInteger(total) || total < 0) return null
   const rate = privatePackUnitRate({
-    amount: packAmount, unit: row.packUnit, count, priceCents,
+    amount: packAmount, unit: row.packUnit as Unit, count, priceCents,
   })
   return { packagesNeeded: packs, pricePerPackCents: priceCents,
     lineTotalCents: total, unitRate: rate ? formatPrivateUnitRate(rate) : null }
@@ -240,7 +244,8 @@ function readPrivateDraft(fingerprint: string, allowedRows: ReadonlySet<string>,
         (row.availabilityReviewed === undefined || typeof row.availabilityReviewed === 'boolean') &&
         typeof row.name === 'string' && row.name.length <= 160 &&
         typeof row.packAmount === 'string' && row.packAmount.length <= 24 &&
-        typeof row.packUnit === 'string' && supportedUnits.includes(row.packUnit as Unit) &&
+        typeof row.packUnit === 'string' &&
+        (row.packUnit === '' || supportedUnits.includes(row.packUnit as Unit)) &&
         typeof row.packCount === 'string' && row.packCount.length <= 8 &&
         typeof row.priceEuros === 'string' && row.priceEuros.length <= 24 &&
         typeof row.available === 'boolean'
@@ -721,6 +726,9 @@ export function LocalTwoStorePriceEditor({
           if (draft.packAmount && packAmount === null) {
             throw new Error(`${store} · ${need.label}: ongeldige fysieke verpakking.`)
           }
+          if (!supportedUnits.includes(draft.packUnit as Unit)) {
+            throw new Error(`${store} · ${need.label}: selecteer de echt waargenomen eenheid van de winkelverpakking.`)
+          }
           if (draft.packUnit === 'piece' && packAmount !== null &&
               !Number.isSafeInteger(packAmount)) {
             throw new Error(`${store} · ${need.label}: losse stuks op de verpakking moeten een heel aantal zijn.`)
@@ -744,7 +752,7 @@ export function LocalTwoStorePriceEditor({
           }
           return [{
             id: originalId,
-            name: draft.name, packAmount, packUnit: draft.packUnit,
+            name: draft.name, packAmount, packUnit: draft.packUnit as Unit,
             packCount: count, available: draft.available,
             priceCents: draft.available ? price : null,
           }]
@@ -1243,10 +1251,13 @@ export function LocalTwoStorePriceEditor({
                   <input type="text" inputMode="decimal" placeholder="Bijv. 500" value={row.packAmount}
                     onChange={e => changeRow(store, need.id, { packAmount: e.target.value }, need.unit)} />
                 </label>
-                <label>Eenheid
-                  <select value={row.packUnit} onChange={e => changeRow(store, need.id, { packUnit: e.target.value as Unit }, need.unit)}>
+                <label>Eenheid van de echte winkelverpakking
+                  <select value={row.packUnit} required
+                    onChange={e => changeRow(store, need.id, { packUnit: e.target.value as DraftUnit }, need.unit)}>
+                    <option value="">Kies de geobserveerde verpakkingseenheid</option>
                     {supportedUnits.map(unit => <option key={unit} value={unit}>{unit === 'piece' ? 'stuk' : unit}</option>)}
                   </select>
+                  <small>Niet afgeleid van het recept: controleer de fysieke inhoud.</small>
                 </label>
                 <label>Stuks per multipack
                   <input inputMode="numeric" type="number" min="1" max="1000" value={row.packCount}
