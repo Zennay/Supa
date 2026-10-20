@@ -692,9 +692,6 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               navigate('list')
             }} />
         </Suspense>}
-        {(tab === 'home' || tab === 'recipes') && <HiFiHome view={tab}
-          onNavigate={navigate} activeDays={activeDays}
-          addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />}
         {tab === 'home' && <Suspense fallback={<p role="status">Mijn winkelvergelijking laden…</p>}>
           <PrivateComparisonJourney
             reviewed={livePrivateReviewed}
@@ -714,6 +711,9 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             }}
           />
         </Suspense>}
+        {(tab === 'home' || tab === 'recipes') && <HiFiHome view={tab}
+          onNavigate={navigate} activeDays={activeDays}
+          addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />}
         {tab === 'products' && <details className="supa-product-archive">
           <summary>Oude ontwerpvoorbeelden en historische bronkaarten tonen (geen actuele prijzen)</summary>
           <p>Alleen de persoonlijk bevestigde bronartikelen hierboven tellen mee in
