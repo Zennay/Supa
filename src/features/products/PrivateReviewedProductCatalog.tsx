@@ -363,7 +363,8 @@ export function PrivateReviewedProductCatalog({ reviewed, captureProgress, budge
     </>}
     {store === 'all' && <PrivateReviewedTwoStoreTable reviewed={reviewed ?? emptyReviewed}
       search={search} unitFilter={unitFilter} order={order} budget={budget}
-      onOpenComparison={onOpenComparison} onOpenList={onOpenList}
+      onOpenComparison={onOpenComparison} onReviewIngredient={onReviewIngredient}
+      onOpenList={onOpenList}
       onOpenMixedRoute={onOpenMixedRoute} onChooseRouteLine={onChooseRouteLine}
       checked={checked} />}
     <button type="button" onClick={onOpenComparison}>Open prijsinvoer en productmatching</button>

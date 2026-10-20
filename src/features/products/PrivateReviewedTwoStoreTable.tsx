@@ -43,13 +43,14 @@ function samePartialPhysicalDemand(left: OneStoreBasket, right: OneStoreBasket):
 /** Both sides are the exact SAME human-reviewed physical weekly demand.
  * No independent source authorization, live pricing or retail claim is implied.
  */
-export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, order, budget, onOpenComparison, onOpenList, onOpenMixedRoute, onChooseRouteLine, checked }: {
+export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, order, budget, onOpenComparison, onReviewIngredient, onOpenList, onOpenMixedRoute, onChooseRouteLine, checked }: {
   reviewed: PrivateReviewedBaskets
   search: string
   unitFilter: 'all' | 'kg' | 'liter' | 'stuk'
   order: 'source' | 'unitPrice' | 'lineTotal' | 'priceGap'
   budget: number
   onOpenComparison: () => void
+  onReviewIngredient?: (shop: OwnStore, ingredientId: string) => void
   onOpenList: (store: OwnStore) => void
   onOpenMixedRoute: () => void
   onChooseRouteLine: (choice: Omit<PrivateRouteChoice, 'serial'>) => void
@@ -589,6 +590,18 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
             : line.requirement.amount + ' ' + line.requirement.unit}
             {' '}· {absent ? 'winkelbron ontbreekt' : 'productmatch of prijs ontbreekt'}
           </span>
+          <button type="button" onClick={() => {
+            const latest = freshReviewedBaskets(reviewedRef.current,
+              reviewedRef.current.planKey, Date.now())
+            const current = latest?.stores[shop]
+            if (!current || !current.basket.lines.some(candidate =>
+              candidate.id === line.id && candidate.status === 'unresolved')) {
+              onOpenComparison()
+              return
+            }
+            if (onReviewIngredient) onReviewIngredient(shop, line.id)
+            else onOpenComparison()
+          }}>{absent ? 'Voeg winkelbron toe' : 'Controleer originele SKU en prijs'}</button>
         </li>)}</ul>
         <button type="button" onClick={onOpenComparison}>
           Vul ontbrekende bronproducten in en controleer productmatching
