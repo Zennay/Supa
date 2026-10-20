@@ -18,7 +18,9 @@ export type CombinedImportedGroceries = {
  * This uses the existing single-recipe portion scaler and exact decimal
  * arithmetic; it never manufactures a purchase price or SKU.
  */
-export function combinedImportedRecipeGroceries(recipes: readonly SavedRecipe[]): CombinedImportedGroceries {
+export function combinedImportedRecipeGroceries(
+  recipes: readonly SavedRecipe[], portionsById: Readonly<Record<string, number>> = {},
+): CombinedImportedGroceries {
   if (!Array.isArray(recipes) || recipes.length === 0 || recipes.length > 15 ||
       new Set(recipes.map(recipe => recipe.id)).size !== recipes.length) {
     throw new Error('Kies één tot vijftien verschillende eigen recepten.')
@@ -31,11 +33,13 @@ export function combinedImportedRecipeGroceries(recipes: readonly SavedRecipe[])
         !Array.isArray(recipe.ingredients) || !recipe.ingredients.length) {
       throw new Error('Een eigen recept heeft geen leesbare ingrediënten.')
     }
-    const ready = !!toPlannerRecipe(recipe, { usage: 'unpriced-demand' })
+    const portions = Object.hasOwn(portionsById, recipe.id)
+      ? portionsById[recipe.id] : recipe.servings
+    const validPortions = typeof portions === 'number' &&
+      Number.isSafeInteger(portions) && portions >= 1 && portions <= 100
+    const ready = validPortions && !!toPlannerRecipe(recipe, { usage: 'unpriced-demand' })
     if (!ready) heldRecipes.push(recipe.title)
-    const single = ready
-      ? ownRecipeShoppingChecklist(recipe, recipe.servings!)
-      : null
+    const single = ready ? ownRecipeShoppingChecklist(recipe, portions) : null
     const sourceLines = single?.canCopy ? single.lines : recipe.ingredients.map((ingredient: SavedRecipe['ingredients'][number], index: number) => ({
       key: String(index), label: ingredient.label || ingredient.original,
       amount: null, unit: null, original: ingredient.original, needsReview: true,

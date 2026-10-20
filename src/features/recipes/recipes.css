@@ -217,3 +217,8 @@
 .recipe-collection-groceries__recipes label { min-height: 38px; }
 .recipe-collection-groceries > label input[type=search] { width: 100%; padding: 11px;
   min-width: 0; border: 1px solid #8da692; border-radius: 10px; background: white; }
+.recipe-collection-groceries__recipe { display:flex; flex-wrap:wrap; align-items:center;
+  justify-content:space-between; gap:8px; padding:7px 0; border-bottom:1px solid #dae6da; }
+.recipe-collection-groceries__recipe > label { display:flex; align-items:center; gap:8px; }
+.recipe-collection-groceries__recipe input[type=number] { width:72px; min-height:44px;
+  padding:7px; border:1px solid #9bb19e; border-radius:9px; background:white; font:inherit; }

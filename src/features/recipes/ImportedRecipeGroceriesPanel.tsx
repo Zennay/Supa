@@ -32,16 +32,19 @@ export function ImportedRecipeGroceriesPanel({
   const [selectedIds, setSelectedIds] = useState<string[]>(() =>
     (recentIds.length ? recentIds : recipes.slice(0, 3).map(recipe => recipe.id)).slice(0, 15))
   const [query, setQuery] = useState('')
+  const [portionsById, setPortionsById] = useState<Record<string, number>>({})
   const [checked, setChecked] = useState<Record<string, boolean>>({})
   const [pendingOnly, setPendingOnly] = useState(false)
   const [feedback, setFeedback] = useState('')
   const selected = recipes.filter(recipe => selectedIds.includes(recipe.id))
   const signature = JSON.stringify(selected.map(recipe => [
-    recipe.id, recipe.servings, recipe.minutes, recipe.warnings,
+    recipe.id, portionsById[recipe.id] ?? recipe.servings, recipe.servings,
+    recipe.minutes, recipe.warnings,
     recipe.ingredients.map(item => [item.original, item.amount, item.unit, item.reviewReason]),
   ]))
   useEffect(() => { setChecked({}); setFeedback('') }, [signature])
-  const result = selected.length ? combinedImportedRecipeGroceries(selected) : null
+  const result = selected.length
+    ? combinedImportedRecipeGroceries(selected, portionsById) : null
   const list = result?.checklist ?? null
   const outstanding = list?.lines.filter(line => line.needsReview).length ?? 0
   const checkedCount = list?.lines.filter(line => !line.needsReview && checked[line.key]).length ?? 0
@@ -83,7 +86,7 @@ export function ImportedRecipeGroceriesPanel({
   const exportForStores = () => {
     if (!list?.canCopy) return
     try {
-      const json = exportCombinedRecipesPrivateWeek(selected)
+      const json = exportCombinedRecipesPrivateWeek(selected, portionsById)
       savePrivateFile('supa-meerdere-recepten-privewinkelmandje.json',
         json, 'application/json;charset=utf-8')
       setFeedback('Je fysieke receptenmandje is veilig geëxporteerd, zonder prijzen. Open de privévergelijker en koppel daar je eigen actuele winkelproducten en waarnemingen.')
@@ -94,7 +97,7 @@ export function ImportedRecipeGroceriesPanel({
   const openInPrivateMatcher = () => {
     if (!list?.canCopy) return
     try {
-      const json = exportCombinedRecipesPrivateWeek(selected)
+      const json = exportCombinedRecipesPrivateWeek(selected, portionsById)
       if (!window.confirm('Open dit ongeprijsde mandje in de privéwinkelvergelijker? ' +
         'Je controleert daar eerst alle fysieke ingrediënten en bevestigt daarna zelf de bronproducten. ' +
         'Oude winkelprijzen en artikelkeuzes worden niet automatisch meegenomen.')) return
@@ -109,8 +112,9 @@ export function ImportedRecipeGroceriesPanel({
     <h3>Één boodschappenlijst voor je nieuwe recepten</h3>
     <p>Kies welke recepten je samen wilt koken. Dezelfde duidelijke ingrediënten en
       metrische eenheden worden samengevoegd. Alle hoeveelheden zijn voor de
-      oorspronkelijke porties van elk recept. Producten, verpakkingsprijzen en
-      besparingen blijven onbekend tot je eigen winkelbronnen controleert.</p>
+      gewenste porties per recept. Gedeeltelijke fysieke stuks blijven handmatig
+      te beoordelen. Producten, verpakkingsprijzen en besparingen blijven
+      onbekend tot je eigen winkelbronnen controleert.</p>
     <label className="recipe-collection-label">Zoek recept in mijn bibliotheek
       <input type="search" maxLength={120} value={query}
         placeholder="Zoek jouw eigen recepten" onChange={event => setQuery(event.currentTarget.value)} />
@@ -118,11 +122,25 @@ export function ImportedRecipeGroceriesPanel({
     <small>{selected.length} van {recipes.length} recepten gekozen (maximaal 15).
       Met zoeken worden gekozen recepten niet ongemerkt verwijderd.</small>
     <div className="recipe-collection-groceries__recipes" role="group" aria-label="Recepten combineren">
-      {visibleRecipes.map(recipe => <label key={recipe.id}>
-        <input type="checkbox" checked={selectedIds.includes(recipe.id)}
-          onChange={event => changeSelection(recipe.id, event.currentTarget.checked)} />
-        {recipe.title} · {recipe.servings ?? '?'} porties
-      </label>)}
+      {visibleRecipes.map(recipe => <div key={recipe.id}
+        className="recipe-collection-groceries__recipe">
+        <label>
+          <input type="checkbox" checked={selectedIds.includes(recipe.id)}
+            onChange={event => changeSelection(recipe.id, event.currentTarget.checked)} />
+          {recipe.title}
+        </label>
+        {selectedIds.includes(recipe.id) && <label>Gewenste porties
+          <input type="number" min="1" max="100" step="1"
+            aria-label={'Gewenste porties voor ' + recipe.title}
+            value={Object.hasOwn(portionsById, recipe.id)
+              ? portionsById[recipe.id] : recipe.servings ?? ''}
+            onChange={event => {
+              const count = Number(event.currentTarget.value)
+              setPortionsById(previous => ({ ...previous, [recipe.id]: count }))
+              setChecked({}); setFeedback('')
+            }} />
+        </label>}
+      </div>)}
     </div>
     {!list ? <p role="status">Kies minstens één recept om een gezamenlijke lijst te maken.</p> : <>
       <p role="status"><strong>{result!.recipes} recepten · {list.lines.length} boodschappenregels</strong>.
