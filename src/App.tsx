@@ -929,6 +929,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             <PrivateSourceShoppingList reviewed={livePrivateReviewed} budget={budget}
               checked={privateShoppingTicks} setChecked={setPrivateShoppingTicks}
               plan={plannedMeals} recipes={recipes} activeDays={activeDays}
+              manualNotes={manualShoppingNotes}
               preferred={preferredOwnStore} onChooseStore={setPreferredOwnStore}
               onOpenComparison={openOwnPriceImport} routeOpenSignal={mixedRouteOpenSignal}
               routeChoice={privateRouteChoice}

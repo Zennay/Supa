@@ -4,6 +4,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import type { BasketTraceLine, RecipeWithIngredients } from '../../domain/basket.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
+import type { UnpricedShoppingNote } from './ManualShoppingNotes.tsx'
 import { freshReviewedBaskets, privateReviewedPairWithin24Hours, type OwnStore, type PrivateReviewedBaskets, type PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
 import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import { extraGroceriesSavedEvent, readSavedExtrasForPlan } from '../comparison/ownExtraGroceriesStorage.ts'
@@ -20,7 +21,7 @@ const MixedStoreShoppingCard = lazy(async () => {
 })
 
 /** Private owner-reviewed baskets only. No fixture rows, browser storage or APIs. */
-export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChooseStore, onOpenComparison, checked, setChecked, plan, recipes, activeDays, routeChoice, routeCostIntent, routeOpenSignal = 0 }: {
+export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChooseStore, onOpenComparison, checked, setChecked, plan, recipes, activeDays, routeChoice, routeCostIntent, routeOpenSignal = 0, manualNotes = [] }: {
   reviewed: PrivateReviewedBaskets
   budget: number
   preferred: OwnStore
@@ -31,6 +32,7 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
   plan: PlannedMeal[]
   recipes: RecipeWithIngredients[]
   activeDays: string[]
+  manualNotes?: readonly UnpricedShoppingNote[]
   routeOpenSignal?: number
   routeChoice?: PrivateRouteChoice | null
   routeCostIntent?: PrivateExtraVisitCostIntent | null
@@ -102,6 +104,11 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
       (privateUnitPrice(line) ?? 'eenheidsprijs onbekend') + ' · ' +
       exactEuro.formatCents(line.lineTotalCents) + ' totaal'
     : line.ingredientLabel + ': product onbekend'
+  // User-added notes are presentation-only, never product matches or euros.
+  const ownNotes = manualNotes.filter(note => note &&
+    (note.store === 'Algemeen' || note.store === store) &&
+    typeof note.label === 'string' && note.label.trim().length > 0 &&
+    note.label.length <= 140 && typeof note.done === 'boolean')
   const textList = [
     'Supa · ' + store + ' · privé gecontroleerd boodschappenlijstje',
     'Eigen bronopname: ' + readable(capture.observedAt),
@@ -109,7 +116,11 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
       'Volledig eigen winkelmandje, afgevinkte artikelen inbegrepen.',
     'Nog op lijst volgens eigen bron: ' + exactEuro.formatCents(remainingCents),
     ...visibleLines.map(line => (checked[tick(line)] ? '☑ ' : '☐ ') + label(line)),
-    ...(remainingOnly && visibleLines.length === 0 ? ['Alles afgevinkt.'] : []),
+    ...(remainingOnly && visibleLines.length === 0 ? ['Alle geprijsde regels afgevinkt.'] : []),
+    ...(ownNotes.length ? ['', 'EIGEN EXTRA BOODSCHAPPEN — prijs onbekend, buiten winkelmandtotaal',
+      ...ownNotes.filter(note => !remainingOnly || !note.done).map(note =>
+        (note.done ? '☑ ' : '☐ ') + readable(note.label) + ' [' + note.store + '] · ongeprijsd'),
+    ] : []),
     'Privébron. Geen actuele kassagarantie of publieke besparingsclaim.',
   ].join('\n')
   const plus = reviewed.stores.PLUS
@@ -524,6 +535,10 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
           Deel of kopieer mijn actuele {store}-winkelmandje
         </button>
         <button type="button" onClick={downloadList}>Download eigen boodschappenlijst (TXT)</button>
+        {ownNotes.length > 0 && <p className="disclaimer" role="status">
+          Deze TXT- en deeltekst bevat ook {ownNotes.length} eigen ongeprijsde {ownNotes.length === 1 ? 'boodschap' : 'boodschappen'}
+          voor {store}. Ze tellen niet mee voor winkelbedragen, besparingen of CSV-/HTML-bronrapporten.
+        </p>}
         <button type="button" onClick={() => { void downloadStoreWithExtras() }}>
           Download winkelmand + mijn bewaarde extra boodschappen (TXT)
         </button>
