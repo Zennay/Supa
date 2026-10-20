@@ -10,11 +10,12 @@ const literal = (value: string | number) => String(value)
  * The canonical CSV ledger first certifies the entire physical basket.
  * No second shop, checkout proof or independently verified price is inferred.
  */
-export function privateSingleStoreShoppingText({ basket, observedAt }: {
+export function privateSingleStoreShoppingText({ basket, observedAt, done = new Set<string>() }: {
   basket: OneStoreBasket
   observedAt: string
+  done?: ReadonlySet<string>
 }): string {
-  privateSingleStoreShoppingCsv({ basket, observedAt, done: new Set<string>() })
+  privateSingleStoreShoppingCsv({ basket, observedAt, done })
   const rows = [
     'SUPA · mijn eigen ' + literal(basket.store.id) + '-weekmand',
     'Bronmoment: ' + literal(observedAt),
@@ -26,7 +27,7 @@ export function privateSingleStoreShoppingText({ basket, observedAt }: {
   for (const line of basket.lines) {
     if (line.status !== 'matched') throw new Error('Niet alle producten zijn gecontroleerd.')
     rows.push(
-      '☐ ' + literal(line.ingredientLabel) + ' · ' + literal(line.requirement.amount) +
+      (done.has(line.id) ? '☑ ' : '☐ ') + literal(line.ingredientLabel) + ' · ' + literal(line.requirement.amount) +
         ' ' + literal(line.requirement.unit),
       '  ' + line.packs + ' × ' + literal(line.productName) +
         ' (SKU ' + literal(line.productId) + ')',

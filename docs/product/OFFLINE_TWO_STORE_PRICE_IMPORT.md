@@ -43,6 +43,19 @@ Dezelfde bestaande, strikte negenkoloms-CSV-converter is nu ook rechtstreeks via
 5. Klik pas na eigen controle op **Neem eigen brondata over**. Voor een ontbrekende tweede winkel wordt dezelfde bestaande veilige toevoegroute gebruikt; voor een al geladen winkel de **bronverschillen-preview** vóór vervanging. Wanneer je één CSV met uitsluitend **nieuwe** oorspronkelijke artikelcodes en exact hetzelfde eerdere waarnemingstijdstip aanlevert, sluit de preview nu direct aan op de bestaande **veilig aanvullen**-route: de eerdere productregels, echte prijzen en het onveranderde bronmoment blijven intact. De matching-preview gebruikt bij deze aanvulroute de gecombineerde lijst van bestaande én nieuwe originele bronproducten, zodat eerdere productmatches niet ten onrechte als ontbrekend worden weergegeven. Bij een andere opnametijd of reeds bestaande broncode gebruikt Supa uitsluitend de bestaande expliciete **winkelvervanging** met bronverschillencontrole; er worden geen oude prijzen doorgeschoven naar een nieuwer moment. Als er al bronnen en controles zijn, vraagt het tegelijk inladen van twee vervangende winkelbestanden expliciet om bevestiging, nadat beide bestanden geldig zijn verklaard. Annuleren behoudt de bestaande brongegevens en vinkjes. Geaccepteerde productcodes zijn niet automatisch met Planner-ingrediënten gematcht: elk fysieke match en de oorspronkelijke prijs moeten apart worden beoordeeld.
 6. Verlopen, ontbrekende of niet-geprijsde winkelobservaties blijven **onbekend**. Een volledig prijsverschil verschijnt alleen als beide complete, brongebonden mandjes aan bestaande voorwaarden voldoen. Dit werkblad is geen toestemming van retailers en geen onafhankelijk veldbewijs.
 
+## Eén winkel klaar terwijl de tweede nog ontbreekt
+
+Wanneer je wel een volledig eigen PLUS- **of** DekaMarkt-mandje
+hebt gecontroleerd maar een vergelijkbare tweede bron nog ontbreekt,
+biedt **Producten → Vergelijk PLUS met DekaMarkt** per beschikbare
+winkel de afzonderlijke **CSV-/TXT-download**, **kopieer**- en
+**deel**-acties aan. De export gebruikt dezelfde oorspronkelijke
+SKU's, echte bronmomenten, hele verpakkingsprijzen en de actuele
+vinkjes van die winkel. De winkeltekst toont de afvinkingen; ook de
+CSV bevat afzonderlijke velden voor afgevinkt. Het systeemklembord en
+de native deelactie worden uitsluitend bij je eigen klik aangeroepen.
+Er wordt geen tweede winkelprijs of besparing verzonnen.
+
 ## Volledig prijsrapport bewaren, printen of mobiel meenemen
 
 Wanneer alle oorspronkelijke SKU's voor **exact hetzelfde fysieke weekmandje** in

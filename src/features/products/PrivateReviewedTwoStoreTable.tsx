@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { ownStoreWeekComparison } from '../planner/ownStoreBudgetComparison.ts'
 import { printableOwnStoreComparison } from '../planner/downloadOwnStoreComparison.ts'
+import { privateSingleStoreShoppingText } from '../shopping-list/privateSingleStoreShoppingText.ts'
 import { observedInstant } from '../../domain/offlineReviewedImport.ts'
 import type { BasketTraceLine } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
@@ -43,16 +44,16 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       return
     }
     try {
+      const done = new Set(receipt.basket.lines.filter(line => line.status === 'matched' &&
+        checked[privatePhysicalShoppingTick(origin.planKey, shop, receipt.basket.store.id, line)])
+        .map(line => line.id))
       const content = kind === 'csv'
         ? (await import('../shopping-list/privateSourceShoppingCsv.ts'))
           .privateSingleStoreShoppingCsv({
             basket: receipt.basket, observedAt: receipt.observedAt,
-            done: new Set(receipt.basket.lines.filter(line => line.status === 'matched' &&
-              checked[privatePhysicalShoppingTick(origin.planKey, shop, receipt.basket.store.id, line)])
-              .map(line => line.id)),
+            done,
           })
-        : (await import('../shopping-list/privateSingleStoreShoppingText.ts'))
-          .privateSingleStoreShoppingText({ basket: receipt.basket, observedAt: receipt.observedAt })
+        : privateSingleStoreShoppingText({ basket: receipt.basket, observedAt: receipt.observedAt, done })
       const latest = freshReviewedBaskets(reviewedRef.current,
         reviewedRef.current.planKey, Date.now())
       if (latest?.planKey !== origin.planKey || latest?.stores[shop] !== receipt)
@@ -75,6 +76,48 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
           'Een compleet prijsverschil met de andere winkel is nog niet beschikbaar.'))
     } catch {
       setReceiptMessage('Download van eigen ' + shop + '-mand mislukt. Herzie de bron.')
+    }
+  }
+  async function handoffSingle(shop: OwnStore, action: 'copy' | 'share') {
+    const current = freshReviewedBaskets(reviewedRef.current,
+      reviewedRef.current.planKey, Date.now())
+    const source = current?.stores[shop]
+    if (!current || !source) {
+      setReceiptMessage(shop + ': geen geldige actuele eigen bron om mee te nemen.')
+      return
+    }
+    try {
+      const done = new Set(source.basket.lines.filter(line => line.status === 'matched' &&
+        checked[privatePhysicalShoppingTick(current.planKey, shop, source.basket.store.id, line)])
+        .map(line => line.id))
+      // Synchronous serialization retains transient user activation for
+      // clipboard/native share. No implicit upload or retailer fetch.
+      const body = privateSingleStoreShoppingText({
+        basket: source.basket, observedAt: source.observedAt, done,
+      })
+      const latest = freshReviewedBaskets(reviewedRef.current,
+        reviewedRef.current.planKey, Date.now())
+      if (latest?.stores[shop] !== source || latest.planKey !== current.planKey)
+        throw Error('Eigen winkelbron is veranderd.')
+      if (action === 'copy') {
+        if (!navigator.clipboard?.writeText) {
+          setReceiptMessage('Klembord niet beschikbaar. Download je eigen winkel-TXT.')
+          return
+        }
+        await navigator.clipboard.writeText(body)
+        setReceiptMessage(shop + ': eigen lijst inclusief afvinkingen gekopieerd.')
+      } else {
+        if (!navigator.share) {
+          setReceiptMessage('Delen niet beschikbaar. Download je eigen winkel-TXT.')
+          return
+        }
+        await navigator.share({ title: 'SUPA · mijn ' + shop + '-lijst', text: body })
+        setReceiptMessage(shop + ': eigen lijst aangeboden aan het deelvenster.')
+      }
+    } catch (error) {
+      if (action === 'share' && error instanceof Error && error.name === 'AbortError')
+        setReceiptMessage('Delen geannuleerd; jouw gegevens blijven behouden.')
+      else setReceiptMessage(shop + ': overdragen mislukt. Gebruik de lokale TXT-download.')
     }
   }
   async function downloadReceipt(kind: 'csv' | 'txt' | 'html') {
@@ -253,6 +296,12 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
               </button>
               <button type="button" onClick={() => { void downloadSingle(shop, 'txt') }}>
                 Bewaar mijn {shop}-lijst (TXT)
+              </button>
+              <button type="button" onClick={() => { void handoffSingle(shop, 'copy') }}>
+                Kopieer mijn {shop}-lijst inclusief afvinkingen
+              </button>
+              <button type="button" onClick={() => { void handoffSingle(shop, 'share') }}>
+                Deel mijn {shop}-lijst via apparaat
               </button>
             </> : <>
               <strong>Prijs onbekend</strong>
