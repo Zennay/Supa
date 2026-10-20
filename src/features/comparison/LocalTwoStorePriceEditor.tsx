@@ -135,9 +135,21 @@ function hasPartialOwnCapture(row: ProductDraft): boolean {
   )
 }
 
-function currentDraftPackPreview(row: ProductDraft, need: { amount: number | null; unit: MatchUnit }): string | null {
-  if (!isCompleteOwnPriceDraft(row) || need.amount === null || !Number.isFinite(need.amount) ||
-      need.amount <= 0) return null
+type DraftPackMath = {
+  packagesNeeded: number
+  pricePerPackCents: number
+  lineTotalCents: number
+  unitRate: string | null
+}
+
+// This calculation is for an UNAPPROVED personally typed product only.
+// It reuses the canonical physical whole-pack arithmetic; the final basket
+// continues to require the original source import + product/price review.
+function currentDraftPackMath(row: ProductDraft,
+  need: { amount: number | null; unit: MatchUnit }): DraftPackMath | null {
+  if (!isCompleteOwnPriceDraft(row) || need.amount === null ||
+      !Number.isFinite(need.amount) || need.amount <= 0 ||
+      (need.unit === 'piece' && !Number.isSafeInteger(need.amount))) return null
   const packAmount = amountOrNull(row.packAmount.trim())
   const priceCents = eurosToCents(row.priceEuros.trim())
   if (packAmount === null || priceCents === null) return null
@@ -152,9 +164,18 @@ function currentDraftPackPreview(row: ProductDraft, need: { amount: number | nul
   const rate = privatePackUnitRate({
     amount: packAmount, unit: row.packUnit, count, priceCents,
   })
-  return packs + ' hele verpakking(en) × ' + exactEuro.formatCents(priceCents) +
-    ' = ' + exactEuro.formatCents(total) + ' voor deze ingrediëntvraag' +
-    (rate ? ' · ' + formatPrivateUnitRate(rate) : '')
+  return { packagesNeeded: packs, pricePerPackCents: priceCents,
+    lineTotalCents: total, unitRate: rate ? formatPrivateUnitRate(rate) : null }
+}
+
+function currentDraftPackPreview(row: ProductDraft,
+  need: { amount: number | null; unit: MatchUnit }): string | null {
+  const math = currentDraftPackMath(row, need)
+  if (!math) return null
+  return math.packagesNeeded + ' hele verpakking(en) × ' +
+    exactEuro.formatCents(math.pricePerPackCents) + ' = ' +
+    exactEuro.formatCents(math.lineTotalCents) + ' voor deze ingrediëntvraag' +
+    (math.unitRate ? ' · ' + math.unitRate : '')
 }
 
 type CaptureStatus = 'priced' | 'unavailable' | 'incompatible' | 'partial' | 'missing'
@@ -249,13 +270,40 @@ export function LocalTwoStorePriceEditor({
 }: Props) {
   const [open, setOpen] = useState(false)
   const [onlyOpenRows, setOnlyOpenRows] = useState(false)
+  const [pricePreviewNow, setPricePreviewNow] = useState(() => Date.now())
   const [sourceSelection, setSourceSelection] = useState<'both' | OfflineRetailer>('both')
   const [scanTarget, setScanTarget] = useState<{
     store: OfflineRetailer; ingredientId: string; fingerprint: string
   } | null>(null)
   const selectedStores = sourceSelection === 'both' ? stores : [sourceSelection]
+  // Do not leave a provisional pair visible forever in a long-running tab.
+  // This only updates advisory UI, never revives or admits source evidence.
+  useEffect(() => {
+    if (!open || sourceSelection !== 'both') return
+    const refresh = () => setPricePreviewNow(Date.now())
+    refresh()
+    const timer = window.setInterval(refresh, 60_000)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', refresh)
+    }
+  }, [open, sourceSelection])
+
   const [rows, setRows] = useState<Record<string, ProductDraft>>({})
   const [capturedAt, setCapturedAt] = useState<Record<OfflineRetailer, string>>({ PLUS: '', DekaMarkt: '' })
+  const sameTimePair = (() => {
+    const plus = timestampWithOffset(capturedAt.PLUS)
+    const deka = timestampWithOffset(capturedAt.DekaMarkt)
+    if (!plus || !deka) return false
+    const first = Date.parse(plus)
+    const second = Date.parse(deka)
+    return Number.isFinite(first) && Number.isFinite(second) &&
+      Math.abs(first - second) <= 86_400_000 &&
+      [first, second].every(time => pricePreviewNow - time >= -300_000 &&
+        pricePreviewNow - time <= 604_800_000)
+  })()
+
   const [error, setError] = useState('')
   const [output, setOutput] = useState('')
   const currentPreparedOutput = useRef(output)
@@ -845,6 +893,26 @@ export function LocalTwoStorePriceEditor({
                 </button>
               })}
             </div>
+            {sameTimePair && (() => {
+              const plus = currentDraftPackMath(
+                rows[key('PLUS', need.id)] ?? emptyDraft(need.unit), need)
+              const deka = currentDraftPackMath(
+                rows[key('DekaMarkt', need.id)] ?? emptyDraft(need.unit), need)
+              if (!plus || !deka) return null
+              const difference = deka.lineTotalCents - plus.lineTotalCents
+              if (!Number.isSafeInteger(difference)) return null
+              return <div className="offline-manual-editor__pair-provisional" role="note">
+                <small>Alleen voorlopig, uit je twee handmatig ingevoerde concepten</small>
+                <span>PLUS {plus.packagesNeeded} × pak: <strong>{exactEuro.formatCents(plus.lineTotalCents)}</strong>
+                  {' · '}DekaMarkt {deka.packagesNeeded} × pak:
+                  {' '}<strong>{exactEuro.formatCents(deka.lineTotalCents)}</strong></span>
+                <strong>{difference === 0 ? 'Gelijke voorlopige regelprijs' :
+                  exactEuro.formatCents(Math.abs(difference)) +
+                  ' op deze ene regel lager bij ' + (difference > 0 ? 'PLUS' : 'DekaMarkt')}</strong>
+                <small>Geen volledig mandtotaal of besparing. Eerst originele SKU,
+                  productequivalentie en actuele eigen prijzen bevestigen in Vergelijk.</small>
+              </div>
+            })()}
           </div>)}
           <p className="disclaimer">Alleen jouw lokale concepten. De echte vergelijking volgt
             pas na beide volledige bronopnames, menselijke reviews en tijd-/prijscontroles.</p>
