@@ -313,7 +313,19 @@ export function ImportedRecipeGroceriesPanel({
       if (!window.confirm('Open dit ongeprijsde mandje in de privéwinkelvergelijker? ' +
         'Je controleert daar eerst alle fysieke ingrediënten en bevestigt daarna zelf de bronproducten. ' +
         'Oude winkelprijzen en artikelkeuzes worden niet automatisch meegenomen.')) return
-      window.sessionStorage.setItem('supa:private-planner-week-handoff:v1', json)
+      const handoffKey = 'supa:private-planner-week-handoff:v1'
+      const previous = window.sessionStorage.getItem(handoffKey)
+      if (previous !== null && previous !== json) {
+        if (!window.confirm('Er staat al een ander privéweekmenu klaar voor de winkelvergelijker. ' +
+          'Wil je deze nog niet gebruikte overdracht bewust vervangen door je nieuwe receptenbundel? ' +
+          'Je oorspronkelijke receptenbibliotheek en eventuele ingevoerde winkelprijzen veranderen niet.')) {
+          setFeedback('De eerdere privéweekmenu-overdracht is bewaard. Download desgewenst de nieuwe JSON apart.')
+          return
+        }
+        if (window.sessionStorage.getItem(handoffKey) !== previous)
+          throw new Error('De vorige weekmenu-overdracht is gewijzigd. Controleer opnieuw voordat je overschrijft.')
+      }
+      window.sessionStorage.setItem(handoffKey, json)
       window.location.assign(import.meta.env.BASE_URL + 'private-basket-mapping.html')
     } catch (cause) {
       setFeedback((cause instanceof Error ? cause.message : 'Directe overdracht niet beschikbaar.') +
