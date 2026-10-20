@@ -24,6 +24,9 @@ export function ManualShoppingNotes({ notes, setNotes }: {
   const [exportVisible, setExportVisible] = useState(false)
   const [message, setMessage] = useState('')
   const [lastRemoved, setLastRemoved] = useState<{ note: UnpricedShoppingNote; index: number } | null>(null)
+  const [editing, setEditing] = useState<{ id: string; initialLabel: string;
+    initialStore: UnpricedShoppingNote['store']; label: string;
+    store: UnpricedShoppingNote['store'] } | null>(null)
   const [sessionEnabled, setSessionEnabled] = useState(false)
   const [sessionProtected, setSessionProtected] = useState(false)
   const [sessionRaw, setSessionRaw] = useState<string | null>(null)
@@ -194,6 +197,38 @@ export function ManualShoppingNotes({ notes, setNotes }: {
     setName('')
     setMessage(`${label} toegevoegd zonder prijs. Dit verandert de supermarktvergelijking niet.`)
   }
+  function saveEditedNote(event: FormEvent) {
+    event.preventDefault()
+    if (!editing) return
+    const label = safeLabel(editing.label)
+    const initial = notes.find(item => item.id === editing.id)
+    if (!label || label.length > 140) {
+      setMessage('Voer een geldige boodschap in van maximaal 140 tekens.')
+      return
+    }
+    if (!initial || initial.label !== editing.initialLabel ||
+        initial.store !== editing.initialStore) {
+      setEditing(null)
+      setMessage('Deze boodschap is intussen gewijzigd. Open de actuele regel opnieuw.')
+      return
+    }
+    if (notes.some(item => item.id !== editing.id &&
+        duplicateKey(item.store, item.label) === duplicateKey(editing.store, label))) {
+      setMessage('Dit artikel staat al bij deze winkel. Er is niets overschreven.')
+      return
+    }
+    setNotes(current => {
+      const row = current.find(item => item.id === editing.id)
+      if (!row || row.label !== editing.initialLabel ||
+          row.store !== editing.initialStore ||
+          current.some(item => item.id !== editing.id &&
+            duplicateKey(item.store, item.label) === duplicateKey(editing.store, label))) return current
+      return current.map(item => item.id === editing.id
+        ? { ...item, label, store: editing.store } : item)
+    })
+    setEditing(null)
+    setMessage('Je eigen boodschap is aangepast. De bestaande afvinking blijft behouden; er zijn geen prijzen toegevoegd.')
+  }
   function removeOwnNote(id: string) {
     const index = notes.findIndex(note => note.id === id)
     if (index < 0) return
@@ -277,12 +312,36 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       <label><input type="checkbox" checked={onlyOpen} onChange={event => setOnlyOpen(event.target.checked)} /> Alleen open</label>
     </div>
     <ul>{visible.map(note => <li key={note.id}>
-      <label><input type="checkbox" checked={note.done}
-        onChange={() => setNotes(current => current.map(item => item.id === note.id
-          ? { ...item, done: !item.done } : item))} />
-        <span>{note.label} <small>· {note.store} · prijs onbekend</small></span></label>
-      <button type="button" onClick={() => removeOwnNote(note.id)}
-        aria-label={`Verwijder ${note.label}`}>Verwijder</button>
+      {editing?.id === note.id ? <form className="manual-shopping-notes__edit" onSubmit={saveEditedNote}>
+        <label>Omschrijving
+          <input maxLength={140} value={editing.label} autoFocus
+            onChange={event => {
+              const value = event.currentTarget.value
+              setEditing(current => current?.id === note.id ? { ...current, label: value } : current)
+            }} />
+        </label>
+        <label>Winkel
+          <select value={editing.store} onChange={event => {
+            const value = event.currentTarget.value as UnpricedShoppingNote['store']
+            setEditing(current => current?.id === note.id ? { ...current, store: value } : current)
+          }}>
+            {stores.map(item => <option key={item} value={item}>{item}</option>)}
+          </select>
+        </label>
+        <button type="submit">Bewaar</button>
+        <button type="button" onClick={() => setEditing(null)}>Annuleer</button>
+        <small>Het vinkje en privé-ID blijven behouden; nooit automatisch een prijs.</small>
+      </form> : <>
+        <label><input type="checkbox" checked={note.done}
+          onChange={() => setNotes(current => current.map(item => item.id === note.id
+            ? { ...item, done: !item.done } : item))} />
+          <span>{note.label} <small>· {note.store} · prijs onbekend</small></span></label>
+        <button type="button" onClick={() => setEditing({ id: note.id,
+          initialLabel: note.label, initialStore: note.store, label: note.label, store: note.store })}
+          aria-label={`Bewerk ${note.label}`}>Bewerk</button>
+        <button type="button" onClick={() => removeOwnNote(note.id)}
+          aria-label={`Verwijder ${note.label}`}>Verwijder</button>
+      </>}
     </li>)}</ul>
     {!visible.length && <p role="status">
       {selected.length ? 'Alle boodschappen in deze selectie zijn afgevinkt.' :

@@ -28,3 +28,9 @@
 .manual-shopping-notes__session label { display:flex; gap:10px; align-items:center; }
 .manual-shopping-notes__session small { color:#405c4e; }
 .manual-shopping-notes__session p { margin:0; overflow-wrap:anywhere; }
+
+/* Edit an own grocery in-place without deleting its personal checkmark. */
+.manual-shopping-notes__edit { flex:1; min-width:0; display:flex; flex-wrap:wrap; align-items:end; gap:10px; }
+.manual-shopping-notes__edit label { display:grid !important; gap:4px !important; min-width:140px; flex:1; font-weight:650; }
+.manual-shopping-notes__edit small { flex-basis:100%; }
+@media(max-width:540px) { .manual-shopping-notes__edit label { flex-basis:100%; } .manual-shopping-notes li { flex-wrap:wrap; } }
