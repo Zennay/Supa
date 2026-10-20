@@ -594,6 +594,40 @@ export function LocalTwoStorePriceEditor({
   }
 
   function changeTimestamp(store: OfflineRetailer, value: string) {
+    const previousTime = capturedAt[store]
+    if (previousTime === value) return
+    // Editing an EXISTING capture time must never re-date a previous price or
+    // stock confirmation. An initially empty time may still be entered after
+    // the person wrote down the original prices; that is not a recapture.
+    const previousCapture = previousTime.trim().length > 0
+    const hasDecisions = previousCapture && activeNeeds.some(need => {
+      const row = rows[key(store, need.id)]
+      return row && (row.available || row.availabilityReviewed ||
+        row.priceEuros.trim().length > 0)
+    })
+    if (hasDecisions && !window.confirm(
+      store + ': je past het bestaande opnamemoment aan. Een andere opnametijd is ' +
+      'geen bewijs dat eerdere prijzen of voorraad nog kloppen. Wis daarom de ' +
+      'prijzen en beschikbaarheidsbevestigingen van alleen deze winkel? ' +
+      'De oorspronkelijke productcodes, namen en verpakkingen blijven behouden; ' +
+      'de andere winkel verandert niet.')) return
+    if (hasDecisions) {
+      setRows(prev => {
+        const next = { ...prev }
+        for (const need of activeNeeds) {
+          const rowKey = key(store, need.id)
+          const row = prev[rowKey]
+          if (!row) continue
+          next[rowKey] = {
+            ...row, priceEuros: '', available: false, availabilityReviewed: false,
+          }
+        }
+        return next
+      })
+      setDraftStatus(store + ': het oude bronmoment is gewijzigd. Bestaande prijzen ' +
+        'en voorraadbevestigingen voor deze winkel zijn gewist. Neem echte nieuwe ' +
+        'prijzen en beschikbaarheid op; de andere winkel is bewaard.')
+    }
     setCapturedAt(prev => ({ ...prev, [store]: value }))
     setOutput(''); setError(''); setPreparedFor(''); onEdit()
   }
