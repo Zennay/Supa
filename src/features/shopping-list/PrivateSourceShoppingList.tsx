@@ -521,7 +521,7 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
           Neem vinkjes uit mijn ongeprijsde Planner-lijst over
         </button>
         <button type="button" onClick={() => { void shareReviewedList() }}>
-          Deel of kopieer mijn actuele ${store}-winkelmandje
+          Deel of kopieer mijn actuele {store}-winkelmandje
         </button>
         <button type="button" onClick={downloadList}>Download eigen boodschappenlijst (TXT)</button>
         <button type="button" onClick={() => { void downloadStoreWithExtras() }}>
