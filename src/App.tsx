@@ -49,6 +49,7 @@ import {
   type PlannerPreferences,
 } from './domain/plannerPreferences'
 import { unavailablePlannerRecipes, previewAvailablePlannerMeals } from './domain/unavailablePlannerRecipes.ts'
+import { privatePhysicalPlanIdentity, privateWeekShareIdentity } from './domain/privatePhysicalPlanIdentity.ts'
 import { saveReplacedPlannerRecipes } from './features/planner/saveReplacedPlannerRecipes.ts'
 import { restorePlannerPreferencesWithCustomBudget } from './features/planner/customWeekBudget.ts'
 import { canReplacePlannerRecord, persistPlannerRecord } from './features/planner/plannerStorageGuard.ts'
@@ -367,12 +368,10 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
     setPlanRepairMessage('')
   }
 
-  // Prices never leave React memory. A changed recipe, day or physical demand
-  // immediately invalidates private source receipts in every other tab.
-  const privatePlanKey = JSON.stringify([
-    plannedMeals, activeDays,
-    recipes.map(recipe => [recipe.id, recipe.ingredients]),
-  ])
+  // Preserve still-current, user-reviewed PLUS/Deka captures when somebody
+  // merely adds an unrelated recipe or edits an inactive day. Only changing
+  // the ACTUAL selected physical week can invalidate these private receipts.
+  const privatePlanKey = privatePhysicalPlanIdentity(plannedMeals, recipes, activeDays)
   // Planner and Lijst share the exact same real-source File handoff. Files
   // stay in this tab until the canonical Vergelijk importer consumes them.
   // No alternate CSV parser or implicit retailer approval is introduced.
@@ -397,11 +396,8 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   // Bind prepared copy to the exact user-visible plan state. Clearing it in
   // an effect alone happens after render and briefly exposes stale personal text.
   const shareSourceKey = JSON.stringify([
-    plannedMeals,
-    activeDays,
-    budget,
-    includeWeekBudget,
-    includeWeekDetails,
+    privateWeekShareIdentity(plannedMeals, recipes, activeDays, includeWeekDetails),
+    budget, includeWeekBudget, includeWeekDetails,
   ])
   const currentManualCopy = currentWeekSharePreview(manualWeekCopy, shareSourceKey)
 
