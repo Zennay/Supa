@@ -120,6 +120,40 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPric
   function prepareCopy() {
     setPrepared({ key: copyKey, text: shoppingText() })
   }
+
+  /** Text-only, explicit user action. Neither prices nor source files leave Supa
+   * automatically; the native share sheet lets the user choose the destination. */
+  async function shareCurrentWeek() {
+    if (error || !items.length) return
+    const expectedDemand = demandIdentity
+    const expectedCopyKey = copyKey
+    const content = shoppingText()
+    if (new TextEncoder().encode(content).length > 120_000) {
+      setBackupMessage('Weeklijst is te groot om mobiel te delen. Download het TXT-bestand.'); return
+    }
+    try {
+      if (typeof navigator.share === 'function') {
+        await navigator.share({ title: 'Mijn Supa-weekboodschappen (zonder prijzen)', text: content })
+        if (currentDemand.current === expectedDemand)
+          setBackupMessage('Weekboodschappen gedeeld via de door jou gekozen app. Er zijn geen winkelprijzen meegestuurd.')
+        return
+      }
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(content)
+        if (currentDemand.current === expectedDemand && copyKey === expectedCopyKey)
+          setBackupMessage('Weekboodschappen naar je klembord gekopieerd, zonder winkelprijzen.')
+        return
+      }
+    } catch (cause) {
+      if (cause instanceof DOMException && cause.name === 'AbortError') return
+      // Denied permissions are normal on private browsing and insecure pages.
+    }
+    // Never silently fail when the OS/browser denies a native share or clipboard.
+    if (currentDemand.current === expectedDemand && copyKey === expectedCopyKey) {
+      setPrepared({ key: expectedCopyKey, text: content })
+      setBackupMessage('Delen of kopiëren is niet beschikbaar. Selecteer de tekst hieronder om zelf te kopiëren.')
+    }
+  }
   function openWithCurrentDemand() {
     if (error || !items.length) return
     try {
@@ -280,6 +314,9 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPric
                   void restoreProgress(file)
                 }} />
             </label>
+            <button type="button" className="ghost-button" onClick={() => void shareCurrentWeek()}>
+              Deel of kopieer mijn weekboodschappen
+            </button>
             <button type="button" className="ghost-button" onClick={downloadUnpricedList}>
               Download weekboodschappen (TXT)
             </button>
