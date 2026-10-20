@@ -1,0 +1,85 @@
+name: M5 offline retailer review pack
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/m5-offline-retailer-review.yml"
+      - "docs/m5-retailer-discovery.v1.json"
+      - "docs/m5-retailer-discovery-contract.md"
+      - "scripts/m5-audit-retailer-discovery.mjs"
+      - "scripts/m5-build-retailer-review-pack.mjs"
+      - "scripts/m5-reconcile-retailer-rights.mjs"
+      - "scripts/m5-assess-retailer-research.mjs"
+      - "scripts/m5-build-retailer-priorities.mjs"
+      - "docs/m5-retailer-research-template.v1.json"
+      - "tests/m5-retailer-research-review.test.mjs"
+      - "tests/m5-retailer-priorities.test.mjs"
+      - "tests/m5-retailer-discovery.test.mjs"
+      - "tests/m5-retailer-review-pack.test.mjs"
+      - "tests/m5-retailer-rights-reconciliation.test.mjs"
+      - "evidence/m1/source-permission-gate.v1.json"
+  workflow_dispatch:
+
+concurrency:
+  group: supa-m5-review-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  offline-review:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Read exact PR head without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: Verify checked-out commit and run all M5 offline tests
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+          node --test tests/m5-retailer-discovery.test.mjs tests/m5-retailer-review-pack.test.mjs tests/m5-retailer-rights-reconciliation.test.mjs tests/m5-retailer-research-review.test.mjs tests/m5-retailer-priorities.test.mjs
+
+      - name: Export offline public candidate research pack and assert fail-closed gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/m5-offline-review
+          node scripts/m5-build-retailer-review-pack.mjs --format=csv > artifacts/m5-offline-review/retailer-review.csv
+          node scripts/m5-build-retailer-review-pack.mjs --format=markdown > artifacts/m5-offline-review/retailer-review.md
+          node scripts/m5-build-retailer-review-pack.mjs --format=json > artifacts/m5-offline-review/retailer-review.json
+          node scripts/m5-reconcile-retailer-rights.mjs > artifacts/m5-offline-review/m1-m5-rights-reconciliation.json
+          node scripts/m5-assess-retailer-research.mjs docs/m5-retailer-research-template.v1.json > artifacts/m5-offline-review/unreviewed-research-completeness.json
+          node scripts/m5-build-retailer-priorities.mjs > artifacts/m5-offline-review/retailer-human-priorities.json
+          node scripts/m5-build-retailer-priorities.mjs --format=markdown > artifacts/m5-offline-review/retailer-human-priorities.md
+
+          set +e
+          node scripts/m5-audit-retailer-discovery.mjs --require-production-ready > artifacts/m5-offline-review/m5-blocked-production.json
+          audit_status=$?
+          node scripts/m5-reconcile-retailer-rights.mjs --require-m5-ready > artifacts/m5-offline-review/m5-blocked-readiness.json
+          ready_status=$?
+          set -e
+
+          test "$audit_status" -eq 2
+          test "$ready_status" -eq 2
+          printf 'M5 candidate research only: both production/readiness gates rejected as designed.\n' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload research-only reviewer worksheet
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: supa-m5-offline-retailer-review
+          path: artifacts/m5-offline-review/
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,61 @@
+name: M5 offline retailer review VPS proof
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/m5-retailer-review-vps.yml"
+      - "docs/m5-retailer-discovery.v1.json"
+      - "docs/m5-retailer-research-template.v1.json"
+      - "scripts/m5-assess-retailer-research.mjs"
+      - "scripts/m5-build-retailer-priorities.mjs"
+      - "scripts/m5-audit-retailer-discovery.mjs"
+      - "scripts/m5-build-retailer-review-pack.mjs"
+      - "scripts/m5-reconcile-retailer-rights.mjs"
+      - "tests/m5-retailer-discovery.test.mjs"
+      - "tests/m5-retailer-review-pack.test.mjs"
+      - "tests/m5-retailer-research-review.test.mjs"
+      - "tests/m5-retailer-priorities.test.mjs"
+      - "tests/m5-retailer-rights-reconciliation.test.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supa-m5-vps-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  offline-contracts:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: self-hosted
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact repo-owned PR source without credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify permanent VPS host and exact source SHA
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(hostname -s)" = "vps-bb300bba"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Prepare deterministic Node 22 for offline tests
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      - name: Verify offline rights and evidence admission; no retailer requests
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test tests/m5-retailer-discovery.test.mjs tests/m5-retailer-review-pack.test.mjs tests/m5-retailer-rights-reconciliation.test.mjs tests/m5-retailer-research-review.test.mjs tests/m5-retailer-priorities.test.mjs
+          node scripts/m5-assess-retailer-research.mjs docs/m5-retailer-research-template.v1.json > /dev/null
+          node scripts/m5-build-retailer-priorities.mjs > /dev/null
+          printf 'Offline M5 reviewer checks passed on permanent VPS; no retailer requests or M5 release.\n' >> "$GITHUB_STEP_SUMMARY"
