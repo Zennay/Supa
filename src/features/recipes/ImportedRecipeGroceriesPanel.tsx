@@ -366,7 +366,9 @@ export function ImportedRecipeGroceriesPanel({
     const key = captureKey
     const target = captureTarget
     try {
+      requireLatestOwnedRecipes()
       const { combinedRecipesCaptureKit } = await import('./combinedRecipesCaptureKit.ts')
+      requireLatestOwnedRecipes()
       if (latestCaptureKey.current !== key)
         throw new Error('De receptenbundel of winkelkeuze veranderde. Bekijk de nieuwe rijen.')
       const stores = target === 'both' ? ['PLUS', 'DekaMarkt'] as const
@@ -390,7 +392,9 @@ export function ImportedRecipeGroceriesPanel({
     const key = captureKey
     const target = captureTarget
     try {
+      requireLatestOwnedRecipes()
       const { combinedRecipesCaptureKit } = await import('./combinedRecipesCaptureKit.ts')
+      requireLatestOwnedRecipes()
       if (latestCaptureKey.current !== key)
         throw new Error('De fysieke receptenbundel veranderde tijdens voorbereiden. Probeer opnieuw.')
       const shops = target === 'both' ? ['PLUS', 'DekaMarkt'] as const
@@ -401,8 +405,10 @@ export function ImportedRecipeGroceriesPanel({
       if (navigator.clipboard?.writeText) {
         try {
           await navigator.clipboard.writeText(content)
-          if (latestCaptureKey.current === key)
+          if (latestCaptureKey.current === key) {
+            requireLatestOwnedRecipes()
             setFeedback('De actuele ongeprijsde opnamegids voor jouw winkelkeuze is gekopieerd.')
+          }
           else setFeedback('De recepten veranderden tijdens kopiëren. Maak de nieuwe gids opnieuw.')
           return
         } catch { /* Browser denied clipboard access. Display only own source hints. */ }
@@ -420,7 +426,9 @@ export function ImportedRecipeGroceriesPanel({
     setFeedback('')
     const identity = progressIdentity
     try {
+      requireLatestOwnedRecipes()
       const { combinedRecipesCaptureKit } = await import('./combinedRecipesCaptureKit.ts')
+      requireLatestOwnedRecipes()
       if (latestProgressIdentity.current !== identity)
         throw new Error('De receptenbundel is gewijzigd. Maak de winkelopname opnieuw.')
       const stores = captureTarget === 'both' ? ['PLUS', 'DekaMarkt'] as const : [captureTarget]
@@ -431,6 +439,7 @@ export function ImportedRecipeGroceriesPanel({
       // This is only a local document identifier, not source-evidence metadata.
       const fingerprint = unpricedProgressStorageKey(identity).split(':').pop()!
       const stem = 'supa-recepten-' + fingerprint + '-' + kit.storeLabel
+      requireLatestOwnedRecipes()
       savePrivateFile(stem + (kind === 'csv' ? '-lege-winkelopname.csv' : '-opnamegids.txt'),
         kind === 'csv' ? kit.csv : kit.guide,
         kind === 'csv' ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8')
@@ -444,6 +453,7 @@ export function ImportedRecipeGroceriesPanel({
   const exportForStores = () => {
     if (!list?.canCopy) return
     try {
+      requireLatestOwnedRecipes()
       const json = exportCombinedRecipesPrivateWeek(selected, portionsById)
       savePrivateFile('supa-meerdere-recepten-privewinkelmandje.json',
         json, 'application/json;charset=utf-8')
@@ -455,6 +465,7 @@ export function ImportedRecipeGroceriesPanel({
   const openInPrivateMatcher = () => {
     if (!list?.canCopy) return
     try {
+      requireLatestOwnedRecipes()
       const json = exportCombinedRecipesPrivateWeek(selected, portionsById)
       if (!window.confirm('Open dit ongeprijsde mandje in de privéwinkelvergelijker? ' +
         'Je controleert daar eerst alle fysieke ingrediënten en bevestigt daarna zelf de bronproducten. ' +
