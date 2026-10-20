@@ -1,5 +1,8 @@
 import { euro as exactEuro } from '../../lib/money.ts'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+// Optional local camera scanner is never loaded by users who type product codes.
+const LocalDeviceBarcodeScanner = lazy(() => import('./LocalDeviceBarcodeScanner.tsx')
+  .then(module => ({ default: module.LocalDeviceBarcodeScanner })))
 import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../domain/basket.ts'
 import { calculateDecimalPackCount } from '../../domain/decimalPackArithmetic.ts'
 import type { MatchUnit } from '../../domain/matching.ts'
@@ -247,6 +250,9 @@ export function LocalTwoStorePriceEditor({
   const [open, setOpen] = useState(false)
   const [onlyOpenRows, setOnlyOpenRows] = useState(false)
   const [sourceSelection, setSourceSelection] = useState<'both' | OfflineRetailer>('both')
+  const [scanTarget, setScanTarget] = useState<{
+    store: OfflineRetailer; ingredientId: string; fingerprint: string
+  } | null>(null)
   const selectedStores = sourceSelection === 'both' ? stores : [sourceSelection]
   const [rows, setRows] = useState<Record<string, ProductDraft>>({})
   const [capturedAt, setCapturedAt] = useState<Record<OfflineRetailer, string>>({ PLUS: '', DekaMarkt: '' })
@@ -269,6 +275,8 @@ export function LocalTwoStorePriceEditor({
   // Avoid importing a draft into a different plan if it changed during File.text().
   const currentPlanFingerprint = useRef(selectedPlanFingerprint)
   currentPlanFingerprint.current = selectedPlanFingerprint
+  // A camera stream belongs only to the selected physical Planner week.
+  useEffect(() => setScanTarget(null), [selectedPlanFingerprint])
   const [preparedFor, setPreparedFor] = useState('')
   const [savedDraftRaw, setSavedDraftRaw] = useState<string | null>(null)
   const [draftOptIn, setDraftOptIn] = useState(false)
@@ -802,6 +810,7 @@ export function LocalTwoStorePriceEditor({
       </div>
       <label>Welke winkel(s) heb je daadwerkelijk geobserveerd?
         <select value={sourceSelection} onChange={event => {
+          setScanTarget(null)
           setSourceSelection(event.currentTarget.value as 'both' | OfflineRetailer)
           setOutput(''); setError(''); setPreparedFor(''); onEdit()
         }}>
@@ -921,6 +930,31 @@ export function LocalTwoStorePriceEditor({
                   placeholder="Code op verpakking, bon of bronartikel"
                   onChange={e => changeRow(store, need.id, { sourceId: e.target.value }, need.unit)} />
               </label>
+              <button type="button" className="ghost-button"
+                aria-expanded={scanTarget?.store === store && scanTarget.ingredientId === need.id}
+                onClick={() => setScanTarget({
+                  store, ingredientId: need.id, fingerprint: selectedPlanFingerprint,
+                })}>
+                Scan barcode van echte verpakking (optioneel)
+              </button>
+              {scanTarget?.store === store && scanTarget.ingredientId === need.id &&
+                scanTarget.fingerprint === selectedPlanFingerprint &&
+                <Suspense fallback={<p role="status">Lokale scanner laden…</p>}>
+                  <LocalDeviceBarcodeScanner
+                    onAccept={code => {
+                      if (currentPlanFingerprint.current !== scanTarget.fingerprint ||
+                          !allowedDraftRows.has(key(store, need.id))) {
+                        setScanTarget(null)
+                        return
+                      }
+                      changeRow(store, need.id, { sourceId: code }, need.unit)
+                      setDraftStatus('Barcode als eigen broncode ingevuld. Controleer dat de code op je ' +
+                        store + '-product of bon hoort. Prijs, verpakking, voorraadstatus en opnamemoment ' +
+                        'moet je nog zelf vastleggen; er is geen automatische winkelmatch.')
+                      setScanTarget(null)
+                    }}
+                    onClose={() => setScanTarget(null)} />
+                </Suspense>}
               <label>Werkelijke productnaam (laat leeg als onbekend)
                 <input value={row.name} maxLength={160} autoComplete="off"
                   list={`historical-products-${store}`}
