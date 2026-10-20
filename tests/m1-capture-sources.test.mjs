@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { SOURCES, validateSources } from '../scripts/m1-capture-sources.mjs'
+import {
+  SOURCES,
+  readBoundedResponseBody,
+  validateSources,
+} from '../scripts/m1-capture-sources.mjs'
 
 test('M1 capture source set is bounded to two supermarkets and three page kinds', () => {
   assert.equal(SOURCES.length, 6)
@@ -127,4 +131,88 @@ test('M1 capture rejects credential-bearing allowlisted URLs', () => {
       ]),
     /does not match supermarket allowlist/,
   )
+})
+
+
+test('M1 capture validator rejects empty, incomplete and malformed source containers', () => {
+  assert.throws(
+    () => validateSources([]),
+    /must contain exactly 6 sources/,
+  )
+  assert.throws(
+    () => validateSources(SOURCES.slice(0, 5)),
+    /must contain exactly 6 sources/,
+  )
+  assert.throws(
+    () => validateSources(null),
+    /must contain exactly 6 sources/,
+  )
+
+  const malformed = [...SOURCES]
+  malformed[0] = null
+  assert.throws(
+    () => validateSources(malformed),
+    /Invalid source entry/,
+  )
+})
+
+test('M1 capture validator rejects duplicate retailer-kind pairs even with unique ids', () => {
+  const duplicatePair = SOURCES.map((source) => ({ ...source }))
+  const plusOffers = duplicatePair.find(
+    (source) => source.supermarket === 'plus' && source.kind === 'offers',
+  )
+  const dekaOffersIndex = duplicatePair.findIndex(
+    (source) => source.supermarket === 'dekamarkt' && source.kind === 'offers',
+  )
+
+  duplicatePair[dekaOffersIndex] = {
+    ...plusOffers,
+    id: 'plus-offers-duplicate-pair',
+  }
+
+  assert.throws(
+    () => validateSources(duplicatePair),
+    /Invalid or duplicate source matrix entry: plus:offers/,
+  )
+})
+
+test('M1 capture validator accepts the complete matrix independent of source order', () => {
+  assert.equal(validateSources([...SOURCES].reverse()), true)
+})
+
+
+test('M1 bounded response reader preserves accepted UTF-8 content and byte count', async () => {
+  const body = 'melk € 1,29'
+  const result = await readBoundedResponseBody(new Response(body), 64)
+
+  assert.equal(result.body, body)
+  assert.equal(result.bytes, Buffer.byteLength(body, 'utf8'))
+})
+
+test('M1 bounded response reader cancels as soon as decoded bytes exceed the ceiling', async () => {
+  let cancelled = false
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(new Uint8Array([1, 2, 3]))
+      controller.enqueue(new Uint8Array([4, 5, 6]))
+    },
+    cancel() {
+      cancelled = true
+    },
+  })
+
+  await assert.rejects(
+    () => readBoundedResponseBody(new Response(stream), 5),
+    /Response exceeded 5 bytes while streaming/,
+  )
+  assert.equal(cancelled, true)
+})
+
+test('M1 bounded response reader rejects malformed byte ceilings', async () => {
+  for (const maxBytes of [0, -1, Number.NaN, Number.MAX_SAFE_INTEGER + 1]) {
+    await assert.rejects(
+      () => readBoundedResponseBody(new Response('ok'), maxBytes),
+      /positive safe integer/,
+    )
+  }
 })
