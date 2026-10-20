@@ -182,6 +182,22 @@ acceptHandoff.addEventListener('click', () => {
     ' maaltijden en ' + demand.ingredients.length + ' fysieke ingrediënten. ' +
     'Kies nu jouw werkelijk geobserveerde producten per winkel; onbekende prijzen blijven onbekend.'
   info.className = 'notice'
+  // Source capture/import lives above the demand section in the existing
+  // comparator. After accepting the real physical basket, offer visible
+  // shortcuts instead of leaving the user to hunt through earlier sections.
+  // These are navigation only: neither link imports a file, invents a price,
+  // nor changes an existing shop capture.
+  for (const [fragment, label] of [
+    ['#source-title', 'Open mijn bestaande PLUS/Deka bronbestanden'],
+    ['#manual-observations', 'Vul eigen echte winkelprijzen handmatig in'],
+  ] as const) {
+    const link = document.createElement('a')
+    link.href = fragment
+    link.textContent = label
+    link.style.display = 'inline-block'
+    link.style.margin = '10px 14px 0 0'
+    info.append(document.createElement('br'), link)
+  }
 })
 
 upload.addEventListener('change', async () => {
