@@ -52,6 +52,12 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
     text: string
   } | null>(null)
 
+  const [copyableComparison, setCopyableComparison] = useState<{
+    plus: NonNullable<PrivateReviewedBaskets['stores']['PLUS']>
+    deka: NonNullable<PrivateReviewedBaskets['stores']['DekaMarkt']>
+    costRaw: string
+    text: string
+  } | null>(null)
   const [directImportMessage, setDirectImportMessage] = useState('')
   const [directDropActive, setDirectDropActive] = useState(false)
   function takeOwnSourceFiles(files: File[]) {
@@ -221,10 +227,13 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       if (fresh.status !== 'comparable' || !current?.stores.PLUS || !current.stores.DekaMarkt) {
         throw new Error('De bronopnames zijn verlopen of niet meer vergelijkbaar. Werk ze bij in Vergelijk.')
       }
+      if (shownCost.trim() && parsedSecondStopCents === null) {
+        throw new Error('Corrigeer de extra winkelstopkosten vóór je de privévergelijking deelt.')
+      }
       downloadOwnStoreText(printableOwnStoreComparison(fresh, {
         PLUS: current.stores.PLUS.observedAt,
         DekaMarkt: current.stores.DekaMarkt.observedAt,
-      }))
+      }, shownCost.trim() ? parsedSecondStopCents : null))
       setDownloadMessage('Je eigen twee-winkelvergelijking is lokaal gedownload.')
     } catch (error) {
       setDownloadMessage(error instanceof Error ? error.message : 'Download is niet gelukt.')
@@ -232,6 +241,7 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
   }
   async function copyPrivateComparison() {
     setDownloadMessage('')
+    setCopyableComparison(null)
     try {
       // A price can cross the seven-day boundary while this tab stays open.
       // Clipboard emission is a new action: re-admit both original sources
@@ -240,10 +250,6 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       const fresh = ownStoreWeekComparison(current)
       if (!current?.stores.PLUS || !current.stores.DekaMarkt || fresh.status !== 'comparable') {
         throw new Error('De winkelprijzen zijn verlopen of niet volledig gecontroleerd. Herzie eerst de originele bronnen.')
-      }
-      if (!navigator.clipboard?.writeText) {
-        setDownloadMessage('Kopiëren is hier niet beschikbaar. Gebruik de TXT-download voor dezelfde privévergelijking.')
-        return
       }
       // Read the clock again immediately before the clipboard operation.
       const latest = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
@@ -257,14 +263,33 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       const copySummary = ownStoreWeekComparison(currentAtCopy)
       if (!currentAtCopy?.stores.PLUS || !currentAtCopy.stores.DekaMarkt ||
           copySummary.status !== 'comparable') throw Error('Winkelbron is verlopen')
+      if (shownCost.trim() && parsedSecondStopCents === null) {
+        throw new Error('Corrigeer de extra winkelstopkosten vóór het kopiëren.')
+      }
       const content = printableOwnStoreComparison(copySummary, {
         PLUS: currentAtCopy.stores.PLUS.observedAt,
         DekaMarkt: currentAtCopy.stores.DekaMarkt.observedAt,
-      })
-      await navigator.clipboard.writeText(content)
-      setDownloadMessage('Eigen PLUS/Deka-weekvergelijking met bronmomenten en originele SKU’s gekopieerd. Deel alleen bewust je privébrondata.')
+      }, shownCost.trim() ? parsedSecondStopCents : null)
+      if (navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(content)
+          setDownloadMessage('Eigen PLUS/Deka-weekvergelijking met bronmomenten en originele SKU’s gekopieerd. Deel alleen bewust je privébrondata.')
+          return
+        } catch { /* Browsers can deny clipboard access, including on mobile. */ }
+      }
+      // Never expose a printable fallback when original reviewed sources have
+      // expired during an asynchronous clipboard permission prompt.
+      const currentFallback = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
+      if (currentFallback?.stores.PLUS !== currentAtCopy.stores.PLUS ||
+          currentFallback?.stores.DekaMarkt !== currentAtCopy.stores.DekaMarkt ||
+          ownStoreWeekComparison(currentFallback).status !== 'comparable') {
+        throw Error('Originele bronprijzen verlopen tijdens kopiëren.')
+      }
+      setCopyableComparison({ plus: currentAtCopy.stores.PLUS, deka: currentAtCopy.stores.DekaMarkt,
+        costRaw: shownCost, text: content })
+      setDownloadMessage('Klembordtoegang ontbreekt. Selecteer de actuele privévergelijking hieronder en kopieer handmatig.')
     } catch {
-      setDownloadMessage('Kopiëren is mislukt of niet toegestaan door je browser. Gebruik de TXT-download en controleer je originele winkelbronnen.')
+      setDownloadMessage('Deze vergelijking of de ingevulde kosten zijn ongeldig of verlopen. Controleer je eigen bronnen en kosten, of download opnieuw.')
     }
   }
   async function downloadPrivateCsv() {
@@ -426,6 +451,31 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
               {' '}Dit is {exactEuro.formatCents(summary.mixedRoute.possibleProductDifferenceCents)}
               {' '}lager dan één complete winkel <strong>vóór</strong> extra reiskosten.
               Het netto voordeel is zonder eigen winkelstopkosten onbekend.</p>}
+          {summary.mixedRoute?.requiresTwoStops && <div className="own-store-planner__route-choice" aria-label="Mijn voordeligste winkelroute">
+            <label>Extra kosten voor een tweede winkelstop (€)
+              <input type="text" inputMode="decimal" maxLength={9}
+                placeholder="Bijvoorbeeld 2,50" value={shownCost}
+                onChange={event => setSecondStopCost({ key: costSourceKey, raw: event.currentTarget.value })} />
+            </label>
+            {!shownCost.trim() ? <p role="status">Vul jouw extra bezoekkosten in om te beoordelen of twee winkels voordeliger zijn.</p>
+              : parsedSecondStopCents === null || mixedNetDifferenceCents === null
+                ? <p role="alert">Vul € 0,00 tot € 1.000,00 in, met maximaal twee decimalen.</p>
+                : mixedNetDifferenceCents > 0n
+                  ? <div role="status"><strong>Twee winkels kunnen goedkoper zijn.</strong>
+                      <p>Na jouw extra stopkosten resteert {exactEuro.formatCents(mixedNetDifferenceCents)} productvoordeel.
+                        Controleer jouw gekozen route en overige kosten in de Lijst.</p>
+                      <button type="button" className="ghost-button" onClick={openCurrentMixedRoute}>Bekijk gecombineerde route</button>
+                    </div>
+                  : <div role="status"><strong>Eén winkel is minstens zo voordelig.</strong>
+                      <p>De combinatie is {mixedNetDifferenceCents === 0n ? 'even duur' :
+                        exactEuro.formatCents(-mixedNetDifferenceCents) + ' duurder'} inclusief jouw extra stopkosten.</p>
+                      <button type="button" className="ghost-button"
+                        onClick={() => openConfirmedStoreList(summary.cheapest ?? selected)}>
+                        Open complete lijst bij {summary.cheapest ?? selected}
+                      </button>
+                    </div>}
+            <small>Alleen jouw gecontroleerde productprijzen en opgegeven kosten. Geen kassagarantie of reistijdwaardering.</small>
+          </div>}
           <div className="own-store-planner__overview-actions">
             <button type="button" className="ghost-button"
               onClick={() => openConfirmedStoreList(summary.cheapest ?? selected)}>
@@ -777,13 +827,21 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
                     Het werkelijke voordeel is onbekend zolang reistijd of extra kosten niet zijn ingevuld.</>
                 : <> Deze selectie past bij één winkel; een tweede winkelstop is niet nodig.</>}</p>
             {summary.mixedRoute.requiresTwoStops && <div className="own-store-planner__second-stop">
-              <label>Extra kosten tweede winkelstop (€)
-                <input type="text" inputMode="decimal" maxLength={9}
-                  placeholder="Bijvoorbeeld 2,50" value={shownCost}
-                  onChange={event => setSecondStopCost({ key: costSourceKey, raw: event.currentTarget.value })} />
-              </label>
-              <p>Jouw eigen omrij-/parkeerscenario. Zonder ingevulde kosten is het
+              <p>Vul bovenaan jouw eigen omrij-/parkeerkosten in. Zonder die kosten is het
                 netto voordeel onbekend. Dit is geen kassaprijs- of besparingsbewijs.</p>
+              <p className="own-store-planner__break-even">
+                <strong>Wanneer loont die tweede winkelstop?</strong>{' '}
+                {summary.mixedRoute.possibleProductDifferenceCents > 0
+                  ? <>De twee winkels zijn voor jouw gecontroleerde producten alleen voordeliger
+                      dan de goedkoopste complete winkel als jouw <em>extra</em> bezoekkosten
+                      lager zijn dan{' '}
+                      <strong>{exactEuro.formatCents(summary.mixedRoute.possibleProductDifferenceCents)}</strong>.
+                      {' '}Bij precies dat bedrag speel je quitte; hogere kosten maken één winkel
+                      voordeliger. Reistijd is niet in euro's omgerekend.</>
+                  : <>Deze combinatie bespaart vóór extra bezoekkosten niets ten opzichte
+                      van één complete winkel. Met positieve extra kosten is één winkel
+                      voor dit mandje voordeliger.</>}
+              </p>
               {shownCost.trim() && parsedSecondStopCents === null && <p role="alert">
                 Vul € 0,00 tot € 1.000,00 in, met maximaal twee decimalen.</p>}
               {parsedSecondStopCents !== null && mixedTripCents !== null &&
@@ -819,6 +877,35 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
               : 'De fysieke hoeveelheden, verpakkingen of mandregels zijn niet gelijkwaardig bevestigd. Herzie de matches in Vergelijk.'}</p>
           <button type="button" className="ghost-button" onClick={onOpenComparison}>Vul ontbrekende brongegevens aan</button>
         </div> : null}
+    {copyableComparison && summary.status === 'comparable' &&
+      copyableComparison.plus === currentSources?.stores.PLUS &&
+      copyableComparison.deka === currentSources?.stores.DekaMarkt &&
+      copyableComparison.costRaw === shownCost &&
+      <label className="own-store-planner__copy-fallback">
+        Privé PLUS/Deka-prijsvergelijking met jouw eigen kosten: selecteer en kopieer
+        <textarea readOnly rows={12} value={copyableComparison.text}
+          onFocus={event => {
+            const current = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
+            if (current?.stores.PLUS !== copyableComparison.plus ||
+                current?.stores.DekaMarkt !== copyableComparison.deka ||
+                ownStoreWeekComparison(current).status !== 'comparable') {
+              setCopyableComparison(null)
+              setDownloadMessage('Bronopnames zijn verlopen: herzie originele winkelprijzen voor je deelt.')
+              return
+            }
+            event.currentTarget.select()
+          }}
+          onCopy={event => {
+            const current = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
+            if (current?.stores.PLUS !== copyableComparison.plus ||
+                current?.stores.DekaMarkt !== copyableComparison.deka ||
+                ownStoreWeekComparison(current).status !== 'comparable') {
+              event.preventDefault()
+              setCopyableComparison(null)
+              setDownloadMessage('Je bronopnames zijn verouderd: kopiëren geannuleerd.')
+            }
+          }} />
+      </label>}
     {downloadMessage && <p role="status" aria-live="polite">{downloadMessage}</p>}
   </section>
 }
