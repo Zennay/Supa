@@ -127,6 +127,12 @@ const pieceNouns = /^(?:(?:ui|uien)|eieren?|tenen?|knoflooktenen?|tomaten?|banan
  * 100 g boter", not only ordinary "1 kg rijst en 100 g boter".
  */
 function containsSecondPhysicalQuantity(label: string): boolean {
+  // An explicit second measured item cannot disappear into a food name,
+  // even if its unit is intentionally unsupported (e.g. tablespoons).
+  // Only a connector or separator introduces this broad check, so recipe
+  // labels with incidental numbers such as "vitamine B12" are unaffected.
+  const joined = /(?:[,;]|\s+(?:en|and|met|with|plus)\s+|\s*\+\s*)((?:\d+\s+)?\d+\/\d+|\d+\s?[½¼¾⅓⅔⅛⅜⅝⅞]|\d+(?:[.,]\d+)?|[½¼¾⅓⅔⅛⅜⅝⅞])\s*([^\s,;]+)/giu
+  if (joined.test(label)) return true
   const pattern = /(?:^|[^\p{L}\p{N}])((?:\d+\s+)?\d+\/\d+|\d+\s?[½¼¾⅓⅔⅛⅜⅝⅞]|\d+(?:[.,]\d+)?|[½¼¾⅓⅔⅛⅜⅝⅞])\s*([a-z]+\.?)(?=\s|[,;]|$)/giu
   let match: RegExpExecArray | null
   while ((match = pattern.exec(label)) !== null) {
