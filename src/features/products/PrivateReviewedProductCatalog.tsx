@@ -159,9 +159,15 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOp
     // This action can be pressed after the seven-day price window expires.
     // Never navigate as though a stale source still certifies a priced list.
     const latest = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
-    const chosen = store === 'all'
-      ? latest?.stores.PLUS ? 'PLUS' : latest?.stores.DekaMarkt ? 'DekaMarkt' : null
-      : latest?.stores[store] ? store : null
+    const comparison = ownStoreWeekComparison(latest)
+    let chosen: OwnStore | null = null
+    if (store !== 'all') chosen = latest?.stores[store] ? store : null
+    else if (comparison.status === 'comparable') chosen = comparison.cheapest
+    else if (comparison.available.length === 1) chosen = comparison.available[0]
+    if (!chosen && comparison.available.length === 2) {
+      setCheckMessage('Er is geen eenduidig goedkoopste winkelmandje. Kies PLUS of DekaMarkt expliciet om één lijst te openen.')
+      return
+    }
     if (!chosen) {
       setCheckMessage('Deze eigen bron is verlopen of gewijzigd. Controleer de originele winkelopname in Vergelijk.')
       return
@@ -403,7 +409,13 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOp
       </article>)}</div>
       {!visible.length && <p>Geen producten gevonden voor deze selectie.</p>}
       <button type="button" onClick={openCurrentCheckedList}>
-        {store === 'all' ? 'Open mijn gecontroleerde boodschappenlijst' : `Open mijn ${store}-boodschappenlijst`}
+        {store !== 'all' ? `Open mijn ${store}-boodschappenlijst`
+          : paired.status === 'comparable' && paired.cheapest
+            ? 'Open goedkoopste complete winkel (' + paired.cheapest + ')'
+            : paired.status === 'comparable' ? 'Gelijke prijs · kies eerst een winkel'
+              : paired.available.length === 1
+                ? 'Open beschikbare winkel (' + paired.available[0] + ')'
+                : 'Kies eerst één winkel voor de boodschappenlijst'}
       </button>
     </>}
     {store === 'all' && <PrivateReviewedTwoStoreTable reviewed={reviewed ?? emptyReviewed}
