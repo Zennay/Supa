@@ -35,6 +35,7 @@ export function ImportedRecipeGroceriesPanel({
     (recentIds.length ? recentIds : recipes.slice(0, 3).map(recipe => recipe.id)).slice(0, 15))
   const [query, setQuery] = useState('')
   const [startDay, setStartDay] = useState(m2InitialPlan[0].day)
+  const [dayOverrides, setDayOverrides] = useState<Record<string, string>>({})
   const [portionsById, setPortionsById] = useState<Record<string, number>>({})
   const [checked, setChecked] = useState<Record<string, boolean>>({})
   const [pendingOnly, setPendingOnly] = useState(false)
@@ -68,10 +69,12 @@ export function ImportedRecipeGroceriesPanel({
   const startDayIndex = plannerDays.indexOf(startDay)
   const plannerAssignments = selected.length <= plannerDays.length && startDayIndex >= 0
     ? selected.map((recipe, index) => ({
-        day: plannerDays[(startDayIndex + index) % plannerDays.length],
+        day: dayOverrides[recipe.id] ?? plannerDays[(startDayIndex + index) % plannerDays.length],
         recipeId: recipe.id, title: recipe.title, servings: recipe.servings,
         recipeSnapshot: JSON.stringify(recipe),
       })) : []
+  const plannerDaysDistinct = plannerAssignments.length > 0 &&
+    new Set(plannerAssignments.map(assignment => assignment.day)).size === plannerAssignments.length
   const signature = JSON.stringify(selected.map(recipe => [
     recipe.id, portionsById[recipe.id] ?? recipe.servings, recipe.servings,
     recipe.minutes, recipe.warnings,
@@ -110,8 +113,8 @@ export function ImportedRecipeGroceriesPanel({
     recipe.title.normalize('NFKC').toLocaleLowerCase('nl').includes(search)) : recipes
   const planSelected = (destination: 'planner' | 'list' | 'basket') => {
     setFeedback('')
-    if (!plannerAssignments.length || !allPlannerReady) {
-      setFeedback('Voor de gewone Planner: kies maximaal zeven recepten met gecontroleerde ingrediënten, bereidingstijd en oorspronkelijke porties. Bewaar aangepaste porties eerst als eigen receptvariant.')
+    if (!plannerAssignments.length || !allPlannerReady || !plannerDaysDistinct) {
+      setFeedback('Kies maximaal zeven recepten met gecontroleerde ingrediënten, originele porties en ieder een andere weekdag. Bewaar afwijkende porties eerst als eigen receptvariant.')
       return
     }
     const summary = plannerAssignments.map(row =>
@@ -279,8 +282,21 @@ export function ImportedRecipeGroceriesPanel({
           </select>
         </label>
         {!!plannerAssignments.length && <ol>{plannerAssignments.map(row =>
-          <li key={row.recipeId}><strong>{row.day}</strong>: {row.title}
-            {' '}({row.servings} porties)</li>)}</ol>}
+          <li key={row.recipeId}>
+            <label className="recipe-collection-groceries__day">
+              <span>{row.title} ({row.servings} porties)</span>
+              <select aria-label={'Weekdag voor ' + row.title} value={row.day}
+                onChange={event => {
+                  setDayOverrides(previous => ({ ...previous, [row.recipeId]: event.currentTarget.value }))
+                  setFeedback('')
+                }}>
+                {plannerDays.map(day => <option key={day} value={day}>{day}</option>)}
+              </select>
+            </label>
+          </li>)}</ol>}
+        {!plannerDaysDistinct && !!plannerAssignments.length &&
+          <p role="alert">Twee recepten staan op dezelfde dag. Kies voor elk recept
+            een andere dag voordat je het weekmenu vastlegt.</p>}
         {selected.length > plannerDays.length &&
           <p role="status">Je kunt maximaal {plannerDays.length} recepten tegelijk
             over verschillende dagen in de gewone Planner zetten. De privévergelijker
@@ -290,11 +306,11 @@ export function ImportedRecipeGroceriesPanel({
             of hebben hier aangepaste porties. Controleer het recept en bewaar
             gewenste andere porties eerst als eigen variant.</p>}
         <div className="recipe-backup-panel__actions">
-          <button type="button" disabled={!allPlannerReady || !plannerAssignments.length}
+          <button type="button" disabled={!allPlannerReady || !plannerAssignments.length || !plannerDaysDistinct}
             onClick={() => planSelected('planner')}>Plan alle gekozen recepten</button>
-          <button type="button" disabled={!allPlannerReady || !plannerAssignments.length}
+          <button type="button" disabled={!allPlannerReady || !plannerAssignments.length || !plannerDaysDistinct}
             onClick={() => planSelected('list')}>Plan en open de boodschappenlijst</button>
-          <button type="button" disabled={!allPlannerReady || !plannerAssignments.length}
+          <button type="button" disabled={!allPlannerReady || !plannerAssignments.length || !plannerDaysDistinct}
             onClick={() => planSelected('basket')}>Plan en vergelijk mijn winkelbronnen</button>
         </div>
       </section>

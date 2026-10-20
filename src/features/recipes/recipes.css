@@ -245,3 +245,8 @@
 .recipe-collection-groceries__order button { min-width:35px; min-height:35px; border:1px solid #aac5b4;
   background:#eff7f2; border-radius:8px; cursor:pointer; }
 .recipe-collection-groceries__order button:disabled { opacity:.35; cursor:not-allowed; }
+
+.recipe-collection-groceries__day { display:flex; justify-content:space-between; align-items:center;
+  flex-wrap:wrap; gap:8px; }
+.recipe-collection-groceries__day span { overflow-wrap:anywhere; }
+.recipe-collection-groceries__day select { min-width:110px; }
