@@ -113,24 +113,22 @@ const validHeader = rows => rows.length > 0 &&
   rows[0].length === HEADER.length &&
   HEADER.every((name, index) => rows[0][index] === name)
 
-function convertStoreCsv(text, allowOne) {
-  // Spreadsheet export/paste is comma CSV, Dutch semicolon CSV or TSV.
-  // Admit a separator only when ALL nine canonical column names are intact;
-  // never guess user facts, source rights, physical quantities or prices.
-  let rows = null
+function parseCanonicalRows(text) {
+  // Preview and actual importer must recognize the same original Dutch
+  // spreadsheet formats. A source delimiter is admitted only when all nine
+  // canonical header names are present in exactly their original order.
   for (const delimiter of [',', ';', '\t']) {
     let candidate
     try { candidate = parseCsv(text, delimiter) }
     catch { continue }
-    if (validHeader(candidate)) {
-      rows = candidate
-      break
-    }
+    if (validHeader(candidate)) return candidate
   }
-  if (!rows) {
-    error('Kolomkop moet exact zijn: ' + HEADER.join(',') +
-      ' (CSV komma/puntkomma of gekopieerde tabgescheiden spreadsheet).')
-  }
+  error('Kolomkop moet exact zijn: ' + HEADER.join(',') +
+    ' (CSV komma/puntkomma of gekopieerde tabgescheiden spreadsheet).')
+}
+
+function convertStoreCsv(text, allowOne) {
+  const rows = parseCanonicalRows(text)
   const captures = new Map()
   const seen = new Map()
   for (const retailer of RETAILERS) seen.set(retailer, new Set())
@@ -210,11 +208,7 @@ export const convertOwnStoreCsv = text => convertStoreCsv(text, true)
  * Returned counts contain no original labels, SKUs, timestamps or prices.
  */
 export function previewOwnStoreCsv(text) {
-  const rows = parseCsv(text)
-  if (!rows.length || rows[0].length !== HEADER.length ||
-      HEADER.some((field, index) => rows[0][index] !== field)) {
-    error('CSV-kop moet exact zijn: ' + HEADER.join(','))
-  }
+  const rows = parseCanonicalRows(text)
   const blanks = Object.fromEntries(RETAILERS.map(store => [store, 0]))
   for (let index = 1; index < rows.length; index++) {
     const row = rows[index]
