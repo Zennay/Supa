@@ -448,6 +448,34 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
           return line.status === 'matched' && other?.status === 'matched'
             ? [{ plus: line, deka: other }] : []
         }) : []
+    const partialShown = partialPairs.filter(({ plus: first, deka: second }) => {
+      if (search && ![first.ingredientLabel, first.productName, first.productId,
+        second.productName, second.productId].some(value =>
+          productSearchText(value).includes(search))) return false
+      if (unitFilter === 'all') return true
+      const a = privatePackUnitRate({ amount: first.pack.amount, unit: first.pack.unit,
+        count: first.pack.count, priceCents: first.pricePerPackCents })
+      const b = privatePackUnitRate({ amount: second.pack.amount, unit: second.pack.unit,
+        count: second.pack.count, priceCents: second.pricePerPackCents })
+      return a?.unit === unitFilter && b?.unit === unitFilter
+    })
+    if (order !== 'source') partialShown.sort((a, b) => {
+      const priceGap = (row: typeof a) =>
+        Math.abs(row.plus.lineTotalCents - row.deka.lineTotalCents)
+      if (order === 'priceGap') return priceGap(b) - priceGap(a)
+      if (order === 'lineTotal') return Math.min(a.plus.lineTotalCents,
+        a.deka.lineTotalCents) - Math.min(b.plus.lineTotalCents, b.deka.lineTotalCents)
+      const rate = (row: typeof a) => privatePackUnitRate({
+        amount: row.plus.pack.amount, unit: row.plus.pack.unit,
+        count: row.plus.pack.count, priceCents: row.plus.pricePerPackCents,
+      })
+      const left = rate(a)
+      const right = rate(b)
+      const familyOrder: Record<string, number> = { kg: 0, liter: 1, stuk: 2 }
+      return (familyOrder[left?.unit ?? ''] ?? 3) -
+        (familyOrder[right?.unit ?? ''] ?? 3) ||
+        (left?.centsPerUnit ?? Infinity) - (right?.centsPerUnit ?? Infinity)
+    })
     const missingPairedCount = plus && deka
       ? Math.max(0, plus.basket.lines.length - partialPairs.length) : 0
     // When one shop has no source at all, the other shop's physical weekly
@@ -570,6 +598,8 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       </details>}
       {partialPairs.length > 0 && <details className="private-reviewed-products__missing">
         <summary>{partialPairs.length} identieke fysieke behoeften met twee bronprijzen bekijken</summary>
+        <p>{partialShown.length} regels passen bij je huidige zoek-, eenheids- en sorteervoorkeur.
+          De lokale kopieertekst behoudt ook niet-getoonde oorspronkelijke regels.</p>
         <p><strong>Gedeeltelijk: totaal prijsverschil onbekend.</strong>
           {' '}Deze afzonderlijke regels komen uit twee verse eigen bronnen binnen 24 uur
           met identiek weekmenu en dezelfde benodigde hoeveelheden.
@@ -577,7 +607,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
             ' ingrediënten zijn niet aan beide kanten geprijsd.'}
           {' '}Geen totale besparing, winkelwinnaar of kassagarantie.</p>
         <div className="private-reviewed-products__paired-rows">
-          {partialPairs.map(({ plus: first, deka: second }) => <article key={first.id}>
+          {partialShown.map(({ plus: first, deka: second }) => <article key={first.id}>
             <h4>{first.ingredientLabel} · {first.requirement.amount} {first.requirement.unit}</h4>
             <div className="private-reviewed-products__paired-options">
               {([['PLUS', first], ['DekaMarkt', second]] as const).map(([shop, line]) =>
