@@ -176,6 +176,11 @@ export function ImportedRecipeGroceriesPanel({
       const variantsByOriginal = new Map(
         variantPreview.changes.map((change, index) => [change.recipeId, created[index].id]))
       setSelectedIds(ids => ids.map(id => variantsByOriginal.get(id) ?? id))
+      // Preserve the explicitly chosen weekday when the source recipe is
+      // replaced by its new saved portion variant.
+      setDayOverrides(previous => Object.fromEntries(
+        Object.entries(previous).map(([id, day]) =>
+          [variantsByOriginal.get(id) ?? id, day])))
       setPortionsById({})
       setChecked({})
       setVariantPreview(null)
@@ -377,6 +382,11 @@ export function ImportedRecipeGroceriesPanel({
             {plannerDays.map(day => <option key={day} value={day}>{day}</option>)}
           </select>
         </label>
+        {selected.some(recipe => Object.hasOwn(dayOverrides, recipe.id)) &&
+          <button type="button" className="ghost-button"
+            onClick={() => { setDayOverrides({}); setFeedback('') }}>
+            Herstel opeenvolgende dagen vanaf {startDay}
+          </button>}
         {!!plannerAssignments.length && <ol>{plannerAssignments.map(row =>
           <li key={row.recipeId}>
             <label className="recipe-collection-groceries__day">
