@@ -835,7 +835,8 @@ export function ManualShoppingNotes({ notes, setNotes }: {
     {backupPreview && <div className="manual-shopping-notes__backup" role="group"
       aria-label="Voorbeeld van de boodschappenbackup">
       <strong>Privébackup klaar: {backupPreview.length} artikelen</strong>
-      <p>Bestaande artikelen worden niet overschreven. Conflicterende IDs en meer
+      <p>Bestaande artikelen en vinkjes worden niet overschreven. Dubbelen met een ander ID
+        maar dezelfde winkel en omschrijving worden overgeslagen. Conflicterende IDs en meer
         dan 100 artikelen worden geweigerd. Niets wordt geüpload of geprijsd.</p>
       <button type="button" onClick={backupConfirm}>Bevestig toevoegen aan mijn lijst</button>
       <button type="button" onClick={() => { readVersion.current++; setBackupPreview(null) }}>

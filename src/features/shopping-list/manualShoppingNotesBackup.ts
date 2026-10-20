@@ -46,6 +46,12 @@ export function normalizePrivateNotes(input: unknown): UnpricedShoppingNote[] {
 export function mergePrivateNotes(current: UnpricedShoppingNote[], incoming: UnpricedShoppingNote[]) {
   if (!Array.isArray(current) || !Array.isArray(incoming)) throw new Error('Geen geldige boodschappen.')
   const existing = new Map(current.map(item => [item.id, item]))
+  // A backup from another tab can assign a new UUID to the same handwritten
+  // article. Store + normalized label, not UUID alone, is its user-facing
+  // duplicate identity. Never replace an existing tick during recovery.
+  const keys = new Set(current.map(item => JSON.stringify([
+    item.store, item.label.normalize('NFC').toLocaleLowerCase('nl-NL'),
+  ])))
   const additional: UnpricedShoppingNote[] = []
   for (const note of incoming) {
     const found = existing.get(note.id)
@@ -54,6 +60,9 @@ export function mergePrivateNotes(current: UnpricedShoppingNote[], incoming: Unp
         throw new Error('Een bestaande boodschap heeft hetzelfde ID maar andere inhoud; niets is geïmporteerd.')
       }
     } else {
+      const key = JSON.stringify([note.store, note.label.normalize('NFC').toLocaleLowerCase('nl-NL')])
+      if (keys.has(key)) continue
+      keys.add(key)
       additional.push(note)
       existing.set(note.id, note)
     }
