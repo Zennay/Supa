@@ -1,5 +1,5 @@
 import type { SavedRecipe } from './recipeLibrary.ts'
-import { formatOwnRecipeChecklist, type OwnRecipeChecklist } from './recipeShoppingChecklist.ts'
+import { formatOwnRecipeChecklist, ownRecipeShoppingChecklist, type OwnRecipeChecklist } from './recipeShoppingChecklist.ts'
 
 export type RecipeWeekAssignment = {
   day: string
@@ -56,12 +56,27 @@ export function exportRecipeWeekPrint(
       (row ? escape(row.recipe.title) + ' · ' + row.servings + ' porties'
         : 'Geen recept gekozen') + '</li>'
   }).join('')
-  const instructions = week.map(({ day, recipe }) =>
-    '<section><h3>' + escape(day) + ' — ' + escape(recipe.title) + '</h3>' +
-    '<p>' + recipe.servings + ' porties · ' + recipe.minutes +
-    ' minuten · eigen recept</p><ol>' +
-    recipe.steps.map(step => '<li>' + escape(step) + '</li>').join('') +
-    '</ol></section>').join('')
+  const instructions = week.map(({ day, recipe }) => {
+    const ingredients = ownRecipeShoppingChecklist(recipe, recipe.servings!)
+    if (!ingredients.canCopy || ingredients.lines.some(line => line.needsReview ||
+        line.amount === null || !Number.isFinite(line.amount) || line.amount <= 0 ||
+        line.unit === null))
+      throw new Error('Een recept bevat ongecontroleerde ingrediënten. Controleer deze eerst.')
+    const items = ingredients.lines.map(line => {
+      const amount = Number(line.amount!.toFixed(3)).toLocaleString('nl-NL', {
+        useGrouping: false, maximumFractionDigits: 3,
+      })
+      return '<li>' + escape(amount + ' ' +
+        (line.unit === 'piece' ? 'stuks' : line.unit) + ' ' + line.label) + '</li>'
+    }).join('')
+    return '<section><h3>' + escape(day) + ' — ' + escape(recipe.title) + '</h3>' +
+      '<p>' + recipe.servings + ' porties · ' + recipe.minutes + ' minuten · eigen recept</p>' +
+      '<h4>Ingrediënten voor dit recept</h4><ul>' + items + '</ul>' +
+      '<small>Per recept voor het koken; niet opnieuw optellen bij het weekmandje.</small>' +
+      '<h4>Bereiding</h4><ol>' +
+      recipe.steps.map(step => '<li>' + escape(step) + '</li>').join('') +
+      '</ol></section>'
+  }).join('')
   const groceries = formatOwnRecipeChecklist(checklist, {}, false)
   const html = '<!doctype html><html lang="nl"><head><meta charset="utf-8">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1">' +
