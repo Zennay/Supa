@@ -459,6 +459,54 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       return physical.filter(line => !capture || line.status === 'unresolved')
         .map(line => ({ shop, line, absent: !capture }))
     })
+    function preparePartialCopy() {
+      const latest = freshReviewedBaskets(reviewedRef.current,
+        reviewedRef.current.planKey, Date.now())
+      if ((latest?.stores.PLUS ?? null) !== (plus ?? null) ||
+          (latest?.stores.DekaMarkt ?? null) !== (deka ?? null) ||
+          !latest) {
+        setReceiptMessage('De eigen bron is verlopen of veranderd. Controleer eerst de bron opnieuw.')
+        return
+      }
+      const clean = (value: string) =>
+        value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim()
+      const content = [
+        'SUPA · eigen onvolledige twee-winkel-vergelijking',
+        'Zelfde weekmenu; uitsluitend originele, lokaal gecontroleerde bronprijzen.',
+        'PLUS: ' + clean(plus?.observedAt ?? 'geen bron'),
+        'DekaMarkt: ' + clean(deka?.observedAt ?? 'geen bron'),
+        'VOLLEDIG MANDVERSCHIL: ONBEKEND · geen besparings- of kassagarantie.',
+        '',
+        'INDIVIDUEEL VERGELIJKBARE REGELS (' + partialPairs.length + ')',
+        ...partialPairs.map(({ plus: a, deka: b }) =>
+          clean(a.ingredientLabel) + ' (' + a.requirement.amount + ' ' +
+          a.requirement.unit + ') · PLUS ' + clean(a.productName) + ' [' +
+          clean(a.productId) + '] ' + a.packs + ' × ' +
+          money.format(a.pricePerPackCents / 100) + ' = ' +
+          money.format(a.lineTotalCents / 100) + ' · DekaMarkt ' +
+          clean(b.productName) + ' [' + clean(b.productId) + '] ' +
+          b.packs + ' × ' + money.format(b.pricePerPackCents / 100) +
+          ' = ' + money.format(b.lineTotalCents / 100)),
+        '', 'NOG ZONDER TWEE BRONPRIJZEN (' + unresolvedByStore.length + ')',
+        ...unresolvedByStore.map(({ shop, line }) =>
+          shop + ' · ' + clean(line.ingredientLabel) + ' · ' +
+          (line.requirement.amount === null ? 'hoeveelheid onbekend' :
+            line.requirement.amount + ' ' + line.requirement.unit) +
+          ' · prijs onbekend'),
+        '', 'Alleen privé voor jouw eigen winkelopnames. Niet uploaden als winkelbewijs.',
+      ].join('\n')
+      if (new TextEncoder().encode(content).length > 256_000) {
+        setReceiptMessage('Deze private tekst is te groot om veilig te tonen.')
+        return
+      }
+      setManualCopy({
+        text: content, label: 'Eigen gedeeltelijke winkelvergelijking',
+        checkedSignature: privateCheckedSignature(checkedRef.current),
+        paired: false, planKey: reviewed.planKey,
+        plus: plus ?? null, deka: deka ?? null,
+      })
+      setReceiptMessage('De onvolledige vergelijking is lokaal als selecteerbare tekst klaar.')
+    }
     return <section className="private-reviewed-products__paired" aria-label="Winkelvergelijking van eigen artikelen">
       <h3>Vergelijk PLUS met DekaMarkt</h3>
       <div className="private-reviewed-products__source-coverage">
@@ -552,6 +600,10 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
           </article>)}
         </div>
       </details>}
+      {(partialPairs.length > 0 || unresolvedByStore.length > 0) &&
+        <button type="button" onClick={preparePartialCopy}>
+          Toon mijn onvolledige winkelvergelijking als tekst om zelf te kopiëren
+        </button>}
       {receiptMessage && <p role="status">{receiptMessage}</p>}
       {manualCopyVisible && <PrivateManualShareText key={manualCopyVisible.text}
         text={manualCopyVisible.text} label={manualCopyVisible.label}
