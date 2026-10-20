@@ -417,7 +417,8 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
               ' lager heel-mandtotaal.'}</strong></p>
           <small>Alleen jouw oorspronkelijke, volledig gecontroleerde prijzen en dezelfde fysieke
             weekvraag met hele verpakkingen. Bronmomenten liggen maximaal 24 uur uiteen.
-            Geen kassagarantie of onafhankelijk bewezen besparing.</small>
+            Geen kassagarantie of onafhankelijk bewezen besparing.
+            Eigen extra boodschappen zonder gecontroleerde SKU/prijs zijn niet in deze mandtotalen opgenomen.</small>
           {summary.mixedRoute && summary.mixedRoute.requiresTwoStops &&
             <p><strong>Optioneel combineren:</strong>
               {' '}{exactEuro.formatCents(summary.mixedRoute.totalCents)}
@@ -465,7 +466,8 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
               zolang de huidige fysieke bronmandjes niet geldig vergelijkbaar zijn.</small>
           </div>}
           <small>Ontbrekende of verlopen winkelprijzen worden nooit geschat of als € 0 ingevuld.
-            Je kunt de rest van je planning en ongeprijsde boodschappenlijst wel blijven gebruiken.</small>
+            Je kunt de rest van je planning en ongeprijsde boodschappenlijst wel blijven gebruiken.
+            Extra eigen boodschappen zonder geldige productprijs tellen niet mee in een getoond eenwinkelbedrag.</small>
           <div className="own-store-planner__overview-actions">
             <button type="button" className="ghost-button" onClick={onOpenComparison}>
               {summary.status === 'different-moments'
