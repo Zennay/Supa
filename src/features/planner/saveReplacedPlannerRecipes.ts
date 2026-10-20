@@ -85,8 +85,12 @@ export function saveReplacedPlannerRecipes({
 
     // One explicit browser action; the original receipt may not have
     // changed in another tab. All next-state fields pass the strict v2 guard.
-    write(nextRaw)
-    return { status: 'saved', raw: nextRaw }
+    try {
+      write(nextRaw)
+      return { status: 'saved', raw: nextRaw }
+    } catch {
+      return { status: 'unavailable', raw: actual }
+    }
   } catch {
     return { status: 'protected', raw: actual }
   }
