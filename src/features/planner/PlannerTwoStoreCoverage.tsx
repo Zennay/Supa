@@ -20,7 +20,29 @@ function cellFor(
   // whole-pack ledger for each export action. An old React prop is no longer
   // enough to call an otherwise visible store "ready".
   const receipt = admitted?.stores[store]
-  if (receipt) return { kind: 'ready', text: 'Heel mandje gecontroleerd' }
+  if (receipt) {
+    // A canonical source may be partially priced. Do not turn admission
+    // of the envelope into an approval for every physical ingredient.
+    const matches = receipt.basket.lines.filter(line => line.id === id)
+    if (matches.length !== 1) return {
+      kind: 'review', text: 'Ingrediënt ontbreekt in deze bronmand: controle vereist',
+    }
+    const line = matches[0]
+    if (line.status === 'matched') {
+      const full = receipt.basket.unresolvedLineCount === 0 &&
+        receipt.basket.matchedLineCount === receipt.basket.lines.length &&
+        receipt.basket.lines.length > 0
+      return { kind: 'ready', text: full
+        ? 'SKU, verpakking en volledig mandje bevestigd'
+        : 'SKU en verpakking bevestigd · ander ingrediënt nog ongeprijsd' }
+    }
+    const previous = progress?.stores[store]
+    if (previous?.fresh && previous.observedAt === receipt.observedAt &&
+        previous.awaitingReviewIngredients.some(item => item.id === id)) return {
+      kind: 'review', text: 'Controleer originele SKU en verpakking',
+    }
+    return { kind: 'missing', text: 'Fysiek ingrediënt nog zonder bevestigde prijs' }
+  }
   if (reviewed?.stores[store]) return {
     kind: 'expired', text: 'Bron verlopen of mandregels gewijzigd: controle vereist',
   }
@@ -35,8 +57,14 @@ function cellFor(
   if (capture.awaitingReviewIngredients.some(item => item.id === id)) {
     return { kind: 'review', text: 'Controleer originele SKU en verpakking' }
   }
-  if (capture.demandLineCount < 1) return { kind: 'review', text: 'Koppeling nog niet beoordeeld' }
-  return { kind: 'reviewed', text: 'SKU gekoppeld · mandje nog onvolledig' }
+  // Only the actual admitted and owner-reviewed SKU detail may count as a
+  // locally linked ingredient. Non-missing progress counters are not proof.
+  const confirmed = capture.confirmedSourceLines?.filter(item => item.ingredientId === id) ?? []
+  if (confirmed.length === 1) return {
+    kind: 'reviewed',
+    text: 'Originele SKU gekoppeld · volledig mandtotaal nog onbekend',
+  }
+  return { kind: 'review', text: 'Productmatch nog niet persoonlijk bevestigd' }
 }
 
 function amountText(need: PlannerCaptureGuideNeed): string {
