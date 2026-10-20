@@ -21,6 +21,7 @@ const UNIT_LABEL: Record<string, string> = {
 }
 const tableHeader = 'ingredientId\twinkel\tproduct\tverpakking\teenheid\tmultipackAantal\tprijs'
 const legacyTableHeader = 'ingredientId\twinkel\tproduct\tverpakking\teenheid\tprijs'
+const boundTableHeader = 'ingredientId\twinkel\tbenodigdAantal\tbenodigdEenheid\tproduct\tverpakking\teenheid\tmultipackAantal\tprijs'
 function safeTableCell(value: string) {
   // The plain TSV route must guard the same invisible-prefix and NFKC
   // spreadsheet formula cases as the existing private CSV exports.
@@ -30,11 +31,12 @@ function safeTableCell(value: string) {
 }
 function tabularData(needs: readonly ManualNeed[], entries: ManualEntries): string {
   return [
-    tableHeader,
+    boundTableHeader,
     ...needs.flatMap(need => MANUAL_RETAILERS.map(store => {
       const quote = entries[manualQuoteKey(store, need.id)]
       return [
         safeTableCell(need.id), store,
+        need.amount === null ? '' : String(need.amount), need.unit,
         safeTableCell(quote?.product ?? ''),
         safeTableCell(quote?.packAmount ?? ''),
         quote?.packUnit ?? '',
@@ -45,7 +47,7 @@ function tabularData(needs: readonly ManualNeed[], entries: ManualEntries): stri
   ].join('\n')
 }
 function readPastedTable(text: string, needs: readonly ManualNeed[]): {
-  entries: ManualEntries; legacyWithoutPackCount: boolean
+  entries: ManualEntries; legacyWithoutPackCount: boolean; boundToDemand: boolean
 } {
   // Bound pasted content like a local file before splitting it into cells.
   // Excel and other spreadsheets may prefix a valid UTF-8 TSV with a BOM.
@@ -55,23 +57,33 @@ function readPastedTable(text: string, needs: readonly ManualNeed[]): {
   const normalized = text.replace(/^\uFEFF/u, '').replace(/\r\n?/gu, '\n')
   const lines = normalized.replace(/\n+$/u, '').split('\n')
   const legacyWithoutPackCount = lines[0] === legacyTableHeader
-  if ((!legacyWithoutPackCount && lines[0] !== tableHeader) ||
+  const boundToDemand = lines[0] === boundTableHeader
+  if ((!legacyWithoutPackCount && !boundToDemand && lines[0] !== tableHeader) ||
       lines.length !== 1 + needs.length * 2) {
-    throw new Error('De tabel moet alle PLUS- en DekaMarkt-regels bevatten; gebruik een zes- of zevenkoloms Supa-blad.')
+    throw new Error('De tabel moet alle PLUS- en DekaMarkt-regels bevatten; gebruik een Supa-invulblad met 6, 7 of 9 kolommen.')
   }
   const expected = new Map(needs.map(need => [need.id, need]))
   const entries: ManualEntries = Object.create(null) as ManualEntries
   const used = new Set<string>()
   for (const line of lines.slice(1)) {
     const cells = line.split('\t')
-    if (cells.length !== (legacyWithoutPackCount ? 6 : 7)) {
+    if (cells.length !== (boundToDemand ? 9 : legacyWithoutPackCount ? 6 : 7)) {
       throw new Error('Gebruik uitsluitend de oorspronkelijke Supa-kolommen; geen regels samenvoegen.')
     }
     // Older six-column Supa exports had no multi-pack observation.
     // Restore their actual product, unit and price, but NEVER infer count=1.
-    const [id, shop, product, packAmount, unit, packCount, price] = legacyWithoutPackCount
-      ? [cells[0], cells[1], cells[2], cells[3], cells[4], '', cells[5]]
-      : cells
+    const [id, shop, product, packAmount, unit, packCount, price] = boundToDemand
+      ? [cells[0], cells[1], cells[4], cells[5], cells[6], cells[7], cells[8]]
+      : legacyWithoutPackCount
+        ? [cells[0], cells[1], cells[2], cells[3], cells[4], '', cells[5]]
+        : cells
+    if (boundToDemand && (
+      !expected.has(id) ||
+      cells[2] !== (expected.get(id)!.amount === null ? '' : String(expected.get(id)!.amount)) ||
+      cells[3] !== expected.get(id)!.unit
+    )) {
+      throw new Error('Planner-behoefte of eenheid is gewijzigd sinds dit invulblad. Exporteer een nieuw blad.')
+    }
     if (!expected.has(id) || (shop !== 'PLUS' && shop !== 'DekaMarkt') ||
         (unit !== '' && !manualCompatibleUnits(expected.get(id)!.unit).includes(unit as Exclude<ManualQuote['packUnit'], ''>)) ||
         product.length > 160 || packAmount.length > 32 || price.length > 20 ||
@@ -83,7 +95,7 @@ function readPastedTable(text: string, needs: readonly ManualNeed[]): {
     used.add(key)
     entries[key] = { product, packAmount, packUnit: unit as ManualQuote['packUnit'], packCount, price }
   }
-  return { entries, legacyWithoutPackCount }
+  return { entries, legacyWithoutPackCount, boundToDemand }
 }
 
 export function ManualStoreComparison({
@@ -231,6 +243,11 @@ export function ManualStoreComparison({
   function restoreTable(text: string) {
     try {
       const imported = readPastedTable(text, needs)
+      if (!imported.boundToDemand &&
+          !window.confirm('Dit oudere Supa-blad bevat geen exacte Planner-hoeveelheden. Controleer of het bij de huidige week hoort. Toch laden?')) {
+        setImportMessage('Oud invulblad niet geladen; huidige invoer behouden.')
+        return
+      }
       if (Object.keys(entries).length > 0 &&
           JSON.stringify(entries) !== JSON.stringify(imported.entries) &&
           !window.confirm('Dit invulblad vervangt jouw bestaande PLUS- en DekaMarkt-productinvoer voor deze Planner-vraag. Doorgaan?')) {
@@ -246,7 +263,9 @@ export function ManualStoreComparison({
           'Controleer opnieuw of de oude hoeveelheid de inhoud per eenheid of de totale multipack inhield. ' +
           'Vul bij iedere winkelregel het echte multipack-aantal in; pas daarna ' +
           'kan een volledig rekenkundig mandverschil verschijnen.'
-        : 'Tabel geladen op dit apparaat; controleer de echte multipack-inhoud en verpakkingenaantallen.')
+        : imported.boundToDemand
+          ? 'Invulblad voor exact deze Planner-vraag geladen; controleer de eigen product- en winkelprijzen.'
+          : 'Oud zevenkolomsblad geladen zonder Planner-behoeftecontrole. Controleer de actuele week en winkelprijzen.')
     } catch (error) {
       setImportMessage(error instanceof Error ? error.message : 'Tabel niet herkend.')
     }
@@ -352,7 +371,7 @@ export function ManualStoreComparison({
           </div>
           {showTable && (
             <div className="manual-compare__table">
-              <p>Kopieer de eerste tabel naar Excel of een spreadsheet. Vul product, fysieke hoeveelheid per eenheid, het aantal eenheden per multipack en de prijs van de hele multipack in. Plak daarna de volledige tabgescheiden tabel terug; eenheden en ingrediënten moeten overeenkomen.</p>
+              <p>Dit negenkolomsinvulblad bewaart ook de originele hoeveelheid en eenheid per Planner-ingrediënt. Wijzig die twee kolommen niet: Supa weigert oude bladen voor een andere Planner-vraag. Vul uitsluitend winkelproduct, verpakking, multipack en eigen prijs in. Plak of laad daarna het hele blad terug. Oude zes- en zevenkolomsbladen vragen een extra controle, omdat ze niet aan een Planner-hoeveelheid zijn gebonden.</p>
               <label>Huidige tabel
                 <textarea readOnly rows={7} value={tabularData(needs, entries)}
                   onFocus={event => event.currentTarget.select()} />
