@@ -142,7 +142,16 @@ try {
     window.sessionStorage.removeItem(handoffKey)
     if (!saved.length || new TextEncoder().encode(saved).length > maxBytes)
       throw Error('Het doorgestuurde weekmenu is leeg of te groot.')
-    presentStagedWeek(demandFromWeek(readWeek(JSON.parse(saved))), 'Jouw doorgestuurde Planner-week')
+    const handoff = demandFromWeek(readWeek(JSON.parse(saved)))
+    presentStagedWeek(handoff, 'Jouw doorgestuurde Planner-week')
+    // Direct recipe/Planner navigation should land at the actual pending
+    // review, not at the manual source form above it. Merely focus and scroll;
+    // never auto-accept or overwrite the user's existing product selections.
+    window.requestAnimationFrame(() => {
+      if (stagedHandoff !== handoff || preview.hidden) return
+      preview.scrollIntoView({ block: 'start', behavior: 'auto' })
+      acceptHandoff.focus({ preventScroll: true })
+    })
   }
 } catch {
   discardStage()
