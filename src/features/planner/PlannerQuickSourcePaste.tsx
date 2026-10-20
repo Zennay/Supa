@@ -1,9 +1,10 @@
 import { euro as exactEuro } from '../../lib/money.ts'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots, type OfflineStoreProduct } from '../../domain/offlineReviewedImport.ts'
+import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots } from '../../domain/offlineReviewedImport.ts'
 import { recentOwnCaptureInstant } from '../comparison/privateReviewedBasketBridge.ts'
 import { privatePackUnitRate, formatPrivateUnitRate } from '../comparison/privateUnitPrice.ts'
 import { productSearchText } from '../products/productSearchText.ts'
+import { completeOwnSourceProduct, privateSourceReviewChecklist } from './privateSourceReviewChecklist.ts'
 import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
 import { PlannerSourceMatchPreview } from './PlannerSourceMatchPreview.tsx'
 import { replaceOwnStoreCapture, type CaptureRefreshChanges } from './combineOwnSourceCapture.ts'
@@ -11,20 +12,6 @@ import { privateSourceChangeCsv } from './privateSourceChangeCsv.ts'
 import './plannerQuickSourcePaste.css'
 
 type Preview = { raw: string; normalized: string; data: OfflinePriceSnapshots }
-/** Presentation-only eligibility, not authority to approve a product or price. */
-function completeOwnSourceProduct(product: OfflineStoreProduct): boolean {
-  if (product.sourceAvailable !== true ||
-      typeof product.sourcePriceCents !== 'number' ||
-      !Number.isSafeInteger(product.sourcePriceCents) || product.sourcePriceCents < 0 ||
-      product.packAmount === null || product.packAmount <= 0 ||
-      product.packUnit === 'unknown' ||
-      !Number.isSafeInteger(product.packCount ?? 1) || (product.packCount ?? 1) <= 0)
-    return false
-  return privatePackUnitRate({
-    amount: product.packAmount, unit: product.packUnit,
-    count: product.packCount ?? 1, priceCents: product.sourcePriceCents,
-  }) !== null
-}
 const limit = 256000
 const dateText = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -345,6 +332,37 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
     return null
   })()
 
+  function downloadCurrentSourceRepairList(store: 'PLUS' | 'DekaMarkt') {
+    if (!preview || preview.raw !== draft) return
+    try {
+      // No field evidence, permission or timestamp is synthesized. The
+      // original source is re-read at click; the list is only a field task.
+      const current = parseOfflinePriceSnapshots(preview.normalized, Date.now())
+      const capture = current.captures[store]
+      if (!capture) throw new Error(store + ': oorspronkelijke bron ontbreekt.')
+      const term = productSearchText(sourceSearch.trim())
+      const stale = !recentOwnCaptureInstant(capture.observedAt, Date.now())
+      const products = capture.products.filter(product =>
+        (!term || [product.id, product.name].some(value =>
+          productSearchText(value).includes(term))) &&
+        (!incompleteOnly || stale || !completeOwnSourceProduct(product)))
+      const content = privateSourceReviewChecklist({ store, observedAt: capture.observedAt,
+        products, stale })
+      const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-' + store.toLowerCase() + '-ontbrekende-eigen-broncontroles.txt'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setMessage(store + ': alleen ontbrekende of opnieuw te observeren originele SKU-taken gedownload. Geen oude prijzen overgenomen.')
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message :
+        'Eigen broncontrolelijst niet beschikbaar. Verklein de selectie.')
+    }
+  }
+
   function downloadCanonicalPreview() {
     if (!preview || preview.raw !== draft) return
     try {
@@ -528,6 +546,12 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
                 <small>Toon hier de eerste 24 gevonden SKU's. Verfijn je zoekterm
                   of bekijk alle oorspronkelijke producten in Vergelijk.</small>}
             </details>
+            {visibleProducts.some(product => !completeOwnSourceProduct(product) ||
+                !recentOwnCaptureInstant(capture.observedAt, now)) &&
+              <button type="button" className="ghost-button"
+                onClick={() => downloadCurrentSourceRepairList(store)}>
+                Download {store}-controles voor originele ontbrekende SKU-data (TXT)
+              </button>}
           </section>
         })}
         <p>{!liveAdmission?.currentEnough
