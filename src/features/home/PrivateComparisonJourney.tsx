@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import { privateKnownPricePairs, privateProgressProductRows, formatKnownUnitGap, type PrivateKnownProduct, type PrivateKnownUnitGap } from '../products/privateProgressProductRows.ts'
@@ -10,7 +10,13 @@ import {
   recentOwnCaptureInstant, partialReviewedLinePairs,
   type OwnStore, type PrivateCaptureProgress, type PrivateReviewedBaskets,
 } from '../comparison/privateReviewedBasketBridge.ts'
+import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
 import './privateComparisonJourney.css'
+
+const PlannerQuickSourcePaste = lazy(async () => {
+  const mod = await import('../planner/PlannerQuickSourcePaste.tsx')
+  return { default: mod.PlannerQuickSourcePaste }
+})
 
 const stores: OwnStore[] = ['PLUS', 'DekaMarkt']
 
@@ -20,10 +26,11 @@ const stores: OwnStore[] = ['PLUS', 'DekaMarkt']
  * Partial price sources are guidance, not a financial estimate.
  */
 export function PrivateComparisonJourney({
-  reviewed, progress, onOpenPlanner, onOpenImport, onOpenProducts, onOpenList, onReview, onImportFiles, fileWarning,
+  reviewed, progress, captureNeeds, onOpenPlanner, onOpenImport, onOpenProducts, onOpenList, onReview, onImportFiles, fileWarning,
 }: {
   reviewed: PrivateReviewedBaskets | null
   progress: PrivateCaptureProgress | null
+  captureNeeds: readonly PlannerCaptureGuideNeed[]
   onOpenPlanner: () => void
   onOpenImport: () => void
   onOpenProducts: () => void
@@ -34,6 +41,7 @@ export function PrivateComparisonJourney({
 }) {
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [exportMessage, setExportMessage] = useState('')
+  const [showPasteSource, setShowPasteSource] = useState(false)
   useEffect(() => {
     const refresh = () => setNowMs(Date.now())
     const timer = window.setInterval(refresh, 60_000)
@@ -159,6 +167,20 @@ export function PrivateComparisonJourney({
         }} />
     </label>
     {fileWarning && <p role="alert" className="private-comparison-journey__error">{fileWarning}</p>}
+    <section className="private-comparison-journey__paste">
+      <button type="button" aria-expanded={showPasteSource}
+        onClick={() => setShowPasteSource(open => !open)}>
+        {showPasteSource ? 'Sluit spreadsheet-invoer' : 'Plak mijn eigen winkelprijzen uit CSV of JSON'}
+      </button>
+      <small>Gebruik dezelfde persoonlijke bronimport als in Planner en Producten.
+        Eerst een voorbeeld van oorspronkelijke SKU, bronmoment en eenheidsprijs;
+        daarna pas expliciet kiezen en controleren in Vergelijk.</small>
+      {showPasteSource && <Suspense fallback={<p role="status">Lokale prijsinvoer openen…</p>}>
+        <PlannerQuickSourcePaste initiallyOpen hasDemand={captureNeeds.length > 0}
+          needs={captureNeeds} onImport={onImportFiles}
+          onRecapture={() => onOpenImport()} onReviewIngredient={onReview} />
+      </Suspense>}
+    </section>
 
     <div className="private-comparison-journey__shops" aria-label="Brondekking per winkel">
       {stores.map(store => {

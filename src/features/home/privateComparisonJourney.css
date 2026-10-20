@@ -75,3 +75,10 @@
 .private-comparison-journey__store-route-actions button{flex:1 1 190px;
   color:#204a30;background:#e8f1e9}
 @media(max-width:630px){.private-comparison-journey__store-route-actions button{width:100%}}
+/* Home uses the same guarded spreadsheet importer as Planner and Producten. */
+.private-comparison-journey__paste{display:grid;gap:.5rem;padding:1rem;
+  border:1px solid #d7e5d9;border-radius:14px;background:#f8fbf7;min-width:0}
+.private-comparison-journey__paste>button{justify-self:start}
+.private-comparison-journey__paste>small{line-height:1.45;color:#435b49}
+.private-comparison-journey__paste>section{min-width:0}
+@media(max-width:630px){.private-comparison-journey__paste>button{width:100%}}

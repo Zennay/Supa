@@ -497,7 +497,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   // Share the canonical aggregated physical week with Producten, rather than
   // inferring missing ingredients from whichever retailer happened to import.
   const productCaptureNeeds = useMemo(() => {
-    if (tab !== 'products') return []
+    if (tab !== 'products' && tab !== 'home') return []
     const physical = recipes.filter((recipe): recipe is RecipeWithIngredients =>
       Array.isArray((recipe as RecipeWithIngredients).ingredients))
     if (physical.length !== recipes.length) return []
@@ -789,6 +789,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         {tab === 'home' && <Suspense fallback={<p role="status">Mijn winkelvergelijking laden…</p>}>
           <PrivateComparisonJourney
             reviewed={livePrivateReviewed}
+            captureNeeds={productCaptureNeeds}
             progress={privateCaptureProgress?.planKey === privatePlanKey
               ? privateCaptureProgress : null}
             onOpenPlanner={() => navigate('planner')}
