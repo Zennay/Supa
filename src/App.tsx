@@ -703,6 +703,8 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             onOpenPlanner={() => navigate('planner')}
             onOpenImport={openOwnPriceImport}
             onOpenList={() => navigate('list')}
+            onImportFiles={handoffOwnPriceFiles}
+            fileWarning={listSourceFileWarning}
             onReview={(store, ingredientId) => {
               setPrivateReviewFocus(previous => ({
                 planKey: privatePlanKey, store, ingredientId,

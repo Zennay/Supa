@@ -14,7 +14,7 @@ const stores: OwnStore[] = ['PLUS', 'DekaMarkt']
  * Partial price sources are guidance, not a financial estimate.
  */
 export function PrivateComparisonJourney({
-  reviewed, progress, onOpenPlanner, onOpenImport, onOpenList, onReview,
+  reviewed, progress, onOpenPlanner, onOpenImport, onOpenList, onReview, onImportFiles, fileWarning,
 }: {
   reviewed: PrivateReviewedBaskets | null
   progress: PrivateCaptureProgress | null
@@ -22,6 +22,8 @@ export function PrivateComparisonJourney({
   onOpenImport: () => void
   onOpenList: () => void
   onReview: (store: OwnStore, ingredientId: string) => void
+  onImportFiles: (files: File[]) => void
+  fileWarning: string
 }) {
   const plus = reviewed?.stores.PLUS
   const deka = reviewed?.stores.DekaMarkt
@@ -48,6 +50,21 @@ export function PrivateComparisonJourney({
       </div>
       <button type="button" onClick={onOpenImport}>Open prijsvergelijking</button>
     </div>
+
+    <label className="private-comparison-journey__upload">
+      <strong>Eigen PLUS/Deka-prijsbestanden meteen openen</strong>
+      <span>Kies één of twee oorspronkelijke CSV, TSV, TXT of Supa JSON-bestanden.
+        De bestaande Vergelijk-werkbank controleert de volledige bron en vraagt
+        bevestiging voordat bestaande winkelgegevens worden vervangen.</span>
+      <input type="file" multiple
+        accept=".csv,.tsv,.txt,.json,text/csv,text/plain,text/tab-separated-values,application/json"
+        onChange={event => {
+          const files = Array.from(event.currentTarget.files ?? [])
+          event.currentTarget.value = ''
+          onImportFiles(files)
+        }} />
+    </label>
+    {fileWarning && <p role="alert" className="private-comparison-journey__error">{fileWarning}</p>}
 
     <div className="private-comparison-journey__shops" aria-label="Brondekking per winkel">
       {stores.map(store => {

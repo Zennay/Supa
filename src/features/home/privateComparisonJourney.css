@@ -19,3 +19,8 @@
 .private-comparison-journey__actions button:not(:first-child){background:#e8f1e9;color:#204a30}
 .private-comparison-journey>small{color:#54685a;line-height:1.5}
 @media(max-width:630px){.private-comparison-journey{margin:1rem .25rem 2rem;border-radius:16px}.private-comparison-journey__shops{grid-template-columns:1fr}.private-comparison-journey__heading>button,.private-comparison-journey__actions button{width:100%}}
+
+.private-comparison-journey__upload{display:flex;flex-direction:column;gap:.5rem;background:#f5f9f5;border:1px dashed #b7cbb9;border-radius:14px;padding:1rem;margin:1rem 0;color:#294832}
+.private-comparison-journey__upload span{font-size:.92rem;line-height:1.45;color:#48614d}
+.private-comparison-journey__upload input{width:100%;max-width:100%;min-height:44px;font:inherit}
+.private-comparison-journey__error{color:#8a2525;font-weight:600}
