@@ -4,6 +4,7 @@ import type {
   OwnStore, PrivateCaptureProgress, PrivateReviewedBaskets,
 } from '../comparison/privateReviewedBasketBridge.ts'
 import { productSearchText } from './productSearchText.ts'
+import { downloadPrivateKnownLinePriceCsv } from './privateKnownLinePriceCsv.ts'
 import {
   privateProgressProductRows, privateKnownPricePairs,
   type PrivateProgressProductRow,
@@ -85,11 +86,19 @@ export function PrivatePartialProductCards({
       {' '}Alle bedragen hieronder gelden alleen voor de genoemde fysieke ingrediëntregel.
       {' '}Ook als de andere winkel al een volledig mandje heeft, verschijnt alleen een
       individueel verschil wanneer dezelfde hoeveelheid binnen 24 uur echt is bevestigd.</p>
-    {paired.length > 0 && <p role="status">
-      Voor {paired.length} fysieke {paired.length === 1 ? 'ingrediëntregel is' : 'ingrediëntregels zijn'}
-      {' '}bij beide winkels gecontroleerde hele-pakprijzen bekend. Dit geeft nog geen
-      vergelijking van het volledige weekmandje.
-    </p>}
+    {paired.length > 0 && <div role="group" aria-label="Eigen deelprijsvergelijking exporteren">
+      <p role="status">Voor {paired.length} fysieke {paired.length === 1 ? 'ingrediëntregel is' : 'ingrediëntregels zijn'}
+        {' '}bij beide winkels gecontroleerde hele-pakprijzen bekend. Dit geeft nog geen
+        vergelijking van het volledige weekmandje.</p>
+      <button type="button" className="ghost-button" onClick={() => {
+        try {
+          const count = downloadPrivateKnownLinePriceCsv(progress, reviewed)
+          setMessage(count + ' eigen vergelijkbare ingrediëntregels lokaal gedownload, zonder volledige mandclaim.')
+        } catch {
+          setMessage('De oorspronkelijke bronmomenten of producten zijn gewijzigd. Open Vergelijk en bekijk je eigen opnames opnieuw.')
+        }
+      }}>Download bekende PLUS/Deka-ingrediëntrijen (CSV)</button>
+    </div>}
     <div className="private-reviewed-products__controls">
       <label>Winkel <select value={store}
         onChange={event => setStore(event.currentTarget.value as typeof store)}>

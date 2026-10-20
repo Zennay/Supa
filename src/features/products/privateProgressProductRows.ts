@@ -84,6 +84,8 @@ export type PrivateKnownPricePair = {
   dekaPacks: number
   difference: number
   basis: 'partial-pair' | 'complete-and-partial'
+  plusObservedAt: string
+  dekaObservedAt: string
 }
 
 export function privateKnownPricePairs(
@@ -107,6 +109,8 @@ export function privateKnownPricePairs(
       dekaPacks: pair.other.packagesNeeded,
       difference: pair.difference,
       basis: 'partial-pair',
+      plusObservedAt: progress.stores.PLUS!.observedAt,
+      dekaObservedAt: progress.stores.DekaMarkt!.observedAt,
     })
   }
   if (!complete) return [...result.values()]
@@ -144,6 +148,8 @@ export function privateKnownPricePairs(
         plusPacks: completeStore === 'PLUS' ? original.packs : line.packagesNeeded,
         dekaPacks: completeStore === 'DekaMarkt' ? original.packs : line.packagesNeeded,
         difference, basis: 'complete-and-partial',
+        plusObservedAt: completeStore === 'PLUS' ? receipt.observedAt : partialCapture.observedAt,
+        dekaObservedAt: completeStore === 'DekaMarkt' ? receipt.observedAt : partialCapture.observedAt,
       })
     }
   }

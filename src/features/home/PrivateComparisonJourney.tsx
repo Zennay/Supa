@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import { privateKnownPricePairs, privateProgressProductRows } from '../products/privateProgressProductRows.ts'
 import { euro } from '../../lib/money.ts'
+import { downloadPrivateKnownLinePriceCsv } from '../products/privateKnownLinePriceCsv.ts'
 import {
   privateReviewedPairWithin24Hours, freshReviewedBaskets,
   recentOwnCaptureInstant, partialReviewedLinePairs,
@@ -30,6 +31,7 @@ export function PrivateComparisonJourney({
   fileWarning: string
 }) {
   const [nowMs, setNowMs] = useState(() => Date.now())
+  const [exportMessage, setExportMessage] = useState('')
   useEffect(() => {
     const refresh = () => setNowMs(Date.now())
     const timer = window.setInterval(refresh, 60_000)
@@ -192,6 +194,15 @@ export function PrivateComparisonJourney({
       <button type="button" onClick={onOpenProducts}>
         Bekijk alle gecontroleerde regels en ontbrekende bronprijzen in Producten
       </button>
+      <button type="button" className="ghost-button" onClick={() => {
+        try {
+          const count = downloadPrivateKnownLinePriceCsv(progress, reviewed)
+          setExportMessage(count + ' individueel vergelijkbare eigen ingrediënten lokaal als CSV opgeslagen. Geen volledig mandbedrag.')
+        } catch {
+          setExportMessage('De bron of prijsvergelijking is gewijzigd of verlopen. Open Producten of Vergelijk voor een actuele controle.')
+        }
+      }}>Download mijn bekende regelprijzen voor beide winkels (CSV)</button>
+      {exportMessage && <p role="status">{exportMessage}</p>}
     </section>}
     <div className="private-comparison-journey__actions">
       <button type="button" onClick={onOpenPlanner}>Open weekplanner</button>
