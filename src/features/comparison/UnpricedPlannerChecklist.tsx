@@ -158,7 +158,7 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, manualNote
       }
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(content)
-        if (currentDemand.current === expectedDemand && copyKey === expectedCopyKey)
+        if (currentDemand.current === expectedDemand && activeCopyKey.current === expectedCopyKey)
           setBackupMessage('Weekboodschappen naar je klembord gekopieerd, zonder winkelprijzen.')
         return
       }
@@ -167,7 +167,7 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, manualNote
       // Denied permissions are normal on private browsing and insecure pages.
     }
     // Never silently fail when the OS/browser denies a native share or clipboard.
-    if (currentDemand.current === expectedDemand && copyKey === expectedCopyKey) {
+    if (currentDemand.current === expectedDemand && activeCopyKey.current === expectedCopyKey) {
       setPrepared({ key: expectedCopyKey, text: content })
       setBackupMessage('Delen of kopiëren is niet beschikbaar. Selecteer de tekst hieronder om zelf te kopiëren.')
     }
@@ -419,6 +419,20 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, manualNote
               </section>
             )) : <p role="status">Alle boodschappen afgevinkt voor deze week.</p>}
           </div>
+          {handwritten.length > 0 && <section className="unpriced-planner-checklist__recipe-group"
+            aria-label="Zelf toegevoegde ongeprijsde boodschappen">
+            <header className="unpriced-planner-checklist__group-title">
+              <h4>Ook meenemen · handmatig toegevoegd</h4>
+              <span>{visibleHandwritten.length} zichtbaar</span>
+            </header>
+            <p>Dit zijn aparte eigen notities zonder winkelprijs of verpakkingsmatch.
+              Ze tellen niet mee bij Planner-ingrediënten of de supermarktvergelijking.
+              Vink ze af of bewerk ze onder Zelf toevoegen verderop in de Lijst.</p>
+            <ul>{visibleHandwritten.map(note => <li key={note.id}>
+              {note.done ? '☑ ' : '☐ '}{safeHandwritten(note.label)}
+              {' '}· {note.store} · prijs onbekend
+            </li>)}</ul>
+          </section>}
           {copy !== null && <div className="unpriced-planner-checklist__copy">
             <p>Deze kopie is alleen voor de huidige gekozen lijst. Selecteer en kopieer de tekst.</p>
             <textarea readOnly rows={Math.min(visible.length + 4, 15)}
