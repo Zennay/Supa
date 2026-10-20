@@ -3,7 +3,15 @@ import { ownRecipeShoppingChecklist, formatOwnRecipeChecklist, type OwnRecipeChe
 import { toPlannerRecipe } from './plannerRecipes.ts'
 import type { SavedRecipe } from './recipeLibrary.ts'
 
+export type GroceryContribution = {
+  recipeTitle: string
+  original: string
+  amount: number | null
+  unit: 'g' | 'ml' | 'piece' | null
+}
+
 export type CombinedImportedGroceries = {
+  contributorsByLine: Record<string, GroceryContribution[]>
   checklist: OwnRecipeChecklist
   recipes: number
   heldRecipes: string[]
@@ -27,6 +35,7 @@ export function combinedImportedRecipeGroceries(
   }
   const lines: OwnRecipeChecklistLine[] = []
   const groups = new Map<string, OwnRecipeChecklistLine>()
+  const contributorsByLine: Record<string, GroceryContribution[]> = Object.create(null)
   const heldRecipes: string[] = []
   for (const recipe of recipes) {
     if (!recipe || typeof recipe.title !== 'string' ||
@@ -52,7 +61,12 @@ export function combinedImportedRecipeGroceries(
       // label that may be spelled the same for physically different items.
       const groupKey = complete && typeof item.query === 'string' && item.query.trim()
         ? JSON.stringify([item.query, item.unit]) : null
+      const contribution: GroceryContribution = {
+        recipeTitle: recipe.title, original: item.original,
+        amount: complete ? item.amount : null, unit: complete ? item.unit : null,
+      }
       const prior = groupKey ? groups.get(groupKey) : null
+      if (prior) contributorsByLine[prior.key].push(contribution)
       if (prior) {
         const total = sumDecimalAmounts([prior.amount!, item.amount!])
         if (total !== null && total <= 1_000_000 &&
@@ -77,6 +91,7 @@ export function combinedImportedRecipeGroceries(
         original: item.original,
       }
       lines.push(line)
+      contributorsByLine[line.key] = [contribution]
       if (groupKey) groups.set(groupKey, line)
     }
   }
@@ -88,7 +103,7 @@ export function combinedImportedRecipeGroceries(
   }
   checklist.copyText = formatOwnRecipeChecklist(checklist, {})
   return {
-    checklist, recipes: recipes.length, heldRecipes,
+    checklist, contributorsByLine, recipes: recipes.length, heldRecipes,
     complete: !heldRecipes.length && lines.every(line => !line.needsReview),
   }
 }

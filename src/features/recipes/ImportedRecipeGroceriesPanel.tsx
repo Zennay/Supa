@@ -171,6 +171,17 @@ export function ImportedRecipeGroceriesPanel({
             ? line.original + ' — hoeveelheid controleren'
             : line.amount + ' ' + (line.unit === 'piece' ? 'stuks' : line.unit) + ' ' + line.label}</span>
         </label>
+        {(result!.contributorsByLine[line.key]?.length ?? 0) > 1 && <details className="recipe-collection-groceries__sources">
+          <summary>Bekijk de hoeveelheden per recept ({result!.contributorsByLine[line.key].length})</summary>
+          <ul>{result!.contributorsByLine[line.key].map((source, index) =>
+            <li key={index}>
+              <strong>{source.recipeTitle}</strong>{' — '}
+              {source.amount === null || source.unit === null
+                ? 'Hoeveelheid nog controleren'
+                : source.amount + ' ' + (source.unit === 'piece' ? 'stuks' : source.unit)}
+              <small> · Origineel: {source.original}</small>
+            </li>)}</ul>
+        </details>}
       </li>)}</ul>
       {!visible.length && <p role="status">Alle controleerbare boodschappen zijn afgevinkt.</p>}
       <div className="recipe-backup-panel__actions">
