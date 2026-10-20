@@ -221,10 +221,13 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       if (fresh.status !== 'comparable' || !current?.stores.PLUS || !current.stores.DekaMarkt) {
         throw new Error('De bronopnames zijn verlopen of niet meer vergelijkbaar. Werk ze bij in Vergelijk.')
       }
+      if (shownCost.trim() && parsedSecondStopCents === null) {
+        throw new Error('Corrigeer de extra winkelstopkosten vóór je de privévergelijking deelt.')
+      }
       downloadOwnStoreText(printableOwnStoreComparison(fresh, {
         PLUS: current.stores.PLUS.observedAt,
         DekaMarkt: current.stores.DekaMarkt.observedAt,
-      }))
+      }, shownCost.trim() ? parsedSecondStopCents : null))
       setDownloadMessage('Je eigen twee-winkelvergelijking is lokaal gedownload.')
     } catch (error) {
       setDownloadMessage(error instanceof Error ? error.message : 'Download is niet gelukt.')
@@ -257,10 +260,13 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       const copySummary = ownStoreWeekComparison(currentAtCopy)
       if (!currentAtCopy?.stores.PLUS || !currentAtCopy.stores.DekaMarkt ||
           copySummary.status !== 'comparable') throw Error('Winkelbron is verlopen')
+      if (shownCost.trim() && parsedSecondStopCents === null) {
+        throw new Error('Corrigeer de extra winkelstopkosten vóór het kopiëren.')
+      }
       const content = printableOwnStoreComparison(copySummary, {
         PLUS: currentAtCopy.stores.PLUS.observedAt,
         DekaMarkt: currentAtCopy.stores.DekaMarkt.observedAt,
-      })
+      }, shownCost.trim() ? parsedSecondStopCents : null)
       await navigator.clipboard.writeText(content)
       setDownloadMessage('Eigen PLUS/Deka-weekvergelijking met bronmomenten en originele SKU’s gekopieerd. Deel alleen bewust je privébrondata.')
     } catch {

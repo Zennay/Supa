@@ -15,6 +15,7 @@ function readable(value: string): string {
 export function printableOwnStoreComparison(
   comparison: Extract<OwnStoreWeekComparison, { status: 'comparable' }>,
   observations: { PLUS: string; DekaMarkt: string },
+  extraVisitCostCents: number | null = null,
 ): string {
   const lines = [
     'Supa · mijn persoonlijke PLUS/DekaMarkt-weekmand',
@@ -25,7 +26,6 @@ export function printableOwnStoreComparison(
     'DekaMarkt totaal hele verpakkingen: ' + exactEuro.formatCents(comparison.dekaCents),
     comparison.cheapest === null ? 'De beide winkelmandjes zijn even duur.' :
       comparison.cheapest + ' is ' + exactEuro.formatCents(comparison.differenceCents) + ' voordeliger voor dit mandje.',
-    '', 'Vergelijking per ingredient (zelfde fysieke vraag):',
   ]
   // Portable TXT and mobile clipboard contain the same conditional
   // two-stop economics as the Planner. Visit expenses remain the shopper's
@@ -41,9 +41,22 @@ export function printableOwnStoreComparison(
         ? 'Alleen voordeliger als jouw extra winkelstopkosten lager zijn dan ' +
           exactEuro.formatCents(route.possibleProductDifferenceCents) + '.'
         : 'Geen productvoordeel tegenover een volledige winkel; extra bezoekkosten maken dit duurder.',
-      'Netto voordeel onbekend: eigen extra reistijd en winkelstopkosten niet ingevuld.',
-      '', 'Vergelijking per ingredient (zelfde fysieke vraag):')
+      ...(extraVisitCostCents === null
+        ? ['Netto voordeel onbekend: eigen extra winkelstopkosten niet ingevuld.']
+        : Number.isSafeInteger(extraVisitCostCents) && extraVisitCostCents >= 0 && extraVisitCostCents <= 100000
+          ? [
+            'Zelf opgegeven extra winkelstopkosten: ' + exactEuro.formatCents(extraVisitCostCents),
+            'Twee winkelstops inclusief die kosten: ' +
+              exactEuro.formatCents(BigInt(route.totalCents) + BigInt(extraVisitCostCents)),
+            'Netto verschil tegenover de goedkoopste volledige winkel: ' +
+              exactEuro.formatCents(BigInt(route.possibleProductDifferenceCents) - BigInt(extraVisitCostCents)) +
+              ' (positief = goedkoper; negatief = duurder).',
+            'Niet meegenomen: overige persoonlijke reistijd of niet opgegeven kosten.',
+          ]
+          : ['Kosten ongeldig: netto vergelijking niet beschikbaar.']),
+    )
   }
+  lines.push('', 'Vergelijking per ingrediënt (zelfde fysieke vraag):')
   for (const row of comparison.lines) {
     const label = readable(row.ingredientLabel)
     const entry = (store: string, line: typeof row.plus) => [
