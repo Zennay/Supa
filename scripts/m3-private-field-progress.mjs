@@ -1,5 +1,5 @@
-import { readFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
+import { readPrivateM3Draft } from './m3-private-draft-read.mjs'
 
 import {
   restoreObservationSheetDraft,
@@ -85,12 +85,9 @@ export async function main(argv = process.argv.slice(2)) {
     throw new Error('usage: m3-private-field-progress <local-observation-sheet.json>')
   }
 
-  let serialized
-  try {
-    serialized = await readFile(argv[0], 'utf8')
-  } catch {
-    throw new Error('private M3 field draft could not be read')
-  }
+  // Only private, single-link, bounded regular 0600 draft files may inform
+  // operator progress. Canonical content restoration remains unchanged.
+  const serialized = await readPrivateM3Draft(argv[0])
 
   const report = buildPrivateM3FieldProgress(serialized)
   if (report === null) {

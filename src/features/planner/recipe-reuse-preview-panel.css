@@ -81,3 +81,137 @@
   outline: 3px solid currentColor;
   outline-offset: 3px;
 }
+
+.recipe-reuse-preview-shopping {
+  min-width: 0;
+  display: grid;
+  gap: .7rem;
+  border: 1px solid var(--border, #d9dfd7);
+  border-radius: .85rem;
+  padding: clamp(.8rem, 2vw, 1.15rem);
+  background: var(--surface, #fff);
+}
+.recipe-reuse-preview-shopping h4,
+.recipe-reuse-preview-shopping p { margin: 0; }
+.recipe-reuse-preview-shopping__rows { padding: 0; margin: 0; list-style: none; }
+.recipe-reuse-preview-shopping__rows li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: .25rem .8rem;
+  border-bottom: 1px solid var(--border, #d9dfd7);
+  padding: .6rem 0;
+}
+.recipe-reuse-preview-shopping__rows strong { flex-basis: 100%; overflow-wrap: anywhere; }
+.recipe-reuse-preview-shopping__rows span { overflow-wrap: anywhere; }
+.recipe-reuse-preview-shopping__actions {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .6rem;
+}
+.recipe-reuse-preview-shopping__actions button { min-height: 44px; max-width: 100%; }
+.recipe-reuse-preview-shopping label { display: grid; gap: .5rem; }
+.recipe-reuse-preview-shopping textarea {
+  width: 100%; min-width: 0; max-width: 100%; font: inherit;
+  border: 1px solid var(--border, #d9dfd7); border-radius: .7rem;
+}
+@media (max-width: 480px) {
+  .recipe-reuse-preview-shopping__actions > button { flex: 1 1 100%; }
+}
+
+/* Full proposed basket is distinct from the delta and stays available
+   without source prices, reviewer decisions or external network access. */
+.recipe-reuse-preview-shopping__full {
+  border: 1px solid var(--border, #d9dfd7);
+  border-radius: .7rem;
+  padding: .65rem .8rem;
+  min-width: 0;
+}
+.recipe-reuse-preview-shopping__full summary {
+  cursor: pointer;
+  font-weight: 700;
+  min-height: 44px;
+  align-content: center;
+}
+.recipe-reuse-preview-shopping__full summary:focus-visible {
+  outline: 3px solid currentColor;
+  outline-offset: 3px;
+}
+.recipe-reuse-preview-shopping__full[open] {
+  display: grid;
+  gap: .5rem;
+}
+.recipe-reuse-preview-shopping__full li {
+  align-items: center;
+  justify-content: space-between;
+}
+
+
+/* Keep the optional capture/export controls usable in a narrow, in-store
+ * phone viewport without crowding the actual recipe-confirmation actions. */
+.recipe-reuse-preview-shopping__actions > .recipe-reuse-preview-shopping__full {
+  flex: 1 1 100%;
+  width: 100%;
+  min-width: 0;
+}
+.recipe-reuse-preview-shopping__capture-store {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  align-items: center;
+  gap: .55rem;
+  padding: .75rem 0;
+  border-top: 1px solid var(--border, #d9dfd7);
+}
+.recipe-reuse-preview-shopping__capture-store strong {
+  grid-column: 1 / -1;
+}
+.recipe-reuse-preview-shopping__capture-store button {
+  min-width: 0;
+  width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.recipe-reuse-preview-shopping__full .recipe-reuse-preview-shopping__actions {
+  display: flex;
+  align-items: stretch;
+}
+.recipe-reuse-preview-shopping__full .recipe-reuse-preview-shopping__actions button {
+  flex: 1 1 14rem;
+}
+@media (max-width: 480px) {
+  .recipe-reuse-preview-shopping__capture-store {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .recipe-reuse-preview-shopping__full .recipe-reuse-preview-shopping__actions button {
+    flex-basis: 100%;
+  }
+}
+
+
+/* File selection is an explicit recipe decision, not a passive upload or
+ * automatic match. Keep the control visible and tappable beside other
+ * recipe-commit actions at phone widths. */
+.recipe-reuse-preview-import {
+  flex: 1 1 100%;
+  min-width: 0;
+  border: 1px solid var(--border, #d9dfd7);
+  border-radius: .75rem;
+  padding: .8rem;
+  display: grid;
+  gap: .5rem;
+  background: var(--surface, #fff);
+}
+.recipe-reuse-preview-import strong { overflow-wrap: anywhere; }
+.recipe-reuse-preview-import small { line-height: 1.5; }
+.recipe-reuse-preview-import input[type="file"] {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  font: inherit;
+}
+.recipe-reuse-preview-import input[type="file"]::file-selector-button {
+  min-height: 44px;
+  max-width: 100%;
+  margin: .25rem .65rem .25rem 0;
+  white-space: normal;
+  cursor: pointer;
+}

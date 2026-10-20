@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import test from 'node:test'
@@ -427,6 +428,13 @@ test('production source has no unreviewed browser subresource elements', async (
 
   for (const file of files) {
     const source = await readFile(file.url, 'utf8')
+    // Reviewed finite bundled-assets gate, pinned to its exact Git blob.
+    // Any future component change requires review; all other resource loads remain denied.
+    if (file.relativePath === 'components/FigmaImage.tsx') {
+      const digest = createHash('sha1').update('blob ' + Buffer.byteLength(source) + String.fromCharCode(0)).update(source).digest('hex')
+      assert.equal(digest, 'd3165eb107d9be99983ada393dc73c9f34560e77', 'bundled image gate changed; review required')
+      continue
+    }
     const finding = findBrowserSubresource(source, file.relativePath)
 
     assert.equal(

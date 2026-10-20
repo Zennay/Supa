@@ -1,15 +1,20 @@
-import { useEffect, useMemo, useState } from 'react'
-import type { OneStoreBasket } from '../../domain/basket'
+import { Fragment, useEffect, useMemo, useState } from 'react'
+import type { OneStoreBasket, RecipeWithIngredients } from '../../domain/basket'
+import type { PlannedMeal } from '../../domain/types'
 import { quantityUnitLabelNl } from '../../lib/quantityPresentation'
+import { euro } from '../../lib/money'
 import { ShoppingListCompletionBanner } from './ShoppingListCompletionBanner'
 import { ShoppingListCopyButton } from './ShoppingListCopyButton'
 import { PrintableShoppingChecklist } from './PrintableShoppingChecklist'
 import {
   restoreShoppingListProgress,
-  serializeShoppingListProgress,
-  shoppingListBasketKey,
+  restorePhysicalShoppingProgress,
+  serializePhysicalShoppingProgress,
+  shoppingListPhysicalBasketKey,
+  shoppingListPhysicalProgressStorageKey,
   shoppingListProgressStorageKey,
 } from './shoppingListProgress'
+import { groupShoppingByRecipe } from './shoppingRecipeGroups'
 
 // An empty checklist is trustworthy only when its store identity is readable.
 // This guards the empty-state message, not ordinary populated product rows.
@@ -56,10 +61,16 @@ function readStoredProgress(basket: OneStoreBasket) {
 
   try {
     return {
-      done: restoreShoppingListProgress(
-        basket,
-        window.localStorage.getItem(shoppingListProgressStorageKey),
-      ),
+      // An existing v2 record takes precedence. Migrate legacy v1 checkmarks
+      // only when its original price-sensitive basket key still matches exactly.
+      // Never rewrite, reinterpret or delete unknown/future v1 bytes.
+      done: (() => {
+        const v2 = window.localStorage.getItem(shoppingListPhysicalProgressStorageKey)
+        return v2 !== null
+          ? restorePhysicalShoppingProgress(basket, v2)
+          : restoreShoppingListProgress(basket,
+              window.localStorage.getItem(shoppingListProgressStorageKey))
+      })(),
       readDenied: false,
     }
   } catch {
@@ -68,8 +79,8 @@ function readStoredProgress(basket: OneStoreBasket) {
   }
 }
 
-// A v1 client must not destroy unsupported, newer or unreadable persisted state.
-// Refuse writes until the key is absent or a strictly recognized v1 snapshot.
+// A v2 client must not destroy unsupported, newer or unreadable persisted state.
+// Refuse writes until the key is absent or a strictly recognized v2 snapshot.
 function canOverwriteStoredProgress(raw: string | null): boolean {
   if (raw === null) return true
   try {
@@ -77,13 +88,13 @@ function canOverwriteStoredProgress(raw: string | null): boolean {
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false
     const record = parsed as Record<string, unknown>
     return (
-      record.schemaVersion === 1 &&
-      typeof record.basketKey === 'string' &&
-      record.basketKey.length > 0 &&
+      record.schemaVersion === 2 &&
+      typeof record.physicalBasketKey === 'string' &&
+      record.physicalBasketKey.length > 0 &&
       Array.isArray(record.doneLineIds) &&
       record.doneLineIds.every((id: unknown) => typeof id === 'string') &&
       Object.keys(record).every((key) =>
-        key === 'schemaVersion' || key === 'basketKey' || key === 'doneLineIds'
+        key === 'schemaVersion' || key === 'physicalBasketKey' || key === 'doneLineIds'
       )
     )
   } catch {
@@ -91,10 +102,15 @@ function canOverwriteStoredProgress(raw: string | null): boolean {
   }
 }
 
-export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
+export function ShoppingListView({ basket, plan, recipes, activeDays }: {
+  basket: OneStoreBasket
+  plan?: PlannedMeal[]
+  recipes?: RecipeWithIngredients[]
+  activeDays?: string[]
+}) {
   const basketKey = useMemo(() => {
     try {
-      return shoppingListBasketKey(basket)
+      return shoppingListPhysicalBasketKey(basket)
     } catch {
       // A damaged basket is not a new empty shopping plan. Never show or
       // persist checkmarks under a fabricated identity.
@@ -116,6 +132,10 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
   const visibleLines = basketKey === null
     ? []
     : shoppingVisibleLines(basket.lines, done, openOnly)
+
+  const recipeGroups = groupShoppingByRecipe(visibleLines, plan, recipes, activeDays)
+  const groupedLines = recipeGroups.flatMap(group => group.lines)
+  const firstLineGroups = new Map(recipeGroups.filter(group => group.lines.length > 0).map(group => [group.lines[0].id, group] as const))
 
   // A genuinely empty plan has no shopping tasks. An empty row array with
   // inconsistent counters is not proof that the customer needs nothing.
@@ -159,7 +179,7 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
     }
 
     try {
-      const stored = window.localStorage.getItem(shoppingListProgressStorageKey)
+      const stored = window.localStorage.getItem(shoppingListPhysicalProgressStorageKey)
       // If the initial read was denied, later-readable existing bytes might
       // contain previously checked rows. Refuse to replace them with [].
       if ((progress.readDenied && stored !== null) ||
@@ -171,9 +191,9 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
         return
       }
 
-      const serialized = serializeShoppingListProgress(basket, progress.done)
+      const serialized = serializePhysicalShoppingProgress(basket, progress.done)
       if (stored !== serialized) {
-        window.localStorage.setItem(shoppingListProgressStorageKey, serialized)
+        window.localStorage.setItem(shoppingListPhysicalProgressStorageKey, serialized)
       }
       if (progress.readDenied || progress.retryAfterFailure) {
         setProgress((current) => current === progress
@@ -193,10 +213,9 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
 
   if (basketKey === null) {
     return (
-      <section className="screen">
+      <section className="screen hifi-shopping-screen" data-figma-node="3342:4815">
         <div className="section-heading">
           <div>
-            <span className="eyebrow">In de winkel</span>
             <h2>Boodschappenlijst</h2>
           </div>
         </div>
@@ -211,11 +230,19 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
   }
 
   return (
-    <section className="screen">
+    <section className="screen hifi-shopping-screen" data-figma-node="3342:4815">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">In de winkel</span>
           <h2>Boodschappenlijst</h2>
+        </div>
+      </div>
+
+      <div className="hifi-shoplist-store" aria-label="Winkel van de berekende voorbeeldmand" data-figma-node="4168:17199">
+        <div className="hifi-shoplist-store-mark" aria-hidden="true">S</div>
+        <div>
+          <span>Winkel voor deze planning</span>
+          <strong>{basket.store.name}</strong>
+          <small>Voorbeeldmand · geen actuele winkelprijzen</small>
         </div>
       </div>
 
@@ -234,12 +261,13 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
         </p>
       )}
 
-      {basket.lines.length > 0 && (
-        <ShoppingListCompletionBanner basket={basket} doneLineIds={done} />
-      )}
-
-      <ShoppingListCopyButton basket={basket} doneLineIds={done} />
-      <PrintableShoppingChecklist basket={basket} doneLineIds={done} />
+      <details className="hifi-shoplist-tools">
+        <summary>Deel of print je lijst</summary>
+        <div className="hifi-shoplist-tool-actions">
+          <ShoppingListCopyButton basket={basket} doneLineIds={done} />
+          <PrintableShoppingChecklist basket={basket} doneLineIds={done} />
+        </div>
+      </details>
 
       {basket.lines.length > 0 && (
         <div className="section-heading" data-shopping-filter={openOnly ? 'open' : 'all'}>
@@ -268,12 +296,19 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
           <p className="disclaimer" role="status">
             Alle regels zijn afgevinkt. Onzekere productkeuzes blijven een handmatige controle.
           </p>
-        ) : visibleLines.map((line) => {
+        ) : groupedLines.map((line) => {
           const checked = done.includes(line.id)
           const label =
             line.status === 'matched' ? line.productName : line.ingredientLabel
 
           return (
+            <Fragment key={line.id}>
+              {firstLineGroups.get(line.id) && (
+                <div className="hifi-shoplist-category" data-figma-node="3342:4838">
+                  <h3>{firstLineGroups.get(line.id)!.title}</h3>
+                  <span>{firstLineGroups.get(line.id)!.lines.length} items</span>
+                </div>
+              )}
             <button
               type="button"
               aria-pressed={checked}
@@ -286,7 +321,6 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
                     ? 'shopping-row checked'
                     : 'shopping-row'
               }
-              key={line.id}
               onClick={() =>
                 setProgress((current) => {
                   const currentDone =
@@ -303,14 +337,32 @@ export function ShoppingListView({ basket }: { basket: OneStoreBasket }) {
               }
             >
               <span className="check" aria-hidden="true">{checked ? '✓' : ''}</span>
-              <span>
+              <span className="hifi-shopping-thumb" aria-hidden="true">{label.trim().slice(0, 1).toLocaleUpperCase('nl-NL')}</span>
+              <span className="hifi-shopping-detail">
                 <strong>{label}</strong>
                 <small>{shoppingQuantity(line)}</small>
               </span>
+              <span className="hifi-shopping-price" aria-label={line.status === 'matched' ? `Voorbeeldprijs ${euro.formatCents(line.lineTotalCents)}` : 'Prijs nog onbekend'}>
+                {line.status === 'matched' ? euro.formatCents(line.lineTotalCents) : '—'}
+              </span>
             </button>
+            </Fragment>
           )
         })}
       </div>
+      {basket.lines.length > 0 && (
+        <section className="hifi-shoplist-total" aria-label="Overzicht boodschappen">
+          <div className="hifi-shoplist-total__line">
+            <span>{basket.unresolvedLineCount > 0 ? 'Bekend minimum' : 'Totaal'}</span>
+            <strong>{euro.formatCents(basket.totalCents)}</strong>
+          </div>
+          {basket.unresolvedLineCount > 0 && (
+            <p>{basket.unresolvedLineCount} productkeuzes zijn nog niet meegeteld.</p>
+          )}
+          <p>Voorbeeldprijzen uit de lokale planning; geen actuele kassaprijzen.</p>
+          <ShoppingListCompletionBanner basket={basket} doneLineIds={done} />
+        </section>
+      )}
     </section>
   )
 }

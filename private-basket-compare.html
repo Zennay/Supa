@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'none'; img-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Supa · Hetzelfde mandje vergelijken</title>
+<style>
+:root{font:16px/1.5 system-ui,sans-serif;color:#183b2d;background:#f3f7f1}*{box-sizing:border-box}body{margin:0}
+main{max-width:1120px;margin:auto;padding:28px 16px 70px}h1{font-size:clamp(1.6rem,4vw,2.4rem);line-height:1.15}
+section{padding:20px;border:1px solid #d2e0d5;border-radius:16px;background:white;margin:18px 0}
+h2{font-size:1.2rem}label{display:block;font-weight:650;margin-top:12px}
+input,button{font:inherit}input[type=file]{display:block;margin-top:5px;padding:10px;border:1px solid #b4c9b9;border-radius:9px;width:100%}
+button,.nav{display:inline-block;border:0;background:#17643e;color:white;padding:11px 16px;border-radius:10px;text-decoration:none;cursor:pointer;margin-top:12px}
+button:disabled{opacity:.5;cursor:not-allowed}.nav{background:#e2eee6;color:#174a31}.hint{color:#476e57}.notice{padding:12px;border-left:4px solid #498562;background:#f3f8f2}
+.warning{background:#fff4df;border-color:#b57820}.error{background:#fff0eb;border-color:#b14c30}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.tablewrap{overflow-x:auto}table{border-collapse:collapse;min-width:660px;width:100%}td,th{text-align:left;vertical-align:top;padding:11px;border-bottom:1px solid #d7e4dc}
+small{color:#587566}strong{color:#164d33}
+@media(max-width:650px){.grid{grid-template-columns:1fr}section{padding:14px}}
+@media print{#budget-euros,#budget-label{display:none!important}body{background:white}.inputs,.nav,button{display:none!important}section{border:0;break-inside:avoid}}
+#trip-items{display:grid;gap:9px;margin:14px 0}
+#trip .trip-line{display:flex;align-items:flex-start;gap:12px;border:1px solid #d6e0d4;border-radius:11px;background:#fafdfa;padding:13px;font-weight:500}
+#trip input[type=checkbox]{width:1.35rem;height:1.35rem;min-width:1.35rem;margin:3px 0 0;accent-color:#17643e}
+#trip .trip-line:has(input:checked) span{text-decoration:line-through;color:#698376}
+#trip select{max-width:100%;width:100%;border:1px solid #afc4b6;border-radius:9px;padding:11px;background:white;color:#183b2d}
+#trip .row-actions{display:flex;gap:12px;flex-wrap:wrap}
+</style>
+<script type="module" src="/src/privateBasketCompare.ts"></script>
+</head>
+<body><main>
+<header><p><strong>SUPA · EIGEN OPNAMES · PRIVÉ</strong></p>
+<h1>Hetzelfde mandje, twee echte winkelopnames</h1>
+<p>Alle bedragen komen uitsluitend uit jouw eigen geüploade prijsbestanden. De vergelijking gebruikt de
+bestaande Supa-berekening voor hele verpakkingen in hele centen.
+Ontbrekende matches, prijzen en verouderde opnames blokkeren altijd een volledig prijsverschil. Met één echte winkelopname blijft de andere winkel onbekend; een volledige eigen winkelmand en budget kunnen wel worden getoond.</p>
+<a class="nav" href="./private-basket-mapping.html">Eerst ingrediënten en winkelproducten koppelen →</a>
+<a class="nav" href="./private-receipt-history.html">Vergelijk twee eerdere eigen prijsrapporten →</a></header>
+<section class="inputs" aria-labelledby="inputs-title">
+<h2 id="inputs-title">1 · Open eigen bron- en mandinvoer</h2>
+<label for="session">Snel hervatten: één bewaarde Supa privésessie met eigen prijzen én gekozen producten</label>
+<input id="session" type="file" accept=".json,application/json">
+<p class="hint">Eigen <code>supa-private-basket-session-v1</code> uit het koppelscherm: geen andere bestanden nodig. Originale prijsopnames blijven ongewijzigd en de berekening start pas na jouw klik.</p>
+<h3>Of: kies losse bronbestanden en mandvraag</h3>
+<label for="combined">Gecombineerde PLUS/Deka CSV of bestaande Supa-bron JSON</label>
+<input id="combined" type="file" accept=".csv,.tsv,.json,.txt,text/csv,text/plain,text/tab-separated-values,application/json">
+<div class="grid">
+<div><label for="plus">Of: PLUS CSV of eigen JSON (ook als alleen deze winkel bekend is)</label><input id="plus" type="file" accept=".csv,.tsv,.txt,.json,text/csv,text/plain,text/tab-separated-values,application/json"></div>
+<div><label for="deka">En/of: DekaMarkt CSV of eigen JSON (ook alleen deze winkel)</label><input id="deka" type="file" accept=".csv,.tsv,.txt,.json,text/csv,text/plain,text/tab-separated-values,application/json"></div>
+</div>
+<label for="demand">2 · Jouw mandvraag JSON uit het koppelscherm</label>
+<input id="demand" type="file" accept=".json,application/json">
+<button type="button" id="compare">Vergelijk mijn twee mandjes</button>
+<p class="hint">Geen netwerkverzoeken naar retailers; geen automatische matches, gesimuleerde prijzen of
+publieke besparingsclaim. Datumvoorwaarden worden pas bij het klikken opnieuw beoordeeld.</p>
+</section>
+<div id="price-status" class="notice" role="status" aria-live="polite">Open één privésessie of kies jouw eigen bronbestanden en mandvraag.</div>
+<section id="result" hidden aria-label="Privé vergelijking">
+<h2>Mandjes naast elkaar</h2>
+<div id="summary" class="notice" role="status"></div>
+<div id="budget-panel" style="padding:12px;margin-top:12px;border:1px solid #d6e0d4;border-radius:10px">
+<label id="budget-label" for="budget-euros">Optioneel: eigen budget voor dit hele mandje (€)</label>
+<input id="budget-euros" type="text" inputmode="decimal" placeholder="Bijv. 50,00" maxlength="12" style="width:160px;max-width:100%" autocomplete="off">
+<div id="budget-status" class="notice" role="status" aria-live="polite">Vul eventueel je eigen budget in. Alleen voor winkels met een volledig, recent eigen mandje; anders onbekend.</div>
+</div>
+<p id="captures"></p>
+<div class="tablewrap"><table>
+<thead><tr><th scope="col">Ingrediënt en fysieke behoefte</th><th scope="col">PLUS</th><th scope="col">DekaMarkt</th><th scope="col">Verschil per ingrediënt</th></tr></thead>
+<tbody id="rows"></tbody>
+</table></div>
+<div id="next-actions" hidden>
+<h3>Wat moet nog worden gecontroleerd?</h3>
+<p>Deze punten zijn afkomstig uit jouw eigen ontbrekende winkelregels en bronmomenten. Ze bevatten geen veronderstelde prijzen.</p>
+<ul id="missing-items"></ul>
+<button type="button" id="download-missing">Download ontbrekende punten als privé TXT</button>
+</div>
+<p><small>Genoemde stuks-/kg-/literprijzen zijn uitsluitend indicatief. De vergelijking gebruikt de
+hele benodigde verpakkingen en de oorspronkelijk opgegeven centen; onvolledige mandjes hebben geen totaal/winnaar.</small></p>
+<section id="trip" hidden aria-label="Eigen boodschappenlijst">
+<h3>4 · Ga boodschappen doen met jouw gekozen winkel</h3>
+<p>Deze afvinklijst gebruikt uitsluitend een <strong>volledig en recent lokaal bekend mandje voor de gekozen winkel</strong>. Als de andere winkel geen bruikbare data heeft, mag je nog steeds een boodschappenlijst maken, maar Supa toont dan geen goedkoopste winkel of volledig prijsverschil. Een prijs is geen garantie voor de actuele kassaprijs. Er wordt niets naar een server verzonden of automatisch bewaard.</p>
+<label for="trip-store">Kies zelf de winkel waar je gaat winkelen</label>
+<select id="trip-store"><option value="PLUS">PLUS</option><option value="DekaMarkt">DekaMarkt</option></select>
+<div id="trip-summary" class="notice" role="status" aria-live="polite"></div>
+<div id="trip-items" role="group" aria-label="Boodschappen afvinken"></div>
+<div class="row-actions">
+<button id="trip-export" type="button">Download mijn boodschappenlijst als TXT</button>
+<button id="trip-copy" class="secondary" type="button">Selecteer boodschappenlijst om te kopiëren</button>
+<button id="trip-reset" class="secondary" type="button">Begin lijst opnieuw</button>
+<button id="trip-backup" class="secondary" type="button">Bewaar afvinkstatus als JSON</button>
+<label for="trip-restore">Herstel jouw eerder opgeslagen afvinkstatus voor precies deze winkelmand</label>
+<input id="trip-restore" type="file" accept=".json,application/json">
+<label style="display:flex;align-items:flex-start;gap:9px;font-weight:500"><input id="trip-restore-price-refresh" type="checkbox" style="width:auto;min-width:18px;height:18px;margin-top:4px">Hervat alleen mijn vinkjes als uitsluitend opnametijd of prijzen zijn gewijzigd; ik controleer de huidige winkelmand opnieuw. Andere SKU's en verpakkingen blijven verboden.</label>
+<textarea id="trip-copy-preview" hidden readonly aria-label="Selecteer deze privéboodschappenlijst om zelf te kopiëren" rows="10" style="width:100%;max-width:100%;font:inherit;margin-top:12px;padding:12px"></textarea>
+</div>
+</section>
+<button id="download-html" type="button">Download dit privéoverzicht als HTML</button>
+<button id="download-csv" type="button">Download eigen prijzen, matching en ontbrekende regels als CSV</button>
+<button id="download-txt" type="button">Download actuele privévergelijking als TXT</button>
+<button id="select-txt" type="button">Selecteer tekst om zelf te kopiëren</button>
+<textarea id="comparison-text-preview" hidden readonly rows="12" aria-label="Selecteer dit lokale privérapport zelf om te kopiëren" style="width:100%;font:inherit;margin-top:12px;padding:12px"></textarea>
+<button id="print" type="button">Print dit privéoverzicht</button>
+</section>
+</main></body></html>

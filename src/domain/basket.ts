@@ -66,7 +66,10 @@ function baseAmount(
   if (unit === 'g') return { amount, family: 'mass' }
   if (unit === 'l') return { amount: amount * 1000, family: 'volume' }
   if (unit === 'ml') return { amount, family: 'volume' }
-  if (unit === 'piece') return { amount, family: 'piece' }
+  // Physical pieces need explicit human review when fractional. Other
+  // dimensions can be decimal and must continue to use exact pack math.
+  if (unit === 'piece') return Number.isSafeInteger(amount)
+    ? { amount, family: 'piece' } : null
   return null
 }
 
@@ -127,9 +130,17 @@ export function aggregatePlanIngredients(
         throw new Error('Ingredient query must be non-blank')
       }
 
+      // A recipe may legitimately read 'half an onion', but this does not
+      // authorise a priced 0.5-piece retailer SKU or automatic rounding.
+      // Keep the ingredient identity and show unknown shopping quantity until
+      // the user reviews a whole purchasable piece in the recipe editor.
+      const physicalAmount = ingredient.unit === 'piece' &&
+        ingredient.amount !== null &&
+        (!Number.isSafeInteger(ingredient.amount) || ingredient.amount <= 0)
+          ? null : ingredient.amount
       const current = aggregated.get(ingredient.id)
       if (!current) {
-        aggregated.set(ingredient.id, { ...ingredient })
+        aggregated.set(ingredient.id, { ...ingredient, amount: physicalAmount })
         continue
       }
 
@@ -142,14 +153,14 @@ export function aggregatePlanIngredients(
       }
 
       current.amount =
-        current.amount === null || ingredient.amount === null
+        current.amount === null || physicalAmount === null
           ? null
           : current.unit === ingredient.unit
-            ? sumDecimalAmounts([current.amount, ingredient.amount])
+            ? sumDecimalAmounts([current.amount, physicalAmount])
             : sumDecimalDemandUnits(
                 [
                   { amount: current.amount, unit: current.unit },
-                  { amount: ingredient.amount, unit: ingredient.unit },
+                  { amount: physicalAmount, unit: ingredient.unit },
                 ],
                 current.unit,
               )
@@ -171,12 +182,15 @@ export function buildOneStoreBasket({
   recipes,
   activeDays,
   products,
+  selectedProducts,
 }: {
   store: Store
   plan: PlannedMeal[]
   recipes: RecipeWithIngredients[]
   activeDays: string[]
   products: StoreProduct[]
+  /** Explicitly chosen SKU from THIS store's admitted source, never a new price. */
+  selectedProducts?: Readonly<Record<string, string>>
 }): OneStoreBasket {
   if (typeof store.id !== 'string' || !store.id.trim()) {
     throw new Error('Store identity must be non-blank')
@@ -204,7 +218,8 @@ export function buildOneStoreBasket({
     if (
       ingredient.amount === null ||
       !Number.isFinite(ingredient.amount) ||
-      ingredient.amount <= 0
+      ingredient.amount <= 0 ||
+      (ingredient.unit === 'piece' && !Number.isSafeInteger(ingredient.amount))
     ) {
       return {
         id: ingredient.id,
@@ -216,7 +231,19 @@ export function buildOneStoreBasket({
       }
     }
 
-    const decision = matchIngredient(ingredient, storeProducts)
+    const chosenId = selectedProducts?.[ingredient.id]
+    // A user can resolve fuzzy-name ambiguity with an EXACT SKU already
+    // present in their own selected store capture. Selection is not proof of
+    // product equivalence: downstream capture-specific review is still needed.
+    const selected = typeof chosenId === 'string' && chosenId.length > 0
+      ? storeProducts.filter(product => product.id === chosenId) : null
+    const decision = selected === null
+      ? matchIngredient(ingredient, storeProducts)
+      : selected.length === 1 && selected[0].available
+        ? { type: 'match' as const, productId: chosenId, score: 65,
+            runnerUpScore: null, reasons: ['own-source SKU explicitly selected by user, not independently verified'] }
+        : { type: 'abstain' as const, score: null, runnerUpScore: null,
+            reasons: ['selected product is absent, duplicated or unavailable in this store capture'] }
     if (decision.type === 'abstain') {
       return {
         id: ingredient.id,
@@ -337,8 +364,25 @@ export function buildOneStoreBasket({
     }
   })
 
+  // One physical supermarket SKU cannot be charged as one independent
+  // purchase for multiple different ingredient identities. Those demands
+  // must first be combined or assigned distinct actual source products.
+  // Until then, do not show an inflated complete basket or a false winner.
+  const skuCounts = new Map<string, number>()
+  for (const line of lines) {
+    if (line.status === 'matched')
+      skuCounts.set(line.productId, (skuCounts.get(line.productId) ?? 0) + 1)
+  }
+  const uniquePhysicalLines: BasketTraceLine[] = lines.map(line =>
+    line.status === 'matched' && (skuCounts.get(line.productId) ?? 0) > 1
+      ? {
+          id: line.id, ingredientLabel: line.ingredientLabel,
+          requirement: line.requirement, status: 'unresolved',
+          reasons: [...line.reasons, 'same source SKU would be purchased twice for different ingredient identities; combine physical demand first'],
+          matchScore: line.matchScore,
+        } : line)
   let totalCents = 0
-  const guardedLines: BasketTraceLine[] = lines.map((line) => {
+  const guardedLines: BasketTraceLine[] = uniquePhysicalLines.map((line) => {
     if (line.status === 'unresolved') return line
 
     const nextTotalCents = totalCents + line.lineTotalCents
