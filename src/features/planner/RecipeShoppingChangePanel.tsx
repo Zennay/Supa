@@ -14,7 +14,7 @@ export function RecipeShoppingChangePanel({ preview, day }: {
   const [notice, setNotice] = useState('')
   const [showCopy, setShowCopy] = useState(false)
   const [showFullCopy, setShowFullCopy] = useState(false)
-  const [captureGuideCopy, setCaptureGuideCopy] = useState<{ stores: string; text: string } | null>(null)
+  const [captureGuideCopy, setCaptureGuideCopy] = useState<{ stores: string; text: string; identity: string } | null>(null)
   if (preview.status !== 'ready') return <section className="recipe-reuse-preview-shopping"
     aria-label="Boodschappenwijziging niet beschikbaar">
     <h4>Nieuwe boodschappen nog niet betrouwbaar</h4>
@@ -24,6 +24,9 @@ export function RecipeShoppingChangePanel({ preview, day }: {
   // Capture the narrowed immutable week demand before nested download callbacks.
   const nextNeeds = preview.nextNeeds
   const completeWeek = nextWeekPhysicalItems(preview)
+  // A copied field guide belongs to exactly this proposed physical demand.
+  const previewIdentity = JSON.stringify([day, ...completeWeek.map(item =>
+    [item.id, item.label, item.amount, item.unit])])
   function getFullText() { return nextWeekPhysicalListText(preview, day) }
   const added = preview.changes.filter(line => line.kind === 'added').length
   const removed = preview.changes.filter(line => line.kind === 'removed').length
@@ -102,7 +105,7 @@ export function RecipeShoppingChangePanel({ preview, day }: {
     } catch {
       try {
         const kit = proposedWeekCaptureKit(preview, stores)
-        setCaptureGuideCopy({ stores: stores.join(' + '), text: kit.guide })
+        setCaptureGuideCopy({ stores: stores.join(' + '), text: kit.guide, identity: previewIdentity })
         setNotice('Klembord niet beschikbaar. Selecteer en kopieer de gids hieronder.')
       } catch (error) {
         setNotice(error instanceof Error ? error.message : 'De opnamegids is niet beschikbaar.')
@@ -304,7 +307,7 @@ export function RecipeShoppingChangePanel({ preview, day }: {
     <small>De invulbladen bevatten geen bronproducten of bedragen en horen alleen bij dit
       voorgestelde weekmenu. Kies het recept eerst en vul uitsluitend echt waargenomen
       brongegevens in voordat je de CSV via Vergelijk importeert.</small>
-    {captureGuideCopy && <label>Opnamegids voor {captureGuideCopy.stores} handmatig kopiëren
+    {captureGuideCopy?.identity === previewIdentity && <label>Opnamegids voor {captureGuideCopy.stores} handmatig kopiëren
       <textarea readOnly rows={12} value={captureGuideCopy.text}
         onFocus={event => event.currentTarget.select()} />
       <small>Dit is alleen je voorgestelde fysieke behoefte. Geen retailerprijs of bewijs.</small>
