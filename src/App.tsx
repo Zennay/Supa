@@ -310,8 +310,62 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         event.preventDefault()
       }
     }
+    // One explicit user action may place several personally reviewed recipes
+    // into different weekdays. Validate the complete batch against the current
+    // local library before changing *any* day: no partially planned menu.
+    const chooseOwnRecipeBatch = (event: Event) => {
+      const input: unknown = (event as CustomEvent<unknown>).detail
+      const deny = () => event.preventDefault()
+      if (!input || typeof input !== 'object' || Array.isArray(input)) return deny()
+      const { assignments, destination } = input as {
+        assignments?: unknown; destination?: unknown
+      }
+      if (!Array.isArray(assignments) || assignments.length < 1 ||
+          assignments.length > m2InitialPlan.length ||
+          !['planner', 'list', 'basket'].includes(String(destination))) return deny()
+      const validDays = new Set(m2InitialPlan.map(meal => meal.day))
+      const days = new Set<string>()
+      const ids = new Set<string>()
+      const pairs: { day: string; recipeId: string }[] = []
+      for (const assignment of assignments) {
+        if (!assignment || typeof assignment !== 'object' || Array.isArray(assignment)) return deny()
+        const { day, recipeId } = assignment as { day?: unknown; recipeId?: unknown }
+        if (typeof day !== 'string' || !validDays.has(day) || days.has(day) ||
+            typeof recipeId !== 'string' || ids.has(recipeId)) return deny()
+        days.add(day); ids.add(recipeId); pairs.push({ day, recipeId })
+      }
+      try {
+        const library = readRecipeLibrary(window.localStorage)
+        if (library.error || !pairs.every(pair => {
+          const recipe = library.recipes.find(item => item.id === pair.recipeId)
+          return !!recipe && !!toPlannerRecipe(recipe) &&
+            recipes.some(item => item.id === pair.recipeId)
+        })) return deny()
+        setPreferences(current => ({
+          ...current,
+          activeDays: m2InitialPlan.map(meal => meal.day).filter(day =>
+            current.activeDays.includes(day) || days.has(day)),
+          recipeByDay: { ...current.recipeByDay,
+            ...Object.fromEntries(pairs.map(pair => [pair.day, pair.recipeId])) },
+        }))
+        // Reuse the existing real-source basket/list, never promote sample
+        // prices or copy previous SKU approvals into a changed physical week.
+        if (destination === 'basket') {
+          navigate('basket')
+          setOwnPriceImportSignal(value => value + 1)
+        } else if (destination === 'list') {
+          navigate('list')
+        } else navigate('planner')
+      } catch {
+        deny()
+      }
+    }
     window.addEventListener('supa-plan-own-recipe', chooseOwnRecipe)
-    return () => window.removeEventListener('supa-plan-own-recipe', chooseOwnRecipe)
+    window.addEventListener('supa-plan-own-recipes', chooseOwnRecipeBatch)
+    return () => {
+      window.removeEventListener('supa-plan-own-recipe', chooseOwnRecipe)
+      window.removeEventListener('supa-plan-own-recipes', chooseOwnRecipeBatch)
+    }
   }, [recipes])
 
   const { budget, activeDays, recipeByDay } = preferences

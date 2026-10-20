@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { SavedRecipe } from './recipeLibrary.ts'
+import { toPlannerRecipe } from './plannerRecipes.ts'
+import { m2InitialPlan } from '../../data/m2Fixture.ts'
 import { combinedImportedRecipeGroceries } from './combinedImportedRecipeGroceries.ts'
 import { formatOwnRecipeChecklist } from './recipeShoppingChecklist.ts'
 import { exportOwnRecipeChecklistCsv } from './recipeShoppingCsv.ts'
@@ -32,11 +34,22 @@ export function ImportedRecipeGroceriesPanel({
   const [selectedIds, setSelectedIds] = useState<string[]>(() =>
     (recentIds.length ? recentIds : recipes.slice(0, 3).map(recipe => recipe.id)).slice(0, 15))
   const [query, setQuery] = useState('')
+  const [startDay, setStartDay] = useState(m2InitialPlan[0].day)
   const [portionsById, setPortionsById] = useState<Record<string, number>>({})
   const [checked, setChecked] = useState<Record<string, boolean>>({})
   const [pendingOnly, setPendingOnly] = useState(false)
   const [feedback, setFeedback] = useState('')
   const selected = recipes.filter(recipe => selectedIds.includes(recipe.id))
+  const allPlannerReady = selected.length > 0 && selected.every(recipe =>
+    !!toPlannerRecipe(recipe) && (Object.hasOwn(portionsById, recipe.id)
+      ? portionsById[recipe.id] === recipe.servings : true))
+  const plannerDays = m2InitialPlan.map(meal => meal.day)
+  const startDayIndex = plannerDays.indexOf(startDay)
+  const plannerAssignments = selected.length <= plannerDays.length && startDayIndex >= 0
+    ? selected.map((recipe, index) => ({
+        day: plannerDays[(startDayIndex + index) % plannerDays.length],
+        recipeId: recipe.id, title: recipe.title, servings: recipe.servings,
+      })) : []
   const signature = JSON.stringify(selected.map(recipe => [
     recipe.id, portionsById[recipe.id] ?? recipe.servings, recipe.servings,
     recipe.minutes, recipe.warnings,
@@ -62,6 +75,23 @@ export function ImportedRecipeGroceriesPanel({
   const search = query.trim().normalize('NFKC').toLocaleLowerCase('nl')
   const visibleRecipes = search ? recipes.filter(recipe =>
     recipe.title.normalize('NFKC').toLocaleLowerCase('nl').includes(search)) : recipes
+  const planSelected = (destination: 'planner' | 'list' | 'basket') => {
+    setFeedback('')
+    if (!plannerAssignments.length || !allPlannerReady) {
+      setFeedback('Voor de gewone Planner: kies maximaal zeven recepten met gecontroleerde ingrediënten, bereidingstijd en oorspronkelijke porties. Bewaar aangepaste porties eerst als eigen receptvariant.')
+      return
+    }
+    const summary = plannerAssignments.map(row =>
+      row.day + ': ' + row.title + ' (' + row.servings + ' porties)').join('\n')
+    if (!window.confirm('Plan deze recepten voor de gekozen dagen?\n\n' +
+      summary + '\n\nBestaande dagkeuzes worden voor deze dagen vervangen. ' +
+      'Je huidige winkelbronprijzen zijn geen bewijs voor het nieuwe mandje.')) return
+    const accepted = window.dispatchEvent(new CustomEvent('supa-plan-own-recipes', {
+      cancelable: true,
+      detail: { assignments: plannerAssignments.map(({ day, recipeId }) => ({ day, recipeId })), destination },
+    }))
+    if (!accepted) setFeedback('De Planner kan één of meer recepten niet meer veilig plaatsen. Open de actuele bibliotheek opnieuw; het bestaande weekmenu blijft behouden.')
+  }
   const exportText = () => {
     if (!list?.canCopy) return
     try {
@@ -190,6 +220,36 @@ export function ImportedRecipeGroceriesPanel({
         </details>}
       </li>)}</ul>
       {!visible.length && <p role="status">Alle controleerbare boodschappen zijn afgevinkt.</p>}
+      <section className="recipe-collection-groceries__week" aria-label="Meerdere eigen recepten samen in mijn Planner zetten">
+        <h4>Plan deze recepten als weekmenu</h4>
+        <p>Alleen de gekozen dagen worden bijgewerkt. Voor Planner heb je gecontroleerde
+          ingrediënten, een bereidingstijd en de opgeslagen originele porties nodig.
+          De ongeprijsde lijst hierboven mag wel andere gewenste porties gebruiken.</p>
+        <label>Begin op
+          <select value={startDay} onChange={event => setStartDay(event.currentTarget.value)}>
+            {plannerDays.map(day => <option key={day} value={day}>{day}</option>)}
+          </select>
+        </label>
+        {!!plannerAssignments.length && <ol>{plannerAssignments.map(row =>
+          <li key={row.recipeId}><strong>{row.day}</strong>: {row.title}
+            {' '}({row.servings} porties)</li>)}</ol>}
+        {selected.length > plannerDays.length &&
+          <p role="status">Je kunt maximaal {plannerDays.length} recepten tegelijk
+            over verschillende dagen in de gewone Planner zetten. De privévergelijker
+            kan apart maximaal 14 recepten in één fysiek mandje verwerken.</p>}
+        {!allPlannerReady && !!selected.length &&
+          <p role="status">Eén of meer recepten zijn nog niet klaar voor Planner
+            of hebben hier aangepaste porties. Controleer het recept en bewaar
+            gewenste andere porties eerst als eigen variant.</p>}
+        <div className="recipe-backup-panel__actions">
+          <button type="button" disabled={!allPlannerReady || !plannerAssignments.length}
+            onClick={() => planSelected('planner')}>Plan alle gekozen recepten</button>
+          <button type="button" disabled={!allPlannerReady || !plannerAssignments.length}
+            onClick={() => planSelected('list')}>Plan en open de boodschappenlijst</button>
+          <button type="button" disabled={!allPlannerReady || !plannerAssignments.length}
+            onClick={() => planSelected('basket')}>Plan en vergelijk mijn winkelbronnen</button>
+        </div>
+      </section>
       <div className="recipe-backup-panel__actions">
         <button type="button" onClick={exportText}>Download gezamenlijke lijst (TXT)</button>
         <button type="button" onClick={exportCsv}
