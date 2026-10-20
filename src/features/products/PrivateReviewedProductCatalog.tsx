@@ -21,6 +21,13 @@ const PlannerReviewedSourceLines = lazy(async () => {
   const module = await import('../planner/PlannerReviewedSourceLines.tsx')
   return { default: module.PlannerReviewedSourceLines }
 })
+// Reuse the Planner's exact admitted offline CSV/TSV/JSON paste workflow.
+// It previews original SKU and capture facts, then hands off to Vergelijk;
+// no independent Products parser, price claim or permission is introduced.
+const PlannerQuickSourcePaste = lazy(async () => {
+  const module = await import('../planner/PlannerQuickSourcePaste.tsx')
+  return { default: module.PlannerQuickSourcePaste }
+})
 
 /** Read-only personally reviewed basket sources, never an inferred live catalog. */
 export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOpenComparison, onOpenList, onOpenMixedRoute, onChooseRouteLine, onReviewIngredient, onImportSourceFiles, fileWarning, checked, onToggleChecked }: {
@@ -147,6 +154,14 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOp
         }} />
     </label>
     {fileWarning && <p role="alert" className="private-reviewed-products__upload-error">{fileWarning}</p>}
+    <Suspense fallback={<p role="status">Lokale broninvoer openen…</p>}>
+      <PlannerQuickSourcePaste
+        onImport={onImportSourceFiles}
+        onRecapture={() => onOpenComparison()}
+        onReviewIngredient={onReviewIngredient}
+        hasDemand={true}
+        needs={[]} />
+    </Suspense>
     <div className="private-reviewed-products__pending" aria-label="Brondekking en openstaande productmatches">
       {shops.map(shop => {
         const full = currentReviewed?.stores[shop]
