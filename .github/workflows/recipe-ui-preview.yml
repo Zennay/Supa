@@ -23,7 +23,9 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm install --no-save --package-lock=false playwright@1.56.1
-      - run: npx playwright install --with-deps chromium
+      # VPS runner OS is Ubuntu 26.04; Playwright 1.56.1 cannot provision OS packages on it.
+      # Keep the mandatory browser proof; install only its browser binary using runner-provisioned OS libraries.
+      - run: npx playwright install chromium
       - name: Render and exercise recipe UI
         run: |
           set -euo pipefail
