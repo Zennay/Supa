@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import source from '../../../docs/product/m3-issue78-exploratory-listing-basket-2026-10-17.json'
 import { euro } from '../../lib/money'
+import { PrivateManualShareText } from '../products/PrivateManualShareText.tsx'
 import './listingBasketPreview.css'
 
 type StoreKey = 'plus' | 'dekamarkt'
@@ -71,16 +72,11 @@ export function ListingBasketPreview() {
     ].join('\n')
   }
 
-  async function copyList() {
-    const text = makeListText()
-    setCopyText(text)
-    try {
-      if (!navigator.clipboard?.writeText) throw new Error('Kopiëren niet ondersteund')
-      await navigator.clipboard.writeText(text)
-      setCopyStatus('Overzicht gekopieerd. Je kunt het nu delen of bewaren.')
-    } catch {
-      setCopyStatus('Selecteer de tekst hieronder en kopieer handmatig.')
-    }
+  function showCopyList() {
+    // Explicit user-controlled selection, never a privileged clipboard
+    // write. The fixed research snapshot remains distinct from live prices.
+    setCopyText(makeListText())
+    setCopyStatus('Selecteer hieronder de tekst en kies zelf Kopieer op je apparaat.')
   }
 
   return (
@@ -100,12 +96,10 @@ export function ListingBasketPreview() {
         <span>voor precies deze geselecteerde verpakkingen</span>
       </p>
       <div className="listing-basket__share">
-        <button type="button" onClick={copyList}>Kopieer de complete boodschappenvergelijking</button>
+        <button type="button" onClick={showCopyList}>Toon complete vergelijking om zelf te kopiëren</button>
         {copyStatus && <p role="status">{copyStatus}</p>}
-        {copyText !== null && <details><summary>Bekijk en selecteer het overzicht</summary>
-          <textarea readOnly aria-label="Kopieerbaar PLUS en DekaMarkt overzicht" value={copyText} rows={11}
-            onFocus={event => event.currentTarget.select()} />
-        </details>}
+        {copyText !== null && <PrivateManualShareText
+          text={copyText} label="Bewaarde PLUS en DekaMarkt vergelijking" />}
       </div>
       <p className="listing-basket__source-note">
         Bewaarde prijsvergelijking van 17 oktober 2026. Geen automatische actuele winkelprijzen;
