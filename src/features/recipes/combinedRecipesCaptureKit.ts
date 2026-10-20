@@ -19,7 +19,7 @@ export function combinedRecipesCaptureKit(
   recipes: readonly SavedRecipe[],
   portionsById: Readonly<Record<string, number>>,
   stores: readonly CaptureStore[],
-): { csv: string; guide: string; storeLabel: string } {
+): { csv: string; guide: string; storeLabel: string; rows: { csvRow: number; store: CaptureStore; id: string; label: string; amount: number; unit: string }[] } {
   const week = JSON.parse(exportCombinedRecipesPrivateWeek(recipes, portionsById)) as CanonicalWeek
   const needs = aggregatePlanIngredients(week.plan, week.recipes, week.activeDays)
   if (needs.length < 1 || needs.length > 200 ||
@@ -33,5 +33,12 @@ export function combinedRecipesCaptureKit(
     guide: 'SUPA · eigen receptenbundel · ' + recipes.length + ' recepten\n' +
       makePlannerCaptureGuide(needs, stores),
     storeLabel: stores.join('-').toLowerCase(),
+    // The existing CSV emits one row per store × original canonical need,
+    // store-major starting after the nine-column header. Reuse EXACTLY that
+    // order to preview the otherwise unlabelled editable CSV rows in-app.
+    rows: stores.flatMap((store, storeIndex) => needs.map((need, ingredientIndex) => ({
+      csvRow: storeIndex * needs.length + ingredientIndex + 2,
+      store, id: need.id, label: need.label, amount: need.amount!, unit: need.unit,
+    }))),
   }
 }
