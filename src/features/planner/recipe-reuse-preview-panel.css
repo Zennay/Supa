@@ -143,3 +143,44 @@
   align-items: center;
   justify-content: space-between;
 }
+
+
+/* Keep the optional capture/export controls usable in a narrow, in-store
+ * phone viewport without crowding the actual recipe-confirmation actions. */
+.recipe-reuse-preview-shopping__actions > .recipe-reuse-preview-shopping__full {
+  flex: 1 1 100%;
+  width: 100%;
+  min-width: 0;
+}
+.recipe-reuse-preview-shopping__capture-store {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  align-items: center;
+  gap: .55rem;
+  padding: .75rem 0;
+  border-top: 1px solid var(--border, #d9dfd7);
+}
+.recipe-reuse-preview-shopping__capture-store strong {
+  grid-column: 1 / -1;
+}
+.recipe-reuse-preview-shopping__capture-store button {
+  min-width: 0;
+  width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.recipe-reuse-preview-shopping__full .recipe-reuse-preview-shopping__actions {
+  display: flex;
+  align-items: stretch;
+}
+.recipe-reuse-preview-shopping__full .recipe-reuse-preview-shopping__actions button {
+  flex: 1 1 14rem;
+}
+@media (max-width: 480px) {
+  .recipe-reuse-preview-shopping__capture-store {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .recipe-reuse-preview-shopping__full .recipe-reuse-preview-shopping__actions button {
+    flex-basis: 100%;
+  }
+}
