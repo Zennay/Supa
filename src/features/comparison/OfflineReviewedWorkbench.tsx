@@ -371,6 +371,11 @@ export function OfflineReviewedWorkbench({
   } | null>(null)
 
   const [weekExportMessage, setWeekExportMessage] = useState('')
+  // A browser without clipboard/share permission gets the exact same local
+  // missing-source guide as selectable text. No retailer prices or app storage.
+  const [portableMissingGuide, setPortableMissingGuide] = useState<{
+    source: object; week: string; text: string
+  } | null>(null)
   const [captureSheetStore, setCaptureSheetStore] = useState<'both' | CaptureStore>('both')
   const [capturePreviewShown, setCapturePreviewShown] = useState<Record<CaptureStore, number>>({ PLUS: 20, DekaMarkt: 20 })
   const [capturePreview, setCapturePreview] = useState<{
@@ -416,6 +421,8 @@ export function OfflineReviewedWorkbench({
   }, [plan, recipes, activeDays])
   const captureWeek = JSON.stringify([planKey ?? null, plannerCaptureNeeds.map(n => [n.id, n.label, n.unit, n.amount])])
   const currentPreview = capturePreview?.week === captureWeek ? capturePreview : null
+  const latestCapturePreview = useRef(currentPreview)
+  latestCapturePreview.current = currentPreview
   const captureWeekRef = useRef(captureWeek)
   captureWeekRef.current = captureWeek
   const freshPreviewInstant = (observedNs?: bigint): boolean => {
@@ -548,47 +555,58 @@ export function OfflineReviewedWorkbench({
     } finally { if (version === importRevision.current) setBusy(false) }
   }
 
+  // Both the TXT download and mobile copy/share use THIS identical list of
+  // unresolved original physical needs. This is not a product/price adapter.
+  function missingPreviewGuide(): { text: string; count: number } {
+    if (!currentPreview || busy) throw Error('Er is geen actuele bronpreview.')
+    const clean = (value: string) =>
+      value.replace(/[\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]/gu, ' ').trim().slice(0, 180)
+    const lines = [
+      'SUPA · ontbrekende prijzen voor het huidige echte weekmenu',
+      'Dit is GEEN retailerproduct, prijsopname, bronautorisatie of besparingsbewijs.',
+      'Controleer zelf originele SKU, verpakking, bronmoment en echte prijs per winkel.',
+      '',
+    ]
+    let count = 0
+    for (const store of stores) {
+      const observation = currentPreview.stores.find(entry => entry.retailer === store)
+      const needs = missingPreviewCaptureNeeds(store, Date.now())
+      if (!observation && imported?.captures[store] && !needs.length) {
+        lines.push(store + ' · andere eigen bronopname bestaat al; geen ontbrekende winkel gefingeerd.')
+        lines.push('Gebruik na acceptatie de volledige winkeldekking om bestaande SKU’s en open controles te bekijken.', '')
+        continue
+      }
+      lines.push(store + (observation
+        ? needs.length === plannerCaptureNeeds.length && plannerCaptureNeeds.length > 0 &&
+            (observation.observedNs === undefined ||
+              !recentOwnCaptureInstant(observation.observedAt, Date.now()))
+          ? ' · bronmoment verlopen: alle originele weekartikelen opnieuw controleren:'
+          : ' · opname aanwezig, openstaande productmatches:'
+        : imported?.captures[store]
+          ? ' · opgeslagen opname niet actueel of niet gepaard; hele nieuwe bron nodig:'
+          : ' · nog geen eigen winkelopname:'))
+      if (!needs.length) lines.push('Geen openstaande matchingvoorstellen op basis van dit eigen bronblad.')
+      for (const need of needs) {
+        count++
+        lines.push('- ' + clean(need.label) + ' · benodigd ' +
+          (need.amount === null ? 'onbekend' : String(need.amount)) +
+          ' ' + clean(need.unit) + ' · zelf oorspronkelijk winkelproduct controleren')
+      }
+      lines.push('')
+    }
+    if (!count) throw Error('Geen ontbrekende matches. Bevestig alsnog de originele SKU’s en prijzen in Vergelijk.')
+    lines.push('Onbekende regels zijn niet gelijk aan €0. Vul alleen echte rechtmatig verkregen gegevens in.')
+    const text = lines.join('\\n') + '\\n'
+    if (new TextEncoder().encode(text).length > 256000)
+      throw Error('Lijst te groot voor lokaal gebruik.')
+    return { text, count }
+  }
+
   function downloadMissingFromPreview() {
     if (!currentPreview || busy) return
     try {
-      const clean = (value: string) => value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim().slice(0, 180)
-      const lines = [
-        'SUPA · ontbrekende prijzen voor het huidige echte weekmenu',
-        'Dit is GEEN retailerproduct, prijsopname, bronautorisatie of besparingsbewijs.',
-        'Controleer zelf originele SKU, verpakking, bronmoment en echte prijs per winkel.',
-        '',
-      ]
-      let missing = 0
-      for (const store of stores) {
-        const observation = currentPreview.stores.find(entry => entry.retailer === store)
-        if (!observation && imported?.captures[store] && !missingPreviewCaptureNeeds(store).length) {
-          lines.push(store + ' · andere eigen bronopname bestaat al; geen ontbrekende winkel gefingeerd.')
-          lines.push('Gebruik na acceptatie de volledige winkeldekking om bestaande SKU’s en open controles te bekijken.', '')
-          continue
-        }
-        lines.push(store + (observation ? ' · opname aanwezig, openstaande productmatches:' :
-          imported?.captures[store]
-            ? ' · opgeslagen opname niet actueel of niet gepaard; hele nieuwe bron nodig:'
-            : ' · nog geen eigen winkelopname:'))
-        const needs = missingPreviewCaptureNeeds(store)
-        if (!needs.length) lines.push('Geen openstaande matchingvoorstellen op basis van dit eigen bronblad.')
-        for (const need of needs) {
-          missing++
-          lines.push('- ' + clean(need.label) + ' · benodigd ' +
-            (need.amount === null ? 'onbekend' : String(need.amount)) +
-            ' ' + clean(need.unit) + ' · zelf oorspronkelijk winkelproduct controleren')
-        }
-        lines.push('')
-      }
-      if (!missing) {
-        setWeekExportMessage('Geen ontbrekende matches in beide lokale previews. Bevestig alsnog per winkel alle oorspronkelijke bronproducten en prijzen.')
-        return
-      }
-      lines.push('Onbekende regels zijn niet gelijk aan €0. Vul alleen echte rechtmatig verkregen gegevens in.')
-      const content = lines.join('\n') + '\n'
-      if (new TextEncoder().encode(content).byteLength > 256000)
-        throw Error('Lijst te groot voor een lokale download.')
-      const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }))
+      const { text, count } = missingPreviewGuide()
+      const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }))
       try {
         const link = document.createElement('a')
         link.href = url
@@ -596,17 +614,70 @@ export function OfflineReviewedWorkbench({
         document.body.append(link)
         try { link.click() } finally { link.remove() }
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
-      setWeekExportMessage(missing + ' nog openstaande fysieke winkelbehoeften lokaal opgeslagen; geen producten of prijzen verzonnen.')
-    } catch {
-      setWeekExportMessage('Onbekende producten konden niet veilig lokaal worden gedownload. Je originele bronopnames zijn behouden.')
+      setWeekExportMessage(count + ' nog openstaande fysieke winkelbehoeften lokaal opgeslagen; geen producten of prijzen verzonnen.')
+    } catch (error) {
+      setWeekExportMessage(error instanceof Error ? error.message :
+        'Onbekende producten konden niet veilig lokaal worden gedownload.')
+    }
+  }
+
+  async function shareMissingFromPreview(action: 'copy' | 'share') {
+    if (!currentPreview || busy) return
+    setPortableMissingGuide(null)
+    const preview = currentPreview
+    const week = captureWeek
+    const revision = importRevision.current
+    try {
+      const { text, count } = missingPreviewGuide()
+      // The user may replace both files while a share/clipboard promise waits.
+      // A stale guide is never presented as the currently admitted source.
+      const samePreview = () => importRevision.current === revision &&
+        captureWeekRef.current === week && latestCapturePreview.current === preview
+      if (!samePreview()) throw Error('De bronpreview is veranderd. Bekijk de actuele ontbrekende artikelen.')
+      if (action === 'share' && typeof navigator.share === 'function') {
+        await navigator.share({ title: 'Supa · ontbrekende winkelproducten', text })
+        if (samePreview()) setWeekExportMessage(count +
+          ' ongeprijsde artikelen aangeboden aan jouw mobiele deelmenu.')
+      } else if (navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(text)
+          if (samePreview()) setWeekExportMessage(count +
+            ' ongeprijsde winkelartikelen gekopieerd; geen winkelprijzen of besparingsclaim.')
+        } catch {
+          if (!samePreview()) throw Error('Bronpreview gewijzigd tijdens kopiëren.')
+          setPortableMissingGuide({ source: preview, week, text })
+          setWeekExportMessage('Klembord geweigerd. Selecteer de volledige lokale lijst hieronder.')
+        }
+      } else {
+        if (!samePreview()) throw Error('Bronpreview gewijzigd tijdens kopiëren.')
+        setPortableMissingGuide({ source: preview, week, text })
+        setWeekExportMessage('Klembord niet beschikbaar. Selecteer de lokale lijst hieronder.')
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        setWeekExportMessage('Delen geannuleerd; jouw bronbestanden blijven behouden.')
+      } else {
+        setWeekExportMessage(error instanceof Error ? error.message :
+          'Mobiel delen niet beschikbaar. Gebruik de TXT-download.')
+      }
     }
   }
 
   // Use physical Planner needs only; a match hint never becomes a retailer SKU.
-  function missingPreviewCaptureNeeds(store: CaptureStore) {
+  function missingPreviewCaptureNeeds(store: CaptureStore, now = Date.now()) {
     if (!currentPreview) return []
     const source = currentPreview.stores.find(item => item.retailer === store)
     if (source) {
+      // A still-open preview is NOT permanent price evidence. If its captured
+      // instant expired, all items need a new genuine observation.
+      if (source.observedNs === undefined ||
+          !recentOwnCaptureInstant(source.observedAt, now)) return plannerCaptureNeeds
+      // Two valid but distant store sources also cannot be compared. Ask
+      // for recapture of the older shop rather than just unmatched SKU rows.
+      const other = currentPreview.stores.find(item => item.retailer !== store)
+      if (other && !currentPreview.pairedWithin24h &&
+          source.observedNs < (other.observedNs ?? source.observedNs))
+        return plannerCaptureNeeds
       const unresolved = new Set(source.matching?.lines.filter(line =>
         line.status === 'unresolved').map(line => line.id) ?? [])
       return plannerCaptureNeeds.filter(need => unresolved.has(need.id))
@@ -2551,10 +2622,36 @@ export function OfflineReviewedWorkbench({
                 de verpakking, prijs en datum.</p>
               {currentPreview.stores.some(store => (store.matching?.unresolved ?? 0) > 0) ||
                 currentPreview.stores.length < 2 ? (
-                <button type="button" className="ghost-button" disabled={busy}
-                  onClick={downloadMissingFromPreview}>
-                  Download alleen ontbrekende winkelproducten (TXT)
-                </button>
+                <>
+                  <button type="button" className="ghost-button" disabled={busy}
+                    onClick={downloadMissingFromPreview}>
+                    Download alleen ontbrekende winkelproducten (TXT)
+                  </button>
+                  <button type="button" className="ghost-button" disabled={busy}
+                    onClick={() => { void shareMissingFromPreview('copy') }}>
+                    Kopieer ontbrekende PLUS/Deka-producten voor onderweg
+                  </button>
+                  {typeof navigator !== 'undefined' && typeof navigator.share === 'function' &&
+                    <button type="button" className="ghost-button" disabled={busy}
+                      onClick={() => { void shareMissingFromPreview('share') }}>
+                      Deel ontbrekende producten op mijn telefoon
+                    </button>}
+                  {portableMissingGuide?.source === currentPreview &&
+                    portableMissingGuide.week === captureWeek && (
+                    <div className="offline-price-workbench__missing-copy">
+                      <label htmlFor="supa-missing-source-copy">Zelf selecteerbare ontbrekende producten</label>
+                      <textarea id="supa-missing-source-copy" rows={9} readOnly
+                        value={portableMissingGuide.text}
+                        onFocus={event => event.currentTarget.select()}
+                        style={{ display: 'block', width: '100%', maxWidth: '100%',
+                          minHeight: 160, boxSizing: 'border-box' }} />
+                      <button type="button" className="ghost-button"
+                        onClick={() => setPortableMissingGuide(null)}>
+                        Sluit kopieertekst
+                      </button>
+                    </div>
+                  )}
+                </>
               ) : null}
               {currentPreview.stores.length === 1 &&
                 currentPreview.stores[0].appendableNewProducts && (
