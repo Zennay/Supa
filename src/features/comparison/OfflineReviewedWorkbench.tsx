@@ -2197,11 +2197,15 @@ export function OfflineReviewedWorkbench({
                     <p><strong>{store}</strong> · waargenomen {captureDate(capture.observedMs)}
                       {' '}· {capture.products.length} eigen bronproducten</p>
                     <button className="ghost-button" type="button" onClick={() => downloadPrivateRecaptureCsv(store)}>
-                      Maak nieuw prijsinvulblad voor {store} (CSV)
+                      Alleen nieuwe prijsopname: oude verpakking als invulhulp behouden (CSV)
                     </button>
                     <button className="ghost-button" type="button"
                       onClick={() => downloadFreshProductReobservation(store, 'csv')}>
                       Nieuwe volledige {store}-meting: ook verpakking en opnametijd leeg (CSV)
+                    </button>
+                    <button className="ghost-button" type="button"
+                      onClick={() => downloadFreshProductReobservation(store, 'csv-excel')}>
+                      Hele {store}-opname in spreadsheet-CSV (puntkomma)
                     </button>
                     <button className="ghost-button" type="button"
                       onClick={() => downloadFreshProductReobservation(store, 'guide')}>
