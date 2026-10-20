@@ -4,6 +4,9 @@ import { privatePriceAgeNotice } from '../comparison/privatePriceAgeNotice.ts'
 import { currentPrivateRouteChoice } from '../comparison/privateRouteChoice.ts'
 import { parsePrivateExtraVisitCostCents } from '../comparison/privateExtraVisitCost.ts'
 import { ownStoreWeekComparison } from './ownStoreBudgetComparison.ts'
+// Native share requires transient user activation, so its existing trusted
+// formatter must be ready synchronously before opening the OS share sheet.
+import { printableOwnStoreComparison } from './downloadOwnStoreComparison.ts'
 // Price deltas only exist after both sources are fully reviewed; defer these
 // heavier presentational modules so the everyday Planner loads sooner.
 const PlannerOwnProductDeltas = lazy(() => import('./PlannerOwnProductDeltas.tsx')
@@ -292,6 +295,41 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       setDownloadMessage('Deze vergelijking of de ingevulde kosten zijn ongeldig of verlopen. Controleer je eigen bronnen en kosten, of download opnieuw.')
     }
   }
+  /** Native opt-in share only for the original reviewed same-demand 2-store
+   * result. The existing formatter retains the private-source disclaimer and
+   * exact whole-pack prices; this path never creates a public savings claim. */
+  async function sharePrivateComparison() {
+    setDownloadMessage('')
+    if (typeof navigator.share !== 'function') {
+      await copyPrivateComparison()
+      return
+    }
+    try {
+      // Browser share needs a synchronous click-to-chooser path: re-admit
+      // original timestamps and complete same-demand baskets immediately.
+      const current = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
+      const exact = ownStoreWeekComparison(current)
+      if (exact.status !== 'comparable' || !current?.stores.PLUS || !current.stores.DekaMarkt)
+        throw new Error('De originele winkelbronnen zijn niet meer actueel en volledig vergelijkbaar.')
+      const text = printableOwnStoreComparison(exact, {
+        PLUS: current.stores.PLUS.observedAt,
+        DekaMarkt: current.stores.DekaMarkt.observedAt,
+      })
+      if (new TextEncoder().encode(text).length > 128_000)
+        throw new Error('De privévergelijking is te groot om direct te delen. Gebruik TXT-download.')
+      // The OS chooser is a deliberate user handoff; no endpoint, recipient or
+      // cloud transmission is selected or triggered by Supa itself.
+      await navigator.share({
+        title: 'Supa · eigen privé PLUS/DekaMarkt-vergelijking', text,
+      })
+      setDownloadMessage('Je eigen gecontroleerde vergelijking is via je gekozen app gedeeld; dit is geen kassagarantie of publieke besparingsclaim.')
+    } catch (cause) {
+      if (cause instanceof DOMException && cause.name === 'AbortError') return
+      setDownloadMessage(cause instanceof Error ? cause.message :
+        'Delen van de privévergelijking is mislukt; gebruik de bestaande TXT-download.')
+    }
+  }
+
   async function downloadPrivateCsv() {
     setDownloadMessage('')
     try {
@@ -807,6 +845,9 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
           </button>
           <button type="button" className="ghost-button" onClick={() => void copyPrivateComparison()}>
             Kopieer mijn prijsvergelijking (tekst)
+          </button>
+          <button type="button" className="ghost-button" onClick={() => void sharePrivateComparison()}>
+            Deel mijn privéprijsvergelijking (met eigen SKU’s en prijzen)
           </button>
           <button type="button" className="ghost-button" onClick={downloadPrivateCsv}>
             Download privévergelijking met originele SKU's (CSV)

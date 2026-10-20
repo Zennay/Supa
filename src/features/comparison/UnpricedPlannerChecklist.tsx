@@ -4,6 +4,7 @@ import { groupShoppingByRecipe } from '../shopping-list/shoppingRecipeGroups.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { exportUnpricedProgress, importUnpricedProgress, unpricedProgressMaxBytes, unpricedProgressStorageKey } from './unpricedPlannerProgress.ts'
 import { exportPrivatePlannerWeek } from './exportPrivatePlannerWeek.ts'
+import { exportUnpricedPlannerCsv } from './unpricedPlannerCsv.ts'
 import './unpricedPlannerChecklist.css'
 
 type ChecklistProps = {
@@ -105,6 +106,8 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPric
   const visible = items.filter(item => !openOnly || !checked[itemKey(item)])
   const recipeGroups = groupShoppingByRecipe(visible, plan, recipes, activeDays)
   const copyKey = JSON.stringify([demandIdentity, checked, openOnly])
+  const activeCopyKey = useRef(copyKey)
+  activeCopyKey.current = copyKey
   const copy = prepared?.key === copyKey ? prepared.text : null
 
   const shoppingText = () => [
@@ -119,6 +122,40 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPric
 
   function prepareCopy() {
     setPrepared({ key: copyKey, text: shoppingText() })
+  }
+
+  /** Text-only, explicit user action. Neither prices nor source files leave Supa
+   * automatically; the native share sheet lets the user choose the destination. */
+  async function shareCurrentWeek() {
+    if (error || !items.length) return
+    const expectedDemand = demandIdentity
+    const expectedCopyKey = copyKey
+    const content = shoppingText()
+    if (new TextEncoder().encode(content).length > 120_000) {
+      setBackupMessage('Weeklijst is te groot om mobiel te delen. Download het TXT-bestand.'); return
+    }
+    try {
+      if (typeof navigator.share === 'function') {
+        await navigator.share({ title: 'Mijn Supa-weekboodschappen (zonder prijzen)', text: content })
+        if (currentDemand.current === expectedDemand)
+          setBackupMessage('Weekboodschappen gedeeld via de door jou gekozen app. Er zijn geen winkelprijzen meegestuurd.')
+        return
+      }
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(content)
+        if (currentDemand.current === expectedDemand && copyKey === expectedCopyKey)
+          setBackupMessage('Weekboodschappen naar je klembord gekopieerd, zonder winkelprijzen.')
+        return
+      }
+    } catch (cause) {
+      if (cause instanceof DOMException && cause.name === 'AbortError') return
+      // Denied permissions are normal on private browsing and insecure pages.
+    }
+    // Never silently fail when the OS/browser denies a native share or clipboard.
+    if (currentDemand.current === expectedDemand && copyKey === expectedCopyKey) {
+      setPrepared({ key: expectedCopyKey, text: content })
+      setBackupMessage('Delen of kopiëren is niet beschikbaar. Selecteer de tekst hieronder om zelf te kopiëren.')
+    }
   }
   function openWithCurrentDemand() {
     if (error || !items.length) return
@@ -178,9 +215,12 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPric
 
   async function downloadUnpricedCsv() {
     if (error || !items.length) return
+    const expectedCopyKey = copyKey
     try {
-      // Keep the spreadsheet exporter out of the ordinary offline-list bundle.
-      const { exportUnpricedPlannerCsv } = await import('./unpricedPlannerCsv.ts')
+      // Native mobile CSV share needs transient click activation: this tiny
+      // existing exporter is already loaded rather than awaited after click.
+      if (currentDemand.current !== demandIdentity || activeCopyKey.current !== expectedCopyKey)
+        throw new Error('Het weekmenu of de afvinkingen zijn gewijzigd. Maak een nieuwe CSV.')
       const csv = exportUnpricedPlannerCsv(items, checked, openOnly)
       const url = URL.createObjectURL(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' }))
       try {
@@ -194,6 +234,38 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPric
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
     } catch (cause) {
       setBackupMessage(cause instanceof Error ? cause.message : 'De ongeprijsde CSV kon niet veilig worden gemaakt.')
+    }
+  }
+
+  /** Share the original exact, unpriced CSV as a local file on supported
+   * phones. Missing SKU/prices remain blank; there is no remote Supa upload. */
+  async function shareUnpricedCsv() {
+    if (error || !items.length) return
+    const expectedDemand = demandIdentity
+    const expectedCopyKey = copyKey
+    try {
+      if (currentDemand.current !== expectedDemand || activeCopyKey.current !== expectedCopyKey) {
+        setBackupMessage('Je weekmenu of vinkjes zijn veranderd. Gebruik de bijgewerkte CSV.')
+        return
+      }
+      const csv = '\\uFEFF' + exportUnpricedPlannerCsv(items, checked, openOnly)
+      const filename = openOnly ? 'supa-planner-nog-te-kopen-ongeprijsd.csv' :
+        'supa-planner-weekmandje-ongeprijsd.csv'
+      const file = new File([csv], filename, { type: 'text/csv;charset=utf-8' })
+      if (typeof navigator.share === 'function' &&
+          typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'Supa · eigen ongeprijsde weekboodschappen' })
+        if (currentDemand.current === expectedDemand)
+          setBackupMessage('Je oorspronkelijke ongeprijsde CSV is gedeeld via de gekozen app.')
+        return
+      }
+      if (currentDemand.current === expectedDemand && activeCopyKey.current === expectedCopyKey)
+        await downloadUnpricedCsv()
+    } catch (cause) {
+      if (cause instanceof DOMException && cause.name === 'AbortError') return
+      if (currentDemand.current === expectedDemand) {
+        setBackupMessage('CSV delen is niet beschikbaar op dit apparaat. Gebruik Download weekboodschappen (CSV).')
+      }
     }
   }
 
@@ -280,11 +352,17 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPric
                   void restoreProgress(file)
                 }} />
             </label>
+            <button type="button" className="ghost-button" onClick={() => void shareCurrentWeek()}>
+              Deel of kopieer mijn weekboodschappen
+            </button>
             <button type="button" className="ghost-button" onClick={downloadUnpricedList}>
               Download weekboodschappen (TXT)
             </button>
             <button type="button" className="ghost-button" onClick={() => void downloadUnpricedCsv()}>
               Download weekboodschappen (CSV)
+            </button>
+            <button type="button" className="ghost-button" onClick={() => void shareUnpricedCsv()}>
+              Deel ongeprijsde CSV met een andere app
             </button>
             <button type="button" className="ghost-button" onClick={openWithCurrentDemand}>
               Neem exact weekmenu mee naar privévergelijker

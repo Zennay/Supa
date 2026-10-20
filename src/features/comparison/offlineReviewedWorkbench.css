@@ -354,3 +354,32 @@ border-radius:10px;padding:.65rem;scroll-margin-top:1.25rem}
 .mixed-store-route__extras-form input,.mixed-store-route__extras-form select { box-sizing:border-box; width:100%; padding:.6rem; border:1px solid #aec5ad; border-radius:.35rem; }
 .mixed-store-route__extras li { display:flex; justify-content:space-between; align-items:baseline; gap:.5rem; }
 .mixed-store-route__extras li label { flex:1; }
+
+/* Complete private PLUS/Deka recapture is separate from already observed prices. */
+.offline-price-workbench__recapture-both {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .65rem;
+  padding: clamp(.85rem, 3vw, 1.25rem);
+  margin: .85rem 0 1rem;
+  border: 1px solid #a9c9b1;
+  background: #f3f9f5;
+  border-radius: 12px;
+  min-width: 0;
+}
+.offline-price-workbench__recapture-both > strong,
+.offline-price-workbench__recapture-both > p {
+  flex: 1 1 100%;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.offline-price-workbench__recapture-both > p { max-width: 78ch; line-height: 1.55; }
+.offline-price-workbench__recapture-both > button {
+  min-height: 44px;
+  white-space: normal;
+  text-align: left;
+}
+.offline-price-workbench__recapture-both button:focus-visible {
+  outline: 3px solid #226f52;
+  outline-offset: 3px;
+}

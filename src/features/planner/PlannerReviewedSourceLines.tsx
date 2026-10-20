@@ -1,4 +1,5 @@
 import { euro as exactEuro } from '../../lib/money.ts'
+import { productSearchText } from '../products/productSearchText.ts'
 import { useRef, useState } from 'react'
 import { observedInstant } from '../../domain/offlineReviewedImport.ts'
 import { recentOwnCaptureInstant, type OwnStore, type PrivateCaptureProgress } from '../comparison/privateReviewedBasketBridge.ts'
@@ -61,11 +62,11 @@ export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient,
     : []
   const pairCopy = pairCopyFallback?.source === progress && bothFresh && pairs.length > 0
     ? pairCopyFallback.csv : null
-  const search = query.trim().normalize('NFKC').toLocaleLowerCase('nl')
+  const search = productSearchText(query.trim())
   const shown = entries.filter(({ store, line }) =>
     (shop === 'both' || shop === store) &&
     (!search || [line.ingredientLabel, line.productName, line.productId]
-      .some(value => value.normalize('NFKC').toLocaleLowerCase('nl').includes(search))))
+      .some(value => productSearchText(value).includes(search))))
   async function downloadPairedCsv() {
     setExportMessage('')
     try {
