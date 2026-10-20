@@ -5,6 +5,10 @@ import { recentOwnCaptureInstant } from '../comparison/privateReviewedBasketBrid
 import { privatePackUnitRate, formatPrivateUnitRate } from '../comparison/privateUnitPrice.ts'
 import { productSearchText } from '../products/productSearchText.ts'
 import { completeOwnSourceProduct, privateSourceReviewChecklist } from './privateSourceReviewChecklist.ts'
+import {
+  privateFullStoreRecaptureCsv, privateFullStoreRecaptureGuide,
+  privatePairedStoreRecaptureCsv, privatePairedStoreRecaptureGuide,
+} from './privateFullStoreRecapture.ts'
 import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
 import { PlannerSourceMatchPreview } from './PlannerSourceMatchPreview.tsx'
 import { replaceOwnStoreCapture, type CaptureRefreshChanges } from './combineOwnSourceCapture.ts'
@@ -337,8 +341,8 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
     const original = preview
     const ticket = revision.current
     try {
-      const { privatePairedStoreRecaptureCsv, privatePairedStoreRecaptureGuide } =
-        await import('./privateFullStoreRecapture.ts')
+      // Small trusted local formatter is already loaded: the download remains
+      // in the original user gesture, including on mobile browsers.
       if (ticket !== revision.current || original.raw !== draft) return
       const current = parseOfflinePriceSnapshots(original.normalized, Date.now())
       const plus = current.captures.PLUS
@@ -374,8 +378,7 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
     const original = preview
     const ticket = revision.current
     try {
-      const { privateFullStoreRecaptureCsv, privateFullStoreRecaptureGuide } =
-        await import('./privateFullStoreRecapture.ts')
+      // Same synchronous private exporter as the combined field sheet.
       if (ticket !== revision.current || original.raw !== draft) return
       const current = parseOfflinePriceSnapshots(original.normalized, Date.now())
       const source = current.captures[store]
