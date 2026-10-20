@@ -204,7 +204,7 @@ export function ImportedRecipeGroceriesPanel({
         'Varianten zijn niet opgeslagen. De originele recepten blijven behouden.')
     }
   }
-  const currentCopyKey = JSON.stringify([progressIdentity, checked])
+  const currentCopyKey = JSON.stringify([progressIdentity, checked, pendingOnly])
   const latestCopyKey = useRef(currentCopyKey)
   latestCopyKey.current = currentCopyKey
   const readyLineKeys = list?.lines.filter(line => !line.needsReview)
@@ -252,7 +252,7 @@ export function ImportedRecipeGroceriesPanel({
     if (!list?.canCopy) return
     const key = currentCopyKey
     try {
-      const text = formatOwnRecipeChecklist(list, checked)
+      const text = formatOwnRecipeChecklist(list, checked, pendingOnly)
       if (new TextEncoder().encode(text).length > 256_000)
         throw new Error('De gecombineerde lijst is te groot om veilig mobiel te kopiëren.')
       if (navigator.clipboard?.writeText) {
@@ -261,7 +261,9 @@ export function ImportedRecipeGroceriesPanel({
           if (latestCopyKey.current !== key) {
             setFeedback('De recepten of afvinkingen veranderden tijdens het kopiëren. Kopieer opnieuw voor de actuele lijst.')
           } else {
-            setFeedback('De complete ongeprijsde receptenboodschappenlijst is gekopieerd.')
+            setFeedback(pendingOnly
+              ? 'Alleen je nog openstaande ongeprijsde boodschappen zijn gekopieerd; dit is geen volledig mandje.'
+              : 'De complete ongeprijsde receptenboodschappenlijst is gekopieerd.')
           }
           return
         } catch { /* The same private text can be selected manually below. */ }
@@ -515,7 +517,9 @@ export function ImportedRecipeGroceriesPanel({
         </div>
       </section>
       <div className="recipe-backup-panel__actions">
-        <button type="button" onClick={() => void copyGroceries()}>Kopieer gezamenlijke lijst (mobiel)</button>
+        <button type="button" onClick={() => void copyGroceries()}>
+          {pendingOnly ? 'Kopieer alleen openstaande boodschappen (mobiel)' : 'Kopieer volledige lijst (mobiel)'}
+        </button>
         <button type="button" onClick={exportText}>Download gezamenlijke lijst (TXT)</button>
         <button type="button" onClick={downloadChecks}>
           Bewaar mijn afvinkingen (JSON)
@@ -551,7 +555,8 @@ export function ImportedRecipeGroceriesPanel({
         80 regels. Gebruik de complete TXT-lijst, of selecteer minder recepten.</small>}
       {manualCopy?.key === currentCopyKey && <label
         className="recipe-collection-groceries__mobile-copy">
-        Selecteer en kopieer mijn volledige, ongeprijsde boodschappenlijst
+        {pendingOnly ? 'Selecteer alleen mijn nog openstaande boodschappen — geen volledig mandje'
+          : 'Selecteer en kopieer mijn volledige, ongeprijsde boodschappenlijst'}
         <textarea rows={12} readOnly value={manualCopy.text}
           onFocus={event => {
             if (latestCopyKey.current === manualCopy.key) event.currentTarget.select()
