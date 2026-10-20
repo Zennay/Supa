@@ -4,6 +4,7 @@ import { groupShoppingByRecipe } from '../shopping-list/shoppingRecipeGroups.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { exportUnpricedProgress, importUnpricedProgress, unpricedProgressMaxBytes, unpricedProgressStorageKey } from './unpricedPlannerProgress.ts'
 import { exportPrivatePlannerWeek } from './exportPrivatePlannerWeek.ts'
+import { exportUnpricedPlannerCsv } from './unpricedPlannerCsv.ts'
 import './unpricedPlannerChecklist.css'
 
 type ChecklistProps = {
@@ -216,8 +217,8 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPric
     if (error || !items.length) return
     const expectedCopyKey = copyKey
     try {
-      // Keep the spreadsheet exporter out of the ordinary offline-list bundle.
-      const { exportUnpricedPlannerCsv } = await import('./unpricedPlannerCsv.ts')
+      // Native mobile CSV share needs transient click activation: this tiny
+      // existing exporter is already loaded rather than awaited after click.
       if (currentDemand.current !== demandIdentity || activeCopyKey.current !== expectedCopyKey)
         throw new Error('Het weekmenu of de afvinkingen zijn gewijzigd. Maak een nieuwe CSV.')
       const csv = exportUnpricedPlannerCsv(items, checked, openOnly)
@@ -243,7 +244,6 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, onOpenPric
     const expectedDemand = demandIdentity
     const expectedCopyKey = copyKey
     try {
-      const { exportUnpricedPlannerCsv } = await import('./unpricedPlannerCsv.ts')
       if (currentDemand.current !== expectedDemand || activeCopyKey.current !== expectedCopyKey) {
         setBackupMessage('Je weekmenu of vinkjes zijn veranderd. Gebruik de bijgewerkte CSV.')
         return
