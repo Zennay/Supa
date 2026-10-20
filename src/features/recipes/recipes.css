@@ -151,3 +151,10 @@
 .recipe-collection-label textarea:focus-visible { outline: 3px solid #276644; outline-offset: 3px; }
 .recipe-collection-label select { max-width: 100%; min-height: 44px; padding: 8px 12px;
   border: 1px solid #8da692; border-radius: 12px; background: #fff; color: #173a26; font: inherit; }
+.recipe-collection-preview { max-height: 355px; overflow-y: auto; display: grid; gap: 8px; }
+.recipe-collection-preview__item { border: 1px solid #d2e0d4; border-radius: 12px;
+  background: #f8faf7; padding: 10px 12px; }
+.recipe-collection-preview__item summary { cursor: pointer; line-height: 1.5; }
+.recipe-collection-preview__item ul { max-height: none; padding-left: 20px; }
+.recipe-collection-preview__item li small { display: block; margin: 2px 0 5px; }
+.recipe-collection-preview__item p { margin: 9px 0; }

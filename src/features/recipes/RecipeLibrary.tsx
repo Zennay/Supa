@@ -816,10 +816,24 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
         <div className="recipe-backup-panel__review" role="group" aria-label="Bevestig import van mijn recepten">
           <strong>{collectionPreview.recipes.length} nieuwe recepten gevonden</strong>
           <small>{collectionPreview.alreadyPresent} al aanwezig of dubbel — die worden niet opnieuw opgeslagen.</small>
-          <ul>{collectionPreview.recipes.map((recipe, index) => <li key={index}>
-            <strong>{recipe.title}</strong> · {recipe.ingredients.length} ingrediënten ·
-            {' '}{recipe.warnings.length ? recipe.warnings.length + ' controlepunten' : 'Geen openstaande importwaarschuwingen'}
-          </li>)}</ul>
+          <div className="recipe-collection-preview">{collectionPreview.recipes.map((recipe, index) =>
+            <details key={index} className="recipe-collection-preview__item">
+              <summary><strong>{recipe.title}</strong> · {recipe.ingredients.length} ingrediënten ·
+                {' '}{recipe.warnings.length ? recipe.warnings.length + ' controlepunten' : 'Geen openstaande importwaarschuwingen'}</summary>
+              <p>{recipe.servings ?? '?'} porties · {recipe.minutes ?? '?'} minuten.
+                {' '}Originele hoeveelheden en waarschuwingen blijven bij het recept.</p>
+              <ul>{recipe.ingredients.map((ingredient, itemIndex) => <li key={itemIndex}>
+                <span>{ingredient.original}</span>
+                {ingredient.reviewReason
+                  ? <small role="status">Controle vereist: {ingredient.reviewReason}</small>
+                  : <small>{ingredient.amount} {ingredient.unit === 'piece' ? 'stuks' : ingredient.unit} genormaliseerd</small>}
+              </li>)}</ul>
+              {!!recipe.warnings.length && <div className="recipe-review-warnings">
+                <strong>Voor gebruik in Planner corrigeren</strong>
+                <ul>{recipe.warnings.map((warning, warningIndex) => <li key={warningIndex}>{warning}</li>)}</ul>
+              </div>}
+              <small>{recipe.steps.length} bereidingsstappen worden privé bewaard.</small>
+            </details>)}</div>
           <p>Geen prijzen of productmatches. Alle recepten worden pas na jouw bevestiging samen opgeslagen.</p>
           <div className="recipe-backup-panel__actions">
             <button type="button" onClick={confirmPlainRecipeCollection}>Bewaar alle recepten</button>
