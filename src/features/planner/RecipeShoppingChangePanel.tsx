@@ -3,6 +3,8 @@ import { recipeShoppingChangeText, type RecipeShoppingChange } from './recipeSho
 import { makeBlankPlannerCaptureCsv } from '../comparison/plannerPriceCaptureSheet.ts'
 import { makePlannerCaptureGuide } from '../comparison/plannerPriceCaptureGuide.ts'
 import { nextWeekPhysicalItems, nextWeekPhysicalListText, nextWeekPhysicalListCsv } from './recipeNextWeekList.ts'
+import { proposedWeekCaptureKit } from './proposedWeekCaptureKit.ts'
+import type { CaptureStore } from '../comparison/plannerPriceCaptureSheet.ts'
 
 /** Source-free physical shopping preview; no SKU or stored retailer price. */
 export function RecipeShoppingChangePanel({ preview, day }: {
@@ -65,6 +67,54 @@ export function RecipeShoppingChangePanel({ preview, day }: {
       setNotice(cause instanceof Error ? cause.message : 'Kan het broninvulblad niet maken.')
     }
   }
+
+  function saveCaptureKitFile(filename: string, contents: string, type: string) {
+    const url = URL.createObjectURL(new Blob([contents], { type }))
+    try {
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.append(link)
+      try { link.click() } finally { link.remove() }
+    } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+  }
+  function downloadStoreCapture(stores: readonly CaptureStore[], part: 'csv' | 'guide') {
+    try {
+      const kit = proposedWeekCaptureKit(preview, stores)
+      saveCaptureKitFile(part === 'csv' ? kit.csvFilename : kit.guideFilename,
+        part === 'csv' ? kit.csv : kit.guide,
+        part === 'csv' ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8')
+      setNotice('Alleen een leeg ' + stores.join(' + ') + '-invulbestand opgeslagen: nog geen bronprijzen.')
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Kan het winkelopnameblad niet downloaden.')
+    }
+  }
+  async function shareStoreCapture(stores: readonly CaptureStore[]) {
+    try {
+      const kit = proposedWeekCaptureKit(preview, stores)
+      const files = [
+        new File([kit.csv], kit.csvFilename, { type: 'text/csv;charset=utf-8' }),
+        new File([kit.guide], kit.guideFilename, { type: 'text/plain;charset=utf-8' }),
+      ]
+      if (typeof navigator.share !== 'function' || typeof navigator.canShare !== 'function' ||
+          !navigator.canShare({ files })) {
+        // Avoid automatic multiple downloads: mobile browsers often suppress
+        // the second download. The user can request the accompanying guide.
+        downloadStoreCapture(stores, 'csv')
+        setNotice('Deeloptie niet beschikbaar. Lege CSV gedownload; de gids kun je apart opslaan.')
+        return
+      }
+      await navigator.share({ title: 'Supa · ' + stores.join(' en ') + ' opnamepakket', files })
+      setNotice('Lege ' + stores.join(' + ') + '-CSV en bijpassende gids gedeeld. Geen prijsbron toegevoegd.')
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        setNotice('Winkelopname delen geannuleerd; je plan en brondata zijn ongewijzigd.')
+      } else {
+        setNotice('Delen niet beschikbaar. Download de winkel-CSV en opnamegids hieronder apart.')
+      }
+    }
+  }
+
   function downloadFullWeek() {
     try {
       const url = URL.createObjectURL(new Blob([getFullText()], { type: 'text/plain;charset=utf-8' }))
@@ -208,6 +258,26 @@ export function RecipeShoppingChangePanel({ preview, day }: {
       <button type="button" className="ghost-button" onClick={() => downloadCapture('guide')}>
         Bijpassende fysieke opnamegids (TXT)
       </button>
+      <details className="recipe-reuse-preview-shopping__capture">
+        <summary>Maak losse winkelopnames voor PLUS of DekaMarkt (leeg en herimporteerbaar)</summary>
+        <p>Vul alleen de echte winkelproductgegevens in de bijpassende CSV in.
+          De gids vermeldt per rij welk fysiek ingrediënt je zoekt.
+          Elke winkel kan afzonderlijk via de bestaande Vergelijk-import worden verwerkt.</p>
+        {(['PLUS', 'DekaMarkt'] as const).map(store => <div key={store}
+          className="recipe-reuse-preview-shopping__capture-store">
+          <strong>{store}</strong>
+          <button type="button" className="ghost-button"
+            onClick={() => void shareStoreCapture([store])}>Deel leeg CSV + gids (mobiel)</button>
+          <button type="button" className="ghost-button"
+            onClick={() => downloadStoreCapture([store], 'csv')}>Download lege {store}-CSV</button>
+          <button type="button" className="ghost-button"
+            onClick={() => downloadStoreCapture([store], 'guide')}>Download {store}-opnamegids</button>
+        </div>)}
+        <button type="button" className="ghost-button"
+          onClick={() => void shareStoreCapture(['PLUS', 'DekaMarkt'])}>
+          Deel gecombineerd leeg PLUS + DekaMarkt-opnamepakket
+        </button>
+      </details>
     </div>
     <small>De invulbladen bevatten geen bronproducten of bedragen en horen alleen bij dit
       voorgestelde weekmenu. Kies het recept eerst en vul uitsluitend echt waargenomen
