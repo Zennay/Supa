@@ -987,9 +987,6 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
               </div>}
             </div>
           })}
-          <ImportedRecipeGroceriesPanel key={lastImportedIds.join(':')}
-            recipes={library.recipes.filter(recipe => lastImportedIds.includes(recipe.id))}
-            onEdit={recipe => openSavedRecipeEditor(recipe)} />
         </section>}
       {lastBulkImport && library.raw === lastBulkImport.afterRaw &&
         <div className="recipe-collection-undo" aria-label="Laatste bulkimport terugdraaien">
@@ -1012,6 +1009,12 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       {collectionError && <p role="alert" className="recipe-error">{collectionError}</p>}
       {collectionMessage && <p role="status">{collectionMessage}</p>}
     </section>
+    {!!library.recipes.length && !library.error && <details className="recipe-bulk-grocery-details"
+      key={lastImportedIds.join(':')} defaultOpen={lastImportedIds.length > 0}>
+      <summary>Maak één boodschappenlijst van mijn eigen recepten</summary>
+      <ImportedRecipeGroceriesPanel recipes={library.recipes}
+        recentIds={lastImportedIds} onEdit={recipe => openSavedRecipeEditor(recipe)} />
+    </details>}
     <section className="recipe-backup-panel" aria-label="Eigen recepten meenemen naar een ander apparaat">
       <h2>Mijn recepten meenemen</h2>
       <p>Maak een privé-backup van je eigen recepten, of herstel een eerdere SUPA-receptenbackup.

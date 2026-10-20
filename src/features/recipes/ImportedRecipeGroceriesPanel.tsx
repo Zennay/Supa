@@ -22,12 +22,15 @@ function savePrivateFile(filename: string, content: string, mime: string) {
  * No automatic store matching, no phantom unit rates, no financial claim.
  */
 export function ImportedRecipeGroceriesPanel({
-  recipes, onEdit,
+  recipes, recentIds, onEdit,
 }: {
   recipes: readonly SavedRecipe[]
+  recentIds: readonly string[]
   onEdit: (recipe: SavedRecipe) => void
 }) {
-  const [selectedIds, setSelectedIds] = useState<string[]>(() => recipes.map(recipe => recipe.id))
+  const [selectedIds, setSelectedIds] = useState<string[]>(() =>
+    (recentIds.length ? recentIds : recipes.slice(0, 3).map(recipe => recipe.id)).slice(0, 15))
+  const [query, setQuery] = useState('')
   const [checked, setChecked] = useState<Record<string, boolean>>({})
   const [pendingOnly, setPendingOnly] = useState(false)
   const [feedback, setFeedback] = useState('')
@@ -43,11 +46,18 @@ export function ImportedRecipeGroceriesPanel({
   const checkedCount = list?.lines.filter(line => !line.needsReview && checked[line.key]).length ?? 0
   const visible = list?.lines.filter(line => !pendingOnly || line.needsReview || !checked[line.key]) ?? []
   const changeSelection = (id: string, include: boolean) => {
+    if (include && selectedIds.length >= 15 && !selectedIds.includes(id)) {
+      setFeedback('Kies maximaal vijftien recepten voor één fysieke boodschappenlijst.')
+      return
+    }
     setSelectedIds(current => include
       ? [...new Set([...current, id])]
       : current.filter(value => value !== id))
     setChecked({}); setFeedback('')
   }
+  const search = query.trim().normalize('NFKC').toLocaleLowerCase('nl')
+  const visibleRecipes = search ? recipes.filter(recipe =>
+    recipe.title.normalize('NFKC').toLocaleLowerCase('nl').includes(search)) : recipes
   const exportText = () => {
     if (!list?.canCopy) return
     try {
@@ -75,8 +85,14 @@ export function ImportedRecipeGroceriesPanel({
       metrische eenheden worden samengevoegd. Alle hoeveelheden zijn voor de
       oorspronkelijke porties van elk recept. Producten, verpakkingsprijzen en
       besparingen blijven onbekend tot je eigen winkelbronnen controleert.</p>
+    <label className="recipe-collection-label">Zoek recept in mijn bibliotheek
+      <input type="search" maxLength={120} value={query}
+        placeholder="Zoek jouw eigen recepten" onChange={event => setQuery(event.currentTarget.value)} />
+    </label>
+    <small>{selected.length} van {recipes.length} recepten gekozen (maximaal 15).
+      Met zoeken worden gekozen recepten niet ongemerkt verwijderd.</small>
     <div className="recipe-collection-groceries__recipes" role="group" aria-label="Recepten combineren">
-      {recipes.map(recipe => <label key={recipe.id}>
+      {visibleRecipes.map(recipe => <label key={recipe.id}>
         <input type="checkbox" checked={selectedIds.includes(recipe.id)}
           onChange={event => changeSelection(recipe.id, event.currentTarget.checked)} />
         {recipe.title} · {recipe.servings ?? '?'} porties

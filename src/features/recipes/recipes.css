@@ -208,3 +208,12 @@
 .recipe-collection-groceries__hold > div { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 @media(max-width:600px) { .recipe-collection-groceries { padding: 12px; }
   .recipe-collection-groceries__controls { flex-direction: column; align-items: stretch; } }
+.recipe-bulk-grocery-details { margin: 18px 0; border: 1px solid #c8ded0;
+  border-radius: 18px; background: #f4faf6; }
+.recipe-bulk-grocery-details > summary { padding: 18px; min-height: 55px;
+  font-weight: 750; cursor: pointer; color: #005135; }
+.recipe-bulk-grocery-details > .recipe-collection-groceries { margin: 0; }
+.recipe-collection-groceries__recipes { max-height: 245px; overflow: auto; }
+.recipe-collection-groceries__recipes label { min-height: 38px; }
+.recipe-collection-groceries > label input[type=search] { width: 100%; padding: 11px;
+  min-width: 0; border: 1px solid #8da692; border-radius: 10px; background: white; }
