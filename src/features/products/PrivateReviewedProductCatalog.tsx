@@ -146,8 +146,8 @@ export function PrivateReviewedProductCatalog({ reviewed, budget, onOpenComparis
       De bijbehorende prijzen zijn verborgen. Herzie de originele bron in Vergelijk;
       je eerdere lijstvinkjes blijven bewaard.
     </p>}
-    {!sources.length ? <div className="private-reviewed-products__missing-empty" role="status">
-      <p>Nog geen complete en actuele eigen bronproducten beschikbaar.
+    {!sources.length ? <div className="private-reviewed-products__missing-empty">
+      <p role="status">Nog geen complete en actuele eigen bronproducten beschikbaar.
         Kies een weekmenu, importeer je eigen winkelbron en controleer iedere SKU en verpakking.</p>
       {unmatchedWithoutPricedRows.length > 0 && <details className="private-reviewed-products__missing">
         <summary>{unmatchedWithoutPricedRows.length} ingrediënten wachten nog op een betrouwbare productmatch of prijs</summary>
