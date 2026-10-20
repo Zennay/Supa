@@ -26,6 +26,8 @@ type ProductDraft = {
   name: string
   packAmount: string
   packUnit: DraftUnit
+  /** Explicitly confirmed observed source unit; absent in older auto-filled drafts. */
+  packUnitConfirmed?: boolean
   packCount: string
   priceEuros: string
   available: boolean
@@ -36,7 +38,7 @@ const supportedUnits: Unit[] = ['g', 'kg', 'ml', 'l', 'piece']
 const emptyDraft = (_ingredientUnit: string): ProductDraft => ({
   // The recipe's requested quantity never establishes a retailer's physical
   // pack unit. The shopper must explicitly choose the observed source unit.
-  sourceId: '', name: '', packAmount: '', packUnit: '',
+  sourceId: '', name: '', packAmount: '', packUnit: '', packUnitConfirmed: false,
   packCount: '1', priceEuros: '', available: false, availabilityReviewed: false,
 })
 const key = (store: OfflineRetailer, ingredientId: string) => JSON.stringify([store, ingredientId])
@@ -106,7 +108,8 @@ function isCompleteOwnPriceDraft(row: ProductDraft): boolean {
     /[\p{L}\p{N}]/u.test(id) &&
     !/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/u.test(id) &&
     row.name.trim().length > 0 && row.name === row.name.trim() &&
-    amount !== null && supportedUnits.includes(row.packUnit as Unit) &&
+    amount !== null && row.packUnitConfirmed === true &&
+    supportedUnits.includes(row.packUnit as Unit) &&
     (row.packUnit !== 'piece' || Number.isSafeInteger(amount)) &&
     /^\d{1,4}$/.test(row.packCount) && Number.isSafeInteger(count) && count >= 1 && count <= 1000 &&
     eurosToCents(row.priceEuros.trim()) !== null
@@ -121,7 +124,8 @@ function isReviewedUnavailableDraft(row: ProductDraft): boolean {
     /[\p{L}\p{N}]/u.test(id) &&
     !/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/u.test(id) &&
     row.name.trim().length > 0 && row.name === row.name.trim() &&
-    !row.priceEuros.trim() && supportedUnits.includes(row.packUnit as Unit) &&
+    !row.priceEuros.trim() && row.packUnitConfirmed === true &&
+    supportedUnits.includes(row.packUnit as Unit) &&
     (row.packAmount.trim().length === 0 || (amount !== null &&
       (row.packUnit !== 'piece' || Number.isSafeInteger(amount)))) &&
     /^\d{1,4}$/.test(row.packCount) && Number.isSafeInteger(count) && count >= 1 && count <= 1000
@@ -240,7 +244,8 @@ function readPrivateDraft(fingerprint: string, allowedRows: ReadonlySet<string>,
           !rawRow || typeof rawRow !== 'object' || Array.isArray(rawRow)) return false
       const row = rawRow as Record<string, unknown>
       return (row.sourceId === undefined || (typeof row.sourceId === 'string' && row.sourceId.length <= 100)) &&
-        Object.keys(row).every(field => ['sourceId', 'name', 'packAmount', 'packUnit', 'priceEuros', 'packCount', 'available', 'availabilityReviewed'].includes(field)) &&
+        Object.keys(row).every(field => ['sourceId', 'name', 'packAmount', 'packUnit', 'packUnitConfirmed', 'priceEuros', 'packCount', 'available', 'availabilityReviewed'].includes(field)) &&
+        (row.packUnitConfirmed === undefined || typeof row.packUnitConfirmed === 'boolean') &&
         (row.availabilityReviewed === undefined || typeof row.availabilityReviewed === 'boolean') &&
         typeof row.name === 'string' && row.name.length <= 160 &&
         typeof row.packAmount === 'string' && row.packAmount.length <= 24 &&
@@ -468,7 +473,8 @@ export function LocalTwoStorePriceEditor({
           typeof pair[1] !== 'string' || !allowedIds.has(pair[1])) continue
       const store = pair[0] as OfflineRetailer
       included.add(store)
-      replacements[rowKey] = { ...item, priceEuros: '', available: false, availabilityReviewed: false }
+      replacements[rowKey] = { ...item, packUnitConfirmed: true,
+        priceEuros: '', available: false, availabilityReviewed: false }
     }
     if (!included.size) {
       setDraftStatus('Er zijn geen eerder persoonlijk gecontroleerde bronartikelen voor deze exacte Planner-week.')
@@ -495,7 +501,8 @@ export function LocalTwoStorePriceEditor({
       if (!Array.isArray(pair) || pair.length !== 2 || pair[0] !== store ||
           typeof pair[1] !== 'string' || !allowedIds.has(pair[1])) continue
       replacements[rowKey] = {
-        ...item, priceEuros: '', available: false, availabilityReviewed: false,
+        ...item, packUnitConfirmed: true,
+        priceEuros: '', available: false, availabilityReviewed: false,
       }
     }
     if (!Object.keys(replacements).length) {
@@ -537,6 +544,10 @@ export function LocalTwoStorePriceEditor({
       // A SKU/pack edit cannot inherit the former product's availability
       // confirmation or financial facts, even before the downstream review.
       if (changed) {
+        // A new source identity/pack cannot inherit its old physical unit
+        // confirmation. Selecting a fresh unit confirms only THAT unit.
+        updated.packUnitConfirmed = Object.hasOwn(patch, 'packUnit') &&
+          supportedUnits.includes(patch.packUnit as Unit)
         updated.available = false
         updated.availabilityReviewed = false
         updated.priceEuros = ''
@@ -1253,11 +1264,21 @@ export function LocalTwoStorePriceEditor({
                 </label>
                 <label>Eenheid van de echte winkelverpakking
                   <select value={row.packUnit} required
-                    onChange={e => changeRow(store, need.id, { packUnit: e.target.value as DraftUnit }, need.unit)}>
+                    onChange={e => changeRow(store, need.id, {
+                      packUnit: e.target.value as DraftUnit,
+                      packUnitConfirmed: supportedUnits.includes(e.target.value as Unit),
+                    }, need.unit)}>
                     <option value="">Kies de geobserveerde verpakkingseenheid</option>
                     {supportedUnits.map(unit => <option key={unit} value={unit}>{unit === 'piece' ? 'stuk' : unit}</option>)}
                   </select>
-                  <small>Niet afgeleid van het recept: controleer de fysieke inhoud.</small>
+                  <small>Niet afgeleid van het recept: controleer de fysieke inhoud.
+                    Oude invulconcepten met automatisch gekozen eenheden vereisen opnieuw bevestiging.</small>
+                  {row.packUnit !== '' && row.packUnitConfirmed !== true && (
+                    <button type="button" className="ghost-button"
+                      onClick={() => changeRow(store, need.id, { packUnitConfirmed: true }, need.unit)}>
+                      Bevestig: deze eenheid staat op de echte verpakking
+                    </button>
+                  )}
                 </label>
                 <label>Stuks per multipack
                   <input inputMode="numeric" type="number" min="1" max="1000" value={row.packCount}
