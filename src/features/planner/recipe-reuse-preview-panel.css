@@ -184,3 +184,34 @@
     flex-basis: 100%;
   }
 }
+
+
+/* File selection is an explicit recipe decision, not a passive upload or
+ * automatic match. Keep the control visible and tappable beside other
+ * recipe-commit actions at phone widths. */
+.recipe-reuse-preview-import {
+  flex: 1 1 100%;
+  min-width: 0;
+  border: 1px solid var(--border, #d9dfd7);
+  border-radius: .75rem;
+  padding: .8rem;
+  display: grid;
+  gap: .5rem;
+  background: var(--surface, #fff);
+}
+.recipe-reuse-preview-import strong { overflow-wrap: anywhere; }
+.recipe-reuse-preview-import small { line-height: 1.5; }
+.recipe-reuse-preview-import input[type="file"] {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  font: inherit;
+}
+.recipe-reuse-preview-import input[type="file"]::file-selector-button {
+  min-height: 44px;
+  max-width: 100%;
+  margin: .25rem .65rem .25rem 0;
+  white-space: normal;
+  cursor: pointer;
+}
