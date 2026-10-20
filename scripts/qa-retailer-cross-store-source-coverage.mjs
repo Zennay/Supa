@@ -3,6 +3,7 @@
  * unverified retailer-pairing candidate? Never labels pairs equivalent and
  * never publishes prices, IDs, permission or savings.
  */
+import { types as nodeTypes } from 'node:util'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { proposePrivateCrossRetailerMatches } from './retailer-private-cross-store-pairing.mjs'
@@ -11,6 +12,30 @@ import { buildUniversalRetailerCatalog } from './retailer-universal-catalog.mjs'
 
 const fail = () => { throw new Error('Private retailer cross-store source coverage QA refused') }
 const kindAllowed = new Set(['product','catalog','offers'])
+
+const OPTION_NAMES = new Set(['asOf', 'maxCrossStoreSkewHours', 'maxAgeHours'])
+function inertCrossStoreReviewOptions(raw) {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw) ||
+      nodeTypes.isProxy(raw)) fail()
+  const prototype = Object.getPrototypeOf(raw)
+  if (prototype !== Object.prototype && prototype !== null) fail()
+  const descriptors = Object.getOwnPropertyDescriptors(raw)
+  const keys = Reflect.ownKeys(descriptors)
+  if (keys.length > 3 || keys.some(key =>
+    typeof key !== 'string' || !OPTION_NAMES.has(key))) fail()
+  const snapshot = {}
+  for (const key of keys) {
+    const descriptor = descriptors[key]
+    if (!Object.hasOwn(descriptor, 'value') ||
+        descriptor.enumerable !== true) fail()
+    // No accessor or user-defined conversion methods are ever invoked here.
+    const value = descriptor.value
+    if (key === 'asOf' ? typeof value !== 'string' :
+        !Number.isSafeInteger(value)) fail()
+    snapshot[key] = value
+  }
+  return Object.freeze(snapshot)
+}
 function utcMs(value, asOf) {
   if (typeof value !== 'string' ||
       !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?Z$/.test(value)) fail()
@@ -33,11 +58,17 @@ function captureCoverage(product, auditTime) {
  * All outputs are counts only. Human review is still mandatory even when both
  * stores have >=2 kinds of historical provenance and synchronized snapshots.
  */
-export function auditPrivateCrossStoreEvidence(catalog, {
-  asOf = new Date().toISOString(),
-  maxCrossStoreSkewHours = 24,
-  maxAgeHours = 24,
-} = {}) {
+export function auditPrivateCrossStoreEvidence(catalog, options = {}) {
+  // A direct JS caller may supply executable getter/Proxy options instead of
+  // inert JSON. Admit only own enumerable primitive review options before
+  // reading the clock or changing the evidence coverage classification.
+  const admitted = inertCrossStoreReviewOptions(options)
+  const asOf = Object.hasOwn(admitted, 'asOf')
+    ? admitted.asOf : new Date().toISOString()
+  const maxCrossStoreSkewHours = Object.hasOwn(admitted, 'maxCrossStoreSkewHours')
+    ? admitted.maxCrossStoreSkewHours : 24
+  const maxAgeHours = Object.hasOwn(admitted, 'maxAgeHours')
+    ? admitted.maxAgeHours : 24
   const clock = utcMs(asOf, Date.now())
   if (!Number.isSafeInteger(maxCrossStoreSkewHours) ||
       maxCrossStoreSkewHours < 1 || maxCrossStoreSkewHours > 720 ||
