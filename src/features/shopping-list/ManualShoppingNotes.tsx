@@ -21,6 +21,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
   const [filterStore, setFilterStore] = useState<'Alle winkels' | UnpricedShoppingNote['store']>('Alle winkels')
   const [exportVisible, setExportVisible] = useState(false)
   const [message, setMessage] = useState('')
+  const [lastRemoved, setLastRemoved] = useState<{ note: UnpricedShoppingNote; index: number } | null>(null)
   const [sessionEnabled, setSessionEnabled] = useState(false)
   const [sessionProtected, setSessionProtected] = useState(false)
   const [sessionRaw, setSessionRaw] = useState<string | null>(null)
@@ -167,13 +168,37 @@ export function ManualShoppingNotes({ notes, setNotes }: {
     setName('')
     setMessage(`${label} toegevoegd zonder prijs. Dit verandert de supermarktvergelijking niet.`)
   }
+  function removeOwnNote(id: string) {
+    const index = notes.findIndex(note => note.id === id)
+    if (index < 0) return
+    setLastRemoved({ note: notes[index], index })
+    setNotes(current => current.filter(note => note.id !== id))
+    setMessage('Boodschap verwijderd. Je kunt de laatste verwijdering herstellen.')
+  }
+  function undoRemove() {
+    if (!lastRemoved) return
+    if (notes.length >= 100 || notes.some(note => note.id === lastRemoved.note.id)) {
+      setMessage('Herstellen kan niet: de lijst is vol of dit artikel bestaat inmiddels opnieuw.')
+      return
+    }
+    const { note, index } = lastRemoved
+    setNotes(current => {
+      if (current.length >= 100 || current.some(entry => entry.id === note.id)) return current
+      const next = [...current]
+      next.splice(Math.min(index, next.length), 0, note)
+      return next
+    })
+    setLastRemoved(null)
+    setMessage('De laatste eigen boodschap is met zijn oorspronkelijke vinkje hersteld.')
+  }
   const selected = notes.filter(note => filterStore === 'Alle winkels' ||
     note.store === filterStore || note.store === 'Algemeen')
   const visible = onlyOpen ? selected.filter(note => !note.done) : selected
   const exportText = [
     'SUPA · EIGEN ONGEPRIJSDE BOODSCHAPPEN · ' + filterStore,
     'Los van Planner, bronopnames, weekbudget en winkelmandtotalen.', '',
-    ...selected.map(note => (note.done ? '☑ ' : '☐ ') + `[${note.store}] ${safeLabel(note.label)} · prijs onbekend`),
+    ...(onlyOpen ? ['Alleen nog open artikelen:'] : []),
+    ...visible.map(note => (note.done ? '☑ ' : '☐ ') + `[${note.store}] ${safeLabel(note.label)} · prijs onbekend`),
     '', 'Geen winkelprijs, bronrecht of besparingsclaim.',
   ].join('\n') + '\n'
   function download() {
@@ -229,10 +254,16 @@ export function ManualShoppingNotes({ notes, setNotes }: {
         onChange={() => setNotes(current => current.map(item => item.id === note.id
           ? { ...item, done: !item.done } : item))} />
         <span>{note.label} <small>· {note.store} · prijs onbekend</small></span></label>
-      <button type="button" onClick={() => setNotes(current => current.filter(item => item.id !== note.id))}
+      <button type="button" onClick={() => removeOwnNote(note.id)}
         aria-label={`Verwijder ${note.label}`}>Verwijder</button>
     </li>)}</ul>
-    {selected.length === 0 && <p role="status">Nog geen boodschappen in deze selectie. De lijst werkt zonder winkelprijzen.</p>}
+    {!visible.length && <p role="status">
+      {selected.length ? 'Alle boodschappen in deze selectie zijn afgevinkt.' :
+        'Nog geen boodschappen in deze selectie. De lijst werkt zonder winkelprijzen.'}
+    </p>}
+    {lastRemoved && <button type="button" className="ghost-button" onClick={undoRemove}>
+      Herstel laatste verwijderde boodschap: {lastRemoved.note.label}
+    </button>}
     <section className="manual-shopping-notes__session" aria-label="Optioneel bewaren in dit tabblad">
       <label><input type="checkbox" checked={sessionEnabled} disabled={sessionProtected}
         onChange={event => changeSessionOptIn(event.target.checked)} />
@@ -242,9 +273,9 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       {sessionMessage && <p role="status" aria-live="polite">{sessionMessage}</p>}
     </section>
     <div className="manual-shopping-notes__actions">
-      <button type="button" disabled={!selected.length} onClick={() => setExportVisible(value => !value)}>
+      <button type="button" disabled={!visible.length} onClick={() => setExportVisible(value => !value)}>
         {exportVisible ? 'Verberg kopieertekst' : 'Toon kopieertekst'}</button>
-      <button type="button" disabled={!selected.length} onClick={download}>Download lijst (TXT)</button>
+      <button type="button" disabled={!visible.length} onClick={download}>Download lijst (TXT)</button>
       <button type="button" disabled={!notes.length} onClick={backupDownload}>Backup hele lijst (JSON)</button>
       <label>Herstel lijst uit JSON-backup (max. 64 kB)
         <input type="file" accept=".json,application/json" disabled={backupBusy}
