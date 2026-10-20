@@ -31,6 +31,9 @@ export function combinedRecipesCaptureKit(
   return {
     csv: makeBlankPlannerCaptureCsv(needs, stores, ';'),
     guide: 'SUPA · eigen receptenbundel · ' + recipes.length + ' recepten\n' +
+      'LET OP: de lege bron-CSV bevat standaard beschikbaar=false. Zet dit alleen op true ' +
+      'als het originele winkelproduct werkelijk beschikbaar is én je de verpakking, prijs en ' +
+      'het echte observatiemoment hebt opgenomen. Een leeg product is NOOIT een gratis product.\n\n' +
       makePlannerCaptureGuide(needs, stores),
     storeLabel: stores.join('-').toLowerCase(),
     // The existing CSV emits one row per store × original canonical need,

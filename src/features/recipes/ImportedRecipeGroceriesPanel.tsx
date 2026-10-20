@@ -725,6 +725,8 @@ export function ImportedRecipeGroceriesPanel({
           je werkelijk en rechtmatig verkregen PLUS/DekaMarkt-SKU’s, verpakkingen,
           opnametijden en pakprijzen in. Importeer de ingevulde bron-CSV via de
           bestaande privéwinkelvergelijker en bevestig iedere productmatch zelf.
+          De lege CSV staat veilig standaard op beschikbaar=false: wijzig dit uitsluitend
+          in true voor een daadwerkelijk beschikbaar en volledig opgenomen winkelproduct.
           Zonder twee volledige actuele opnames blijft een prijsverschil onbekend.</p>
         <label>Winkel(s) voor de lege opname
           <select value={captureTarget}
