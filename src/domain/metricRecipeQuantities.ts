@@ -23,7 +23,7 @@ function fraction(raw: string): Fraction | null {
   }
   // Recipes often write 1½ or 1 ½ without an ASCII slash. Keep these
   // fractions exact until the final upward rounding to 0.001 g/ml.
-  const joined = /^(\\d+)\\s?([½¼¾⅓⅔⅛⅜⅝⅞])$/u.exec(raw)
+  const joined = /^(\d+)\s?([½¼¾⅓⅔⅛⅜⅝⅞])$/u.exec(raw)
   const normalized = joined
     ? joined[1] + ' ' + vulgar[joined[2]]
     : vulgar[raw] ?? raw
