@@ -154,7 +154,11 @@ export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
   // Each additional unit must belong to the same physical family. Never
   // silently turn "1 kg 250 g 100 g" into a label or underbuy ingredients.
   if (metric) {
-    const additional = /^(?:(?:en|\+)\s*)?((?:\d+\s+)?\d+\/\d+|\d+\s?[½¼¾⅓⅔⅛⅜⅝⅞]|\d+(?:[.,]\d+)?|[½¼¾⅓⅔⅛⅜⅝⅞])\s*([^\s,]+)(?:\s+|,\s*)(.*)$/u
+    // Both Dutch and English recipes use joined units: "1 kg en 250 g"
+    // or "1 lb and 4 oz". Recognize only explicit same-family additions.
+    // An unknown or incompatible extra measure must not disappear into a
+    // product label, causing the Planner to underbuy the requested amount.
+    const additional = /^(?:(?:en|and|plus|\+)\s*)?((?:\d+\s+)?\d+\/\d+|\d+\s?[½¼¾⅓⅔⅛⅜⅝⅞]|\d+(?:[.,]\d+)?|[½¼¾⅓⅔⅛⅜⅝⅞])\s*([^\s,]+)(?:\s+|,\s*)(.*)$/iu
     for (; componentCount < 8; componentCount++) {
       const next = additional.exec(label)
       if (!next) break
@@ -173,6 +177,14 @@ export function normalizeIngredientLine(raw: string): RecipeDraftIngredient {
     if (componentCount === 8 && additional.test(label)) {
       return { original, label: original, query: original.toLocaleLowerCase('nl'),
         amount: null, unit: null, reviewReason: 'Te veel samengestelde hoeveelheden: controleer handmatig' }
+    }
+    // If another clearly written amount follows an unsupported separator,
+    // leave the full original editable rather than silently ignoring it.
+    // Do not reinterpret a product name containing a number as a measure.
+    const overlooked = /^(?:&|met|with|\+|en|and|plus)\s+((?:\d+\s+)?\d+\/\d+|\d+\s?[½¼¾⅓⅔⅛⅜⅝⅞]|\d+(?:[.,]\d+)?|[½¼¾⅓⅔⅛⅜⅝⅞])\s+([^\s,]+)/iu.exec(label)
+    if (overlooked && units[overlooked[2].toLowerCase()]) {
+      return { original, label: original, query: original.toLocaleLowerCase('nl'),
+        amount: null, unit: null, reviewReason: 'Controleer alle samengestelde hoeveelheden en de juiste ingrediënten' }
     }
   }
   const inferredPiece = !metric && pieceNouns.test(tail)
