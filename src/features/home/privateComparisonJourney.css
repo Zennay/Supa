@@ -130,3 +130,10 @@
 .private-comparison-journey__unpriced-start p{margin:0;line-height:1.5;color:#425c49}
 .private-comparison-journey__unpriced-start button{flex:1 1 180px}
 @media(max-width:630px){.private-comparison-journey__unpriced-start button{width:100%}}
+
+/* Reuse the Planner's missing-only source sheet without crowding the Home
+ * overview before a user explicitly opens their next retailer visit. */
+.private-comparison-journey__targeted{margin-block:1rem;padding:1rem;border:1px solid #d7e5db;border-radius:14px;background:#fbfdfb}
+.private-comparison-journey__targeted>strong{display:block;font-size:1.08rem}
+.private-comparison-journey__targeted>p{max-width:70ch;line-height:1.5}
+.private-comparison-journey__targeted>button{min-height:44px}

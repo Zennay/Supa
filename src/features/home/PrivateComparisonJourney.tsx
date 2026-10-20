@@ -26,6 +26,11 @@ const PlannerTwoStoreCoverage = lazy(async () => {
   return { default: mod.PlannerTwoStoreCoverage }
 })
 
+const PlannerMissingCapturePanel = lazy(async () => {
+  const mod = await import('../planner/PlannerMissingCapturePanel.tsx')
+  return { default: mod.PlannerMissingCapturePanel }
+})
+
 const stores: OwnStore[] = ['PLUS', 'DekaMarkt']
 
 /**
@@ -53,6 +58,7 @@ export function PrivateComparisonJourney({
   const [captureMessage, setCaptureMessage] = useState('')
   const [partialQuery, setPartialQuery] = useState('')
   const [showAllPartial, setShowAllPartial] = useState(false)
+  const [showTargetedCapture, setShowTargetedCapture] = useState(false)
   const [pendingCopyText, setPendingCopyText] = useState('')
   const [pendingMessage, setPendingMessage] = useState('')
   const captureKey = JSON.stringify(captureNeeds.map(need =>
@@ -364,6 +370,18 @@ export function PrivateComparisonJourney({
   const hasAnySource = singleReady || stores.some(store =>
     !!progress?.stores[store] || !!reviewed?.stores[store])
 
+  // Reuse Planner's targeted missing-source worksheet rather than asking for
+  // a new full capture on every visit. An unreviewed original SKU is NOT a
+  // missing retailer article and must be checked in the existing workbench.
+  const hasMissingOriginalSource = captureNeeds.length > 0 && hasAnySource && !ready &&
+    stores.some(store => {
+      if (valid?.stores[store]) return false
+      const source = progress?.stores[store]
+      return !source || !source.fresh ||
+        !recentOwnCaptureInstant(source.observedAt, nowMs) ||
+        source.missingIngredients.length > 0
+    })
+
   return <section className="private-comparison-journey" aria-label="Mijn echte winkelvergelijking">
     <div className="private-comparison-journey__heading">
       <div>
@@ -560,6 +578,28 @@ export function PrivateComparisonJourney({
         comparisonStatus={comparisonStatus} now={nowMs}
         onOpenComparison={onOpenImport} onReviewIngredient={onReview} />
     </Suspense>}
+
+    {hasMissingOriginalSource && <section
+      className="private-comparison-journey__targeted"
+      aria-label="Gericht ontbrekende originele winkelbronnen aanvullen">
+      <strong>Je bestaande winkelopnames behouden</strong>
+      <p>Er missen nog originele PLUS- of DekaMarkt-producten.
+        Maak alleen voor die ontbrekende fysieke ingrediënten een
+        nieuw leeg importblad. Reeds gekoppelde bronproducten worden
+        niet tot nieuwe prijzen of een nieuw bronmoment omgezet.</p>
+      <button type="button" aria-expanded={showTargetedCapture}
+        onClick={() => setShowTargetedCapture(value => !value)}>
+        {showTargetedCapture ? 'Sluit gerichte bronopname'
+          : 'Maak invulbladen voor alleen ontbrekende winkelproducten'}
+      </button>
+      {showTargetedCapture && <Suspense fallback={
+        <p role="status">Gerichte winkelopname openen…</p>
+      }>
+        <PlannerMissingCapturePanel captureNeeds={captureNeeds}
+          captureProgress={progress} reviewed={reviewed}
+          now={nowMs} onOpenComparison={onOpenImport} />
+      </Suspense>}
+    </section>}
 
     <div className="private-comparison-journey__result" role="status" aria-live="polite">
       {ready && delta !== null ? <>
