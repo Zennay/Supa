@@ -314,12 +314,29 @@ export function ManualStoreComparison({
                               ? 'Controleer product, verpakking, eenheid en prijs.'
                               : 'Nog geen prijsberekening.'}
                           {state.state === 'complete' && state.unitPriceCents !== null &&
-                            ` · ${exactEuro.formatCents(state.unitPriceCents)} per ${row.requiredUnit === 'g' || row.requiredUnit === 'kg' ? 'kg' : 'liter'}`}
+                            ` · ${exactEuro.formatCents(state.unitPriceCents)} per ${row.requiredUnit === 'piece' ? 'stuk' : row.requiredUnit === 'g' || row.requiredUnit === 'kg' ? 'kg' : 'liter'}`}
                         </p>
                       </fieldset>
                     )
                   })}
                 </div>
+                {row.quotes.PLUS.unitPriceCents !== null &&
+                  row.quotes.DekaMarkt.unitPriceCents !== null && (
+                  <p className="manual-compare__row-result">
+                    <strong>Afgeronde eenheidsprijzen per {row.requiredUnit === 'piece'
+                      ? 'stuk' : row.requiredUnit === 'g' || row.requiredUnit === 'kg' ? 'kg' : 'liter'}:</strong>{' '}
+                    PLUS {exactEuro.formatCents(row.quotes.PLUS.unitPriceCents)} · DekaMarkt{' '}
+                    {exactEuro.formatCents(row.quotes.DekaMarkt.unitPriceCents)}.{' '}
+                    {row.quotes.PLUS.unitPriceCents === row.quotes.DekaMarkt.unitPriceCents
+                      ? 'Op centen afgerond gelijk.'
+                      : `${row.quotes.PLUS.unitPriceCents < row.quotes.DekaMarkt.unitPriceCents
+                        ? 'PLUS' : 'DekaMarkt'} heeft een ${exactEuro.formatCents(Math.abs(
+                        row.quotes.PLUS.unitPriceCents - row.quotes.DekaMarkt.unitPriceCents
+                      ))} lagere afgeronde eenheidsprijs.`}{' '}
+                    Dit is alleen een vergelijking van jouw ingevoerde verpakkingen; de
+                    werkelijke mandkosten blijven gebaseerd op hele multipacks.
+                  </p>
+                )}
                 {row.quotes.PLUS.state === 'complete' &&
                   row.quotes.DekaMarkt.state === 'complete' &&
                   row.quotes.PLUS.lineCents !== null &&
