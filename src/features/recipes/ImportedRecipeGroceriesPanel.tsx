@@ -203,11 +203,38 @@ export function ImportedRecipeGroceriesPanel({
         'Varianten zijn niet opgeslagen. De originele recepten blijven behouden.')
     }
   }
+  const readyLineKeys = list?.lines.filter(line => !line.needsReview)
+    .map(line => line.key) ?? []
+  async function restoreChecks(file: File | null) {
+    if (!file || !list?.canCopy) return
+    setFeedback('')
+    const expected = progressIdentity
+    try {
+      if (file.size < 1 || file.size > unpricedProgressMaxBytes)
+        throw new Error('Kies een privé-Supa-afvinkingenbestand van maximaal 128 kB.')
+      const text = await file.text()
+      if (latestProgressIdentity.current !== expected)
+        throw new Error('De geselecteerde recepten of hoeveelheden zijn veranderd. Kies de back-up opnieuw.')
+      // Reuse the strict own-demand restore contract. Reviewed/unknown rows
+      // cannot become checked through a crafted, user-imported JSON record.
+      const recovered = importUnpricedProgress(text, expected, readyLineKeys)
+      const count = Object.keys(recovered).length
+      if (!window.confirm(`Herstel ${count} afgevinkte boodschappen voor exact deze recepten en porties? ` +
+        'Je huidige vinkjes worden vervangen; recepten en prijzen blijven onaangeroerd.')) return
+      if (latestProgressIdentity.current !== expected)
+        throw new Error('De actuele fysieke boodschappen zijn tussentijds gewijzigd; niets hersteld.')
+      setChecked(recovered)
+      setFeedback(`${count} afgevinkte boodschappen veilig hersteld voor deze exacte receptenbundel.`)
+    } catch (cause) {
+      setFeedback(cause instanceof Error ? cause.message :
+        'Back-up niet herkend; je bestaande vinkjes blijven behouden.')
+    }
+  }
   const downloadChecks = () => {
     if (!list?.canCopy) return
     try {
       const record = exportUnpricedProgress(progressIdentity,
-        list.lines.map(line => line.key), checked)
+        readyLineKeys, checked)
       savePrivateFile('supa-receptenbundel-boodschappen-vinkjes.json',
         record, 'application/json;charset=utf-8')
       setFeedback('Je afvinkingen zijn lokaal als privé-JSON opgeslagen, zonder prijzen of winkelgegevens.')
@@ -448,6 +475,13 @@ export function ImportedRecipeGroceriesPanel({
         <button type="button" onClick={downloadChecks}>
           Bewaar mijn afvinkingen (JSON)
         </button>
+        <label className="recipe-collection-groceries__restore">Herstel mijn afvinkingen (JSON)
+          <input type="file" accept="application/json,.json" onChange={event => {
+            const file = event.currentTarget.files?.[0] ?? null
+            event.currentTarget.value = ''
+            void restoreChecks(file)
+          }} />
+        </label>
         <button type="button" onClick={exportCsv}
           disabled={list.lines.length > 80}>Download gezamenlijke lijst (CSV)</button>
         <button type="button" onClick={openInPrivateMatcher}
@@ -471,8 +505,10 @@ export function ImportedRecipeGroceriesPanel({
       {list.lines.length > 80 && <small>De veilige CSV-export ondersteunt maximaal
         80 regels. Gebruik de complete TXT-lijst, of selecteer minder recepten.</small>}
       {feedback && <p role="status">{feedback}</p>}
-      <small>Dit is uitsluitend een persoonlijke, ongeprijsde lijst. Afvinken blijft
-        op dit scherm en bevestigt geen aankoop, prijs of productmatch.</small>
+      <small>Dit is uitsluitend een persoonlijke, ongeprijsde lijst. Vinkjes blijven
+        op dit scherm totdat je zelf een back-up downloadt en later herstelt.
+        Terugzetten kan alleen voor exact dezelfde recepten, porties, fysieke ingrediënten
+        en controlepunten. Een vinkje bevestigt geen aankoop, prijs of productmatch.</small>
     </>}
   </section>
 }
