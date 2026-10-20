@@ -318,6 +318,44 @@ export function ManualShoppingNotes({ notes, setNotes }: {
     ...visible.map(note => (note.done ? '☑ ' : '☐ ') + `[${note.store}] ${safeLabel(note.label)} · prijs onbekend`),
     '', 'Geen winkelprijs, bronrecht of besparingsclaim.',
   ].join('\n') + '\n'
+  function downloadPrintableList() {
+    if (!visible.length) return
+    // Static local HTML only: encode all user text and deny external resources.
+    const escapeHtml = (text: string) => text.replace(/&/gu, '&amp;')
+      .replace(/</gu, '&lt;').replace(/>/gu, '&gt;')
+      .replace(/"/gu, '&quot;').replace(/'/gu, '&#39;')
+    const groups = stores.flatMap(shop => {
+      const items = visible.filter(note => note.store === shop)
+      if (!items.length) return []
+      return ['<section><h2>' + shop + '</h2><p>' +
+        items.filter(note => !note.done).length + ' open van ' + items.length + '</p><ul>' +
+        items.map(note => '<li><span aria-hidden="true">' + (note.done ? '☑' : '☐') +
+          '</span> ' + escapeHtml(safeLabel(note.label)) + '</li>').join('') +
+        '</ul></section>']
+    }).join('')
+    const html = '<!doctype html><html lang="nl"><head><meta charset="utf-8">' +
+      '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+      `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">` +
+      '<title>SUPA · Eigen ongeprijsde boodschappen</title>' +
+      '<style>body{font:16px/1.5 system-ui,sans-serif;max-width:760px;margin:auto;padding:24px;color:#202820}' +
+      'section{break-inside:avoid;border-top:2px solid #ccc;margin:16px 0;padding:12px 0}' +
+      'ul{padding:0;list-style:none}li{padding:7px 0;border-bottom:1px solid #ddd;overflow-wrap:anywhere}' +
+      'li span{font-size:1.3em;margin-right:.6em}small{color:#555}' +
+      '@media print{body{padding:0}section{break-inside:avoid}}</style></head><body>' +
+      '<h1>Mijn eigen boodschappen</h1><p>' + visible.length +
+      ' ongeprijsde items, ' + visible.filter(note => !note.done).length +
+      ' nog te kopen.</p>' + groups +
+      '<footer><small>Persoonlijke lijst zonder winkelprijzen. Geen winkelvergelijking, bronbewijs of besparingsclaim.</small></footer>' +
+      '</body></html>'
+    const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
+    try {
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'supa-eigen-boodschappen-print.html'
+      document.body.append(link); link.click(); link.remove()
+      setMessage('De zichtbare ongeprijsde boodschappen zijn als offline printbestand bewaard.')
+    } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+  }
   function download() {
     const uri = URL.createObjectURL(new Blob([exportText], { type: 'text/plain;charset=utf-8' }))
     try {
@@ -452,6 +490,9 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       <button type="button" disabled={!visible.length} onClick={() => setExportVisible(value => !value)}>
         {exportVisible ? 'Verberg kopieertekst' : 'Toon kopieertekst'}</button>
       <button type="button" disabled={!visible.length} onClick={download}>Download lijst (TXT)</button>
+      <button type="button" disabled={!visible.length} onClick={downloadPrintableList}>
+        Offline afdrukbare lijst (HTML)
+      </button>
       <button type="button" disabled={!notes.length} onClick={backupDownload}>Backup hele lijst (JSON)</button>
       <label>Herstel lijst uit JSON-backup (max. 64 kB)
         <input type="file" accept=".json,application/json" disabled={backupBusy}
