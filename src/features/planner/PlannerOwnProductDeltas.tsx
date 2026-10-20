@@ -34,7 +34,9 @@ function unitPriceGap(item: ComparedOwnLine): {
   return {
     unit: plus.unit,
     differenceMilliCents: Math.abs(difference),
-    roundedDifferenceCents: Math.abs(deka.roundedCentsPerUnit - plus.roundedCentsPerUnit),
+    // Round the DIFFERENCE once, not two separately rounded unit prices.
+    // Two rates that round €0.01 apart can actually differ by <€0.005.
+    roundedDifferenceCents: Math.floor((Math.abs(difference) + 500) / 1000),
     cheaper: difference > 0 ? 'PLUS' : difference < 0 ? 'DekaMarkt' : null,
   }
 }
