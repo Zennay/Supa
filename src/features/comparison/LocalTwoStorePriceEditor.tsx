@@ -270,6 +270,7 @@ export function LocalTwoStorePriceEditor({
 }: Props) {
   const [open, setOpen] = useState(false)
   const [onlyOpenRows, setOnlyOpenRows] = useState(false)
+  const [preparedOpenCaptureCopy, setPreparedOpenCaptureCopy] = useState<{ identity: string; text: string } | null>(null)
   const [pricePreviewNow, setPricePreviewNow] = useState(() => Date.now())
   const [sourceSelection, setSourceSelection] = useState<'both' | OfflineRetailer>('both')
   const [scanTarget, setScanTarget] = useState<{
@@ -337,6 +338,13 @@ export function LocalTwoStorePriceEditor({
   const selectedPlanFingerprint = JSON.stringify([
     plan, activeDays, needs.map(item => [item.id, item.label, item.query, item.amount, item.unit]),
   ])
+  const openCaptureIdentity = JSON.stringify([selectedPlanFingerprint, sourceSelection,
+    openCaptureTasks.map(task => [task.store, task.need.id, task.need.label,
+      task.need.amount, task.need.unit, task.status])])
+  const latestOpenCaptureIdentity = useRef(openCaptureIdentity)
+  latestOpenCaptureIdentity.current = openCaptureIdentity
+  const selectableOpenCaptureText = preparedOpenCaptureCopy?.identity === openCaptureIdentity
+    ? preparedOpenCaptureCopy.text : null
   // Avoid importing a draft into a different plan if it changed during File.text().
   const currentPlanFingerprint = useRef(selectedPlanFingerprint)
   currentPlanFingerprint.current = selectedPlanFingerprint
@@ -517,12 +525,10 @@ export function LocalTwoStorePriceEditor({
     }
     setOutput(''); setError(''); setPreparedFor(''); onEdit()
   }
-  function downloadOpenCaptureTasks() {
-    if (!openCaptureTasks.length) return
-    try {
-      const printable = (value: string) =>
-        value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim().slice(0, 180)
-      const rows = [
+  function openCaptureTasksText(): string {
+    const printable = (value: string) =>
+      value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim().slice(0, 180)
+    const rows = [
         'Supa · nog te verzamelen eigen winkelproducten voor dit exacte Planner-weekmenu',
         'Dit is een ongeprijsde werklijst, geen winkelbron, voorraadbevestiging of prijsbewijs.',
         'Gebruik uitsluitend eigen rechtmatig verkregen producten, echte opnamemomenten en echte pakprijzen.',
@@ -539,9 +545,16 @@ export function LocalTwoStorePriceEditor({
         'Na de echte winkelopname: vul SKU, naam, pakmaat, aantal, prijs, voorraad en bronmoment in Supa in.',
         'Pas na volledige originele broncontrole kan Vergelijk een mandverschil berekenen.',
       ]
-      const output = rows.join('\n') + '\n'
-      if (new TextEncoder().encode(output).length > 100_000)
-        throw Error('De openstaande winkelcontroles passen niet in één bestand.')
+    const output = rows.join('\n') + '\n'
+    if (new TextEncoder().encode(output).length > 100_000)
+      throw Error('De openstaande winkelcontroles passen niet in één bestand.')
+    return output
+  }
+
+  function downloadOpenCaptureTasks() {
+    if (!openCaptureTasks.length) return
+    try {
+      const output = openCaptureTasksText()
       const url = URL.createObjectURL(new Blob([output], {
         type: 'text/plain;charset=utf-8',
       }))
@@ -555,6 +568,28 @@ export function LocalTwoStorePriceEditor({
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
     } catch {
       setDraftStatus('Kon de open winkelproducten niet downloaden. Je invoer blijft bewaard.')
+    }
+  }
+
+  async function copyOpenCaptureTasks() {
+    if (!openCaptureTasks.length) return
+    const identity = openCaptureIdentity
+    try {
+      const output = openCaptureTasksText()
+      if (!navigator.clipboard?.writeText) throw Error('clipboard-unavailable')
+      await navigator.clipboard.writeText(output)
+      if (latestOpenCaptureIdentity.current !== identity) return
+      setPreparedOpenCaptureCopy(null)
+      setDraftStatus('Openstaande PLUS/Deka-winkelcontroles zonder prijzen lokaal gekopieerd.')
+    } catch {
+      if (latestOpenCaptureIdentity.current !== identity) return
+      try {
+        const output = openCaptureTasksText()
+        setPreparedOpenCaptureCopy({ identity, text: output })
+        setDraftStatus('Automatisch kopiëren is niet beschikbaar: selecteer hieronder de ongeprijsde werklijst.')
+      } catch {
+        setDraftStatus('De werklijst kon niet worden gekopieerd. Je eigen concept blijft bewaard.')
+      }
     }
   }
 
@@ -944,6 +979,17 @@ export function LocalTwoStorePriceEditor({
               onClick={downloadOpenCaptureTasks}>
               Download {openCaptureTasks.length} openstaande winkelcontroles (zonder prijzen)
             </button>}
+            {openCaptureTasks.length > 0 && <button type="button" className="ghost-button"
+              onClick={() => void copyOpenCaptureTasks()}>
+              Kopieer mijn openstaande winkelcontroles (mobiel)
+            </button>}
+            {selectableOpenCaptureText !== null && <label>
+              Selecteer mijn privéwerklijst voor de winkel
+              <textarea readOnly value={selectableOpenCaptureText}
+                rows={Math.min(openCaptureTasks.length * 2 + 5, 12)}
+                onFocus={event => event.currentTarget.select()}
+                aria-label="Kopieer openstaande persoonlijke winkelcontroles zonder prijzen" />
+            </label>}
             {nextIncompletePairIndex >= 0 && <button type="button" className="ghost-button"
               onClick={() => {
                 const need = activeNeeds[nextIncompletePairIndex]
