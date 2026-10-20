@@ -1,0 +1,10 @@
+.planner-portable-week { display:grid; gap:.75rem; border:1px solid #d5e4d9; padding:1rem; margin:1rem 0; border-radius:16px; background:#fff; }
+.planner-portable-week h3,.planner-portable-week p { margin:0; }
+.planner-portable-week p { line-height:1.5; color:#405a49; }
+.planner-portable-week__actions { display:flex; flex-wrap:wrap; gap:.7rem; align-items:center; }
+.planner-portable-week__actions label { display:grid; gap:.3rem; max-width:100%; }
+.planner-portable-week__actions button { min-height:44px; border-radius:9px; padding:.5rem 1rem; }
+.planner-portable-week__preview { display:grid; gap:.65rem; border:1px solid #9bb7a3; border-radius:12px; padding:1rem; background:#f1f8f3; }
+.planner-portable-week__preview ul { margin:0; padding-left:1.3rem; }
+.planner-portable-week__preview li { padding:.15rem 0; overflow-wrap:anywhere; }
+.planner-portable-week :is(button,input):focus-visible { outline:3px solid #236f50; outline-offset:2px; }

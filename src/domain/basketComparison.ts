@@ -214,6 +214,33 @@ function inspectBasket(label: string, basket: OneStoreBasket): string[] {
   return reasons
 }
 
+/**
+ * A single locally reviewed shop is only ready for Planner, Products and List
+ * when its original whole-pack ledger is coherent. A caller can otherwise
+ * provide apparently complete counts with an unrelated retailer identity or
+ * forged cents, even before there is a second shop to compare against.
+ *
+ * Reuse exactly the same financial and physical rules as the canonical
+ * two-shop comparator. Do not calculate a replacement amount or imply source
+ * rights. Malformed/partially restored private state fails closed.
+ */
+export function isCoherentPricedBasket(
+  basket: unknown,
+  expectedStoreId: string,
+): basket is OneStoreBasket {
+  if (!basket || typeof basket !== 'object' || Array.isArray(basket) ||
+      !canonicalStoreIdentity(expectedStoreId)) return false
+  try {
+    const source = basket as OneStoreBasket
+    return canonicalStoreIdentity(source.store?.id) &&
+      canonicalStoreIdentity(source.store?.name) &&
+      source.store.id === expectedStoreId &&
+      inspectBasket('source', source).length === 0
+  } catch {
+    return false
+  }
+}
+
 function unknownComparison(
   baseline: OneStoreBasket,
   candidate: OneStoreBasket,

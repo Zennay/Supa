@@ -120,10 +120,11 @@ function validCapturedAt(value: unknown): value is string {
       .slice(1)
       .split(':')
       .map(Number)
-    // Civil UTC offsets are bounded by ±14:00; 14:01–23:59
-    // may parse in permissive JS engines but cannot prove capture time.
-    if (offsetHour > 14 || offsetMinute > 59 ||
-        (offsetHour === 14 && offsetMinute !== 0)) return false
+    // Physical civil offsets: UTC−12:00..UTC+14:00 (asymmetric).
+    // JS Date.parse can accept −13/−14 even though no civil zone can.
+    const upper = match[5][0] === '-' ? 12 : 14
+    if (offsetHour > upper || offsetMinute > 59 ||
+        (offsetHour === upper && offsetMinute !== 0)) return false
   }
 
   const timestamp = Date.parse(value)
@@ -165,6 +166,7 @@ function validHttpsPlusUrl(
     // was never part of its reviewed provenance.
     return (
       url.search === '' && url.hash === '' &&
+      !value.includes('?') && !value.includes('#') &&
       // WHATWG URL deliberately canonicalizes the explicit default :443
       // port away. Keep that historical valid HTTPS form, but still refuse
       // arbitrary URL spellings, queries and fragments.

@@ -85,13 +85,22 @@ function safeCapturedAt(value: unknown): value is string {
       .slice(1)
       .split(':')
       .map(Number)
-    // Civil UTC offsets are bounded by ±14:00; 14:01–23:59
-    // may parse in permissive JS engines but cannot prove capture time.
-    if (offsetHour > 14 || offsetMinute > 59 ||
-        (offsetHour === 14 && offsetMinute !== 0)) return false
+    // Physical civil offsets: UTC−12:00..UTC+14:00 (asymmetric).
+    // JS Date.parse can accept −13/−14 even though no civil zone can.
+    const upper = match[5][0] === '-' ? 12 : 14
+    if (offsetHour > upper || offsetMinute > 59 ||
+        (offsetHour === upper && offsetMinute !== 0)) return false
   }
 
-  return Number.isFinite(Date.parse(value))
+  const millis = Date.parse(value)
+  if (!Number.isFinite(millis)) return false
+  // The product adapters must apply the same ±60s future skew rule as
+  // catalog/offers capture ingestion, with the original 1–9 fractional
+  // digits retained rather than silently accepting a future sub-ms tick.
+  const fraction = /\.(\d{1,9})(?:Z|[+-]\d{2}:\d{2})$/u.exec(value)?.[1] ?? ''
+  const capturedNs = BigInt(millis) * 1_000_000n +
+    BigInt((fraction.padEnd(9, '0').slice(3)) || '0')
+  return capturedNs <= BigInt(Date.now() + 60_000) * 1_000_000n
 }
 
 function safePlusProductUrl(value: unknown): value is string {
@@ -102,7 +111,18 @@ function safePlusProductUrl(value: unknown): value is string {
       url.protocol === 'https:' &&
       url.hostname === 'www.plus.nl' &&
       url.port === '' &&
+      url.search === '' && url.hash === '' &&
+      !value.includes('?') && !value.includes('#') &&
+      (value === url.href || value === url.href.replace(
+        'https://' + url.hostname + '/', 'https://' + url.hostname + ':443/',
+      )) &&
       url.pathname.startsWith('/product/') &&
+      url.pathname.length > '/product/'.length &&
+      // Evidence must be the exact bare, canonical public product page.
+      // A query, fragment, credential or ambiguous URL cannot gain a
+      // verified-SKU identity just by appearing in both source/JSON-LD.
+      url.href === value &&
+      !/[?#]/u.test(value) &&
       url.username === '' &&
       url.password === ''
     )

@@ -14,6 +14,18 @@ const ALLOWED_UNITS = new Set(['g', 'kg', 'ml', 'l', 'piece', 'unknown'])
 const ALLOWED_PRICE_CONTEXTS = new Set(['in-store', 'online-order'])
 const ALLOWED_SOURCES = new Set(['manual-cart', 'receipt', 'consented-export'])
 const KEY_PATTERN = /^[a-z0-9][a-z0-9_-]{2,63}$/
+const WEEK_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
+
+// A private report must never relabel a malformed or foreign-version field
+// study as the current M3 format. Reuse the domain's strict Gregorian rules.
+function validCalendarDate(value) {
+  const parts = typeof value === 'string' ? WEEK_DATE_PATTERN.exec(value) : null
+  if (!parts) return false
+  const year = Number(parts[1]), month = Number(parts[2]), day = Number(parts[3])
+  const date = new Date(Date.UTC(year, month - 1, day))
+  return date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+}
 
 function assert(condition, message) {
   if (!condition) throw new Error(message)
@@ -203,7 +215,7 @@ function validateEvidence(evidence, path) {
 
 export function validateObservedWeekInput(study) {
   requireRecord(study, 'study')
-  assert(Number.isInteger(study.schemaVersion), 'schemaVersion must be an integer')
+  assert(study.schemaVersion === 1, 'Unsupported M3 study schemaVersion')
   requireString(study.studyId, 'studyId')
   assert(KEY_PATTERN.test(study.studyId), 'studyId must be a path-safe study key')
   requireString(study.participantKey, 'participantKey')
@@ -213,7 +225,7 @@ export function validateObservedWeekInput(study) {
   )
   requireReportSafeMetadata(study.population, 'population')
   requireReportSafeMetadata(study.region, 'region')
-  requireString(study.weekStart, 'weekStart')
+  assert(validCalendarDate(study.weekStart), 'weekStart must be a valid YYYY-MM-DD date')
   assert(
     ALLOWED_PRICE_CONTEXTS.has(study.priceContext),
     'priceContext must be in-store or online-order',

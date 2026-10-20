@@ -9,6 +9,7 @@ const MAX_SELECTORS = 24
 const HTML_TAG = /<([a-z][a-z0-9-]{0,32})\b([^<>]{0,1500})>/gi
 const CLASS_ATTR = /\bclass\s*=\s*(?:"([^"]{0,1000})"|'([^']{0,1000})')/i
 const STATIC_NAME = /^[a-z][a-z0-9_-]{1,59}$/i
+const KNOWN_MERCHANT_HOSTS = Object.freeze({ plus: 'www.plus.nl', dekamarkt: 'www.dekamarkt.nl' })
 const FIELD_RULES = Object.freeze({
   product: /(?:^|[-_])(product|item|card|tile|sku|article)(?:$|[-_])/i,
   name: /(?:^|[-_])(name|title|label|heading)(?:$|[-_])/i,
@@ -27,14 +28,25 @@ function validSnapshotOrigin(origin) {
   try {
     const url = new URL(origin.url)
     const exact = url.href === origin.url
+    const syntax = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(origin.capturedAt)
+    if (!syntax) return false
     const timestamp = Date.parse(origin.capturedAt)
+    if (!Number.isFinite(timestamp) || timestamp > Date.now()) return false
+    // Date.parse silently normalizes impossible Gregorian dates (e.g. Feb 30).
+    // Preserve the user's ORIGINAL UTC clock in SHA-linked source metadata.
+    const civilUtc = new Date(timestamp).toISOString().slice(0, 19)
+    if (origin.capturedAt.slice(0, 19) !== civilUtc) return false
+    // These two retailer IDs have exact known official hosts; a historical
+    // foreign-host page must not be mislabeled as either merchant.
+    const requiredHost = Object.hasOwn(KNOWN_MERCHANT_HOSTS, origin.retailerId)
+      ? KNOWN_MERCHANT_HOSTS[origin.retailerId] : null
+    if (requiredHost && url.hostname !== requiredHost) return false
     return exact && url.protocol === 'https:' &&
       /^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/.test(url.hostname) &&
       isIP(url.hostname) === 0 &&
       url.port === '' && !url.username && !url.password &&
       !url.search && !url.hash && url.hostname !== 'localhost' &&
-      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(origin.capturedAt) &&
-      Number.isFinite(timestamp) && timestamp <= Date.now()
+      Number.isFinite(timestamp)
   } catch {
     return false
   }

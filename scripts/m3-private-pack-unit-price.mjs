@@ -19,13 +19,28 @@ function exactDecimal(value) {
 }
 
 export function privateM3PackUnitPrice(product) {
-  if (product === null || typeof product !== 'object' ||
-      product.status !== 'known' ||
-      !Number.isSafeInteger(product.pricePerPackageCents) ||
-      product.pricePerPackageCents < 0 ||
-      !Number.isSafeInteger(product.itemsPerPackage) ||
-      product.itemsPerPackage <= 0) return null
-  const quantity = exactDecimal(product.packAmount)
+  if (product === null || typeof product !== 'object') return null
+  // Snapshot only five ordinary *own data properties*, never user-controlled
+  // getter/prototype values. Inspection itself can throw (notably on Proxies):
+  // no advisory or partial financial amount should escape that failure.
+  const fields = ['status', 'pricePerPackageCents', 'packAmount',
+    'packUnit', 'itemsPerPackage']
+  const pack = Object.create(null)
+  try {
+    for (const field of fields) {
+      const descriptor = Object.getOwnPropertyDescriptor(product, field)
+      if (!descriptor || !Object.hasOwn(descriptor, 'value')) return null
+      pack[field] = descriptor.value
+    }
+  } catch {
+    return null
+  }
+  if (pack.status !== 'known' ||
+      !Number.isSafeInteger(pack.pricePerPackageCents) ||
+      pack.pricePerPackageCents < 0 ||
+      !Number.isSafeInteger(pack.itemsPerPackage) ||
+      pack.itemsPerPackage <= 0) return null
+  const quantity = exactDecimal(pack.packAmount)
   if (!quantity) return null
 
   const unitPrices = {
@@ -35,14 +50,17 @@ export function privateM3PackUnitPrice(product) {
     l: { baseFactor: 1000n, displaySize: 100n, label: '100 ml' },
     piece: { baseFactor: 1n, displaySize: 1n, label: 'stuk' },
   }
-  const conversion = Object.hasOwn(unitPrices, product.packUnit)
-    ? unitPrices[product.packUnit] : null
+  // A non-string pack unit must not reach Object.hasOwn's ToPropertyKey:
+  // boxed objects and Symbol.toPrimitive hooks could execute caller code.
+  if (typeof pack.packUnit !== 'string') return null
+  const conversion = Object.hasOwn(unitPrices, pack.packUnit)
+    ? unitPrices[pack.packUnit] : null
   if (!conversion) return null
 
   const denominator = quantity.numerator * conversion.baseFactor *
-    BigInt(product.itemsPerPackage)
+    BigInt(pack.itemsPerPackage)
   if (denominator === 0n) return null
-  const numerator = BigInt(product.pricePerPackageCents) *
+  const numerator = BigInt(pack.pricePerPackageCents) *
     conversion.displaySize * quantity.denominator
   // Round half-up only at display time. This is not used as a basket total.
   const roundedCents = (numerator * 2n + denominator) / (denominator * 2n)

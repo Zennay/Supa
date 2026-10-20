@@ -8,8 +8,10 @@ import { ShoppingListCopyButton } from './ShoppingListCopyButton'
 import { PrintableShoppingChecklist } from './PrintableShoppingChecklist'
 import {
   restoreShoppingListProgress,
-  serializeShoppingListProgress,
-  shoppingListBasketKey,
+  restorePhysicalShoppingProgress,
+  serializePhysicalShoppingProgress,
+  shoppingListPhysicalBasketKey,
+  shoppingListPhysicalProgressStorageKey,
   shoppingListProgressStorageKey,
 } from './shoppingListProgress'
 import { groupShoppingByRecipe } from './shoppingRecipeGroups'
@@ -59,10 +61,16 @@ function readStoredProgress(basket: OneStoreBasket) {
 
   try {
     return {
-      done: restoreShoppingListProgress(
-        basket,
-        window.localStorage.getItem(shoppingListProgressStorageKey),
-      ),
+      // An existing v2 record takes precedence. Migrate legacy v1 checkmarks
+      // only when its original price-sensitive basket key still matches exactly.
+      // Never rewrite, reinterpret or delete unknown/future v1 bytes.
+      done: (() => {
+        const v2 = window.localStorage.getItem(shoppingListPhysicalProgressStorageKey)
+        return v2 !== null
+          ? restorePhysicalShoppingProgress(basket, v2)
+          : restoreShoppingListProgress(basket,
+              window.localStorage.getItem(shoppingListProgressStorageKey))
+      })(),
       readDenied: false,
     }
   } catch {
@@ -71,8 +79,8 @@ function readStoredProgress(basket: OneStoreBasket) {
   }
 }
 
-// A v1 client must not destroy unsupported, newer or unreadable persisted state.
-// Refuse writes until the key is absent or a strictly recognized v1 snapshot.
+// A v2 client must not destroy unsupported, newer or unreadable persisted state.
+// Refuse writes until the key is absent or a strictly recognized v2 snapshot.
 function canOverwriteStoredProgress(raw: string | null): boolean {
   if (raw === null) return true
   try {
@@ -80,13 +88,13 @@ function canOverwriteStoredProgress(raw: string | null): boolean {
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false
     const record = parsed as Record<string, unknown>
     return (
-      record.schemaVersion === 1 &&
-      typeof record.basketKey === 'string' &&
-      record.basketKey.length > 0 &&
+      record.schemaVersion === 2 &&
+      typeof record.physicalBasketKey === 'string' &&
+      record.physicalBasketKey.length > 0 &&
       Array.isArray(record.doneLineIds) &&
       record.doneLineIds.every((id: unknown) => typeof id === 'string') &&
       Object.keys(record).every((key) =>
-        key === 'schemaVersion' || key === 'basketKey' || key === 'doneLineIds'
+        key === 'schemaVersion' || key === 'physicalBasketKey' || key === 'doneLineIds'
       )
     )
   } catch {
@@ -102,7 +110,7 @@ export function ShoppingListView({ basket, plan, recipes, activeDays }: {
 }) {
   const basketKey = useMemo(() => {
     try {
-      return shoppingListBasketKey(basket)
+      return shoppingListPhysicalBasketKey(basket)
     } catch {
       // A damaged basket is not a new empty shopping plan. Never show or
       // persist checkmarks under a fabricated identity.
@@ -171,7 +179,7 @@ export function ShoppingListView({ basket, plan, recipes, activeDays }: {
     }
 
     try {
-      const stored = window.localStorage.getItem(shoppingListProgressStorageKey)
+      const stored = window.localStorage.getItem(shoppingListPhysicalProgressStorageKey)
       // If the initial read was denied, later-readable existing bytes might
       // contain previously checked rows. Refuse to replace them with [].
       if ((progress.readDenied && stored !== null) ||
@@ -183,9 +191,9 @@ export function ShoppingListView({ basket, plan, recipes, activeDays }: {
         return
       }
 
-      const serialized = serializeShoppingListProgress(basket, progress.done)
+      const serialized = serializePhysicalShoppingProgress(basket, progress.done)
       if (stored !== serialized) {
-        window.localStorage.setItem(shoppingListProgressStorageKey, serialized)
+        window.localStorage.setItem(shoppingListPhysicalProgressStorageKey, serialized)
       }
       if (progress.readDenied || progress.retryAfterFailure) {
         setProgress((current) => current === progress

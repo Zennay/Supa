@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
+import { isIP } from 'node:net'
 
 const EXPECTED_SOURCES = ['dekamarkt', 'plus']
 const PERMISSION_STATUSES = new Set([
@@ -17,10 +18,31 @@ function assert(condition, message) {
   if (!condition) throw new Error(message)
 }
 
+// Documentary evidence must identify a readable public HTTPS origin. This is
+// deliberately syntactic: DNS lookups or requests cannot establish permission.
 function safeHttpsUrl(value) {
-  if (typeof value !== 'string') return false
+  if (typeof value !== 'string' || value.length > 4096 ||
+      !/^https:\/\//u.test(value) ||
+      /[\\\p{Cc}\p{Cf}\s]/u.test(value)) return false
   try {
-    return new URL(value).protocol === 'https:'
+    const url = new URL(value)
+    const hostname = url.hostname.replace(/\.$/u, '').toLowerCase()
+    // Public DNS names, including documented example.invalid placeholders,
+    // are allowed as citations. Bare/IP and private resolver names are not.
+    if (url.protocol !== 'https:' || url.username || url.password ||
+        !hostname.includes('.') || !hostname ||
+        isIP(hostname.replace(/^\[|\]$/gu, '')) !== 0 ||
+        /(?:^|\.)(?:localhost|local|internal|lan|home|onion)$/u.test(hostname) ||
+        hostname.endsWith('.home.arpa') || hostname.endsWith('.in-addr.arpa') ||
+        hostname.endsWith('.ip6.arpa') ||
+        url.port !== '' || url.hash !== '') return false
+    // A signed, login or bearer URL is not an independent permission
+    // document. Never persist it as an authorization witness.
+    for (const key of url.searchParams.keys()) {
+      const normalized = key.normalize('NFKC').replace(/[^a-z0-9]/giu, '').toLowerCase()
+      if (/^(?:token|apikey|key|access(?:token)?|secret|password|passwd|auth|authorization|code|sig|signature|session(?:id)?|jwt|bearer|credential)$/u.test(normalized)) return false
+    }
+    return true
   } catch {
     return false
   }
