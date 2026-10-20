@@ -1113,6 +1113,10 @@ function clearComparisonTextPreview(): void {
   comparisonTextPreview.value = ''
   comparisonTextPreview.hidden = true
 }
+function currentCoverageText(): string {
+  return stores.map(store => store + ' prijsdekking: ' +
+    coverageLabels[store].textContent).join(' · ')
+}
 function privateComparisonText(): string | null {
   if (result.hidden) return null
   const tableLines = Array.from(rows.querySelectorAll('tr')).map(row => {
@@ -1132,6 +1136,7 @@ function privateComparisonText(): string | null {
     '',
     summary.textContent ?? 'Geen volledig prijsverschil bekend.',
     capturesLabel.textContent ?? 'Bronmomenten onbekend.',
+    currentCoverageText(),
     ...budget,
     '',
     'Ingrediënt en fysieke behoefte | PLUS | DekaMarkt | Verschil',
@@ -1209,7 +1214,7 @@ document.querySelector<HTMLButtonElement>('#download-html')!.addEventListener('c
     })
     const html = renderPrivateBasketSnapshot({
       capturedAt: new Date().toISOString(),
-      summary: (summary.textContent ?? '') +
+      summary: (summary.textContent ?? '') + '\n' + currentCoverageText() +
         (budgetInCents(budgetInput.value.trim()) !== null && budgetTotals
           ? ' Eigen budget: ' + (budgetStatus.textContent ?? '') : ''),
       sourceMoments: capturesLabel.textContent ?? '',
