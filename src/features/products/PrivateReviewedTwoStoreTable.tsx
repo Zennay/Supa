@@ -450,6 +450,15 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         }) : []
     const missingPairedCount = plus && deka
       ? Math.max(0, plus.basket.lines.length - partialPairs.length) : 0
+    // When one shop has no source at all, the other shop's physical weekly
+    // demand is still useful as a price-free field checklist for that shop.
+    const unresolvedByStore = (['PLUS', 'DekaMarkt'] as const).flatMap(shop => {
+      const capture = fresh?.stores[shop]
+      const other = fresh?.stores[shop === 'PLUS' ? 'DekaMarkt' : 'PLUS']
+      const physical = capture?.basket.lines ?? other?.basket.lines ?? []
+      return physical.filter(line => !capture || line.status === 'unresolved')
+        .map(line => ({ shop, line, absent: !capture }))
+    })
     return <section className="private-reviewed-products__paired" aria-label="Winkelvergelijking van eigen artikelen">
       <h3>Vergelijk PLUS met DekaMarkt</h3>
       <div className="private-reviewed-products__source-coverage">
@@ -491,6 +500,26 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         : missing.length > 0
           ? missing.join(' en ') + ' heeft nog geen volledig bruikbare eigen prijsopname. Vul de brongegevens aan voordat Supa een prijsverschil toont.'
           : 'Het bestaande bronpaar is nog niet betrouwbaar vergelijkbaar voor hetzelfde fysieke weekmandje. Controleer de productkoppelingen opnieuw.'}</p>
+      {unresolvedByStore.length > 0 && <details className="private-reviewed-products__missing">
+        <summary>Ontbrekende winkelregels voor mijn weekmenu ({unresolvedByStore.length})</summary>
+        <p>Dit zijn nog te controleren fysieke ingrediënten per winkel.
+          Een niet-ingelezen winkel krijgt dezelfde ingrediënten als je bestaande
+          weekmand, maar nooit automatisch een productcode, prijs of bronmoment.</p>
+        <ul>{unresolvedByStore.map(({ shop, line, absent }) => <li
+          key={JSON.stringify([shop, line.id])}>
+          <strong>{shop} · {line.ingredientLabel}</strong>
+          <span> · {line.requirement.amount === null
+            ? 'hoeveelheid onbekend'
+            : line.requirement.amount + ' ' + line.requirement.unit}
+            {' '}· {absent ? 'winkelbron ontbreekt' : 'productmatch of prijs ontbreekt'}
+          </span>
+        </li>)}</ul>
+        <button type="button" onClick={onOpenComparison}>
+          Vul ontbrekende bronproducten in en controleer productmatching
+        </button>
+        <small>Een ontbrekende winkelregel is nooit een prijs van € 0.
+          Het volledige mandje blijft onbekend totdat beide winkels compleet zijn.</small>
+      </details>}
       {partialPairs.length > 0 && <details className="private-reviewed-products__missing">
         <summary>{partialPairs.length} identieke fysieke behoeften met twee bronprijzen bekijken</summary>
         <p><strong>Gedeeltelijk: totaal prijsverschil onbekend.</strong>
