@@ -116,7 +116,9 @@ export function ManualShoppingNotes({ notes, setNotes }: {
     additions: UnpricedShoppingNote[]; duplicateCount: number;
   } | null>(null)
   const [backupBusy, setBackupBusy] = useState(false)
-  const [lastBackupAdded, setLastBackupAdded] = useState<UnpricedShoppingNote[] | null>(null)
+  const [lastImport, setLastImport] = useState<{
+    source: 'JSON-backup' | 'tekstlijst'; added: UnpricedShoppingNote[]
+  } | null>(null)
   const readVersion = useRef(0)
   function backupDownload() {
     try {
@@ -169,7 +171,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       }
       const previous = backupPreview.existing
       setNotes(current => serializePrivateNotes(current) === previous ? merged.notes : current)
-      setLastBackupAdded(backupPreview.additions)
+      setLastImport({ source: 'JSON-backup', added: backupPreview.additions })
       setBackupPreview(null)
       setMessage(merged.added + ' boodschappen toegevoegd; bestaande items en vinkjes behouden.')
     } catch (error) {
@@ -178,20 +180,20 @@ export function ManualShoppingNotes({ notes, setNotes }: {
     }
   }
 
-  function undoBackupImport() {
-    if (!lastBackupAdded?.length) return
-    const ids = new Set(lastBackupAdded.map(item => item.id))
+  function undoLastImport() {
+    if (!lastImport?.added.length) return
+    const ids = new Set(lastImport.added.map(item => item.id))
     const same = (a: UnpricedShoppingNote, b: UnpricedShoppingNote) =>
       a.id === b.id && a.label === b.label && a.store === b.store && a.done === b.done
-    if (lastBackupAdded.some(item => !notes.some(current => same(current, item)))) {
-      setLastBackupAdded(null)
-      setMessage('Backup-import is intussen gewijzigd. Herstellen geweigerd om je bewerkingen te bewaren.')
+    if (lastImport.added.some(item => !notes.some(current => same(current, item)))) {
+      setLastImport(null)
+      setMessage('De laatst geïmporteerde artikelen zijn gewijzigd. Herstellen geweigerd om je bewerkingen te bewaren.')
       return
     }
-    setNotes(current => lastBackupAdded.every(item => current.some(row => same(row, item)))
+    setNotes(current => lastImport.added.every(item => current.some(row => same(row, item)))
       ? current.filter(item => !ids.has(item.id)) : current)
-    setLastBackupAdded(null)
-    setMessage('Alleen de laatst toegevoegde backupartikelen zijn uit je persoonlijke lijst gehaald. Andere boodschappen en prijzen blijven intact.')
+    setLastImport(null)
+    setMessage('Alleen de laatst geïmporteerde ongeprijsde artikelen zijn verwijderd. Andere boodschappen, vinkjes en winkelprijzen blijven intact.')
   }
 
   async function readBulkText(file?: File) {
@@ -290,6 +292,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       const before = bulkPreview.existing
       setNotes(current => serializePrivateNotes(current) === before
         ? [...current, ...added] : current)
+      setLastImport({ source: 'tekstlijst', added })
       setBulkDraft('')
       setBulkPreview(null)
       setMessage(incoming.length + ' eigen boodschappen toegevoegd, ' +
@@ -884,9 +887,9 @@ export function ManualShoppingNotes({ notes, setNotes }: {
         Annuleer import
       </button>
     </div>}
-    {lastBackupAdded && lastBackupAdded.length > 0 &&
-      <button type="button" className="ghost-button" onClick={undoBackupImport}>
-        Herstel laatste JSON-import ({lastBackupAdded.length} eigen artikelen)
+    {lastImport && lastImport.added.length > 0 &&
+      <button type="button" className="ghost-button" onClick={undoLastImport}>
+        Herstel laatste import uit {lastImport.source} ({lastImport.added.length} eigen artikelen)
       </button>}
     {exportVisible && visible.length > 0 && <label>Kopieer mijn ongeprijsde boodschappen
       <textarea rows={Math.min(selected.length + 6, 15)} readOnly value={exportText}
