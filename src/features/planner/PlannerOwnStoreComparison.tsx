@@ -418,14 +418,31 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
           <small>Alleen jouw oorspronkelijke, volledig gecontroleerde prijzen en dezelfde fysieke
             weekvraag met hele verpakkingen. Bronmomenten liggen maximaal 24 uur uiteen.
             Geen kassagarantie of onafhankelijk bewezen besparing.</small>
+          {summary.mixedRoute && summary.mixedRoute.requiresTwoStops &&
+            <p><strong>Optioneel combineren:</strong>
+              {' '}{exactEuro.formatCents(summary.mixedRoute.totalCents)}
+              {' '}aan origineel gecontroleerde boodschappenproducten in twee winkels.
+              {' '}Dit is {exactEuro.formatCents(summary.mixedRoute.possibleProductDifferenceCents)}
+              {' '}lager dan één complete winkel <strong>vóór</strong> extra reiskosten.
+              Het netto voordeel is zonder eigen winkelstopkosten onbekend.</p>}
           <div className="own-store-planner__overview-actions">
             <button type="button" className="ghost-button"
               onClick={() => openConfirmedStoreList(summary.cheapest ?? selected)}>
               Open {summary.cheapest ?? selected}-boodschappenlijst
             </button>
-            <button type="button" className="ghost-button" onClick={onOpenComparison}>
-              Bekijk originele SKU- en pakprijsregels
+            <button type="button" className="ghost-button" onClick={() => {
+              const details = document.querySelector<HTMLDetailsElement>('details.own-store-planner__details')
+              if (!details) { onOpenComparison(); return }
+              details.open = true
+              window.requestAnimationFrame(() =>
+                details.scrollIntoView({ block: 'start', behavior: 'smooth' }))
+            }}>
+              Bekijk originele productprijzen en regelverschillen
             </button>
+            {summary.mixedRoute?.requiresTwoStops && <button type="button"
+              className="ghost-button" onClick={openCurrentMixedRoute}>
+              Bekijk twee-winkelroute in Lijst
+            </button>}
           </div>
         </>
         : <>
