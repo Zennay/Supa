@@ -91,6 +91,20 @@ export function ImportedRecipeGroceriesPanel({
       setFeedback(cause instanceof Error ? cause.message : 'Het fysieke mandje kon niet veilig worden overgedragen.')
     }
   }
+  const openInPrivateMatcher = () => {
+    if (!list?.canCopy) return
+    try {
+      const json = exportCombinedRecipesPrivateWeek(selected)
+      if (!window.confirm('Open dit ongeprijsde mandje in de privéwinkelvergelijker? ' +
+        'Je controleert daar eerst alle fysieke ingrediënten en bevestigt daarna zelf de bronproducten. ' +
+        'Oude winkelprijzen en artikelkeuzes worden niet automatisch meegenomen.')) return
+      window.sessionStorage.setItem('supa:private-planner-week-handoff:v1', json)
+      window.location.assign(import.meta.env.BASE_URL + 'private-basket-mapping.html')
+    } catch (cause) {
+      setFeedback((cause instanceof Error ? cause.message : 'Directe overdracht niet beschikbaar.') +
+        ' Download het JSON-bestand en importeer dit handmatig als weekmenu in de privévergelijker.')
+    }
+  }
   return <section className="recipe-collection-groceries" aria-label="Gecombineerde ongeprijsde boodschappenlijst">
     <h3>Één boodschappenlijst voor je nieuwe recepten</h3>
     <p>Kies welke recepten je samen wilt koken. Dezelfde duidelijke ingrediënten en
@@ -145,6 +159,10 @@ export function ImportedRecipeGroceriesPanel({
         <button type="button" onClick={exportText}>Download gezamenlijke lijst (TXT)</button>
         <button type="button" onClick={exportCsv}
           disabled={list.lines.length > 80}>Download gezamenlijke lijst (CSV)</button>
+        <button type="button" onClick={openInPrivateMatcher}
+          disabled={!result!.complete || selected.length > 14}>
+          Vergelijk dit mandje met mijn eigen winkelproducten
+        </button>
         <button type="button" onClick={exportForStores}
           disabled={!result!.complete || selected.length > 14}>
           Gebruik deze recepten in de privéwinkelvergelijker (JSON)
@@ -157,7 +175,7 @@ export function ImportedRecipeGroceriesPanel({
       {result!.complete && selected.length <= 14 && <a
         href={import.meta.env.BASE_URL + 'private-basket-mapping.html#own-recipe-import'}
         target="_blank" rel="noopener noreferrer">
-        Open de bestaande privévergelijker en importeer het JSON-mandje
+        Of open de bestaande privévergelijker voor handmatige JSON-import
       </a>}
       {list.lines.length > 80 && <small>De veilige CSV-export ondersteunt maximaal
         80 regels. Gebruik de complete TXT-lijst, of selecteer minder recepten.</small>}
