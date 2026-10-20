@@ -59,6 +59,7 @@ export function PrivateComparisonJourney({
   const [partialQuery, setPartialQuery] = useState('')
   const [showAllPartial, setShowAllPartial] = useState(false)
   const [showTargetedCapture, setShowTargetedCapture] = useState(false)
+  const [showTwoStoreCoverage, setShowTwoStoreCoverage] = useState(false)
   const [pendingCopyText, setPendingCopyText] = useState('')
   const [pendingMessage, setPendingMessage] = useState('')
   const captureKey = JSON.stringify(captureNeeds.map(need =>
@@ -570,14 +571,27 @@ export function PrivateComparisonJourney({
         onFocus={event => event.currentTarget.select()} />}
     </section>}
 
-    {captureNeeds.length > 0 && <Suspense fallback={
-      <p role="status">Twee-winkelcontrolelijst openen…</p>
-    }>
-      <PlannerTwoStoreCoverage
-        needs={captureNeeds} progress={progress} reviewed={reviewed}
-        comparisonStatus={comparisonStatus} now={nowMs}
-        onOpenComparison={onOpenImport} onReviewIngredient={onReview} />
-    </Suspense>}
+    {captureNeeds.length > 0 && <section
+      className="private-comparison-journey__coverage"
+      aria-label="Hetzelfde fysieke mandje bij PLUS en DekaMarkt">
+      <strong>Van weekmenu naar twee gecontroleerde winkelmandjes</strong>
+      <p>Volg per ingrediënt welke originele SKU en verpakking bij beide winkels
+        zijn gekoppeld, en welke prijs of broncontrole nog ontbreekt.
+        Deze status maakt een onvolledig mandje niet alsnog geprijsd.</p>
+      <button type="button" aria-expanded={showTwoStoreCoverage}
+        onClick={() => setShowTwoStoreCoverage(value => !value)}>
+        {showTwoStoreCoverage ? 'Verberg de complete twee-winkelcontrole'
+          : 'Bekijk alle ' + captureNeeds.length + ' ingrediënten bij beide winkels'}
+      </button>
+      {showTwoStoreCoverage && <Suspense fallback={
+        <p role="status">Twee-winkelcontrolelijst openen…</p>
+      }>
+        <PlannerTwoStoreCoverage
+          needs={captureNeeds} progress={progress} reviewed={reviewed}
+          comparisonStatus={comparisonStatus} now={nowMs}
+          onOpenComparison={onOpenImport} onReviewIngredient={onReview} />
+      </Suspense>}
+    </section>}
 
     {hasMissingOriginalSource && <section
       className="private-comparison-journey__targeted"
