@@ -21,6 +21,11 @@ const PlannerQuickSourcePaste = lazy(async () => {
   return { default: mod.PlannerQuickSourcePaste }
 })
 
+const PlannerTwoStoreCoverage = lazy(async () => {
+  const mod = await import('../planner/PlannerTwoStoreCoverage.tsx')
+  return { default: mod.PlannerTwoStoreCoverage }
+})
+
 const stores: OwnStore[] = ['PLUS', 'DekaMarkt']
 
 /**
@@ -71,6 +76,11 @@ export function PrivateComparisonJourney({
   const comparison = paired
     ? compareFullBaskets({ baseline: plus.basket, candidate: deka.basket }) : null
   const ready = paired && comparison?.claimable === true
+  // Use the exact same canonical outcome as Planner's source progress view.
+  // A two-shop "covered" UI state alone cannot make an unsafe basket claimable.
+  const comparisonStatus = ready ? 'comparable'
+    : plus && deka ? (paired ? 'not-comparable' : 'different-moments')
+      : 'missing'
   const cheaper = ready
     ? plus!.basket.totalCents === deka!.basket.totalCents ? null
       : plus!.basket.totalCents < deka!.basket.totalCents ? 'PLUS' : 'DekaMarkt'
@@ -541,6 +551,15 @@ export function PrivateComparisonJourney({
         aria-label="Selecteerbare privé-lijst met ontbrekende winkelbroncontroles"
         onFocus={event => event.currentTarget.select()} />}
     </section>}
+
+    {captureNeeds.length > 0 && <Suspense fallback={
+      <p role="status">Twee-winkelcontrolelijst openen…</p>
+    }>
+      <PlannerTwoStoreCoverage
+        needs={captureNeeds} progress={progress} reviewed={reviewed}
+        comparisonStatus={comparisonStatus} now={nowMs}
+        onOpenComparison={onOpenImport} onReviewIngredient={onReview} />
+    </Suspense>}
 
     <div className="private-comparison-journey__result" role="status" aria-live="polite">
       {ready && delta !== null ? <>
