@@ -108,6 +108,62 @@ export function ManualStoreComparison({
       return { ...previous, [key]: { ...quote, [field]: value } }
     })
   }
+  // Portable personal report from this complete current calculation only.
+  // This is a standalone unverified calculator, not a retailer receipt,
+  // canonical source import or basis for public savings claims.
+  function downloadMyCalculatedComparison() {
+    if (!summary?.fullBasket || summary.deltaCents === null ||
+        summary.totals.PLUS === null || summary.totals.DekaMarkt === null) return
+    try {
+      const clean = (text: string): string =>
+        text.replace(/[\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]/gu, ' ').trim().slice(0, 160)
+      const rows = [
+        'SUPA · alleen mijn eigen handmatig berekende twee-winkelmandje',
+        'NIET onafhankelijk geverifieerd: geen bronrechten, originele SKU, opnamebewijs of besparingsclaim.',
+        'Dezelfde Planner-vraag, maar productgelijkwaardigheid en gedeelde SKU-verpakkingen zijn onbekend.',
+        '',
+      ]
+      for (const row of summary.rows) {
+        const plus = row.quotes.PLUS
+        const deka = row.quotes.DekaMarkt
+        if (plus.state !== 'complete' || deka.state !== 'complete' ||
+            plus.lineCents === null || deka.lineCents === null)
+          throw new Error('Eén of meer prijsregels zijn veranderd. Controleer de volledige mandjes.')
+        rows.push(clean(row.label) + ' · benodigd ' + row.requiredAmount + ' ' + row.requiredUnit)
+        for (const store of MANUAL_RETAILERS) {
+          const quote = entries[manualQuoteKey(store, row.ingredientId)]
+          const line = row.quotes[store]
+          if (!quote || !line.packs || line.lineCents === null || !quote.packCount)
+            throw new Error('Het ingevoerde product of multipack is niet compleet.')
+          rows.push(store + ': ' + clean(quote.product) + ' · ' + line.packs +
+            ' hele multipack(s), elk ' + quote.packCount + ' × ' + quote.packAmount +
+            ' ' + quote.packUnit + ' · ' + exactEuro.formatCents(line.lineCents))
+        }
+        rows.push('Rekenkundig regelverschil (Deka minus PLUS): ' +
+          exactEuro.formatCents(deka.lineCents - plus.lineCents), '')
+      }
+      rows.push('PLUS eigen ingevuld totaal: ' + exactEuro.formatCents(summary.totals.PLUS),
+        'DekaMarkt eigen ingevuld totaal: ' + exactEuro.formatCents(summary.totals.DekaMarkt),
+        'Rekenkundig mandverschil (Deka minus PLUS): ' + exactEuro.formatCents(
+          summary.totals.DekaMarkt - summary.totals.PLUS),
+        '', 'Alleen op dit apparaat gemaakt. Controleer echte winkelproductgelijkheid en bronmomenten apart.')
+      const content = rows.join('\\n') + '\\n'
+      if (new TextEncoder().encode(content).length > 128000)
+        throw new Error('De persoonlijke berekening is te groot om lokaal te exporteren.')
+      const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-mijn-ongeverifieerde-plus-deka-vergelijking.txt'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setImportMessage('Volledige persoonlijke rekenvergelijking lokaal bewaard. Geen onafhankelijk geverifieerde winkelprijzen.')
+    } catch (error) {
+      setImportMessage(error instanceof Error ? error.message :
+        'Kon de persoonlijke winkelvergelijking niet lokaal bewaren.')
+    }
+  }
   function applyTable() {
     try {
       const imported = readPastedTable(importText, needs)
@@ -175,6 +231,11 @@ export function ManualStoreComparison({
           <div className="manual-compare__actions">
             <button className="ghost-button" type="button" onClick={() => setShowTable(value => !value)}>
               {showTable ? 'Verberg Excel-tabel' : 'Tabel kopiëren of importeren'}
+            </button>
+            <button className="ghost-button" type="button"
+              disabled={!summary.fullBasket}
+              onClick={downloadMyCalculatedComparison}>
+              Download mijn complete berekening (TXT)
             </button>
             <button className="ghost-button" type="button" onClick={() => {
               setEntries({})
