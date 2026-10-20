@@ -730,20 +730,28 @@ export function OfflineReviewedWorkbench({
       // Two valid but distant store sources also cannot be compared. Ask
       // for recapture of the older shop rather than just unmatched SKU rows.
       const other = currentPreview.stores.find(item => item.retailer !== store)
-      if (other && !currentPreview.pairedWithin24h &&
-          source.observedNs < (other.observedNs ?? source.observedNs))
+      const retained = currentPreview.retainedOther
+      if ((other && !currentPreview.pairedWithin24h &&
+            other.observedNs !== undefined && source.observedNs < other.observedNs) ||
+          (retained && retained.retailer !== store && !retained.within24h &&
+            source.observedNs < retained.observedNs)) {
         return plannerCaptureNeeds
+      }
       const unresolved = new Set(source.matching?.lines.filter(line =>
         line.status === 'unresolved').map(line => line.id) ?? [])
       return plannerCaptureNeeds.filter(need => unresolved.has(need.id))
     }
-    // A fresh, truly paired retained shop needs no new capture. An old or
-    // >24h-distant source requires a new complete physical observation.
+    // With one new upload and one retained capture, a 24-hour mismatch
+    // requires a repeat of the OLDER shop, not always the retained shop.
+    // Never instruct the shopper to replace a newer, still-valid observation.
     if (imported?.captures[store]) {
       const kept = currentPreview.retainedOther
-      return kept?.retailer === store &&
-        (!kept.within24h || !freshPreviewInstant(kept.observedNs))
-        ? plannerCaptureNeeds : []
+      if (!kept || kept.retailer !== store) return plannerCaptureNeeds
+      if (!freshPreviewInstant(kept.observedNs)) return plannerCaptureNeeds
+      const incoming = currentPreview.stores.find(item => item.retailer !== store)
+      if (!kept.within24h && incoming?.observedNs !== undefined &&
+          kept.observedNs < incoming.observedNs) return plannerCaptureNeeds
+      return []
     }
     return plannerCaptureNeeds
   }
