@@ -371,6 +371,30 @@ export function ManualShoppingNotes({ notes, setNotes }: {
     setMessage(groupStore + ': alleen de zichtbare persoonlijke boodschappen ' +
       (checked ? 'afgevinkt.' : 'weer opengezet.') + ' Geen prijzen veranderd.')
   }
+  function moveOwnNoteWithinStore(id: string, direction: -1 | 1) {
+    // Order is private presentation data, never a change in product identity,
+    // retailer provenance, quantities, source prices or checklist state.
+    const sameStore = notes.filter(item => item.store === notes.find(note => note.id === id)?.store)
+    const position = sameStore.findIndex(item => item.id === id)
+    const neighbor = sameStore[position + direction]
+    const moving = sameStore[position]
+    if (!moving || !neighbor || onlyOpen || needle) return
+    setNotes(current => {
+      const left = current.findIndex(item => item.id === moving.id)
+      const right = current.findIndex(item => item.id === neighbor.id)
+      if (left < 0 || right < 0) return current
+      const latest = current.filter(item => item.store === moving.store)
+      const currentPosition = latest.findIndex(item => item.id === moving.id)
+      if (latest[currentPosition + direction]?.id !== neighbor.id ||
+          current[left].label !== moving.label || current[left].done !== moving.done ||
+          current[right].label !== neighbor.label || current[right].done !== neighbor.done ||
+          current[right].store !== moving.store) return current
+      const reordered = [...current]
+      ;[reordered[left], reordered[right]] = [reordered[right], reordered[left]]
+      return reordered
+    })
+    setMessage('Persoonlijke boodschappenvolgorde aangepast. TXT en print volgen de winkelvolgorde; originele bronprijzen blijven onaangeroerd.')
+  }
   function moveVisibleOwnNotes(from: UnpricedShoppingNote['store']) {
     const target = moveTargets[from]
     const candidates = visible.filter(note => note.store === from)
@@ -554,6 +578,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
         {nextOpenStore ? 'Ga naar eerstvolgende open winkel: ' + nextOpenStore : 'Alle zichtbare boodschappen klaar'}
       </button>
     </nav>
+    <p className="manual-shopping-notes__order-hint">Orden je eigen artikelen binnen een winkel met ↑ en ↓. Zet zoeken en 'Alleen open' uit om de hele volgorde te bewerken; kopie, TXT en print nemen jouw volgorde over.</p>
     <div className="manual-shopping-notes__groups" aria-label="Boodschappen per winkel">
       {grouped.map(group => <section className="manual-shopping-notes__group" key={group.store}
         id={'supa-own-trip-' + group.store} tabIndex={-1}
@@ -609,6 +634,17 @@ export function ManualShoppingNotes({ notes, setNotes }: {
           onChange={() => setNotes(current => current.map(item => item.id === note.id
             ? { ...item, done: !item.done } : item))} />
           <span>{note.label} <small>· {note.store} · prijs onbekend</small></span></label>
+        <div className="manual-shopping-notes__ordering" role="group"
+          aria-label={`Volgorde van ${note.label} bij ${group.store}`}>
+          <button type="button" aria-label={`Zet ${note.label} hoger bij ${group.store}`}
+            title="Eerder in deze winkel"
+            disabled={onlyOpen || !!needle || group.items[0]?.id === note.id}
+            onClick={() => moveOwnNoteWithinStore(note.id, -1)}>↑</button>
+          <button type="button" aria-label={`Zet ${note.label} lager bij ${group.store}`}
+            title="Later in deze winkel"
+            disabled={onlyOpen || !!needle || group.items.at(-1)?.id === note.id}
+            onClick={() => moveOwnNoteWithinStore(note.id, 1)}>↓</button>
+        </div>
         <button type="button" onClick={() => setEditing({ id: note.id,
           initialLabel: note.label, initialStore: note.store, label: note.label, store: note.store })}
           aria-label={`Bewerk ${note.label}`}>Bewerk</button>
