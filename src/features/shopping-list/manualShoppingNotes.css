@@ -58,3 +58,9 @@
 .manual-shopping-notes__assign select { min-width:140px; }
 .manual-shopping-notes__assign small { flex-basis:100%; color:#425c4b; }
 .manual-shopping-notes__assign button { min-height:44px; }
+
+.manual-shopping-notes__trip-nav { display:grid; gap:.65rem; padding:1rem; border:1px solid #b9d5be; border-radius:13px; background:#f5fbf6; }
+.manual-shopping-notes__trip-nav-stores { display:flex; gap:.5rem; flex-wrap:wrap; }
+.manual-shopping-notes__trip-nav > button { justify-self:start; }
+.manual-shopping-notes__trip-nav button:disabled { opacity:.55; cursor:not-allowed; }
+.manual-shopping-notes__group:focus { outline:3px solid #236d4d; outline-offset:3px; }

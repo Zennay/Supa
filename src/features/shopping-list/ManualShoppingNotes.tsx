@@ -298,6 +298,12 @@ export function ManualShoppingNotes({ notes, setNotes }: {
   const grouped = shopRoute.map(groupStore => ({
     store: groupStore, items: visible.filter(note => note.store === groupStore),
   })).filter(group => group.items.length > 0)
+  const nextOpenStore = grouped.find(group => group.items.some(item => !item.done))?.store ?? null
+  function goToStore(groupStore: UnpricedShoppingNote['store']) {
+    const target = document.getElementById('supa-own-trip-' + groupStore)
+    target?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    target?.focus({ preventScroll: true })
+  }
   const visibleIds = new Set(visible.map(note => note.id))
   const remainingVisible = visible.filter(note => !note.done).length
   const completedVisible = visible.length - remainingVisible
@@ -455,8 +461,23 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       </button>
       <small>Alleen de huidige winkel- en open-filterselectie. Geen prijzen of bronmomenten wijzigen.</small>
     </div>
+    <nav className="manual-shopping-notes__trip-nav" aria-label="Mijn persoonlijke winkelroute">
+      <strong>Winkelroute · alleen mijn eigen ongeprijsde artikelen</strong>
+      <div className="manual-shopping-notes__trip-nav-stores">
+        {grouped.map(group => <button type="button" key={group.store}
+          onClick={() => goToStore(group.store)}>
+          {group.store} · {group.items.filter(item => !item.done).length} open / {group.items.length}
+        </button>)}
+      </div>
+      <button type="button" disabled={!nextOpenStore} onClick={() => {
+        if (nextOpenStore) goToStore(nextOpenStore)
+      }}>
+        {nextOpenStore ? 'Ga naar eerstvolgende open winkel: ' + nextOpenStore : 'Alle zichtbare boodschappen klaar'}
+      </button>
+    </nav>
     <div className="manual-shopping-notes__groups" aria-label="Boodschappen per winkel">
       {grouped.map(group => <section className="manual-shopping-notes__group" key={group.store}
+        id={'supa-own-trip-' + group.store} tabIndex={-1}
         aria-label={'Eigen ongeprijsde boodschappen bij ' + group.store}>
         <header className="manual-shopping-notes__group-heading">
           <h3>{group.store}</h3>
