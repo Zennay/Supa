@@ -50,6 +50,7 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOp
   const [order, setOrder] = useState<'source' | 'unitPrice' | 'lineTotal' | 'priceGap'>('source')
   const [checkMessage, setCheckMessage] = useState('')
   const [showPasteSource, setShowPasteSource] = useState(false)
+  const [expandedMatchShop, setExpandedMatchShop] = useState<OwnStore | null>(null)
   const [nowMs, setNowMs] = useState(() => Date.now())
   useEffect(() => {
     const refresh = () => setNowMs(Date.now())
@@ -184,6 +185,10 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOp
         const missing = recent ? partial?.missingIngredients ?? [] : []
         const pending = recent ? partial?.awaitingReviewIngredients ?? [] : []
         const next = recent ? (pending[0] ?? missing[0]) : null
+        const queued = [...pending.map(item => ({ ...item, task: 'Te beoordelen' })),
+          ...missing.map(item => ({ ...item, task: 'Ontbrekende bronprijs' }))]
+          .filter((item, index, all) => all.findIndex(row => row.id === item.id) === index)
+        const visibleQueued = expandedMatchShop === shop ? queued : queued.slice(0, 4)
         return <article key={shop}>
           <header><h3>{shop}</h3><span>{full ? 'Volledig gecontroleerd'
             : partial && !recent ? 'Opname vernieuwen'
@@ -199,6 +204,31 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, budget, onOp
               <p>{missing.length} ontbreken; {pending.length} vragen review.
                 Zonder volledig mandje blijft het prijsverschil onbekend.</p>
               {next && <p><strong>Volgend product:</strong> {next.label}</p>}
+              {queued.length > 0 && <div className="private-reviewed-products__match-queue">
+                <strong>Openstaande productmatching · {queued.length} unieke ingrediënten</strong>
+                <ul>{visibleQueued.map(item => <li key={item.id}>
+                  <div><strong>{item.label}</strong>
+                    <small>{item.task} · {item.amount ?? 'hoeveelheid onbekend'} {item.unit ?? ''}</small>
+                  </div>
+                  <button type="button" onClick={() => {
+                    // The cached queue is only a navigation aid. Expired
+                    // observations never authorize new prices or a review.
+                    if (!recentOwnCaptureInstant(partial!.observedAt, Date.now())) {
+                      setCheckMessage('De eigen bron van ' + shop +
+                        ' is verlopen. Open Vergelijk voor een nieuwe opname.')
+                      onOpenComparison()
+                      return
+                    }
+                    onReviewIngredient(shop, item.id)
+                  }}>Controleer dit artikel</button>
+                </li>)}</ul>
+                {queued.length > 4 && <button type="button"
+                  aria-expanded={expandedMatchShop === shop}
+                  onClick={() => setExpandedMatchShop(old => old === shop ? null : shop)}>
+                  {expandedMatchShop === shop ? 'Toon minder' :
+                    'Toon alle ' + queued.length + ' openstaande artikelen'}
+                </button>}
+              </div>}
             </> : <p>Geen actuele, volledige prijsdekking. Bedragen blijven onbekend.</p>}
           <button type="button" onClick={() => {
             // A tab wake-up cannot reuse an expired approval as live evidence.
