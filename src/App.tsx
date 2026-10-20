@@ -872,6 +872,12 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         {tab === 'list' && (
           <nav className="screen" aria-label="Snelle acties voor je boodschappenlijst">
             <button type="button" className="ghost-button" onClick={() =>
+              document.getElementById('supa-manual-shopping-notes')?.scrollIntoView({
+                behavior: 'smooth', block: 'start',
+              })}>
+              Zelf losse boodschappen toevoegen ({manualShoppingNotes.length})
+            </button>
+            <button type="button" className="ghost-button" onClick={() =>
               document.getElementById('supa-own-extra-groceries')?.scrollIntoView({
                 behavior: 'smooth', block: 'start',
               })}>
@@ -952,7 +958,8 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         )}
         {visitedList && (
           <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
-            <section className="screen" aria-label="Eigen artikelen naast je boodschappenlijst">
+            <section id="supa-manual-shopping-notes" className="screen"
+              aria-label="Zelf toegevoegde artikelen zonder winkelprijs">
               <Suspense fallback={<p role="status">Eigen ongeprijsde boodschappen laden…</p>}>
                 <ManualShoppingNotes notes={manualShoppingNotes} setNotes={setManualShoppingNotes} />
               </Suspense>

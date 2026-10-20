@@ -23,9 +23,6 @@
 .manual-shopping-notes__bulk form { display:grid; gap:10px; margin-top:12px; }
 .manual-shopping-notes__bulk textarea { min-height:110px; border-radius:10px; padding:10px; border:1px solid #98b6a0; }
 
-.manual-shopping-notes__combined { padding:16px; border-radius:14px; background:#fff; border:1px solid #bed4c4; display:grid; gap:12px; }
-.manual-shopping-notes__combined h3 { margin:0; }
-.manual-shopping-notes__combined textarea { min-height:200px; }
 
 .manual-shopping-notes__session { background:#fff; border:1px solid #bed4c4; border-radius:12px; padding:12px; display:grid; gap:7px; }
 .manual-shopping-notes__session label { display:flex; gap:10px; align-items:center; }
