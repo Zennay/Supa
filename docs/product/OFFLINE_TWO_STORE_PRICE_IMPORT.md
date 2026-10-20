@@ -115,6 +115,12 @@ De TXT-/selecteerbare kopieertekst neemt nu ook de oorspronkelijke afvinkstatus 
 de winkelprijzen blijven altijd de volledige originele fysieke mand, niet alleen de nog
 open boodschappen. Afvinken is geen betalingsbewijs.
 
+Een weergegeven selecteerbare privétekst is een momentopname van
+de originele winkelbronnen én de afvinkstatus op dat moment. Zodra je
+een boodschappenartikel (ook bij de andere winkel) afvinkt of terugzet,
+wordt de eerder gemaakte kopieertekst verborgen totdat je deze opnieuw
+opvraagt. Zo verspreid je niet ongemerkt een verouderde lijst.
+
 Via **Bewaar printbaar volledig weekmandje (HTML)** krijg je een lokaal,
 scriptvrij document met de twee bronmomenten, oorspronkelijke SKU's,
 pakinhoud, pakprijzen, eenheidsprijzen, daadwerkelijke hele-pakkentotalen en

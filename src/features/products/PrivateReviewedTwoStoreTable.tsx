@@ -38,9 +38,15 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   const reviewedRef = useRef(reviewed)
   reviewedRef.current = reviewed
   const [receiptMessage, setReceiptMessage] = useState('')
+  // Manual-copy text contains checkbox state; invalidate it if the shopper
+  // changes any original line after generating the displayed private text.
+  const checkedSignature = Object.entries(checked)
+    .filter(([, selected]) => selected === true)
+    .map(([id]) => id).sort().join('\n')
   const [manualCopy, setManualCopy] = useState<{
     text: string
     label: string
+    checkedSignature: string
     planKey: string
     plus: PrivateReviewedBasket | null
     deka: PrivateReviewedBasket | null
@@ -131,7 +137,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         throw Error('Eigen winkelbron is veranderd.')
       setManualCopy({
         text, label: shop + (onlyOpen ? ' · alleen nog te kopen' : ' · volledige privéweekmand'),
-        planKey: current.planKey, plus: current.stores.PLUS ?? null,
+        checkedSignature, planKey: current.planKey, plus: current.stores.PLUS ?? null,
         deka: current.stores.DekaMarkt ?? null,
       })
       setReceiptMessage('Selecteer de persoonlijke tekst hieronder om zelf te kopiëren of te delen.')
@@ -244,7 +250,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
           latest.planKey !== current.planKey) throw Error('De bronnen zijn veranderd.')
       setManualCopy({
         text, label: 'PLUS / DekaMarkt · volledig eigen weekmandje',
-        planKey: current.planKey, plus: current.stores.PLUS,
+        checkedSignature, planKey: current.planKey, plus: current.stores.PLUS,
         deka: current.stores.DekaMarkt,
       })
       setReceiptMessage('Selecteer de volledige persoonlijke vergelijking hieronder om zelf te kopiëren.')
@@ -260,7 +266,8 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       ? money.format((totalCents - budgetCents) / 100) + ' boven je Planner-weekbudget'
       : money.format((budgetCents - totalCents) / 100) + ' binnen je Planner-weekbudget'
   const fresh = freshReviewedBaskets(reviewed, reviewed.planKey, Date.now())
-  const manualCopyVisible = manualCopy?.planKey === reviewed.planKey &&
+  const manualCopyVisible = manualCopy?.checkedSignature === checkedSignature &&
+    manualCopy.planKey === reviewed.planKey &&
     manualCopy.plus === (fresh?.stores.PLUS ?? null) &&
     manualCopy.deka === (fresh?.stores.DekaMarkt ?? null) ? manualCopy : null
   const plus = fresh?.stores.PLUS
@@ -368,6 +375,9 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       {receiptMessage && <p role="status">{receiptMessage}</p>}
       {manualCopyVisible && <PrivateManualShareText key={manualCopyVisible.text}
         text={manualCopyVisible.text} label={manualCopyVisible.label} />}
+      {manualCopy && !manualCopyVisible && <p role="status">
+        De oorspronkelijke bron of afvinkstatus is gewijzigd. Maak je kopieertekst opnieuw.
+      </p>}
       <button type="button" onClick={onOpenComparison}>Open bronimport en productmatching</button>
       <small>Geen kassagarantie of onafhankelijk bewezen besparing. Een onbekende prijs is niet nul.</small>
     </section>
@@ -524,6 +534,9 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       {receiptMessage && <p role="status">{receiptMessage}</p>}
       {manualCopyVisible && <PrivateManualShareText key={manualCopyVisible.text}
         text={manualCopyVisible.text} label={manualCopyVisible.label} />}
+      {manualCopy && !manualCopyVisible && <p role="status">
+        De oorspronkelijke bron of afvinkstatus is gewijzigd. Maak je kopieertekst opnieuw.
+      </p>}
     </div>
     <div className="private-reviewed-products__advantage-filter"
       role="group" aria-label="Filter persoonlijk gecontroleerde regelprijzen per winkel">
