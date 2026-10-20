@@ -5,7 +5,7 @@ import { privatePackUnitRate, privateUnitPrice } from '../comparison/privateUnit
 import './plannerPriceBreakdown.css'
 
 import { euro as exactEuro } from '../../lib/money.ts'
-type DifferenceFilter = 'all' | 'PLUS' | 'DekaMarkt' | 'equal'
+type DifferenceFilter = 'all' | 'PLUS' | 'DekaMarkt' | 'equal' | 'unit-PLUS' | 'unit-DekaMarkt'
 type DifferenceSort = 'impact' | 'unit-gap' | 'ingredient' | 'plus-price' | 'deka-price'
 
 function PriceEvidence({ line }: { line: ComparedOwnLine['plus'] }) {
@@ -72,11 +72,15 @@ export function PlannerOwnProductDeltas({ lines, onChooseLine }: {
   const plusLower = lines.filter(line => line.deltaCents > 0).length
   const dekaLower = lines.filter(line => line.deltaCents < 0).length
   const tied = lines.length - plusLower - dekaLower
+  const unitPlusLower = lines.filter(line => unitPriceGap(line)?.cheaper === 'PLUS').length
+  const unitDekaLower = lines.filter(line => unitPriceGap(line)?.cheaper === 'DekaMarkt').length
   const normalizedQuery = query.normalize('NFKC').trim().toLocaleLowerCase('nl')
   const visibleLines = lines.filter(line => {
     if (filter === 'PLUS' && line.deltaCents <= 0) return false
     if (filter === 'DekaMarkt' && line.deltaCents >= 0) return false
     if (filter === 'equal' && line.deltaCents !== 0) return false
+    if (filter === 'unit-PLUS' && unitPriceGap(line)?.cheaper !== 'PLUS') return false
+    if (filter === 'unit-DekaMarkt' && unitPriceGap(line)?.cheaper !== 'DekaMarkt') return false
     if (!normalizedQuery) return true
     return [line.ingredientLabel, line.plus.productName, line.deka.productName,
       line.plus.productId, line.deka.productId]
@@ -109,7 +113,9 @@ export function PlannerOwnProductDeltas({ lines, onChooseLine }: {
     <summary>Bekijk {lines.length} productprijzen, verpakkingen en regelverschillen</summary>
     <p>Per ingrediënt het originele, persoonlijk gecontroleerde winkelproduct. Eenheidsprijzen
       zijn indicatief per kg, liter of stuk; de vergelijking rekent met hele verpakkingen.
-      Filters en volgorde wijzigen jouw winkelmandje niet.</p>
+      Je kunt zowel op hele-verpakkingenregelprijs als op indicatieve eenheidsprijs zoeken,
+      filteren en sorteren. Alleen hele verpakkingen tellen mee voor de werkelijke manduitkomst;
+      filters en volgorde wijzigen de mand niet.</p>
     <div className="own-store-breakdown__overview" aria-label="Prijsverschillen per product">
       <span><strong>{plusLower}</strong> ingrediënten goedkoper bij PLUS</span>
       <span><strong>{dekaLower}</strong> ingrediënten goedkoper bij DekaMarkt</span>
@@ -127,6 +133,8 @@ export function PlannerOwnProductDeltas({ lines, onChooseLine }: {
           <option value="PLUS">PLUS goedkoper ({plusLower})</option>
           <option value="DekaMarkt">DekaMarkt goedkoper ({dekaLower})</option>
           <option value="equal">Gelijke regelprijs ({tied})</option>
+          <option value="unit-PLUS">Lagere eenheidsprijs bij PLUS ({unitPlusLower})</option>
+          <option value="unit-DekaMarkt">Lagere eenheidsprijs bij DekaMarkt ({unitDekaLower})</option>
         </select>
       </label>
       <label>Sorteer
