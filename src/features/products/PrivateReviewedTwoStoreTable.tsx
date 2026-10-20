@@ -641,14 +641,18 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         }
         const a = shopCell('PLUS')
         const b = shopCell('DekaMarkt')
-        const delta = a.price !== null && b.price !== null
+        // Two recent individual receipts are NOT necessarily a paired
+        // observation. An offset beyond 24h must never yield a delta.
+        const pairedNow = !!left && !!right &&
+          privateReviewedPairWithin24Hours(left, right)
+        const delta = pairedNow && a.price !== null && b.price !== null
           ? b.price - a.price : null
         rows.push([need.id, need.ingredientLabel,
           need.requirement.amount === null ? '' : String(need.requirement.amount),
           need.requirement.unit, ...a.values, ...b.values,
           delta !== null && Number.isSafeInteger(delta) ? String(delta) : '',
-          delta === null ? 'Prijsverschil onbekend' : 'Eigen gecontroleerde regelprijzen'])
-      }
+          delta === null ? 'Prijsverschil onbekend (onvolledig of verschillende bronmomenten)' :
+            'Eigen gecontroleerde regelprijzen'])      }
       try {
         const { partialReviewedPricePrintHtml } =
           await import('../comparison/partialReviewedPrintHtml.ts')
