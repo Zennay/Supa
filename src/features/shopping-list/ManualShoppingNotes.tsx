@@ -582,6 +582,39 @@ export function ManualShoppingNotes({ notes, setNotes }: {
     ...routeItems.map(note => (note.done ? '☑ ' : '☐ ') + `[${note.store}] ${safeLabel(note.label)} · prijs onbekend`),
     '', 'Geen winkelprijs, bronrecht of besparingsclaim.',
   ].join('\n') + '\n'
+  async function sharePersonalShoppingList() {
+    if (!visible.length) return
+    // Only the currently visible personal notes are shared, after an explicit
+    // tap. Never include an imported retailer price, SKU, source or budget.
+    // The OS share sheet is user-controlled; Supa does not transmit the text.
+    if (typeof navigator.share !== 'function') {
+      setExportVisible(true)
+      setMessage('Delen is niet beschikbaar in deze browser. Selecteer hieronder jouw privéboodschappen om ze te kopiëren.')
+      return
+    }
+    try {
+      await navigator.share({ title: 'Mijn eigen ongeprijsde boodschappen', text: exportText })
+      setMessage('Je zichtbare persoonlijke boodschappen zijn via het deelmenu aangeboden.')
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        setMessage('Delen geannuleerd; je persoonlijke boodschappen zijn niet aangepast.')
+      } else {
+        setExportVisible(true)
+        setMessage('Delen werd niet toegestaan. De geselecteerde kopieertekst staat hieronder, zonder prijsinformatie.')
+      }
+    }
+  }
+  async function copyPersonalShoppingList() {
+    if (!visible.length) return
+    try {
+      if (typeof navigator.clipboard?.writeText !== 'function') throw new Error('clipboard unavailable')
+      await navigator.clipboard.writeText(exportText)
+      setMessage('Alleen je zichtbare ongeprijsde boodschappen zijn gekopieerd.')
+    } catch {
+      setExportVisible(true)
+      setMessage('Automatisch kopiëren is niet toegestaan. Selecteer de privétekst hieronder om zelf te kopiëren.')
+    }
+  }
   function downloadPrintableList() {
     if (!visible.length) return
     // Static local HTML only: encode all user text and deny external resources.
@@ -859,6 +892,12 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       <button type="button" disabled={!visible.length} onClick={() => setExportVisible(value => !value)}>
         {exportVisible ? 'Verberg kopieertekst' : 'Toon kopieertekst'}</button>
       <button type="button" disabled={!visible.length} onClick={download}>Download lijst (TXT)</button>
+      <button type="button" disabled={!visible.length} onClick={() => void copyPersonalShoppingList()}>
+        Kopieer zichtbare lijst
+      </button>
+      <button type="button" disabled={!visible.length} onClick={() => void sharePersonalShoppingList()}>
+        Deel zichtbare lijst (mobiel)
+      </button>
       <button type="button" disabled={!visible.length} onClick={downloadPrintableList}>
         Offline afdrukbare lijst (HTML)
       </button>
