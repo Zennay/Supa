@@ -6,7 +6,7 @@ export type ManualRetailer = 'PLUS' | 'DekaMarkt'
 export type ManualQuote = Readonly<{
   product: string
   packAmount: string
-  packUnit: MatchUnit
+  packUnit: MatchUnit | ''
   price: string
 }>
 export type ManualEntries = Record<string, ManualQuote>
@@ -74,7 +74,7 @@ function evaluatedQuote(need: ManualNeed, quote: ManualQuote | undefined) {
   }
   const packs = calculateDecimalPackCount(
     [{ amount: need.amount, unit: need.unit }],
-    { amount, unit: quote.packUnit, count: 1 },
+    { amount, unit: quote.packUnit as MatchUnit, count: 1 },
   )
   if (packs === null || packs > 10000 || !Number.isSafeInteger(packs * cents) ||
       packs * cents > 100000000) {
