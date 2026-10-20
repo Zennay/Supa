@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
-import { freshReviewedBaskets, type PrivateReviewedBaskets, type PrivateCaptureProgress, type OwnStore, type PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
+import { freshReviewedBaskets, recentOwnCaptureInstant, type PrivateReviewedBaskets, type PrivateCaptureProgress, type OwnStore, type PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
 import { privatePriceAgeNotice } from '../comparison/privatePriceAgeNotice.ts'
 import { currentPrivateRouteChoice } from '../comparison/privateRouteChoice.ts'
 import { parsePrivateExtraVisitCostCents } from '../comparison/privateExtraVisitCost.ts'
@@ -519,6 +519,7 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
           <small>{capture ? `Eigen opname: ${capture.observedAt}` : 'Nog geen complete, gecontroleerde opname'}</small>
           {captureProgress?.stores[store] && !capture && (() => {
             const progress = captureProgress.stores[store]!
+            const sourceFresh = progress.fresh && recentOwnCaptureInstant(progress.observedAt, now)
             const partial = confirmedPartialBasket(captureProgress, store, now)
             return <div className="own-store-planner__capture-status" role="status">
               <small>Eigen bron: {progress.observedAt} · {progress.originalProductCount} originele SKU’s.</small>
@@ -565,10 +566,10 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
                 {progress.autoMatchedLineCount} eenduidige productmatch(es) automatisch gekoppeld.
                 {' '}Alleen onzekere artikelen moet je nog beoordelen.
               </small>}
-              <small>{progress.fresh
+              <small>{sourceFresh
                 ? 'Nog niet volledig gekoppeld: prijs en budget blijven onbekend.'
                 : 'Bronopname te oud of toekomstig: vernieuw de echte bron voordat prijzen meetellen.'}</small>
-              {progress.fresh && progress.missingIngredients.length > 0 &&
+              {sourceFresh && progress.missingIngredients.length > 0 &&
                 <div className="own-store-planner__review-queue" aria-label={'Ontbrekende bronproducten bij ' + store}>
                   <strong>Zoek echte bronproducten</strong>
                   {progress.missingIngredients.slice(0, 5).map(item =>
@@ -580,7 +581,7 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
                   {progress.missingIngredients.length > 5 &&
                     <small>En {progress.missingIngredients.length - 5} andere zonder match.</small>}
                 </div>}
-              {progress.fresh && progress.awaitingReviewIngredients.length > 0 &&
+              {sourceFresh && progress.awaitingReviewIngredients.length > 0 &&
                 <div className="own-store-planner__review-queue" aria-label={'Te controleren winkelproducten bij ' + store}>
                   <strong>Controleer originele SKU, verpakking en pakprijs</strong>
                   {progress.awaitingReviewIngredients.slice(0, 5).map(item =>
