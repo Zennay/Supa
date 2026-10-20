@@ -161,17 +161,17 @@ export function ImportedRecipeGroceriesPanel({
     })
     setChecked({}); setFeedback('')
   }
-  // Match only identical, personally reviewed physical ingredient identities
-  // from the existing recipe-to-Planner projector. No substitution, unit
-  // conversion, stock or saving amount is inferred from this display hint.
+  // Suggest reuse only for the same canonical physical identity AND label.
+  // A matching query+unit with different source labels is a source conflict,
+  // not an approved substitution or already available inventory.
   const selectedPhysicalKeys = new Set(selected.flatMap(recipe =>
     (toPlannerRecipe(recipe, { usage: 'unpriced-demand' })?.ingredients ?? [])
-      .map(item => JSON.stringify([item.query, item.unit]))))
+      .map(item => JSON.stringify([item.query, item.unit, item.label]))))
   const sharedPhysicalIngredients = (recipe: SavedRecipe): string[] => {
     if (selectedIds.includes(recipe.id) || !selectedPhysicalKeys.size) return []
     const shared = new Map<string, string>()
     for (const ingredient of toPlannerRecipe(recipe, { usage: 'unpriced-demand' })?.ingredients ?? []) {
-      const key = JSON.stringify([ingredient.query, ingredient.unit])
+      const key = JSON.stringify([ingredient.query, ingredient.unit, ingredient.label])
       if (selectedPhysicalKeys.has(key) && !shared.has(key))
         shared.set(key, ingredient.label + ' (' + ingredient.unit + ')')
     }
