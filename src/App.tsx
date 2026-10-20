@@ -50,7 +50,7 @@ import {
 } from './domain/plannerPreferences'
 import { unavailablePlannerRecipes, previewAvailablePlannerMeals } from './domain/unavailablePlannerRecipes.ts'
 import { privatePhysicalPlanIdentity, privateWeekShareIdentity } from './domain/privatePhysicalPlanIdentity.ts'
-import { saveReplacedPlannerRecipes } from './features/planner/saveReplacedPlannerRecipes.ts'
+import { saveReplacedPlannerRecipes, missingStoredOwnRecipeSelections } from './features/planner/saveReplacedPlannerRecipes.ts'
 import { restorePlannerPreferencesWithCustomBudget } from './features/planner/customWeekBudget.ts'
 import { canReplacePlannerRecord, persistPlannerRecord } from './features/planner/plannerStorageGuard.ts'
 import {
@@ -130,8 +130,15 @@ function readPlannerPreferences(validRecipeIds = availableRecipes().map(recipe =
   }
   try {
     const raw = window.localStorage.getItem(plannerStorageKey)
+    const restored = restorePlannerPreferencesWithCustomBudget(raw, m2InitialPlan, validRecipeIds)
+    const missing = missingStoredOwnRecipeSelections(raw, m2InitialPlan, validRecipeIds)
     return {
-      preferences: restorePlannerPreferencesWithCustomBudget(raw, m2InitialPlan, validRecipeIds),
+      // Missing OWN recipe IDs remain a read-only, in-memory repair intent.
+      // The actual week uses its existing safe temporary built-in fallback
+      // and only a deliberate user action can update the protected v2 bytes.
+      preferences: Object.keys(missing).length
+        ? { ...restored, recipeByDay: { ...restored.recipeByDay, ...missing } }
+        : restored,
       warning: canReplacePlannerRecord(raw, m2InitialPlan.map((meal) => meal.day), validRecipeIds)
         ? null : 'protected',
       raw,
@@ -335,6 +342,18 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   function acceptMissingRecipeReplacements() {
     const remaining = unavailablePlannerRecipes(preferences, m2InitialPlan, recipes.map(recipe => recipe.id))
     if (!remaining.length) return
+    // A corrupt/unreadable recipe library can masquerade as a deleted
+    // private recipe. Never offer an irreversible replacement of its saved
+    // Planner references while that underlying library cannot be read.
+    try {
+      if (readRecipeLibrary(window.localStorage).error) {
+        setPlanRepairMessage('Je eigen receptbibliotheek is niet leesbaar. De oorspronkelijke weekkeuzes blijven bewaard. Herstel eerst de bibliotheek.')
+        return
+      }
+    } catch {
+      setPlanRepairMessage('Je eigen recepten zijn tijdelijk niet leesbaar. De eerdere Planner-keuzes blijven bewaard.')
+      return
+    }
     const repaired: PlannerPreferences = {
       ...preferences,
       recipeByDay: {
