@@ -111,8 +111,12 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       setSessionMessage('Browsertab-opslag geweigerd; gebruik een eigen JSON-backup.')
     }
   }
-  const [backupPreview, setBackupPreview] = useState<UnpricedShoppingNote[] | null>(null)
+  const [backupPreview, setBackupPreview] = useState<{
+    incoming: UnpricedShoppingNote[]; existing: string;
+    additions: UnpricedShoppingNote[]; duplicateCount: number;
+  } | null>(null)
   const [backupBusy, setBackupBusy] = useState(false)
+  const [lastBackupAdded, setLastBackupAdded] = useState<UnpricedShoppingNote[] | null>(null)
   const readVersion = useRef(0)
   function backupDownload() {
     try {
@@ -140,8 +144,12 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       const source = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
       const parsed = normalizePrivateNotes(JSON.parse(source))
       const merged = mergePrivateNotes(notes, parsed)
-      setBackupPreview(parsed)
-      setMessage(merged.added + ' nieuwe boodschappen gevonden. Controleer en bevestig de import.')
+      setBackupPreview({
+        incoming: parsed, existing: serializePrivateNotes(notes),
+        additions: merged.notes.slice(notes.length),
+        duplicateCount: parsed.length - merged.added,
+      })
+      setMessage(merged.added + ' nieuwe boodschappen gevonden. Controleer de winkellijsten en bevestig de import.')
     } catch (error) {
       if (version === readVersion.current) setMessage(error instanceof Error ? error.message : 'Kon backup niet inlezen.')
     } finally { if (version === readVersion.current) setBackupBusy(false) }
@@ -149,16 +157,41 @@ export function ManualShoppingNotes({ notes, setNotes }: {
   function backupConfirm() {
     if (!backupPreview) return
     try {
-      const merged = mergePrivateNotes(notes, backupPreview)
-      setNotes(current => {
-        try { return mergePrivateNotes(current, backupPreview).notes }
-        catch { return current }
-      })
+      if (backupPreview.existing !== serializePrivateNotes(notes)) {
+        setBackupPreview(null)
+        setMessage('De lijst is na de voorinzage veranderd. Open de backup opnieuw om niets onverwachts toe te voegen.')
+        return
+      }
+      const merged = mergePrivateNotes(notes, backupPreview.incoming)
+      if (serializePrivateNotes(merged.notes) !==
+          serializePrivateNotes([...notes, ...backupPreview.additions])) {
+        throw Error('De backupvoorinzage is niet meer actueel.')
+      }
+      const previous = backupPreview.existing
+      setNotes(current => serializePrivateNotes(current) === previous ? merged.notes : current)
+      setLastBackupAdded(backupPreview.additions)
       setBackupPreview(null)
       setMessage(merged.added + ' boodschappen toegevoegd; bestaande items en vinkjes behouden.')
     } catch (error) {
+      setBackupPreview(null)
       setMessage(error instanceof Error ? error.message : 'Import geweigerd.')
     }
+  }
+
+  function undoBackupImport() {
+    if (!lastBackupAdded?.length) return
+    const ids = new Set(lastBackupAdded.map(item => item.id))
+    const same = (a: UnpricedShoppingNote, b: UnpricedShoppingNote) =>
+      a.id === b.id && a.label === b.label && a.store === b.store && a.done === b.done
+    if (lastBackupAdded.some(item => !notes.some(current => same(current, item)))) {
+      setLastBackupAdded(null)
+      setMessage('Backup-import is intussen gewijzigd. Herstellen geweigerd om je bewerkingen te bewaren.')
+      return
+    }
+    setNotes(current => lastBackupAdded.every(item => current.some(row => same(row, item)))
+      ? current.filter(item => !ids.has(item.id)) : current)
+    setLastBackupAdded(null)
+    setMessage('Alleen de laatst toegevoegde backupartikelen zijn uit je persoonlijke lijst gehaald. Andere boodschappen en prijzen blijven intact.')
   }
 
   async function readBulkText(file?: File) {
@@ -834,15 +867,27 @@ export function ManualShoppingNotes({ notes, setNotes }: {
     </div>
     {backupPreview && <div className="manual-shopping-notes__backup" role="group"
       aria-label="Voorbeeld van de boodschappenbackup">
-      <strong>Privébackup klaar: {backupPreview.length} artikelen</strong>
+      <strong>Privébackup: {backupPreview.incoming.length} artikelen, waarvan {backupPreview.additions.length} nieuw</strong>
+      <p>{backupPreview.duplicateCount} bestaande of dubbele artikelen overgeslagen. De voorinzage is alleen geldig zolang jouw lijst onveranderd blijft.</p>
+      {backupPreview.additions.length > 0 && <ul>
+        {backupPreview.additions.slice(0, 15).map(item => <li key={item.id}>
+          {item.done ? '☑' : '☐'} [{item.store}] {item.label}
+        </li>)}
+        {backupPreview.additions.length > 15 &&
+          <li>En {backupPreview.additions.length - 15} andere nieuwe boodschappen.</li>}
+      </ul>}
       <p>Bestaande artikelen en vinkjes worden niet overschreven. Dubbelen met een ander ID
         maar dezelfde winkel en omschrijving worden overgeslagen. Conflicterende IDs en meer
         dan 100 artikelen worden geweigerd. Niets wordt geüpload of geprijsd.</p>
-      <button type="button" onClick={backupConfirm}>Bevestig toevoegen aan mijn lijst</button>
+      <button type="button" disabled={!backupPreview.additions.length} onClick={backupConfirm}>Bevestig {backupPreview.additions.length} nieuwe boodschappen</button>
       <button type="button" onClick={() => { readVersion.current++; setBackupPreview(null) }}>
         Annuleer import
       </button>
     </div>}
+    {lastBackupAdded && lastBackupAdded.length > 0 &&
+      <button type="button" className="ghost-button" onClick={undoBackupImport}>
+        Herstel laatste JSON-import ({lastBackupAdded.length} eigen artikelen)
+      </button>}
     {exportVisible && visible.length > 0 && <label>Kopieer mijn ongeprijsde boodschappen
       <textarea rows={Math.min(selected.length + 6, 15)} readOnly value={exportText}
         onFocus={event => event.currentTarget.select()} /></label>}
