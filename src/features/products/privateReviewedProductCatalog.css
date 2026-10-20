@@ -93,3 +93,10 @@ background:#e7f4eb;color:#255336;font-weight:650}
 .private-reviewed-products__trip-cost p{line-height:1.5}
 .private-reviewed-products__trip-cost [role=alert]{color:#8b3b23;font-weight:650}
 .private-reviewed-products__trip-cost small{line-height:1.45}
+
+.private-reviewed-products__manual-copy{display:grid;gap:.6rem;min-width:0;
+  border:1px solid #c5d8c7;padding:1rem;border-radius:12px;background:#f5faf6}
+.private-reviewed-products__manual-copy p{line-height:1.5;margin:0}
+.private-reviewed-products__manual-copy textarea{width:100%;box-sizing:border-box;
+  resize:vertical;min-height:140px;padding:.7rem;border-radius:8px;
+  font:13px/1.5 ui-monospace,monospace;white-space:pre-wrap;overflow-wrap:anywhere}

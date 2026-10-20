@@ -48,14 +48,13 @@ Dezelfde bestaande, strikte negenkoloms-CSV-converter is nu ook rechtstreeks via
 Wanneer je wel een volledig eigen PLUS- **of** DekaMarkt-mandje
 hebt gecontroleerd maar een vergelijkbare tweede bron nog ontbreekt,
 biedt **Producten → Vergelijk PLUS met DekaMarkt** per beschikbare
-winkel de afzonderlijke **CSV-/TXT-download**, **offline HTML-afdruk**, **kopieer**- en
-**deel**-acties aan. De export gebruikt dezelfde oorspronkelijke
+winkel de afzonderlijke **CSV-/TXT-download**, **offline HTML-afdruk**, **handmatig kopieerbare tekst**-acties aan. De export gebruikt dezelfde oorspronkelijke
 SKU's, echte bronmomenten, hele verpakkingsprijzen en de actuele
 vinkjes van die winkel. De winkeltekst toont de afvinkingen; ook de
 CSV bevat afzonderlijke velden voor afgevinkt. De scriptvrije offline HTML-afdruk toont
 het originele complete mandje, de afzonderlijke nog te kopen regels, hun
-originele eenheids- en pakprijzen en de geregistreerde brontijd. Het systeemklembord en
-de native deelactie worden uitsluitend bij je eigen klik aangeroepen.
+originele eenheids- en pakprijzen en de geregistreerde brontijd. Het lokale selecteerbare tekstvak is pas na een expliciete klik zichtbaar;
+je kopieert zelf via je apparaatmenu, zonder geprivilegieerde browserrechten.
 Er wordt geen tweede winkelprijs of besparing verzonnen.
 
 ## Volledig prijsrapport bewaren, printen of mobiel meenemen
@@ -66,8 +65,8 @@ producten en de *nog op de lijst* openstaande hele-pakkosten. De volledige
 mandtotalen blijven onveranderd: dit openstaande bedrag is geen kassabedrag
 en afvinken is geen prijs- of betalingsbewijs.
 
-Gebruik **Bewaar alleen nog te kopen (TXT)** of **Kopieer alleen nog te
-kopen** voor een compacte persoonlijke winkelroute. Deze tekst bevat
+Gebruik **Bewaar alleen nog te kopen (TXT)** of **Toon alleen nog te
+kopen om zelf te kopiëren** voor een compacte persoonlijke winkelroute. Deze tekst bevat
 alleen originele nog niet afgevinkte productregels en de prijscontext van
 de oorspronkelijke complete bron. Als alles is afgevinkt meldt de lijst
 expliciet dat er niets meer openstaat. De originele brondata, complete
@@ -89,7 +88,7 @@ als winkelprijs, kassabedrag of bewijs opgeslagen.
 Ook nadat beide volledige winkelbronnen vergelijkbaar zijn, blijft in
 **Producten → Zelfde weekmandje → Ik ga naar één winkel** de zelfstandige
 PLUS- of DekaMarkt-weeklijst bereikbaar. Je kunt elk winkelmandje afzonderlijk
-afdrukken, als CSV/TXT bewaren, kopiëren of met het apparaat delen.
+afdrukken, als CSV/TXT bewaren of als selecteerbare privétekst zelf kopiëren en delen.
 Dit is handig als je voor één winkel kiest in plaats van een gecombineerde route.
 De bestaande twee-winkelprijzen en andere winkelbron worden niet gewijzigd.
 
@@ -103,7 +102,7 @@ In de offline HTML-afdrukken toont Supa ook het ingestelde Planner-weekbudget
 (alleen bij een geldig bedrag) en hoeveel het originele volledige mandje erboven
 of eronder ligt. Afgevinkte bedragen zijn niet de betaalde kassasom.
 
-De TXT-/klembord-/deeltekst neemt nu ook de oorspronkelijke afvinkstatus per winkel over;
+De TXT-/selecteerbare kopieertekst neemt nu ook de oorspronkelijke afvinkstatus per winkel over;
 de winkelprijzen blijven altijd de volledige originele fysieke mand, niet alleen de nog
 open boodschappen. Afvinken is geen betalingsbewijs.
 
@@ -112,11 +111,11 @@ scriptvrij document met de twee bronmomenten, oorspronkelijke SKU's,
 pakinhoud, pakprijzen, eenheidsprijzen, daadwerkelijke hele-pakkentotalen en
 vergelijkingsregels. Open het bestand op je toestel om af te drukken; het
 bestand vraagt geen internetverbinding en bevat een beperkend CSP.
-**Kopieer mijn volledige privéweekmand** gebruikt uitsluitend na jouw klik
-het systeemklembord. **Deel privéweekmand via mijn apparaat** opent uitsluitend
-na jouw klik het standaard deelvenster; je kiest zelf waar de tekst heengaat.
-Als een browser klembord of delen niet ondersteunt, kun je de bestaande
-TXT-/CSV-download gebruiken.
+**Toon complete privévergelijking om zelf te kopiëren of delen** maakt na
+jouw klik een selecteerbaar tekstvak met diezelfde complete brongebonden
+inhoud. Je kiest zelf Kopieer/Delen via het apparaatmenu. Supa vraagt
+geen automatische klembord- of native deelrechten aan. Je kunt ook
+een CSV-, TXT- of printbaar HTML-bestand lokaal bewaren.
 
 De downloads gebruiken altijd het **oorspronkelijke complete weekmandje**,
 niet alleen de huidige zoek- of winkelprijsfilter. Bij ontbrekende, gewijzigde,

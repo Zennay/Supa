@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { ownStoreWeekComparison } from '../planner/ownStoreBudgetComparison.ts'
 import { printableOwnStoreComparison } from '../planner/downloadOwnStoreComparison.ts'
 import { privateSingleStoreShoppingText } from '../shopping-list/privateSingleStoreShoppingText.ts'
+import { PrivateManualShareText } from './PrivateManualShareText.tsx'
 import { observedInstant } from '../../domain/offlineReviewedImport.ts'
 import type { BasketTraceLine, OneStoreBasket } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
@@ -37,6 +38,13 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   const reviewedRef = useRef(reviewed)
   reviewedRef.current = reviewed
   const [receiptMessage, setReceiptMessage] = useState('')
+  const [manualCopy, setManualCopy] = useState<{
+    text: string
+    label: string
+    planKey: string
+    plus: PrivateReviewedBasket | null
+    deka: PrivateReviewedBasket | null
+  } | null>(null)
   const [shopAdvantage, setShopAdvantage] = useState<'all' | 'plus' | 'deka' | 'equal'>('all')
   // A personal travel-cost scenario is bound to the exact ORIGINAL source
   // objects, never inherited by a reimported price or another Planner week.
@@ -102,49 +110,34 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       setReceiptMessage('Download van eigen ' + shop + '-mand mislukt. Herzie de bron.')
     }
   }
-  async function handoffSingle(shop: OwnStore, action: 'copy' | 'share' | 'copy-open') {
+  function prepareSingleText(shop: OwnStore, onlyOpen: boolean) {
     const current = freshReviewedBaskets(reviewedRef.current,
       reviewedRef.current.planKey, Date.now())
     const source = current?.stores[shop]
     if (!current || !source) {
-      setReceiptMessage(shop + ': geen geldige actuele eigen bron om mee te nemen.')
+      setReceiptMessage(shop + ': geen geldige actuele eigen bron om te tonen.')
       return
     }
     try {
       const done = new Set(source.basket.lines.filter(line => line.status === 'matched' &&
         checked[privatePhysicalShoppingTick(current.planKey, shop, source.basket.store.id, line)])
         .map(line => line.id))
-      // Synchronous serialization retains transient user activation for
-      // clipboard/native share. No implicit upload or retailer fetch.
-      const body = privateSingleStoreShoppingText({
-        basket: source.basket, observedAt: source.observedAt, done,
-        onlyOpen: action === 'copy-open',
+      const text = privateSingleStoreShoppingText({
+        basket: source.basket, observedAt: source.observedAt, done, onlyOpen,
       })
       const latest = freshReviewedBaskets(reviewedRef.current,
         reviewedRef.current.planKey, Date.now())
       if (latest?.stores[shop] !== source || latest.planKey !== current.planKey)
         throw Error('Eigen winkelbron is veranderd.')
-      if (action === 'copy' || action === 'copy-open') {
-        if (!navigator.clipboard?.writeText) {
-          setReceiptMessage('Klembord niet beschikbaar. Download je eigen winkel-TXT.')
-          return
-        }
-        await navigator.clipboard.writeText(body)
-        setReceiptMessage(shop + (action === 'copy-open'
-          ? ': alleen nog te kopen gekopieerd.'
-          : ': eigen lijst inclusief afvinkingen gekopieerd.'))
-      } else {
-        if (!navigator.share) {
-          setReceiptMessage('Delen niet beschikbaar. Download je eigen winkel-TXT.')
-          return
-        }
-        await navigator.share({ title: 'SUPA · mijn ' + shop + '-lijst', text: body })
-        setReceiptMessage(shop + ': eigen lijst aangeboden aan het deelvenster.')
-      }
-    } catch (error) {
-      if (action === 'share' && error instanceof Error && error.name === 'AbortError')
-        setReceiptMessage('Delen geannuleerd; jouw gegevens blijven behouden.')
-      else setReceiptMessage(shop + ': overdragen mislukt. Gebruik de lokale TXT-download.')
+      setManualCopy({
+        text, label: shop + (onlyOpen ? ' · alleen nog te kopen' : ' · volledige privéweekmand'),
+        planKey: current.planKey, plus: current.stores.PLUS ?? null,
+        deka: current.stores.DekaMarkt ?? null,
+      })
+      setReceiptMessage('Selecteer de persoonlijke tekst hieronder om zelf te kopiëren of te delen.')
+    } catch {
+      setManualCopy(null)
+      setReceiptMessage(shop + ': privétekst niet beschikbaar. Bewaar de lokale TXT-download.')
     }
   }
   async function downloadReceipt(kind: 'csv' | 'txt' | 'html') {
@@ -221,29 +214,18 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       setReceiptMessage('Het privé-overzicht kon niet worden gemaakt. Je winkelbronnen blijven ongewijzigd.')
     }
   }
-  async function handoffReceipt(kind: 'copy' | 'share') {
-    const initial = freshReviewedBaskets(reviewedRef.current,
+  function preparePairedText() {
+    const current = freshReviewedBaskets(reviewedRef.current,
       reviewedRef.current.planKey, Date.now())
-    if (!initial?.stores.PLUS || !initial.stores.DekaMarkt ||
-        !privateReviewedPairWithin24Hours(initial.stores.PLUS, initial.stores.DekaMarkt)) {
-      setReceiptMessage('Een complete actuele vergelijking ontbreekt. Controleer eerst beide bronnen.')
+    const comparison = ownStoreWeekComparison(current)
+    if (!current?.stores.PLUS || !current.stores.DekaMarkt ||
+        !privateReviewedPairWithin24Hours(current.stores.PLUS, current.stores.DekaMarkt) ||
+        comparison.status !== 'comparable') {
+      setManualCopy(null)
+      setReceiptMessage('De originele winkelbronnen zijn niet meer compleet vergelijkbaar.')
       return
     }
     try {
-      // Share APIs require a transient direct user gesture: never await a
-      // dynamic import before invoking navigator.share or clipboard.
-      const current = freshReviewedBaskets(reviewedRef.current,
-        reviewedRef.current.planKey, Date.now())
-      if (!current || current.planKey !== initial.planKey ||
-          current.stores.PLUS !== initial.stores.PLUS ||
-          current.stores.DekaMarkt !== initial.stores.DekaMarkt) {
-        throw Error('Bronnen tijdens voorbereiding gewijzigd.')
-      }
-      const comparison = ownStoreWeekComparison(current)
-      if (comparison.status !== 'comparable' ||
-          !current.stores.PLUS || !current.stores.DekaMarkt) {
-        throw Error('Geen vergelijkbare mandjes.')
-      }
       const text = printableOwnStoreComparison(comparison, {
         PLUS: current.stores.PLUS.observedAt,
         DekaMarkt: current.stores.DekaMarkt.observedAt,
@@ -255,30 +237,20 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         },
         checked,
       })
-      if (kind === 'copy') {
-        if (!navigator.clipboard?.writeText) {
-          setReceiptMessage('Kopiëren wordt hier niet ondersteund. Gebruik de privé-TXT-download.')
-          return
-        }
-        await navigator.clipboard.writeText(text)
-        setReceiptMessage('Je volledige privéweekmand is naar je klembord gekopieerd.')
-      } else {
-        if (!navigator.share) {
-          setReceiptMessage('Mobiel delen wordt hier niet ondersteund. Bewaar een TXT- of HTML-bestand.')
-          return
-        }
-        // Native share sheet only after explicit user action. Never upload the
-        // personal comparison or silently send it to a third party.
-        await navigator.share({ title: 'SUPA · mijn privéweekmand', text })
-        setReceiptMessage('Je privéweekmand is via het gekozen deelvenster aangeboden.')
-      }
-    } catch (error) {
-      if (kind === 'share' && typeof error === 'object' && error !== null &&
-          'name' in error && error.name === 'AbortError') {
-        setReceiptMessage('Delen geannuleerd. Je winkelbronnen zijn behouden.')
-      } else {
-        setReceiptMessage('Privéoverzicht niet overgedragen. Controleer de bronnen of bewaar als TXT.')
-      }
+      const latest = freshReviewedBaskets(reviewedRef.current,
+        reviewedRef.current.planKey, Date.now())
+      if (latest?.stores.PLUS !== current.stores.PLUS ||
+          latest.stores.DekaMarkt !== current.stores.DekaMarkt ||
+          latest.planKey !== current.planKey) throw Error('De bronnen zijn veranderd.')
+      setManualCopy({
+        text, label: 'PLUS / DekaMarkt · volledig eigen weekmandje',
+        planKey: current.planKey, plus: current.stores.PLUS,
+        deka: current.stores.DekaMarkt,
+      })
+      setReceiptMessage('Selecteer de volledige persoonlijke vergelijking hieronder om zelf te kopiëren.')
+    } catch {
+      setManualCopy(null)
+      setReceiptMessage('De privévergelijking kon niet als selecteerbare tekst worden gemaakt.')
     }
   }
   const exactBudget = validCustomWeekBudgetEuros(budget)
@@ -288,6 +260,9 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       ? money.format((totalCents - budgetCents) / 100) + ' boven je Planner-weekbudget'
       : money.format((budgetCents - totalCents) / 100) + ' binnen je Planner-weekbudget'
   const fresh = freshReviewedBaskets(reviewed, reviewed.planKey, Date.now())
+  const manualCopyVisible = manualCopy?.planKey === reviewed.planKey &&
+    manualCopy.plus === (fresh?.stores.PLUS ?? null) &&
+    manualCopy.deka === (fresh?.stores.DekaMarkt ?? null) ? manualCopy : null
   const plus = fresh?.stores.PLUS
   const deka = fresh?.stores.DekaMarkt
   const comparable = !!plus && !!deka &&
@@ -345,14 +320,11 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
               <button type="button" onClick={() => { void downloadSingle(shop, 'html') }}>
                 Print mijn {shop}-weekmand (HTML)
               </button>
-              <button type="button" onClick={() => { void handoffSingle(shop, 'copy') }}>
-                Kopieer mijn {shop}-lijst inclusief afvinkingen
+              <button type="button" onClick={() => prepareSingleText(shop, false)}>
+                Toon mijn {shop}-lijst om zelf te kopiëren of delen
               </button>
-              <button type="button" onClick={() => { void handoffSingle(shop, 'copy-open') }}>
-                Kopieer alleen nog te kopen bij {shop}
-              </button>
-              <button type="button" onClick={() => { void handoffSingle(shop, 'share') }}>
-                Deel mijn {shop}-lijst via apparaat
+              <button type="button" onClick={() => prepareSingleText(shop, true)}>
+                Toon alleen nog te kopen bij {shop} om te kopiëren
               </button>
     </div>
   }
@@ -394,6 +366,8 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
           ? missing.join(' en ') + ' heeft nog geen volledig bruikbare eigen prijsopname. Vul de brongegevens aan voordat Supa een prijsverschil toont.'
           : 'Het bestaande bronpaar is nog niet betrouwbaar vergelijkbaar voor hetzelfde fysieke weekmandje. Controleer de productkoppelingen opnieuw.'}</p>
       {receiptMessage && <p role="status">{receiptMessage}</p>}
+      {manualCopyVisible && <PrivateManualShareText key={manualCopyVisible.text}
+        text={manualCopyVisible.text} label={manualCopyVisible.label} />}
       <button type="button" onClick={onOpenComparison}>Open bronimport en productmatching</button>
       <small>Geen kassagarantie of onafhankelijk bewezen besparing. Een onbekende prijs is niet nul.</small>
     </section>
@@ -541,16 +515,15 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       <button type="button" onClick={() => { void downloadReceipt('html') }}>
         Bewaar printbaar volledig weekmandje (HTML)
       </button>
-      <button type="button" onClick={() => { void handoffReceipt('copy') }}>
-        Kopieer mijn volledige privéweekmand
-      </button>
-      <button type="button" onClick={() => { void handoffReceipt('share') }}>
-        Deel privéweekmand via mijn apparaat
+      <button type="button" onClick={preparePairedText}>
+        Toon complete privévergelijking om zelf te kopiëren of delen
       </button>
       <small>Downloads, kopiëren en expliciet delen gebruiken het originele complete weekmandje en
         bronmomenten, onafhankelijk van je zoekfilter. Alleen privé; geen kassagarantie,
         openbare besparingsclaim of nieuwe winkelbronimport.</small>
       {receiptMessage && <p role="status">{receiptMessage}</p>}
+      {manualCopyVisible && <PrivateManualShareText key={manualCopyVisible.text}
+        text={manualCopyVisible.text} label={manualCopyVisible.label} />}
     </div>
     <div className="private-reviewed-products__advantage-filter"
       role="group" aria-label="Filter persoonlijk gecontroleerde regelprijzen per winkel">
