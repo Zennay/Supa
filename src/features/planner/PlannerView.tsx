@@ -362,6 +362,7 @@ export function PlannerView({
           recipes={ingredientRecipes}
           onChooseRecipe={onRecipeChange}
           onOpenComparison={onOpenComparison}
+          onOpenList={onOpenShoppingList}
         />
       )}
 
