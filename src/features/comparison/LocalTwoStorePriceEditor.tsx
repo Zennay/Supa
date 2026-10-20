@@ -313,6 +313,23 @@ export function LocalTwoStorePriceEditor({
     try { return aggregatePlanIngredients(plan, recipes, activeDays) }
     catch { return [] }
   }, [plan, recipes, activeDays])
+  const recaptureStores = new Set<OfflineRetailer>()
+  const observedByStore = new Map<OfflineRetailer, number>()
+  for (const store of stores) {
+    const time = timestampWithOffset(capturedAt[store])
+    if (!time) continue
+    const observed = Date.parse(time)
+    if (!Number.isFinite(observed)) continue
+    observedByStore.set(store, observed)
+    if (pricePreviewNow - observed > 604_800_000) recaptureStores.add(store)
+  }
+  const plusObserved = observedByStore.get('PLUS')
+  const dekaObserved = observedByStore.get('DekaMarkt')
+  if (plusObserved !== undefined && dekaObserved !== undefined &&
+      Math.abs(plusObserved - dekaObserved) > 86_400_000) {
+    // Re-observe the older source, never merely give it a newer timestamp.
+    recaptureStores.add(plusObserved < dekaObserved ? 'PLUS' : 'DekaMarkt')
+  }
   const activeNeeds = needs.filter(item => item.label.trim() && item.query.trim())
   // Count the SAME physical ingredient needs with two complete provisional
   // price entries. No partial total or store winner may be inferred from this.
@@ -321,13 +338,14 @@ export function LocalTwoStorePriceEditor({
     currentDraftPackMath(rows[key('DekaMarkt', need.id)] ?? emptyDraft(need.unit), need),
   ).map(need => need.id))
   const nextIncompletePairIndex = activeNeeds.findIndex(need =>
-    !readyPairedDraftIds.has(need.id))
+    !readyPairedDraftIds.has(need.id) || recaptureStores.size > 0)
   const openCaptureTasks = selectedStores.flatMap(store => activeNeeds.flatMap(need => {
     const row = rows[key(store, need.id)] ?? emptyDraft(need.unit)
     const status = ownCaptureStatus(row, need)
-    return status === 'priced' || status === 'unavailable'
+    const needsFreshObservation = recaptureStores.has(store)
+    return !needsFreshObservation && (status === 'priced' || status === 'unavailable')
       ? []
-      : [{ store, need, status }]
+      : [{ store, need, status, needsFreshObservation }]
   }))
 
 
@@ -340,7 +358,7 @@ export function LocalTwoStorePriceEditor({
   ])
   const openCaptureIdentity = JSON.stringify([selectedPlanFingerprint, sourceSelection,
     openCaptureTasks.map(task => [task.store, task.need.id, task.need.label,
-      task.need.amount, task.need.unit, task.status])])
+      task.need.amount, task.need.unit, task.status, task.needsFreshObservation])])
   const latestOpenCaptureIdentity = useRef(openCaptureIdentity)
   latestOpenCaptureIdentity.current = openCaptureIdentity
   const selectableOpenCaptureText = preparedOpenCaptureCopy?.identity === openCaptureIdentity
@@ -537,7 +555,9 @@ export function LocalTwoStorePriceEditor({
           '[ ] ' + item.store + ': ' + printable(item.need.label) +
             ' · nodig ' + (item.need.amount === null ? 'hoeveelheid controleren' :
               String(item.need.amount).replace('.', ',') + ' ' + item.need.unit),
-          '    Nog te doen: ' + captureStatusNames[item.status] +
+          '    Nog te doen: ' + (item.needsFreshObservation
+            ? 'Oud of te ver uiteenliggend winkelmoment: observeer opnieuw met echte prijzen, voorraad en tijd'
+            : captureStatusNames[item.status]) +
             (item.need.unit === 'piece' && item.need.amount === null
               ? ' · corrigeer eerst het aantal stuks in Recepten' : ''),
         ].join('\n')),
@@ -1009,6 +1029,10 @@ export function LocalTwoStorePriceEditor({
               ? 'Beide originele bronmomenten zijn voorlopig binnen 24 uur en maximaal zeven dagen oud.'
               : 'Prijsverschillen blijven verborgen tot beide echte winkelmomenten geldig en maximaal 24 uur uit elkaar zijn.'}
               {' '}Dit is geen bevestigde match en geen volledig mandtotaal.</small>
+            {recaptureStores.size > 0 && <small role="alert">
+              Vernieuw de originele bron voor {Array.from(recaptureStores).join(' en ')}:
+              {' '}eerder ingevoerde pakprijzen mogen niet onder een nieuw bronmoment worden hergebruikt.
+            </small>}
             {openCaptureTasks.length > 0 && <button type="button" className="ghost-button"
               onClick={downloadOpenCaptureTasks}>
               Download {openCaptureTasks.length} openstaande winkelcontroles (zonder prijzen)
@@ -1029,14 +1053,18 @@ export function LocalTwoStorePriceEditor({
                 const need = activeNeeds[nextIncompletePairIndex]
                 const plusReady = currentDraftPackMath(
                   rows[key('PLUS', need.id)] ?? emptyDraft(need.unit), need)
-                const store = plusReady ? 'DekaMarkt' : 'PLUS'
+                const store = recaptureStores.has('PLUS') ? 'PLUS' :
+                  recaptureStores.has('DekaMarkt') ? 'DekaMarkt' :
+                  plusReady ? 'DekaMarkt' : 'PLUS'
                 setOnlyOpenRows(false)
                 window.requestAnimationFrame(() => {
                   const field = document.getElementById(`own-price-${store}-${nextIncompletePairIndex}`)
                   field?.scrollIntoView({ behavior: 'smooth', block: 'center' })
                   field?.querySelector('input')?.focus({ preventScroll: true })
                 })
-              }}>Vul volgend ontbrekend winkelproduct aan</button>}
+              }}>{recaptureStores.size > 0
+                ? 'Vernieuw de oudere winkelbron'
+                : 'Vul volgend ontbrekend winkelproduct aan'}</button>}
             {readyPairedDraftIds.size === activeNeeds.length && !sameTimePair &&
               <small>Alle conceptregels zijn ingevuld, maar kijk eerst de echte
                 opnamemomenten na; anders zijn de winkelprijzen niet vergelijkbaar.</small>}
@@ -1123,6 +1151,9 @@ export function LocalTwoStorePriceEditor({
           <label className="offline-manual-editor__time">Wanneer zijn deze producten echt waargenomen? (Nederlandse tijd)
             <input type="datetime-local" value={capturedAt[store]} onChange={e => changeTimestamp(store, e.target.value)} />
             <small role="status">{captureTimeAdvice(capturedAt[store])}</small>
+            <small>Pas je een eerder ingevuld bronmoment aan, dan worden de
+              oude prijs en beschikbaarheidsbevestiging van alleen deze winkel
+              na bevestiging ingetrokken; code, naam en verpakking blijven bewaard.</small>
           </label>
           {(() => {
             const completed = activeNeeds.filter(need => isEnteredOwnCapture(
