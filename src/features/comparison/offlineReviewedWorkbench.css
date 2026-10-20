@@ -307,6 +307,13 @@ border-radius:10px;padding:.65rem;scroll-margin-top:1.25rem}
   color:#4e6253; line-height:1.5; overflow-wrap:anywhere;
 }
 .offline-manual-editor__pair-coverage button { min-height:44px; max-width:100%; text-align:left; }
+.offline-manual-editor__pair-coverage label { display:grid; gap:.4rem; width:100%; min-width:0; }
+.offline-manual-editor__pair-coverage textarea {
+  box-sizing:border-box; display:block; width:100%; min-width:0;
+  min-height:8rem; padding:.7rem; border:1px solid #a8bba8;
+  border-radius:.6rem; font:inherit; line-height:1.45; overflow-wrap:anywhere;
+}
+
 
 .offline-manual-editor__pair-matrix p { margin:.2rem 0; line-height:1.45; }
 .offline-manual-editor__pair-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,2fr);
