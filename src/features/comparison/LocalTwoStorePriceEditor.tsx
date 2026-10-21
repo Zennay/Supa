@@ -870,12 +870,21 @@ export function LocalTwoStorePriceEditor({
             totalCents: item.deka.lineTotalCents, unitRate: item.deka.unitRate },
         }
       })
+      const alreadyPaired = new Set(provisionalDifferences.map(item => item.need.id))
+      const unpaired = activeNeeds.filter(need => !alreadyPaired.has(need.id)).map(need => ({
+        ingredient: need.label,
+        demand: String(need.amount ?? 'onbekend') + ' ' + need.unit,
+        plusStatus: captureStatusNames[ownCaptureStatus(
+          rows[key('PLUS', need.id)] ?? emptyDraft(need.unit), need)],
+        dekaStatus: captureStatusNames[ownCaptureStatus(
+          rows[key('DekaMarkt', need.id)] ?? emptyDraft(need.unit), need)],
+      }))
       const { privateDraftReviewHtml } = await import('./privateDraftReviewHtml.ts')
       if (identity !== currentDraftReviewIdentity.current ||
           Date.now() - Math.min(...instants) > 604800000) {
         throw Error('Je winkel- of Planner-invoer is ondertussen gewijzigd of verouderd. Open het overzicht opnieuw.')
       }
-      const html = privateDraftReviewHtml(records, capturedAt, activeNeeds.length)
+      const html = privateDraftReviewHtml(records, capturedAt, activeNeeds.length, unpaired)
       const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
       try {
         const link = document.createElement('a')
