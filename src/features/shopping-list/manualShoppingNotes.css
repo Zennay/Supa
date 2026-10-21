@@ -91,3 +91,6 @@
 .manual-shopping-notes__bulk-preview strong,.manual-shopping-notes__bulk-preview p,
 .manual-shopping-notes__bulk-preview ul { flex-basis:100%; }
 .manual-shopping-notes__bulk-preview ul { max-height:220px; overflow:auto; }
+
+.manual-shopping-notes__recovery {display:flex;flex-wrap:wrap;gap:10px;padding:8px 0}
+.manual-shopping-notes__recovery button {flex:1 1 210px}

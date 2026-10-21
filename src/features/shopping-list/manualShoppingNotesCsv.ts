@@ -85,27 +85,44 @@ export function importUnpricedShoppingCsv(source: string): Row[] {
 /** Excel/Calc clipboard copies cells as TSV, not as a .csv file. Only accept
  * Supa's exact unpriced four-column contract; never infer price columns. */
 export function importUnpricedShoppingPaste(source: string): Row[] {
-  if (!source.replace(/^\ufeff/u, '').startsWith('supa-eigen-ongeprijsd-v1\t')) {
-    return importUnpricedShoppingCsv(source)
-  }
   if (new TextEncoder().encode(source).length > 32768) throw Error('Tabel groter dan 32 kB.')
-  const lines = source.replace(/^\ufeff/u, '').replace(/\r\n/gu, '\n').split('\n')
+  const unmarked = source.replace(/^\ufeff/u, '')
+  // Existing Supa CSV remains the only accepted semicolon format. A simple
+  // personal Excel/Calc tab-copy can be accepted without price/source columns.
+  if (!unmarked.includes('\t')) return importUnpricedShoppingCsv(source)
+  if (unmarked.includes('\r') && !unmarked.includes('\r\n'))
+    throw Error('Gebruik een tabel met normale regeleinden.')
+  const lines = unmarked.replace(/\r\n/gu, '\n').split('\n')
   if (lines.at(-1) === '') lines.pop()
-  if (!lines.length || lines[0] !== header.replace(/;/gu, '\t'))
-    throw Error('Plak vier kolommen uit het eigen ongeprijsde Supa-invulblad.')
+  const heading = lines[0]?.split('\t')
+  const supa = heading?.join('\t') === header.replace(/;/gu, '\t')
+  const simple = heading?.join('\t').toLocaleLowerCase('nl-NL')
+  const allowed = ['winkel\tartikel', 'artikel\twinkel',
+    'winkel\tartikel\tafgevinkt', 'artikel\twinkel\tafgevinkt']
+  if (!supa && !allowed.includes(simple ?? ''))
+    throw Error('Gebruik kolommen winkel/artikel (eventueel afgevinkt), zonder prijs- of SKU-kolommen.')
   if (lines.length < 2 || lines.length > 101) throw Error('Plak 1–100 eigen boodschappen.')
+  const storeFirst = supa || simple?.startsWith('winkel\t')
+  const hasDone = supa || simple?.endsWith('\tafgevinkt')
   const originalRows = lines.slice(1).map(line => {
     if (line.includes('\r')) throw Error('Tabel bevat ongeldige regeleinden.')
     const cells = line.split('\t')
-    if (cells.length !== 4 || cells[0] !== 'eigen') throw Error('Tabel bevat extra of ontbrekende kolommen.')
-    return cells
+    if (cells.length !== (supa ? 4 : hasDone ? 3 : 2) ||
+        (supa && cells[0] !== 'eigen')) throw Error('Tabel bevat extra of ontbrekende kolommen.')
+    if (supa) return cells
+    const store = cells[storeFirst ? 0 : 1]
+    const label = cells[storeFirst ? 1 : 0]
+    const checked = hasDone ? cells[2] : 'nee'
+    return ['eigen', store, label, checked]
   })
-  // Reuse exactly the same admitted schema, duplicate checking and length limits.
-  // TSV cells may already carry our literal-text apostrophe. Quoting them
-  // a SECOND time would double it and corrupt copy → paste roundtrips.
-  // This temporary internal CSV never leaves the parser or opens in Excel.
+  // Route both formats through the same exact validation for labels, stores,
+  // duplicates and opt-in preview. No SKU, price or retailer proof is inferred.
+  // A copied Supa cell already contains the literal-text apostrophe from its
+  // CSV export. Re-escaping that cell would turn a leading '=...' label into
+  // an extra apostrophe. Ordinary untrusted tables require the escape.
   const rawQuote = (value: string) => '"' + value.replace(/"/gu, '""') + '"'
+  const encode = supa ? rawQuote : quote
   const csv = '\ufeff' + header + '\r\n' +
-    originalRows.map(cells => cells.map(rawQuote).join(';')).join('\r\n') + '\r\n'
+    originalRows.map(cells => cells.map(encode).join(';')).join('\r\n') + '\r\n'
   return importUnpricedShoppingCsv(csv)
 }

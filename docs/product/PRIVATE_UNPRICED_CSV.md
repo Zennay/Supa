@@ -14,3 +14,45 @@ De knop **Kopieer alle boodschappen als Excel-tabel (4 kolommen)** kopieert de c
 De JSON-backup blijft de volledige private gegevensbackup. TXT, kopieertekst, mobiel delen en offline HTML-print blijven onafhankelijk beschikbaar.
 
 **Releasegrens:** deze functionaliteit is pas op main beschikbaar na een daadwerkelijk gemergede PR; een bouw- of branch-commit op zichzelf is niet live.
+
+## Optionele lokale bewaarmogelijkheden
+
+Persoonlijke ongeprijsde artikelen blijven standaard alleen in de geopende app. Er zijn
+nu **twee aparte, vrijwillige** keuzes: in dit browsertabblad bewaren
+(`sessionStorage`) of duurzaam in dit browserprofiel op het apparaat bewaren
+(`localStorage`, ook na sluiten van de tab). Beide kopieën bevatten uitsluitend
+privéartikelen/winkels/vinkjes met maximaal 100 regels, geen supermarktprijzen,
+bronmoment, SKU of toestemming. Er is geen server- of cloudsync.
+
+De app controleert een bestaande kopie vóór overschrijven. Bij een wijziging vanuit
+een ander tabblad of tegenstrijdige opgeslagen versies stopt automatisch bewaren
+zonder de geopende lijst te vervangen. Gebruik dan de JSON-backup om artikelen
+expliciet te controleren en samen te voegen. De nieuwe keuze wordt nooit stilzwijgend
+ingeschakeld en uitschakelen wist alleen de gekozen bewaarde apparaatkopie.
+
+### Bij een opslagconflict
+
+De privélijst blijft in de app zichtbaar maar de conflicterende opslag wordt niet
+automatisch overschreven. De gebruiker kan de oude tab-/apparaatkopie eerst lokaal
+bekijken via dezelfde expliciete JSON-merge-voorinzage, of de betreffende oude
+kopie na een bevestiging wissen. Wissen verandert nooit de geopende lijst, andere
+opslagkopieën, prijsbronnen of handmatig gedownloade back-ups.
+
+### Algemene Excel/Calc-tabellen
+
+Naast het originele Supa-formaat accepteert het lokale plakveld nu een
+tabel met **exact** de kopjes `artikel` en `winkel` in willekeurige volgorde,
+eventueel gevolgd door `afgevinkt` (waarde `ja` of `nee`). Boodschappen
+zonder afvinkkolom beginnen open. Alleen `Algemeen`, `PLUS` en `DekaMarkt`
+zijn winkels; aanvullende prijs-, SKU-, hoeveelheid- of bronkolommen worden
+geweigerd in plaats van stilzwijgend genegeerd. Voorbeeld:
+
+```text
+artikel	winkel	afgevinkt
+Afwasmiddel	Algemeen	nee
+Havermout	PLUS	ja
+```
+
+De bestaande begrensde Supa-CSV-parser controleert vervolgens nogmaals de
+artikelnamen, dubbele regels en groepscodes. Het resultaat moet altijd door
+de gewone expliciete persoonlijke importvoorinzage voordat de lijst wijzigt.
