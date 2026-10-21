@@ -3,6 +3,7 @@ import type { CaptureStore } from './plannerPriceCaptureSheet.ts'
 import type { PlannerCaptureGuideNeed } from './plannerPriceCaptureGuide.ts'
 import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
 import { exportLocalCaptureDraft, restoreLocalCaptureDraft } from './localCaptureEditorBackup.ts'
+import { incompleteCaptureFields, offlineCaptureFieldChecklist } from './localCaptureFieldProgress.ts'
 
 type Row = {
   state: 'unseen' | 'available' | 'unavailable'
@@ -57,6 +58,8 @@ export function LocalObservationCaptureEditor({
   const [moments, setMoments] = useState<Record<string, string>>({})
   const [status, setStatus] = useState('')
   const [search, setSearch] = useState('')
+  const [onlyOpen, setOnlyOpen] = useState(false)
+  const [portable, setPortable] = useState<{ store: CaptureStore; text: string } | null>(null)
   const changed = snapshot.fingerprint !== currentFingerprint
   const rowKey = (store: CaptureStore, index: number) => store + ':' + index
   const row = (store: CaptureStore, index: number) => rows[rowKey(store, index)] ?? empty()
@@ -97,7 +100,7 @@ export function LocalObservationCaptureEditor({
     ++changes.current
     ++latestRestore.current
     setSnapshot({ fingerprint: currentFingerprint, needs: [...needs], stores: [...stores] })
-    setRows({}); setMoments({}); setStatus(''); setSearch('')
+    setRows({}); setMoments({}); setStatus(''); setSearch(''); setOnlyOpen(false); setPortable(null)
     invalidatePreviewOnce()
   }
   function backupDraft() {
@@ -146,6 +149,37 @@ export function LocalObservationCaptureEditor({
       invalidatePreviewOnce()
     } catch (cause) {
       setStatus(cause instanceof Error ? cause.message : 'Kon het lokale concept niet herstellen.')
+    }
+  }
+  async function carryOpen(store: CaptureStore, method: 'copy' | 'download') {
+    try {
+      setStatus('')
+      const text = offlineCaptureFieldChecklist(store, snapshot.needs, rows,
+        moments[store] ?? '')
+      setPortable({ store, text })
+      if (method === 'copy') {
+        if (!navigator.clipboard?.writeText) {
+          setStatus('Klembord niet beschikbaar. Selecteer de privécontrolelijst hieronder om handmatig te kopiëren.')
+          return
+        }
+        await navigator.clipboard.writeText(text)
+        setStatus(store + ': openstaande winkelopnamepunten gekopieerd; geen prijs geaccepteerd.')
+        return
+      }
+      const uri = URL.createObjectURL(new Blob([text], {
+        type: 'text/plain;charset=utf-8',
+      }))
+      try {
+        const a = document.createElement('a')
+        a.href = uri
+        a.download = 'supa-' + store.toLowerCase() + '-nog-opnemen-prive.txt'
+        document.body.append(a)
+        try { a.click() } finally { a.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
+      setStatus(store + ': controlelijst lokaal gedownload; niets als winkelbron geaccepteerd.')
+    } catch (cause) {
+      setStatus(cause instanceof Error ? cause.message :
+        'Kan de privécontrolelijst niet kopiëren of bewaren.')
     }
   }
   function filledFiles(): File[] {
@@ -257,8 +291,38 @@ export function LocalObservationCaptureEditor({
         placeholder="Filter ingrediënten in beide winkels"
         onChange={event => setSearch(event.currentTarget.value)} />
     </label>
+    <label><input type="checkbox" checked={onlyOpen}
+      onChange={event => setOnlyOpen(event.currentTarget.checked)} />
+      {' '}Alleen nog niet waargenomen of onvolledige invoerregels tonen
+    </label>
     {snapshot.stores.map(store => <fieldset key={store}>
       <legend>{store} · originele persoonlijke bronopname</legend>
+      {(() => {
+        const open = incompleteCaptureFields(store, snapshot.needs, rows,
+          moments[store] ?? '')
+        return <div>
+          <p role="status">{open.length} van {snapshot.needs.length} Planner-regels
+            hebben nog ontbrekende originele waarnemingsvelden.
+            {open.length === 0 ? ' Alle velden zijn ingevuld; broncontrole blijft verplicht.' : ''}
+          </p>
+          {open.length > 0 && <div className="offline-price-workbench__actions">
+            <button type="button" className="ghost-button"
+              onClick={() => { void carryOpen(store, 'copy') }}>
+              Kopieer {open.length} openstaande {store}-regels voor onderweg
+            </button>
+            <button type="button" className="ghost-button"
+              onClick={() => { void carryOpen(store, 'download') }}>
+              Download {store}-controlelijst zonder prijzen (TXT)
+            </button>
+          </div>}
+          {portable?.store === store && <label>
+            Mijn selecteerbare {store}-herinnering (ook zonder klembordrechten)
+            <textarea readOnly rows={7} spellCheck={false} value={portable.text}
+              onFocus={event => event.currentTarget.select()}
+              style={{ display: 'block', width: '100%', boxSizing: 'border-box' }} />
+          </label>}
+        </div>
+      })()}
       <p role="status">{snapshot.needs.filter((_, index) =>
         row(store, index).state !== 'unseen').length} van {snapshot.needs.length}
         {' '}fysieke Planner-regels hebben een door jou opgegeven bronproduct;
@@ -271,7 +335,12 @@ export function LocalObservationCaptureEditor({
       <small>Dezelfde echte waarnemingstijd geldt voor alle producten in dit
         winkelblad. Als je later een product opnieuw vastlegt, maak dan een nieuwe
         opname met het nieuwe werkelijke tijdstip; hergebruik geen oude prijs.</small>
-      {snapshot.needs.map((need, index) => ({ need, index })).filter(({ need }) =>
+      {snapshot.needs.map((need, index) => ({ need, index }))
+        .filter(({ index }) => !onlyOpen || incompleteCaptureFields(
+          store, [snapshot.needs[index]], {
+            [store + ':0']: row(store, index),
+          }, moments[store] ?? '').length > 0)
+        .filter(({ need }) =>
         !search.trim() || [need.label, need.id].join(' ').normalize('NFKD')
           .toLocaleLowerCase('nl-NL').includes(search.trim().normalize('NFKD')
             .toLocaleLowerCase('nl-NL'))).map(({ need, index }) => {

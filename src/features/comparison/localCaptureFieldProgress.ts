@@ -1,0 +1,88 @@
+import type { PlannerCaptureGuideNeed } from './plannerPriceCaptureGuide.ts'
+import type { LocalCaptureEntry } from './localCaptureEditorBackup.ts'
+import type { CaptureStore } from './plannerPriceCaptureSheet.ts'
+import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
+import { observedInstant } from '../../domain/offlineReviewedImport.ts'
+
+export type CaptureFieldNeed = {
+  index: number
+  need: PlannerCaptureGuideNeed
+  missing: readonly string[]
+}
+
+/**
+ * A mobile field checklist, not proof of a product or a usable price.
+ * All rows remain tied to the original Planner index (the source CSV header is row 1).
+ * An unavailable product also needs a real SKU/name/unit and observation moment;
+ * a genuinely unobserved item cannot become a retailer product automatically.
+ */
+export function incompleteCaptureFields(
+  store: CaptureStore, needs: readonly PlannerCaptureGuideNeed[],
+  rows: Readonly<Record<string, LocalCaptureEntry>>,
+  observedAt: string,
+): CaptureFieldNeed[] {
+  const seenSku = new Set<string>()
+  return needs.flatMap((need, index) => {
+    const row = rows[store + ':' + index]
+    const missing: string[] = []
+    if (!row || row.state === 'unseen') {
+      missing.push('nog niet zelf waargenomen')
+    } else {
+      if (!observedInstant(observedAt.trim()))
+        missing.push('geldig werkelijk ISO-bronmoment met tijdzone')
+      if (row.sku.trim()) {
+        if (seenSku.has(row.sku.trim()))
+          missing.push('dubbele artikelcode; origineel bronproduct maar één keer vastleggen')
+        seenSku.add(row.sku.trim())
+      }
+      if (!row.sku.trim()) missing.push('originele artikelcode')
+      if (!row.name.trim()) missing.push('originele productnaam')
+      if (!['g', 'kg', 'ml', 'l', 'piece'].includes(row.unit))
+        missing.push('geobserveerde verpakkingseenheid')
+      if (row.state === 'available') {
+        const amount = Number(row.amount.trim())
+        if (!row.amount.trim() || !Number.isFinite(amount) || amount <= 0 ||
+            amount > 100000 || (row.unit === 'piece' && !Number.isSafeInteger(amount)))
+          missing.push('geldige echte pakinhoud')
+        const count = Number(row.count.trim())
+        if (!/^\d+$/u.test(row.count.trim()) || !Number.isSafeInteger(count) ||
+            count < 1 || count > 1000)
+          missing.push('geldig multipack-aantal')
+        const cents = Number(row.cents.trim())
+        if (!/^\d+$/u.test(row.cents.trim()) || !Number.isSafeInteger(cents) ||
+            cents < 0 || cents > 1000000)
+          missing.push('geldige geobserveerde prijs in centen')
+      }
+    }
+    return missing.length ? [{ index, need, missing }] : []
+  })
+}
+
+/** Portable, explicitly unpriced field reminder. It never contains fabricated source rows. */
+export function offlineCaptureFieldChecklist(
+  store: CaptureStore, needs: readonly PlannerCaptureGuideNeed[],
+  rows: Readonly<Record<string, LocalCaptureEntry>>, observedAt: string,
+): string {
+  const open = incompleteCaptureFields(store, needs, rows, observedAt)
+  if (!open.length) throw Error(store + ': geen ontbrekende invoervelden.')
+  const lines = [
+    'SUPA | ' + store + ' | mijn nog op te nemen winkelproducten',
+    'PRIVÉ HERINNERING. Geen geaccepteerde retailerprijs, SKU-match of besparing.',
+    'De fysieke Planner-vraag is geen bewijs van een winkelverpakking.',
+    '',
+    ...open.flatMap(({ index, need, missing }) => [
+      'Bronblad regel ' + (index + 2) + ': ' + JSON.stringify(need.label),
+      '  Werkelijke Planner-vraag: ' + readablePlannerDemandAmount(need.amount) +
+        ' ' + JSON.stringify(need.unit),
+      '  Zelf nog vastleggen/controleren: ' + missing.join('; '),
+      '',
+    ]),
+    'Na echte waarneming: vul het originele mobiele formulier in en start',
+    'afzonderlijk de bestaande broncontrole vóór een prijs of match te accepteren.',
+    '',
+  ]
+  const text = lines.join('\n')
+  if (new TextEncoder().encode(text).byteLength > 128000)
+    throw Error('De openstaande winkelopnamelijst is te groot voor lokaal delen.')
+  return text
+}
