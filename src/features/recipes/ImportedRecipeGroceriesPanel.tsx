@@ -335,6 +335,29 @@ export function ImportedRecipeGroceriesPanel({
         'De boodschappen per kookdag konden niet veilig worden gemaakt.')
     }
   }
+  async function downloadDayGroceryCsv() {
+    setFeedback('')
+    const expected = plannerExportKey
+    try {
+      if (!plannerReadyForSelection || !plannerDaysDistinct ||
+          plannerAssignments.length === 0 || !result?.complete)
+        throw new Error('Kies geldige porties en unieke weekdagen voordat je de kookdag-CSV maakt.')
+      requireLatestOwnedRecipes()
+      const { exportRecipeWeekShoppingByDayCsv } = await import('./formatRecipeWeekShoppingByDay.ts')
+      if (expected !== latestPlannerExportKey.current)
+        throw new Error('De recepten, porties of dagen zijn veranderd. Maak de CSV opnieuw.')
+      requireLatestOwnedRecipes()
+      const csv = exportRecipeWeekShoppingByDayCsv(result, plannerAssignments)
+      if (expected !== latestPlannerExportKey.current)
+        throw new Error('De weekindeling is veranderd. Download de actuele CSV.')
+      savePrivateFile('supa-weekboodschappen-met-receptbijdragen.csv',
+        '\uFEFF' + csv, 'text/csv;charset=utf-8')
+      setFeedback('De ongeprijsde kookdag-CSV is lokaal opgeslagen. Alleen Totaal-regels zijn boodschappen; bijdragen zijn geen extra aankopen.')
+    } catch (cause) {
+      setFeedback(cause instanceof Error ? cause.message :
+        'De kookdag-CSV kon niet veilig worden gemaakt.')
+    }
+  }
   const changedPortions = selected.filter(recipe =>
     Object.hasOwn(portionsById, recipe.id) &&
     portionsById[recipe.id] !== recipe.servings)
@@ -968,6 +991,11 @@ export function ImportedRecipeGroceriesPanel({
             disabled={!plannerReadyForSelection || !plannerAssignments.length || !plannerDaysDistinct}
             onClick={() => void downloadDayGroceryOrigin()}>
             Download weekboodschappen met receptbijdragen per dag (TXT)
+          </button>
+          <button type="button" className="ghost-button"
+            disabled={!plannerReadyForSelection || !plannerAssignments.length || !plannerDaysDistinct}
+            onClick={() => void downloadDayGroceryCsv()}>
+            Download weekboodschappen met receptbijdragen (CSV)
           </button>
         </div>
         <div className="recipe-backup-panel__actions">
