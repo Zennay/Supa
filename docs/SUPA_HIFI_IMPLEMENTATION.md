@@ -46,3 +46,9 @@ The M2 Firefox workflow enters Planner from the new Home before replaying all ex
 - Oorspronkelijke Producten-icons voor filter, zoekveld, weekknop, sortering en 5-vaks navigatie gebruikt, inclusief ongewijzigde SVG-intrinsieke maten. De Home-productcatalogus is bewust onveranderd.
 - Code-build `npm run build -- --base=/supa/` is geslaagd op exacte productiebron-HEAD `34393e9`; er zijn geen QA- of regressiesuites toegevoegd of uitgevoerd.
 - **Nog open richting exact 1:1:** individuele Figma-productteksten, ontbrekende voorbeeldprijzen, exacte schermscreenshotvergelijking en specifieke Lijst-productfoto's. Figma MCP Starter limiet blokkeert nu nieuwe screenshots; geen volledige visuele acceptatie claimen tot de bron weer beschikbaar is. De originele lokale afbeeldingen zijn geen bewijs van actuele supermarktprijzen.
+
+## Product discovery search follow-up (2026-10-21)
+
+- Product search uses the existing accent-insensitive normalizer and matches the displayed product name, retailer, package/unit, demo price text and product ID. Historical price-free source identities also match their retailer, package, capture timestamp, source URL and source ID.
+- Switching between historical identities and Figma examples clears cross-source filters, so a favorites-only selection from one catalog cannot silently make the other catalog appear empty.
+- This is discovery-only behavior: it does not add current retailer prices, change source rights, or feed demo values into the private reviewed-basket calculator.

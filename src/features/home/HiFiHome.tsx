@@ -11,6 +11,7 @@ const RecipeLibrary = lazy(async () => {
 import { curatedFigmaRecipes } from '../recipes/curatedFigmaRecipes'
 import { historicalRetailerProducts, filterHistoricalProducts } from '../products/historicalRetailerProducts'
 import { filterDemoProductsByUnit, orderDemoProductsByUnitPrice, type DemoUnitFilter } from '../products/productUnitPrice'
+import { productSearchText } from '../products/productSearchText'
 
 export type HiFiTab = 'home' | 'recipes' | 'products'
 export const designProducts = [
@@ -67,17 +68,32 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
   const [storeFilter, setStoreFilter] = useState<'all' | 'PLUS' | 'DekaMarkt'>('all')
   const dialog = useRef<HTMLDialogElement>(null)
   useEffect(() => { setQuery('') }, [view])
-  const matches = (item: { id: string; name: string }) =>
-    item.name.toLocaleLowerCase('nl').includes(query.trim().toLocaleLowerCase('nl')) &&
-    (!favoritesOnly || favorites.includes(item.id))
-  const recipes = designRecipes.filter(recipe => recipe.title.toLocaleLowerCase('nl').includes(query.trim().toLocaleLowerCase('nl')) && (!favoritesOnly || favorites.includes(recipe.id)))
-  const matchingProducts = filterDemoProductsByUnit(designProducts.filter(product => (view === 'products' ? product.id !== 'bananas' : !product.id.startsWith('figma-')) && matches(product)), unitFilter)
+  const normalizedQuery = productSearchText(query.trim())
+  const includesQuery = (values: readonly (string | null | undefined)[]) =>
+    !normalizedQuery || values.some(value => typeof value === 'string' &&
+      productSearchText(value).includes(normalizedQuery))
+  const recipes = designRecipes.filter(recipe =>
+    includesQuery([recipe.title]) && (!favoritesOnly || favorites.includes(recipe.id)))
+  const matchingProducts = filterDemoProductsByUnit(designProducts.filter(product =>
+    (view === 'products' ? product.id !== 'bananas' : !product.id.startsWith('figma-')) &&
+    includesQuery([product.name, product.store, product.unit, product.unitPrice, product.old, product.price, product.id]) &&
+    (!favoritesOnly || favorites.includes(product.id))), unitFilter)
   const products = sortByPrice ? orderDemoProductsByUnitPrice(matchingProducts) :
     view === 'products' ? [...matchingProducts].sort((left, right) =>
       ['cola-regular', 'cola-zero', 'figma-paprika', 'figma-watermelon', 'figma-cola-classic', 'figma-arla-milk', 'figma-heineken', 'figma-pastry', 'figma-muffins', 'figma-peanut-butter', 'figma-fruit', 'figma-ginger', 'cola-pack'].indexOf(left.id) -
       ['cola-regular', 'cola-zero', 'figma-paprika', 'figma-watermelon', 'figma-cola-classic', 'figma-arla-milk', 'figma-heineken', 'figma-pastry', 'figma-muffins', 'figma-peanut-butter', 'figma-fruit', 'figma-ginger', 'cola-pack'].indexOf(right.id)) : matchingProducts
-  const historical = filterHistoricalProducts(historicalRetailerProducts, query, storeFilter).filter(item => !favoritesOnly || favorites.includes(item.id))
+  const historical = filterHistoricalProducts(historicalRetailerProducts, '', storeFilter).filter(item =>
+    includesQuery([item.name, item.pack, item.store, item.capturedAt, item.sourceUrl, item.id]) &&
+    (!favoritesOnly || favorites.includes(item.id)))
   const toggleFavorite = (id: string) => setFavorites(current => current.includes(id) ? current.filter(x => x !== id) : [...current, id])
+  const switchProductSource = (source: 'history' | 'figma') => {
+    setProductSource(source)
+    setQuery('')
+    setFavoritesOnly(false)
+    setUnitFilter('all')
+    setStoreFilter('all')
+    setSortByPrice(false)
+  }
   const changeView = (next: HiFiTab) => { setQuery(''); setUnitFilter('all'); setSortByPrice(false); onNavigate(next) }
 
 
@@ -95,12 +111,12 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
     </> : <header className="hifi-products-heading" data-figma-node="3064:3128"><h1 className="hifi-page-title">Producten</h1><button type="button" className="hifi-go-to-list" onClick={() => onNavigate('list')} aria-label={`Bekijk mijn lijst met ${addedProducts.length} gekozen producten`}>Mijn lijst <span aria-hidden="true">({addedProducts.length})</span> →</button><button className="hifi-icon-button" aria-label="Productfilters" aria-expanded={filterOpen} aria-controls="hifi-filter-panel" onClick={() => setFilterOpen(!filterOpen)}><FigmaImage asset={a.productsFilter} alt="" /></button></header>}
 
     <div className="hifi-search-row" data-figma-node={view === 'products' ? '3068:4921' : undefined}>
-      <label className="hifi-search"><FigmaImage asset={view === "products" ? a.productsSearch : a.imgVector1} alt="" /><input type="search" aria-label="Zoek gerechten of producten" placeholder={view === 'products' ? 'Coca Cola' : 'Zoek gerechten of producten'} value={query} onChange={e => setQuery(e.target.value)} /></label>
+      <label className="hifi-search"><FigmaImage asset={view === "products" ? a.productsSearch : a.imgVector1} alt="" /><input type="search" aria-label={view === 'products' ? 'Zoek producten op naam, winkel, verpakking of broncode' : 'Zoek gerechten of producten'} placeholder={view === 'products' ? 'Coca Cola' : 'Zoek gerechten of producten'} value={query} onChange={e => setQuery(e.target.value)} /></label>
       {view === 'products'
         ? <button className="hifi-weekly-link" type="button" aria-label="Ga naar de weekplanning" onClick={() => onNavigate('planner')}><FigmaImage asset={a.productsWeekly} alt="" /></button>
         : <button className="hifi-filter" aria-label="Filters" aria-expanded={filterOpen} aria-controls="hifi-filter-panel" onClick={() => setFilterOpen(!filterOpen)}><FigmaImage asset={a.imgVector2} alt="" /></button>}
     </div>
-    {filterOpen && <div id="hifi-filter-panel" className="hifi-filter-panel"><label><input type="checkbox" checked={favoritesOnly} onChange={e => setFavoritesOnly(e.target.checked)} /> Alleen favorieten</label>{view === 'products' && <div className="hifi-product-source-tabs" role="group" aria-label="Weergave van producten"><button type="button" aria-pressed={productSource === 'figma'} onClick={() => { setProductSource('figma'); setQuery(''); setStoreFilter('all') }}>Ontwerpvoorbeelden</button><button type="button" aria-pressed={productSource === 'history'} onClick={() => { setProductSource('history'); setQuery(''); setUnitFilter('all'); setSortByPrice(false) }}>Bronproducten</button></div>}{view === 'products' && productSource === 'history' && <label>Winkel <select aria-label="Filter historische producten op winkel" value={storeFilter} onChange={e => setStoreFilter(e.target.value as 'all' | 'PLUS' | 'DekaMarkt')}><option value="all">Alle winkels</option><option value="PLUS">PLUS</option><option value="DekaMarkt">DekaMarkt</option></select></label>}{view === 'products' && productSource === 'figma' && <label>Eenheid <select aria-label="Filter producten op eenheid" value={unitFilter} onChange={e => setUnitFilter(e.target.value as DemoUnitFilter)}><option value="all">Alle eenheden</option><option value="l">Per liter</option><option value="kg">Per kilogram</option></select></label>}<button onClick={() => { setQuery(''); setFavoritesOnly(false); setUnitFilter('all'); setStoreFilter('all'); setSortByPrice(false) }}>Wis filters</button></div>}
+    {filterOpen && <div id="hifi-filter-panel" className="hifi-filter-panel"><label><input type="checkbox" checked={favoritesOnly} onChange={e => setFavoritesOnly(e.target.checked)} /> Alleen favorieten</label>{view === 'products' && <div className="hifi-product-source-tabs" role="group" aria-label="Weergave van producten"><button type="button" aria-pressed={productSource === 'figma'} onClick={() => switchProductSource('figma')}>Ontwerpvoorbeelden</button><button type="button" aria-pressed={productSource === 'history'} onClick={() => switchProductSource('history')}>Bronproducten</button></div>}{view === 'products' && productSource === 'history' && <label>Winkel <select aria-label="Filter historische producten op winkel" value={storeFilter} onChange={e => setStoreFilter(e.target.value as 'all' | 'PLUS' | 'DekaMarkt')}><option value="all">Alle winkels</option><option value="PLUS">PLUS</option><option value="DekaMarkt">DekaMarkt</option></select></label>}{view === 'products' && productSource === 'figma' && <label>Eenheid <select aria-label="Filter producten op eenheid" value={unitFilter} onChange={e => setUnitFilter(e.target.value as DemoUnitFilter)}><option value="all">Alle eenheden</option><option value="l">Per liter</option><option value="kg">Per kilogram</option></select></label>}<button onClick={() => { setQuery(''); setFavoritesOnly(false); setUnitFilter('all'); setStoreFilter('all'); setSortByPrice(false) }}>Wis filters</button></div>}
     {view === 'home' && <p className="hifi-demo-note">Recepten uit de SUPA-planner · voorbeeldproductprijzen en aanbiedingen zijn niet actueel.</p>}
     {view === 'home' && <section className="hifi-section" aria-label="Mijn eigen winkelmand vergelijken">
       <h2>Jouw recepten, jouw winkelmand</h2>
@@ -120,7 +136,7 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
       </article>)}</div>
       {recipes.length === 0 && <p className="hifi-empty">Geen gerechten gevonden. Probeer een andere zoekterm of wis je filters.</p>}
     </section>}
-    {view === 'products' && <div className="hifi-product-source-tabs" aria-label="Productbron"><button type="button" aria-pressed={productSource === 'history'} onClick={() => { setProductSource('history'); setUnitFilter('all'); setSortByPrice(false) }}>Bronwaarnemingen</button><button type="button" aria-pressed={productSource === 'figma'} onClick={() => { setProductSource('figma'); setStoreFilter('all') }}>Figma voorbeelden</button></div>}
+    {view === 'products' && <div className="hifi-product-source-tabs" aria-label="Productbron"><button type="button" aria-pressed={productSource === 'history'} onClick={() => switchProductSource('history')}>Bronwaarnemingen</button><button type="button" aria-pressed={productSource === 'figma'} onClick={() => switchProductSource('figma')}>Figma voorbeelden</button></div>}
     {view === 'products' && <section className="hifi-section" aria-label="Vergelijk met je eigen werkelijke winkelbron">
       <div className="hifi-section-heading"><h2>Vergelijk jouw eigen winkelprijzen</h2></div>
       <p className="hifi-demo-note">De historische productvoorbeelden hierboven hebben geen vrijgegeven actuele prijzen.
