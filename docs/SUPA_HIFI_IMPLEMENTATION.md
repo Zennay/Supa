@@ -56,4 +56,5 @@ The M2 Firefox workflow enters Planner from the new Home before replaying all ex
 - Empty results in recipes, historical products and Figma examples now offer a direct accessible reset action that clears the search and source-specific filters; users do not have to reopen the filter panel to recover the catalog.
 - Entering Products from another tab clears recipe-only favorites and source-specific filters because recipe and product IDs are separate domains; this prevents an unrelated favorites selection from hiding the entire catalog.
 - Planner and the manual Meten/observation screen are route-level lazy chunks with explicit loading announcements, so the initial Home/Producten bundle does not eagerly load those full workflows.
+- The personal-source list, unpriced planner checklist and demo shopping list are also split into on-demand chunks with loading announcements, while keeping their existing mount/storage contracts.
 - This is discovery-only behavior: it does not add current retailer prices, change source rights, or feed demo values into the private reviewed-basket calculator.

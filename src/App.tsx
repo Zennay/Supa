@@ -14,8 +14,14 @@ const BasketView = lazy(async () => {
   const module = await import('./features/basket/BasketView')
   return { default: module.BasketView }
 })
-import { ShoppingListView } from './features/shopping-list/ShoppingListView'
-import { PrivateSourceShoppingList } from './features/shopping-list/PrivateSourceShoppingList.tsx'
+const ShoppingListView = lazy(async () => {
+  const module = await import('./features/shopping-list/ShoppingListView')
+  return { default: module.ShoppingListView }
+})
+const PrivateSourceShoppingList = lazy(async () => {
+  const module = await import('./features/shopping-list/PrivateSourceShoppingList.tsx')
+  return { default: module.PrivateSourceShoppingList }
+})
 import './features/shopping-list/listSourceFilePicker.css'
 const PartialReviewedShoppingList = lazy(async () => {
   const module = await import('./features/shopping-list/PartialReviewedShoppingList.tsx')
@@ -28,7 +34,10 @@ const PrivateReviewedProductCatalog = lazy(async () => {
   const module = await import('./features/products/PrivateReviewedProductCatalog.tsx')
   return { default: module.PrivateReviewedProductCatalog }
 })
-import { UnpricedPlannerChecklist } from './features/comparison/UnpricedPlannerChecklist.tsx'
+const UnpricedPlannerChecklist = lazy(async () => {
+  const module = await import('./features/comparison/UnpricedPlannerChecklist.tsx')
+  return { default: module.UnpricedPlannerChecklist }
+})
 const OwnExtraGroceries = lazy(async () => {
   const module = await import('./features/comparison/OwnExtraGroceries.tsx')
   return { default: module.OwnExtraGroceries }
@@ -898,8 +907,8 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         {visitedList && !livePrivateReviewed && (
           <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
             <section className="screen" aria-label="Boodschappenlijst uit mijn eigen weekmenu">
-              <UnpricedPlannerChecklist plan={plannedMeals} recipes={recipes} activeDays={activeDays}
-                onOpenPriceImport={openOwnPriceImport} onOpenRecipes={() => navigate('recipes')} />
+              <Suspense fallback={<p role="status">Boodschappenlijst wordt geladen…</p>}><UnpricedPlannerChecklist plan={plannedMeals} recipes={recipes} activeDays={activeDays}
+                onOpenPriceImport={openOwnPriceImport} onOpenRecipes={() => navigate('recipes')} /></Suspense>
               {tab === 'list' && (designProductIds.length > 0
                 ? <section aria-label="Mijn expliciet toegevoegde producten">
                     <h3>Mijn toegevoegde producten · apart van receptboodschappen</h3>
@@ -907,25 +916,27 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
                       Historische gegevens en Figma-voorbeelden zijn geen geverifieerde prijzen
                       en doen niet mee in een eigen winkelmandvergelijking.</p>
                     <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
-                    <ShoppingListView basket={basket} />
+                    <Suspense fallback={<p role="status">Voorbeeldlijst wordt geladen…</p>}><ShoppingListView basket={basket} /></Suspense>
                   </section>
                 : <details className="demo-comparison-disclosure">
                     <summary>Toon oude voorbeeldboodschappen (geen actuele winkelprijzen)</summary>
                     <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
-                    <ShoppingListView basket={basket} />
+                    <Suspense fallback={<p role="status">Voorbeeldlijst wordt geladen…</p>}><ShoppingListView basket={basket} /></Suspense>
                   </details>)}
             </section>
           </div>
         )}
         {livePrivateReviewed && (
           <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
-            <PrivateSourceShoppingList reviewed={livePrivateReviewed} budget={budget}
-              checked={privateShoppingTicks} setChecked={setPrivateShoppingTicks}
-              plan={plannedMeals} recipes={recipes} activeDays={activeDays}
-              preferred={preferredOwnStore} onChooseStore={setPreferredOwnStore}
-              onOpenComparison={openOwnPriceImport} routeOpenSignal={mixedRouteOpenSignal}
-              routeChoice={privateRouteChoice}
-              routeCostIntent={mixedCostIntent} />
+            <Suspense fallback={<p role="status">Je eigen boodschappenlijst wordt geladen…</p>}>
+              <PrivateSourceShoppingList reviewed={livePrivateReviewed} budget={budget}
+                checked={privateShoppingTicks} setChecked={setPrivateShoppingTicks}
+                plan={plannedMeals} recipes={recipes} activeDays={activeDays}
+                preferred={preferredOwnStore} onChooseStore={setPreferredOwnStore}
+                onOpenComparison={openOwnPriceImport} routeOpenSignal={mixedRouteOpenSignal}
+                routeChoice={privateRouteChoice}
+                routeCostIntent={mixedCostIntent} />
+            </Suspense>
           </div>
         )}
         {visitedList && (
