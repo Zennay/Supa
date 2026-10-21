@@ -405,7 +405,9 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       <label>{done} van {lines.length} oorspronkelijke artikelen afgevinkt
         <progress value={done} max={Math.max(1, lines.length)} />
       </label>
-      <strong>{full ? 'Nog op jouw lijst' : 'Bekend open deel'}: {money.format(remainingCents / 100)}</strong>
+      <strong>{full ? 'Nog op jouw lijst: ' + money.format(remainingCents / 100)
+        : lines.length > 0 ? 'Bekend open deelbedrag: ' + money.format(remainingCents / 100)
+          : 'Open bedrag onbekend — geen gekoppelde winkelprijzen'}</strong>
       {!full && <small role="status">{unresolved.length} fysieke ingrediënten zijn nog niet
         gekoppeld aan een bruikbare prijs. Het totale open bedrag is onbekend;
         dit is uitsluitend het bekende bedrag voor gematchte hele verpakkingen.</small>}
@@ -745,8 +747,12 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
             <h4>{shop}</h4>
             {capture ? <>
               <strong>{capture.basket.unresolvedLineCount === 0 &&
-                capture.basket.lines.length > 0 ? 'Volledige eigen mand' : 'Bekende regels, totaal onbekend'}: {
-                money.format(capture.basket.totalCents / 100)}</strong>
+                capture.basket.lines.length > 0
+                ? 'Volledige eigen mand: ' + money.format(capture.basket.totalCents / 100)
+                : capture.basket.matchedLineCount > 0
+                  ? 'Bekend deelbedrag (geen mandtotaal): ' +
+                    money.format(capture.basket.totalCents / 100)
+                  : 'Volledige prijs onbekend — geen gekoppelde winkelprijzen'}</strong>
               {capture.basket.unresolvedLineCount === 0 &&
                 capture.basket.lines.length > 0 &&
                 budgetComparison(capture.basket.totalCents) && <small>
