@@ -352,16 +352,27 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       if (serial === bulkFileSerial.current) setMessage(error instanceof Error ? error.message : 'TXT kon niet worden gelezen.')
     }
   }
-  function downloadOwnCsv(template = false) {
+  function downloadOwnCsv(mode: 'template' | 'all' | 'visible' = 'all') {
+    // Keep the full private backup separate from a shareable filtered export.
+    // Both use the same strict unpriced four-column CSV, never retailer data.
+    const rows = mode === 'template'
+      ? [{ label: '', store: 'Algemeen' as const, done: false }]
+      : mode === 'visible' ? routeItems : notes
+    if (rows.length === 0) return
     try {
-      const uri = URL.createObjectURL(new Blob([exportUnpricedShoppingCsv(template
-        ? [{ label: '', store: 'Algemeen', done: false }] : notes)], { type: 'text/csv;charset=utf-8' }))
+      const uri = URL.createObjectURL(new Blob([exportUnpricedShoppingCsv(rows)], { type: 'text/csv;charset=utf-8' }))
       try {
         const link = document.createElement('a')
         link.href = uri
-        link.download = template ? 'supa-lege-ongeprijsde-boodschappen.csv' : 'supa-eigen-ongeprijsde-boodschappen.csv'
+        link.download = mode === 'template' ? 'supa-lege-ongeprijsde-boodschappen.csv'
+          : mode === 'visible' ? 'supa-zichtbare-ongeprijsde-boodschappen.csv'
+          : 'supa-eigen-ongeprijsde-boodschappen.csv'
         document.body.append(link); link.click(); link.remove()
-        setMessage(template ? 'Leeg CSV-invulblad opgeslagen: vul het veld artikel in en behoud de vier kolommen.' : 'Alle eigen boodschappen als CSV opgeslagen, zonder prijzen of SKU’s.')
+        setMessage(mode === 'template'
+          ? 'Leeg CSV-invulblad opgeslagen: vul artikel in en behoud de vier kolommen.'
+          : mode === 'visible'
+            ? rows.length + ' zichtbare eigen boodschappen voor jouw winkelronde geëxporteerd, met winkel en vinkje. Geen prijzen of SKU’s.'
+            : 'Alle eigen boodschappen als CSV opgeslagen, zonder prijzen of SKU’s.')
       } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
     } catch { setMessage('Kon de ongeprijsde CSV niet bewaren.') }
   }
@@ -573,6 +584,15 @@ export function ManualShoppingNotes({ notes, setNotes }: {
     setLastRemoved(null)
     setMessage('De laatste eigen boodschap is met zijn oorspronkelijke vinkje hersteld.')
   }
+  // Warn about buying the same still-open personal note at both retailers.
+  // Never silently merge different shopping IDs or choose a cheaper store:
+  // these notes contain no trustworthy prices or product identities.
+  const openDekaLabels = new Set(notes.filter(note => note.store === 'DekaMarkt' && !note.done)
+    .map(note => note.label.normalize('NFC').toLocaleLowerCase('nl-NL')))
+  const duplicatedOpenRetailerNotes = notes.filter(note => note.store === 'PLUS' && !note.done &&
+    openDekaLabels.has(note.label.normalize('NFC').toLocaleLowerCase('nl-NL')))
+  const duplicateOpenLabels = Array.from(new Map(duplicatedOpenRetailerNotes.map(note =>
+    [note.label.normalize('NFC').toLocaleLowerCase('nl-NL'), note.label] as const)).values())
   const selected = notes.filter(note => filterStore === 'Alle winkels' ||
     note.store === filterStore || note.store === 'Algemeen')
   // Search only the shopper's own notes. Never infer a retailer identity.
@@ -893,7 +913,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
           <input type="file" accept=".txt,text/plain"
             onChange={event => { void readBulkText(event.currentTarget.files?.[0]); event.currentTarget.value = '' }} />
         </label>
-        <button type="button" onClick={() => downloadOwnCsv(true)}>
+        <button type="button" onClick={() => downloadOwnCsv('template')}>
           Download leeg CSV-invulblad voor eigen boodschappen
         </button>
         <label>Importeer eigen ongeprijsde Supa-CSV of Excel-TSV (max. 32 kB; geen winkelprijzen)
@@ -1003,6 +1023,21 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       </div>}
       {lastNextRound && <button type="button" onClick={undoNextRound}>Herstel oude vinkjes</button>}
     </section>
+    {duplicateOpenLabels.length > 0 && <section className="manual-shopping-notes__double-buy"
+      role="status" aria-label="Mogelijk dubbel kopen bij twee winkels">
+      <strong>{duplicateOpenLabels.length} {duplicateOpenLabels.length === 1
+        ? 'eigen boodschap staat' : 'eigen boodschappen staan'} nog open bij PLUS én DekaMarkt</strong>
+      <p>Controleer of je deze persoonlijke artikelen écht bij beide winkels wilt kopen.
+        Er zijn geen prijzen of automatische productmatches gebruikt. Tik op een artikel en
+        verplaats of verwijder daarna zelf één van de dubbele regels.</p>
+      <ul>{duplicateOpenLabels.slice(0, 8).map(label => <li key={label}>
+        <button type="button" onClick={() => {
+          setFilterStore('Alle winkels'); setOnlyOpen(false); setSearch(label)
+        }}>Bekijk {label} bij beide winkels</button>
+      </li>)}</ul>
+      {duplicateOpenLabels.length > 8 && <small>En {duplicateOpenLabels.length - 8} andere; bekijk
+        alle winkels met je eigen zoekfilter.</small>}
+    </section>}
     <nav className="manual-shopping-notes__trip-nav" aria-label="Mijn persoonlijke winkelroute">
       <strong>Winkelroute · alleen mijn eigen ongeprijsde artikelen</strong>
       <div className="manual-shopping-notes__trip-nav-stores">
@@ -1145,8 +1180,11 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       <button type="button" disabled={!visible.length} onClick={downloadPrintableList}>
         Offline afdrukbare lijst (HTML)
       </button>
-      <button type="button" disabled={!notes.length} onClick={() => downloadOwnCsv()}>
-        Eigen ongeprijsde lijst (CSV voor Excel)
+      <button type="button" disabled={!visible.length} onClick={() => downloadOwnCsv('visible')}>
+        Zichtbare winkelronde (CSV voor Excel)
+      </button>
+      <button type="button" disabled={!notes.length} onClick={() => downloadOwnCsv('all')}>
+        Hele eigen ongeprijsde lijst (CSV voor Excel)
       </button>
       <button type="button" disabled={!notes.length} onClick={() => void copyOwnSpreadsheet()}>
         Kopieer alle boodschappen als Excel-tabel (4 kolommen)

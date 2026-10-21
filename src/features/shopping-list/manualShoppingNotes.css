@@ -94,3 +94,11 @@
 
 .manual-shopping-notes__recovery {display:flex;flex-wrap:wrap;gap:10px;padding:8px 0}
 .manual-shopping-notes__recovery button {flex:1 1 210px}
+
+/* Personal double-buy warning: no retailer price, product match or automatic merge. */
+.manual-shopping-notes__double-buy { display:grid; gap:.6rem; padding:1rem; margin:.75rem 0;
+  background:#fff9e8; border:1px solid #c9a85d; border-radius:12px; }
+.manual-shopping-notes__double-buy p { margin:0; }
+.manual-shopping-notes__double-buy ul { display:flex; flex-wrap:wrap; gap:.5rem; padding:0;
+  margin:0; list-style:none; }
+.manual-shopping-notes__double-buy button { min-height:44px; white-space:normal; text-align:left; }

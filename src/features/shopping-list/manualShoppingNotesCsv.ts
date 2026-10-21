@@ -4,12 +4,13 @@ type Row = Pick<UnpricedShoppingNote, 'label' | 'store' | 'done'>
 const header = 'supa-eigen-ongeprijsd-v1;winkel;artikel;afgevinkt'
 const stores = new Set(['Algemeen', 'PLUS', 'DekaMarkt'])
 const safeLabel = (label: string) => label.replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/gu, ' ').replace(/\s+/gu, ' ').trim()
-// Inspect the canonical compatibility form, but retain the shopper's exact
-// entered label. Invisible/combining Unicode before a formula operator must
-// never silently bypass spreadsheet literal-text encoding.
+// Always treat spreadsheet-compatible formula starters as literal shopper
+// text, even after control, format, combining-mark and braille-blank prefixes.
+// NFKC is inspection-only: the actual private label stays unchanged.
 function potentialFormula(value: string): boolean {
-  return /^[\p{White_Space}\p{Default_Ignorable_Code_Point}\p{Mark}]*[=+@\-\u2212]/u
-    .test(value.normalize('NFKC'))
+  const inspected = value.normalize('NFKC').replace(
+    /^[\p{White_Space}\p{Default_Ignorable_Code_Point}\p{Mark}\p{Cc}\p{Zs}\p{Zl}\p{Zp}\u2800]*/u, '')
+  return /^[=+@\-\u2212]/u.test(inspected)
 }
 function spreadsheetSafe(value: string): string {
   return value.startsWith("'") || potentialFormula(value) ? "'" + value : value
