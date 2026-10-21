@@ -351,16 +351,27 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       if (serial === bulkFileSerial.current) setMessage(error instanceof Error ? error.message : 'TXT kon niet worden gelezen.')
     }
   }
-  function downloadOwnCsv(template = false) {
+  function downloadOwnCsv(mode: 'template' | 'all' | 'visible' = 'all') {
+    // Keep the full private backup separate from a shareable filtered export.
+    // Both use the same strict unpriced four-column CSV, never retailer data.
+    const rows = mode === 'template'
+      ? [{ label: '', store: 'Algemeen' as const, done: false }]
+      : mode === 'visible' ? routeItems : notes
+    if (rows.length === 0) return
     try {
-      const uri = URL.createObjectURL(new Blob([exportUnpricedShoppingCsv(template
-        ? [{ label: '', store: 'Algemeen', done: false }] : notes)], { type: 'text/csv;charset=utf-8' }))
+      const uri = URL.createObjectURL(new Blob([exportUnpricedShoppingCsv(rows)], { type: 'text/csv;charset=utf-8' }))
       try {
         const link = document.createElement('a')
         link.href = uri
-        link.download = template ? 'supa-lege-ongeprijsde-boodschappen.csv' : 'supa-eigen-ongeprijsde-boodschappen.csv'
+        link.download = mode === 'template' ? 'supa-lege-ongeprijsde-boodschappen.csv'
+          : mode === 'visible' ? 'supa-zichtbare-ongeprijsde-boodschappen.csv'
+          : 'supa-eigen-ongeprijsde-boodschappen.csv'
         document.body.append(link); link.click(); link.remove()
-        setMessage(template ? 'Leeg CSV-invulblad opgeslagen: vul het veld artikel in en behoud de vier kolommen.' : 'Alle eigen boodschappen als CSV opgeslagen, zonder prijzen of SKU’s.')
+        setMessage(mode === 'template'
+          ? 'Leeg CSV-invulblad opgeslagen: vul artikel in en behoud de vier kolommen.'
+          : mode === 'visible'
+            ? rows.length + ' zichtbare eigen boodschappen voor jouw winkelronde geëxporteerd, met winkel en vinkje. Geen prijzen of SKU’s.'
+            : 'Alle eigen boodschappen als CSV opgeslagen, zonder prijzen of SKU’s.')
       } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
     } catch { setMessage('Kon de ongeprijsde CSV niet bewaren.') }
   }
@@ -873,7 +884,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
           <input type="file" accept=".txt,text/plain"
             onChange={event => { void readBulkText(event.currentTarget.files?.[0]); event.currentTarget.value = '' }} />
         </label>
-        <button type="button" onClick={() => downloadOwnCsv(true)}>
+        <button type="button" onClick={() => downloadOwnCsv('template')}>
           Download leeg CSV-invulblad voor eigen boodschappen
         </button>
         <label>Importeer eigen ongeprijsde Supa-CSV (max. 32 kB; geen retailerprijzen)
@@ -1125,8 +1136,11 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       <button type="button" disabled={!visible.length} onClick={downloadPrintableList}>
         Offline afdrukbare lijst (HTML)
       </button>
-      <button type="button" disabled={!notes.length} onClick={() => downloadOwnCsv()}>
-        Eigen ongeprijsde lijst (CSV voor Excel)
+      <button type="button" disabled={!visible.length} onClick={() => downloadOwnCsv('visible')}>
+        Zichtbare winkelronde (CSV voor Excel)
+      </button>
+      <button type="button" disabled={!notes.length} onClick={() => downloadOwnCsv('all')}>
+        Hele eigen ongeprijsde lijst (CSV voor Excel)
       </button>
       <button type="button" disabled={!notes.length} onClick={backupDownload}>Backup hele lijst (JSON)</button>
       <label>Herstel lijst uit JSON-backup (max. 64 kB)
