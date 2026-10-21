@@ -514,6 +514,7 @@ export function MixedStoreShoppingCard({
         checked: new Set(plan.lines.filter(line => done(line.key)).map(line => line.key)),
         extraVisitCostCents: appliedCostCents, strategy: mode,
         extras, manualNotes: validManualNotes, stop,
+        onlyOpen: !!stop && onlyOpen,
       })
       if (!eligibleNow()) throw Error('Deze opnames zijn inmiddels verlopen.')
       const url = URL.createObjectURL(new Blob([page], { type: 'text/html;charset=utf-8' }))
@@ -744,7 +745,8 @@ export function MixedStoreShoppingCard({
           </button>
           <button type="button" className="ghost-button" disabled={!all.length}
             onClick={() => { void downloadPrintHtml(false, store) }}>
-            Bewaar / print alleen mijn {store}-winkelstop (HTML)
+            {onlyOpen ? 'Print alleen openstaande' : 'Bewaar / print volledige'} {' '}
+            {store}-winkelstop (HTML)
           </button>
           <p><strong>{perStoreProgress[store].done} van {perStoreProgress[store].count}</strong>
             {' '}ingrediënten afgevinkt. Nog op de lijst bij deze winkel:{' '}

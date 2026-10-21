@@ -26,6 +26,8 @@ export function printMixedStoreRouteHtml(input: {
   manualNotes?: readonly UnpricedShoppingNote[]
   /** Print one shop without changing the fully validated basket. */
   stop?: MixedStore
+  /** A printed stop may mirror the in-app 'only still to buy' filter. */
+  onlyOpen?: boolean
 }): string {
   exportMixedStoreRouteCsv(input)
   const { route, captured, checked, stop } = input
@@ -40,7 +42,8 @@ export function printMixedStoreRouteHtml(input: {
     ? normalizePrivateNotes({ schema: 'supa-private-unpriced-notes-v1',
         notes: [...input.manualNotes] }) : []
   const manual = stop
-    ? allManual.filter(note => note.store === stop || note.store === 'Algemeen')
+    ? allManual.filter(note => (note.store === stop || note.store === 'Algemeen') &&
+        (!input.onlyOpen || !note.done))
     : allManual
   const both = route.lines.some(line => line.store === 'PLUS') &&
     route.lines.some(line => line.store === 'DekaMarkt')
@@ -53,11 +56,13 @@ export function printMixedStoreRouteHtml(input: {
   ]
   const storeSection = (store: MixedStore) => {
     const lines = route.lines.filter(line => line.store === store)
+    const shown = stop && input.onlyOpen ? lines.filter(line => !checked.has(line.key)) : lines
     return '<section><h2>' + clean(store) + ' · ' +
       clean(exactEuro.formatCents(route.totals[store])) + '</h2><ul>' +
-      (lines.length === 0
-        ? '<li>Geen aankopen nodig bij deze winkel.</li>'
-        : lines.map(line => '<li><span class="tick">' +
+      (shown.length === 0
+        ? '<li>' + (lines.length ? 'Alle geprijsde artikelen in deze winkelstop zijn afgevinkt.' :
+          'Geen aankopen nodig bij deze winkel.') + '</li>'
+        : shown.map(line => '<li><span class="tick">' +
           (checked.has(line.key) ? '&#9745;' : '&#9744;') +
           '</span><div><strong>' + clean(line.ingredientLabel) +
           '</strong><br><small>Benodigd: ' + clean(line.amount) + ' ' +
@@ -114,6 +119,8 @@ export function printMixedStoreRouteHtml(input: {
       '</b></p><p>Nog niet afgevinkte pakken <b>' +
       clean(exactEuro.formatCents(stopRemaining)) +
       '</b></p></div><p>Alleen deze winkelstop, niet het volledige mandje. ' +
+      (input.onlyOpen ? 'Alleen openstaande regels zijn getoond; bovenstaande gecontroleerde ' +
+        'totaalprijs hoort bij de gehele oorspronkelijke winkelstop. ' : '') +
       'Extra bezoekkosten en eigen ongeprijsde boodschappen zijn niet meegerekend.</p>'
     : '<div class="totals"><p>PLUS hele mand <b>' +
     clean(exactEuro.formatCents(route.plusWholeCents)) + '</b></p>' +
