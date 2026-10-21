@@ -82,8 +82,10 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
       const manualReview = { PLUS: false, DekaMarkt: false }
       for (const store of stores) {
         const capture = source.captures[store]
-        if (!capture || olderPairedStore === store ||
-            !recentOwnCaptureInstant(capture.observedAt, clock) ||
+        // A real original source can still inform an individual shop even
+        // when its paired capture window has expired. The paired delta below
+        // remains explicitly suppressed until BOTH clocks are comparable.
+        if (!capture || !recentOwnCaptureInstant(capture.observedAt, clock) ||
             need.amount === null || !Number.isFinite(need.amount) ||
             need.amount <= 0 || !units.has(need.unit)) {
           suggestions[store] = null
@@ -189,8 +191,12 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
   }, [needs, source, olderPairedStore, clock])
   if (!coverage.length) return null
   const suggested = stores.map(store => coverage.filter(line => line.suggestions[store]).length)
-  const paired = coverage.filter(line => line.suggestions.PLUS && line.suggestions.DekaMarkt).length
-  const missing = coverage.filter(line => !line.suggestions.PLUS || !line.suggestions.DekaMarkt)
+  const paired = source.pairedWithin24h ? coverage.filter(line =>
+    line.suggestions.PLUS && line.suggestions.DekaMarkt).length : 0
+  // "Only missing" means missing FOR A TWO-SHOP COMPARISON. Two individually
+  // valid product hints with incompatible clocks are not paired evidence.
+  const missing = coverage.filter(line => !source.pairedWithin24h ||
+    !line.suggestions.PLUS || !line.suggestions.DekaMarkt)
   const requiringChoice = stores.map(store =>
     coverage.filter(line => line.manualReview[store]).length)
   const sourceKnownButUnpriced = stores.map(store =>
@@ -250,7 +256,8 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
     if (actionFilter === 'capture') return selectedStores.some(store =>
       !line.suggestions[store] && !line.manualReview[store] &&
       !line.unpricedHints[store])
-    if (actionFilter === 'paired') return stores.every(store => !!line.suggestions[store])
+    if (actionFilter === 'paired') return source.pairedWithin24h &&
+      stores.every(store => !!line.suggestions[store])
     return storeFilter === 'both' || selectedStores.some(store =>
       !line.suggestions[store] || line.manualReview[store])
   }).sort((a, b) => {
@@ -274,8 +281,12 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
       const capture = source.captures[store]
       if (capture && !recentOwnCaptureInstant(capture.observedAt, Date.now()))
         return 'Bronopname verlopen of toekomstig · werkelijke winkelbron opnieuw opnemen'
-      if (olderPairedStore === store)
-        return 'Bronpaar meer dan 24 uur uiteen · oudste winkel opnieuw opnemen'
+      if (olderPairedStore === store) {
+        const candidate = line.suggestions[store]
+        return 'Origineel bronpaar meer dan 24 uur uiteen · oudste winkel opnieuw opnemen' +
+          (candidate ? ' · individueel onbevestigd bronvoorstel SKU ' + candidate.sku +
+            ' blijft zichtbaar, niet geldig als gepaarde prijs' : '')
+      }
       if (line.manualReview[store]) return 'Kies zelf bestaande originele SKU in Vergelijk'
       const incomplete = line.unpricedHints[store]
       if (incomplete) return 'Originele mogelijke SKU ' + incomplete.sku +
@@ -446,11 +457,17 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
       {source.captures.PLUS && source.captures.DekaMarkt &&
         !source.pairedWithin24h && <p><strong>Niet gelijktijdig vergelijkbaar:</strong>
           {' '}de twee oorspronkelijke opnames liggen meer dan 24 uur uit elkaar.
-          Nieuwe echte opnames zijn nodig voor een actuele twee-winkeldelta.</p>}
+          De individuele SKU-voorstellen uit actuele originele opnames blijven
+          zichtbaar voor winkelcontrole; dit zijn geen gepaarde prijzen of
+          besparingen. Neem de oudere winkel opnieuw op voor een echte twee-winkeldelta.</p>}
     </div>
     <p>{coverage.length} fysieke ingrediënten: PLUS {suggested[0]} mogelijke kandidaten,
       DekaMarkt {suggested[1]}. Voor {paired} ingrediënten is er voorlopig een
-      kandidaat bij beide winkels.</p>
+      {source.pairedWithin24h
+        ? ' kandidaat bij beide winkels binnen dezelfde 24-uurs bronperiode.'
+        : olderPairedStore
+          ? ' vergelijkbaar kandidaatpaar: de originele winkelmomenten liggen meer dan 24 uur uiteen.'
+          : ' vergelijkbaar kandidaatpaar: beide huidige oorspronkelijke winkelopnames zijn vereist.'}</p>
     {previewRows.length > 0 && <p className="supa-planner-source-matches__tentative-summary">
       <strong>Alleen voorlopige SKU-regels uit je twee oorspronkelijke bronnen:</strong>
       {' '}{provisionalLower.PLUS} ingrediëntregels met lagere PLUS-hele-pakkenregel,
@@ -498,8 +515,9 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
         {nextReview && onReviewIngredient && <button type="button" className="ghost-button"
           onClick={() => {
             const capture = source.captures[nextReview.store]
-            if (olderPairedStore !== nextReview.store && capture &&
-                recentOwnCaptureInstant(capture.observedAt, Date.now()))
+            // Individual SKU review is still useful; it never creates a
+            // paired timestamp or automatically approves a basket total.
+            if (capture && recentOwnCaptureInstant(capture.observedAt, Date.now()))
               onReviewIngredient(nextReview.store, nextReview.need.id)
           }}>
           {nextCapture ? '2.' : '1.'} Beoordeel {nextReview.need.label} bij {nextReview.store}
@@ -604,6 +622,11 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
         {stores.map(store => <span role="cell" data-store={store} key={store}>
           {suggestions[store] ? <>Kandidaat: {suggestions[store]!.name}
             <small>SKU {suggestions[store]!.sku} · niet bevestigd</small>
+            {olderPairedStore === store && <small className="supa-planner-source-matches__missing-delta">
+              Alleen deze originele winkelopname: ouder dan de andere bron met
+              meer dan 24 uur. De producten mogen afzonderlijk worden bekeken,
+              maar leveren geen twee-winkelprijsverschil op.
+            </small>}
             <small>{suggestions[store]!.packCount} × {suggestions[store]!.packAmount}
               {' '}{suggestions[store]!.packUnit} · opgenomen bronpakprijs
               {' '}{exactEuro(suggestions[store]!.packCents)}
