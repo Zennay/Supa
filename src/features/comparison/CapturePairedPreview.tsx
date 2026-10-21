@@ -134,10 +134,13 @@ export function CapturePairedPreview({
     ].join(' ')).includes(filter)))
     .sort((a, b) => Number(b.open) - Number(a.open))
   const missing = rows.filter(row => row.open).length
+  const selectedOpen = storeFilter === 'all' ? missing :
+    storeFilter === 'PLUS' ? plusOpen : dekaOpen
 
   function reviewText() {
     return privateTwoStorePreviewChecklist({
-      plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh, plusFresh, dekaFresh, describeReason,
+      plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh,
+      plusFresh, dekaFresh, describeReason,
     })
   }
   function downloadLocal(content: string, mime: string, filename: string) {
@@ -200,10 +203,11 @@ export function CapturePairedPreview({
     try {
       setExportMessage('')
       const text = privateTwoStoreMissingChecklist({
-        plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh, plusFresh, dekaFresh, describeReason,
+        plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh, plusFresh, dekaFresh,
+        focusStore: storeFilter, describeReason,
       })
       downloadLocal(text, 'text/plain;charset=utf-8',
-        'supa-PLUS-Deka-openstaande-broncontroles-prive.txt')
+        'supa-' + (storeFilter === 'all' ? 'PLUS-Deka' : storeFilter) + '-openstaande-broncontroles-prive.txt')
       setExportMessage('Openstaande of opnieuw op te nemen winkelbronnen lokaal bewaard. Nog geen winkelprijzen bevestigd.')
     } catch (cause) {
       setExportMessage(cause instanceof Error ? cause.message : 'Kan de ontbrekende bronregels niet bewaren.')
@@ -213,10 +217,11 @@ export function CapturePairedPreview({
     try {
       setExportMessage('')
       const note = privateTwoStoreMissingChecklist({
-        plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh, plusFresh, dekaFresh, describeReason,
+        plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh, plusFresh, dekaFresh,
+        focusStore: storeFilter, describeReason,
       })
       downloadLocal(privateTwoStorePreviewPrintHtml(note), 'text/html;charset=utf-8',
-        'supa-PLUS-Deka-openstaande-broncontroles-afdruk-prive.html')
+        'supa-' + (storeFilter === 'all' ? 'PLUS-Deka' : storeFilter) + '-openstaande-broncontroles-afdruk-prive.html')
       setExportMessage('Openstaande én eventueel opnieuw op te nemen winkelregels afdrukbaar bewaard. Geen prijzen bevestigd.')
     } catch (cause) {
       setExportMessage(cause instanceof Error ? cause.message : 'Kan het ontbrekende-bronblad niet afdrukbaar bewaren.')
@@ -246,7 +251,8 @@ export function CapturePairedPreview({
     try {
       setExportMessage('')
       const note = scope === 'all' ? reviewText() : privateTwoStoreMissingChecklist({
-        plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh, plusFresh, dekaFresh, describeReason,
+        plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh, plusFresh, dekaFresh,
+        focusStore: storeFilter, describeReason,
       })
       // Always provide a local selectable fallback for denied permissions.
       setPrintable(note)
@@ -261,7 +267,7 @@ export function CapturePairedPreview({
           throw Error('Mobiel delen niet beschikbaar. Selecteer de tekst hieronder.')
         }
         await navigator.share({
-          title: 'Supa · privé ' + (scope === 'missing' ? 'ontbrekende winkelmatches' : 'winkelbroncontrole'),
+          title: 'Supa · privé ' + (scope === 'missing' ? 'openstaande ' + (storeFilter === 'all' ? 'winkelmatches' : storeFilter + '-matches') : 'winkelbroncontrole'),
           text: note,
         })
         setExportMessage('Privécontroleblad bewust via je toestel gedeeld. Geen bron geaccepteerd.')
@@ -379,7 +385,7 @@ export function CapturePairedPreview({
       <button type="button" className="ghost-button" onClick={() => downloadSpreadsheet(false)}>
         Download beide originele winkelbronvoorstellen in Excel-CSV
       </button>
-      <button type="button" className="ghost-button" disabled={missing === 0}
+      <button type="button" className="ghost-button" disabled={selectedOpen === 0}
         onClick={() => downloadSpreadsheet(true)}>
         Download openstaande {storeFilter === 'all' ? missing :
           storeFilter === 'PLUS' ? plusOpen : dekaOpen} regels van
@@ -389,7 +395,7 @@ export function CapturePairedPreview({
         onClick={() => void shareSpreadsheet(false)}>
         Deel volledige Excel-CSV via mijn telefoon
       </button>
-      <button type="button" className="ghost-button" disabled={missing === 0}
+      <button type="button" className="ghost-button" disabled={selectedOpen === 0}
         onClick={() => void shareSpreadsheet(true)}>
         Deel openstaande {storeFilter === 'all' ? 'twee-winkel' : storeFilter + '-'}CSV via mijn telefoon
       </button>
@@ -400,21 +406,21 @@ export function CapturePairedPreview({
         Bewaar offline printblad van beide originele bronvoorstellen (HTML)
       </button>
       <button type="button" className="ghost-button" onClick={downloadMissingReview}
-        disabled={missing === 0}>
-        Download {missing} openstaande broncontroles (TXT)
+        disabled={selectedOpen === 0}>
+        Download {selectedOpen} openstaande {storeFilter === 'all' ? 'twee-winkel' : storeFilter + '-'}controles (TXT)
       </button>
       <button type="button" className="ghost-button"
-        onClick={downloadMissingPrintableReview} disabled={missing === 0}>
-        Bewaar {missing} openstaande broncontroles als offline afdrukblad (HTML)
+        onClick={downloadMissingPrintableReview} disabled={selectedOpen === 0}>
+        Bewaar {selectedOpen} openstaande {storeFilter === 'all' ? 'twee-winkel' : storeFilter + '-'}controles als HTML
       </button>
       <button type="button" className="ghost-button" onClick={() => void carryReview('all', 'copy')}>
         Kopieer broncontrole voor onderweg
       </button>
-      <button type="button" className="ghost-button" disabled={missing === 0}
+      <button type="button" className="ghost-button" disabled={selectedOpen === 0}
         onClick={() => void carryReview('missing', 'copy')}>
-        Kopieer {missing} openstaande of te vernieuwen winkelregels
+        Kopieer {selectedOpen} openstaande regels van {storeFilter === 'all' ? 'beide winkels' : storeFilter}
       </button>
-      <button type="button" className="ghost-button" disabled={missing === 0}
+      <button type="button" className="ghost-button" disabled={selectedOpen === 0}
         onClick={() => void carryReview('missing', 'share')}>
         Deel openstaande of te vernieuwen broncontroles via mijn telefoon
       </button>

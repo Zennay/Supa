@@ -69,6 +69,7 @@ export function privateTwoStorePreviewChecklist({
   plusObservedAt: string; dekaObservedAt: string
   within24h: boolean; sourceFresh: boolean
   plusFresh?: boolean; dekaFresh?: boolean
+  focusStore?: 'all' | 'PLUS' | 'DekaMarkt'
   describeReason?: (value: string) => string
 }): string {
   if (!Array.isArray(plus) || !Array.isArray(deka) ||
@@ -144,14 +145,24 @@ export function privateTwoStoreMissingChecklist(
   }
   const plusById = new Map(input.plus.map(line => [line.id, line]))
   const dekaById = new Map(input.deka.map(line => [line.id, line]))
-  const mustRecapture = !input.within24h || !input.sourceFresh
+  const plusInstant = observedInstant(input.plusObservedAt)
+  const dekaInstant = observedInstant(input.dekaObservedAt)
+  const older = plusInstant && dekaInstant
+    ? plusInstant.ns <= dekaInstant.ns ? 'PLUS' : 'DekaMarkt' : null
+  const plusUsable = (input.plusFresh ?? input.sourceFresh) &&
+    (input.within24h || older !== 'PLUS')
+  const dekaUsable = (input.dekaFresh ?? input.sourceFresh) &&
+    (input.within24h || older !== 'DekaMarkt')
+  const focusStore = input.focusStore ?? 'all'
   const incomplete = new Set([...plusById.keys(), ...dekaById.keys()].filter(id => {
-    if (mustRecapture) return true
     const left = plusById.get(id) ?? null
     const right = dekaById.get(id) ?? null
-    return !left || !right || left.label !== right.label ||
-      !samePrivatePhysicalDemand(left, right) ||
-      !completePreviewProposal(left) || !completePreviewProposal(right)
+    const same = !!left && !!right && left.label === right.label &&
+      samePrivatePhysicalDemand(left, right)
+    const plusOpen = !same || !plusUsable || !completePreviewProposal(left)
+    const dekaOpen = !same || !dekaUsable || !completePreviewProposal(right)
+    return focusStore === 'PLUS' ? plusOpen : focusStore === 'DekaMarkt'
+      ? dekaOpen : plusOpen || dekaOpen
   }))
   if (incomplete.size === 0) {
     throw Error('Geen openstaande of opnieuw op te nemen winkelregels.')
