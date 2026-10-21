@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { makeBlankPlannerCaptureCsv, type CaptureStore } from './plannerPriceCaptureSheet.ts'
 import { makePlannerCaptureGuide, type PlannerCaptureGuideNeed } from './plannerPriceCaptureGuide.ts'
+import { LocalObservationCaptureEditor } from './LocalObservationCaptureEditor.tsx'
 
 type CaptureDocument = 'csv' | 'guide'
 type Displayed = { key: string; kind: CaptureDocument; text: string }
@@ -11,6 +12,7 @@ type Displayed = { key: string; kind: CaptureDocument; text: string }
  */
 export function PortableBlankCapture({
   needs, stores, captureKey, needsAtClick, purpose = 'blank', delimiter = ',',
+  onReview, onDraftChange,
 }: {
   needs: readonly PlannerCaptureGuideNeed[]
   stores: readonly CaptureStore[]
@@ -18,6 +20,8 @@ export function PortableBlankCapture({
   needsAtClick?: () => readonly PlannerCaptureGuideNeed[]
   purpose?: 'blank' | 'missing'
   delimiter?: ',' | ';' | '\t'
+  onReview?: (files: File[]) => void
+  onDraftChange?: () => void
 }) {
   const [displayed, setDisplayed] = useState<Displayed | null>(null)
   const [feedback, setFeedback] = useState<{key: string; message: string} | null>(null)
@@ -100,6 +104,10 @@ export function PortableBlankCapture({
       <button type="button" className="ghost-button" disabled={!needs.length}
         onClick={() => void act('guide', 'share')}>Deel opnamegids op mijn telefoon</button>
     </div>
+    <LocalObservationCaptureEditor needs={needs} stores={stores}
+      needsAtClick={needsAtClick} delimiter={delimiter}
+      context={captureKey.replace(/:\d{6,}$/, '')}
+      onReview={onReview} onDraftChange={onDraftChange} />
     {current && <div className="offline-price-workbench__missing-copy">
       <label>Alleen dit geselecteerde weekmenu en {stores.join(' + ')} ·
         {current.kind === 'csv' ? ' blanco CSV' : ' bijbehorende opnamegids'}

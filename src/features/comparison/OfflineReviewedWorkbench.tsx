@@ -2559,6 +2559,12 @@ export function OfflineReviewedWorkbench({
           <PortableBlankCapture needs={plannerCaptureNeeds}
             stores={captureSheetStore === 'both' ? stores : [captureSheetStore]}
             delimiter={captureDelimiter}
+            onReview={files => { void previewFilledCsv(files) }}
+            onDraftChange={() => {
+              ++importRevision.current
+              setCapturePreview(null)
+              setWeekExportMessage('Je eigen nog onbevestigde winkelinvoer is gewijzigd. Bekijk de nieuwe bron opnieuw.')
+            }}
             captureKey={captureWeek + ':' + captureSheetStore + ':' + captureDelimiter} />
           <a className="ghost-button" href={`${import.meta.env.BASE_URL}private-basket-mapping.html`} target="_blank" rel="noopener noreferrer">
             Open uitgebreide privévergelijker
@@ -3288,6 +3294,7 @@ export function OfflineReviewedWorkbench({
                       </div>
                       {missingPriceCaptureNeeds[store].length > 0 &&
                         <PortableBlankCapture purpose="missing"
+                          onReview={files => { void previewFilledCsv(files) }}
                           needs={missingPriceCaptureNeeds[store]}
                           needsAtClick={() => missingCaptureNeedsNow(store)}
                           stores={[store]}
