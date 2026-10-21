@@ -484,3 +484,9 @@ border-radius:10px;padding:.65rem;scroll-margin-top:1.25rem}
   max-width: 100%;
   white-space: normal;
 }
+
+/* Every pre-import matching result stays discoverable on mobile. */
+.offline-price-workbench__matching-controls { display:flex; flex-wrap:wrap; gap:.75rem 1.5rem; margin-block:.75rem; align-items:flex-end; }
+.offline-price-workbench__matching-controls label:first-child { flex:1 1 16rem; min-width:0; }
+.offline-price-workbench__matching-controls input[type="search"] { display:block; width:100%; max-width:32rem; }
+.offline-price-workbench__matching-actions { display:flex; flex-wrap:wrap; gap:.5rem; margin-block:.5rem; }

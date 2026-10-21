@@ -36,6 +36,7 @@ import { currentTripKey, loadTripProgress, saveTripProgress } from '../../privat
 import { createPrivateBasketComparisonCsv } from '../../privateBasketComparisonCsv.ts'
 import { UnpricedPlannerChecklist } from './UnpricedPlannerChecklist.tsx'
 import { PrivateCapturePastePreview } from './PrivateCapturePastePreview.tsx'
+import { CaptureMatchingPreview } from './CaptureMatchingPreview.tsx'
 import { recentOwnCaptureInstant, type PrivateReviewedBaskets, type PrivateCaptureProgress, type PrivateReviewFocus } from './privateReviewedBasketBridge.ts'
 import './offlineReviewedWorkbench.css'
 const dateTime = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
@@ -2643,34 +2644,11 @@ export function OfflineReviewedWorkbench({
                 </details>
               ))}
               {currentPreview.stores.map(store => store.matching && (
-                <details key={'matches-' + store.retailer}
-                  className="offline-price-workbench__capture-matching">
-                  <summary>{store.retailer}: Planner-productmatching vooraf bekijken
-                    {store.appendableNewProducts ? ' (bestaande + nieuwe bronproducten)' : ''}
-                    {' '}({store.matching.proposed} voorstellen,
-                    {' '}{store.matching.unresolved} nog zonder match)</summary>
-                  <p className="disclaimer">Deze suggesties komen uit exact dezelfde
-                    conservatieve matching en fysieke verpakkingsberekening als
-                    jouw uiteindelijke winkelmand. Er is nog niets bevestigd,
-                    geen compleet mandbedrag en geen prijsverschil vrijgegeven.</p>
-                  <ul>
-                    {store.matching.lines.slice(0, 60).map(line => (
-                      <li key={line.id}>
-                        <strong>{line.label}</strong>:
-                        {' '}{line.status === 'matched'
-                          ? 'Voorstel: ' + line.product + ' · broncode ' + line.originalSku +
-                            ' · ' + line.packs + ' hele verpakking(en). Controleer zelf.'
-                          : 'Nog geen betrouwbare productmatch. ' +
-                            (line.reasons[0] ? humanMatchReason(line.reasons[0]) : 'Handmatige keuze nodig.')}
-                      </li>
-                    ))}
-                  </ul>
-                  {store.matching.total > 60 && (
-                    <p className="disclaimer">Nog
-                      {' '}{store.matching.total - 60}
-                      {' '}Planner-regels verschijnen na het overnemen bij de volledige productreview.</p>
-                  )}
-                </details>
+                <CaptureMatchingPreview
+                  key={store.retailer + ':' + store.observedAt + ':' + captureWeek}
+                  retailer={store.retailer} lines={store.matching.lines}
+                  proposed={store.matching.proposed} unresolved={store.matching.unresolved}
+                  appended={!!store.appendableNewProducts} reason={humanMatchReason} />
               ))}
               {currentPreview.unobservedOtherStoreRows > 0 && (
                 <p>{currentPreview.unobservedOtherStoreRows}
