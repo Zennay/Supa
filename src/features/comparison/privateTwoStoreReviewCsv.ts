@@ -117,8 +117,10 @@ export function privateTwoStoreReviewCsv(input: Input): string {
     body.push([
       open ? 'Openstaand' : 'Alleen voorstel', id, left?.label ?? right?.label ?? '',
       quantity(left), quantity(right), equal ? 'ja' : 'nee',
-      ...storeColumns(left, plusObservedAt, plusUsable),
-      ...storeColumns(right, dekaObservedAt, dekaUsable), reason,
+      // Different physical demand means these cannot be compared; preserve
+      // the original SKU/pack facts but suppress even draft money cells.
+      ...storeColumns(left, plusObservedAt, plusUsable && equal),
+      ...storeColumns(right, dekaObservedAt, dekaUsable && equal), reason,
     ])
   }
   if (onlyOpen && body.length === 0) throw Error('Er zijn geen openstaande winkelregels.')

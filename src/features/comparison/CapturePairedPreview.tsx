@@ -328,11 +328,20 @@ export function CapturePairedPreview({
             </small></th>
             {row.sameDemand
               ? <><td>{localOffer(row.left, describeReason, plusUsable)}</td><td>{localOffer(row.right, describeReason, dekaUsable)}</td></>
-              : <td colSpan={2}>De originele fysieke vraag is niet eenduidig
-                voor beide winkels. PLUS: {row.left ? labelQuantity(row.left) : 'ontbreekt'}.
-                {' '}DekaMarkt: {row.right ? labelQuantity(row.right) : 'ontbreekt'}.
-                {' '}Herstel de Planner-vraag of de oorspronkelijke bronregels vóór
-                prijsweergave of bevestiging.</td>}
+              : <>
+                {[{ store: 'PLUS', line: row.left }, { store: 'DekaMarkt', line: row.right }]
+                  .map(({ store, line }) => <td key={store}>
+                    <strong>Ongelijke of ontbrekende Planner-vraag. Prijs onbekend.</strong>
+                    <small style={{ display: 'block' }}>Oorspronkelijke vraag:{' '}
+                      {line ? labelQuantity(line) : 'ontbreekt'}.</small>
+                    {line?.product && <small style={{ display: 'block' }}>
+                      Bronproduct: {line.product}</small>}
+                    {line?.originalSku && <small style={{ display: 'block' }}>
+                      Originele artikelcode: {line.originalSku}</small>}
+                    <small>Herstel de oorspronkelijke vraag voor beide winkels;
+                      bedragen en prijsverschillen blijven onbekend.</small>
+                  </td>)}
+              </>}
           </tr>)}</tbody>
       </table>
     </div>
