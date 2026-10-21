@@ -100,7 +100,9 @@ export function combinedRecipesCaptureKit(
   return {
     csv: makeBlankPlannerCaptureCsv(needs, stores, delimiter),
     guide: 'SUPA · eigen receptenbundel · ' + recipes.length + ' recepten\n' +
-      'LET OP: de lege bron-CSV bevat standaard beschikbaar=false. Zet dit alleen op true ' +
+      'Bestandsformaat: ' + (delimiter === '\t' ? 'TSV met tabs' :
+        delimiter === ';' ? 'Nederlandse CSV met puntkomma' : 'CSV met komma') + '\n' +
+      'LET OP: de lege bron-CSV/TSV bevat standaard beschikbaar=false. Zet dit alleen op true ' +
       'als het originele winkelproduct werkelijk beschikbaar is én je de verpakking, prijs en ' +
       'het echte observatiemoment hebt opgenomen. Een leeg product is NOOIT een gratis product.\n\n' +
       makePlannerCaptureGuide(needs, stores) +

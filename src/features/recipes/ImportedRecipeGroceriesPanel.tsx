@@ -799,7 +799,7 @@ export function ImportedRecipeGroceriesPanel({
         '-printbare-lege-winkelopname.html', html, 'text/html;charset=utf-8')
       setFeedback('Printbaar offline-formulier voor precies dezelfde CSV-rijen opgeslagen. ' +
         'Open de HTML lokaal en print deze. De originele broncode, prijs, verpakking en echte tijd ' +
-        'moet je zelf rechtmatig vastleggen; kopieer ze daarna in het bijbehorende lege CSV.')
+        'moet je zelf rechtmatig vastleggen; kopieer ze daarna in het bijbehorende lege CSV/TSV-blad.')
     } catch (cause) {
       setFeedback(cause instanceof Error ? cause.message :
         'Het printbare formulier is niet beschikbaar. De winkelprijzen blijven onbekend.')
