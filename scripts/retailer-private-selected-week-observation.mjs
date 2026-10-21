@@ -35,8 +35,19 @@ export function buildPrivateSelectedWeekObservationWorksheet(records, days = m2D
       summary.publicSavingsClaimEligible !== false || summary.externalRequests !== 0 ||
       privateReview.livePriceClaimsAllowed !== false ||
       summary.retailerReviewRows !== privateReview.preview.rows.length) refuse()
+  // Canonical row order is independent of planner and source-archive iteration.
+  // Keep each ingredient's PLUS/Deka pair adjacent, with a fixed retailer order.
+  const retailerOrder = { plus: 0, dekamarkt: 1 }
+  const orderedPreviewRows = [...privateReview.preview.rows].sort((left, right) => {
+    const leftIngredient = typeof left?.ingredientId === 'string' ? left.ingredientId : ''
+    const rightIngredient = typeof right?.ingredientId === 'string' ? right.ingredientId : ''
+    if (leftIngredient !== rightIngredient) return leftIngredient < rightIngredient ? -1 : 1
+    const leftRetailer = retailerOrder[left?.retailerId] ?? 99
+    const rightRetailer = retailerOrder[right?.retailerId] ?? 99
+    return leftRetailer - rightRetailer
+  })
   const seen = new Set()
-  const rows = privateReview.preview.rows.map(row => {
+  const rows = orderedPreviewRows.map(row => {
     if (!['plus', 'dekamarkt'].includes(row.retailerId) ||
         typeof row.ingredientId !== 'string' || !row.ingredientId ||
         typeof row.ingredientLabel !== 'string' || !row.ingredientLabel ||
