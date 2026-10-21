@@ -143,14 +143,68 @@ function conflictingOfferEvidence(offers: JsonObject[]): boolean {
   return false
 }
 
-function extractPrice(offers: JsonObject[]): number | null {
-  // AggregateOffer.lowPrice and ranges describe many offers, not the
-  // payable price of this exact SKU/pack. Multiple offers or a unit-price
-  // specification cannot independently prove a checkout package price.
-  // An unambiguous concrete typed Offer.price is the only price authority.
+type ExtractedPrice = {
+  cents: number
+  evidence: 'offer_price' | 'pack_matched_unit_price'
+}
+
+function schemaUnitCode(value: unknown): 'g' | 'kg' | 'ml' | 'l' | null {
+  const code = asString(value)?.toUpperCase()
+  if (code === 'GRM') return 'g'
+  if (code === 'KGM') return 'kg'
+  if (code === 'MLT') return 'ml'
+  if (code === 'LTR') return 'l'
+  return null
+}
+
+/**
+ * A UnitPriceSpecification is a usable pack price only when its explicit
+ * reference quantity exactly matches the product's declared pack quantity.
+ * Never multiply a per-unit price into a guessed checkout price.
+ */
+function unitPriceSpecificationMatchesPack(specification: JsonObject, pack: RawPack): boolean {
+  if (pack.amount === null || pack.unit === 'unknown') return false
+  const reference = specification.referenceQuantity
+  if (!isObject(reference)) return false
+  const value = asString(reference.value)
+  const unit = schemaUnitCode(reference.unitCode)
+  if (!value || !unit) return false
+  const normalized = normalizePackText(value + ' ' + unit)
+  return normalized.amount !== null &&
+    normalized.unit !== 'unknown' &&
+    normalized.amount === pack.amount &&
+    normalized.unit === pack.unit
+}
+
+function extractPrice(offers: JsonObject[], pack: RawPack): ExtractedPrice | null {
+  // AggregateOffer ranges and multiple offers cannot prove a checkout price.
   if (offers.length !== 1 || !hasType(offers[0], 'Offer') ||
       hasType(offers[0], 'AggregateOffer')) return null
-  return cents(offers[0].price)
+  const offer = offers[0]
+  const directPrice = cents(offer.price)
+  const specifications = priceSpecificationCandidates(offer)
+  const packMatchedUnitPrices = specifications.filter(specification =>
+    hasType(specification, 'UnitPriceSpecification') &&
+    unitPriceSpecificationMatchesPack(specification, pack))
+
+  if (directPrice !== null) {
+    // A unit-price declaration for this exact pack must not contradict the
+    // concrete Offer.price. Specifications for a different reference quantity
+    // remain unit prices and are never promoted to pack prices.
+    if (packMatchedUnitPrices.some(specification => cents(specification.price) !== directPrice)) {
+      return null
+    }
+    return { cents: directPrice, evidence: 'offer_price' }
+  }
+
+  // Without Offer.price, accept exactly one explicit EUR unit-price record
+  // only when its reference quantity equals the known pack size and unit.
+  if (specifications.length !== 1 || packMatchedUnitPrices.length !== 1) return null
+  const specification = packMatchedUnitPrices[0]
+  const price = cents(specification.price)
+  const currency = asString(specification.priceCurrency)?.toUpperCase()
+  if (price === null || currency !== 'EUR') return null
+  return { cents: price, evidence: 'pack_matched_unit_price' }
 }
 
 function extractCurrency(offers: JsonObject[]): string | null {
@@ -237,13 +291,15 @@ function extractPack(product: JsonObject): RawPack {
   }
 }
 
-function buildOffer(offers: JsonObject[], price: number | null): RawOffer | null {
+function buildOffer(offers: JsonObject[], price: ExtractedPrice | null): RawOffer | null {
   if (offers.length !== 1 || price === null) return null
 
   return {
-    label: 'schema.org Offer',
+    label: price.evidence === 'offer_price'
+      ? 'schema.org Offer'
+      : 'schema.org UnitPriceSpecification (pack-matched)',
     mechanics: null,
-    offerPriceCents: price,
+    offerPriceCents: price.cents,
     originalPriceCents: null,
     validFrom: asString(offers[0].validFrom),
     validTo: asString(offers[0].priceValidUntil),
@@ -291,7 +347,9 @@ export function parseSchemaOrgProduct(
     }
   }
 
-  const price = extractPrice(offers)
+  const pack = extractPack(product)
+  const extractedPrice = extractPrice(offers, pack)
+  const price = extractedPrice?.cents ?? null
   if (price !== null && currency === null) {
     return {
       type: 'abstain',
@@ -305,8 +363,8 @@ export function parseSchemaOrgProduct(
     name,
     currentPriceCents: price,
     currency: 'EUR',
-    pack: extractPack(product),
-    offer: buildOffer(offers, price),
+    pack,
+    offer: buildOffer(offers, extractedPrice),
     availability: extractAvailability(offers),
     provenance,
   }
