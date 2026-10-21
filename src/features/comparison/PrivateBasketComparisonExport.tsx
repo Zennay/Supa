@@ -5,9 +5,9 @@ const COLUMNS = [
   'plusObservedAt', 'dekaObservedAt', 'comparisonStatus',
   'ingredientId', 'ingredient', 'requiredAmount', 'requiredUnit',
   'plusStatus', 'plusProduct', 'plusPacks', 'plusPackAmount', 'plusPackUnit',
-  'plusPackCount', 'plusPackPriceCents', 'plusLineCents',
+  'plusPackCount', 'plusPackPriceCents', 'plusUnitPriceEuro', 'plusUnitPriceBasis', 'plusLineCents',
   'dekaStatus', 'dekaProduct', 'dekaPacks', 'dekaPackAmount', 'dekaPackUnit',
-  'dekaPackCount', 'dekaPackPriceCents', 'dekaLineCents',
+  'dekaPackCount', 'dekaPackPriceCents', 'dekaUnitPriceEuro', 'dekaUnitPriceBasis', 'dekaLineCents',
   'deltaCentsDekaMinusPlus',
 ]
 
@@ -23,15 +23,48 @@ function cell(value: string | number): string {
   return '"' + text.replace(/"/g, '""') + '"'
 }
 
+function unitPriceFields(line: BasketTraceLine): [number | '', string] {
+  if (line.status !== 'matched' ||
+      !Number.isSafeInteger(line.pricePerPackCents) || line.pricePerPackCents < 0 ||
+      !Number.isFinite(line.pack.amount) || line.pack.amount <= 0 ||
+      !Number.isFinite(line.pack.count) || line.pack.count <= 0) return ['', '']
+  const quantity = line.pack.amount * line.pack.count
+  const unit = line.pack.unit.trim().toLowerCase()
+  let baseQuantity = 0
+  let basis = ''
+  if (['g', 'gram', 'grams', 'gramme', 'grammen'].includes(unit)) {
+    baseQuantity = quantity / 1000
+    basis = '€/kg'
+  } else if (['kg', 'kilogram', 'kilogrammen'].includes(unit)) {
+    baseQuantity = quantity
+    basis = '€/kg'
+  } else if (['ml', 'milliliter', 'millilitre', 'milliliters', 'millilitres'].includes(unit)) {
+    baseQuantity = quantity / 1000
+    basis = '€/l'
+  } else if (['l', 'liter', 'litre', 'liters', 'litres'].includes(unit)) {
+    baseQuantity = quantity
+    basis = '€/l'
+  } else if (['stuk', 'stuks', 'pc', 'pcs', 'piece', 'pieces', 'each'].includes(unit)) {
+    baseQuantity = quantity
+    basis = '€/stuk'
+  } else {
+    return ['', '']
+  }
+  if (!Number.isFinite(baseQuantity) || baseQuantity <= 0) return ['', '']
+  return [Number((line.pricePerPackCents / 100 / baseQuantity).toFixed(4)), basis]
+}
+
 function lineFields(line: BasketTraceLine): (string | number)[] {
   if (line.status !== 'matched') return [
-    'niet gekoppeld', '', '', '', '', '', '', '',
+    'niet gekoppeld', '', '', '', '', '', '', '', '', '',
   ]
+  const [unitPriceEuro, unitPriceBasis] = unitPriceFields(line)
   return [
     line.reasons.includes('explicit local user selection; not an automatic or verified retailer match')
       ? 'door gebruiker gekoppeld' : 'automatisch gekoppeld',
     line.productName, line.packs, line.pack.amount,
-    line.pack.unit, line.pack.count, line.pricePerPackCents, line.lineTotalCents,
+    line.pack.unit, line.pack.count, line.pricePerPackCents,
+    unitPriceEuro, unitPriceBasis, line.lineTotalCents,
   ]
 }
 
