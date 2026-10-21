@@ -1446,3 +1446,16 @@ prijs gereconstrueerd. De bestaande fysieke productmatching bepaalt
 vervolgens of datzelfde originele pak werkelijk bij één of meer gevraagde
 ingrediënten past. Ook een handmatig gekozen verwijzing omzeilt nooit de
 aparte menselijke review, huidige bronmomenten of bronrechten.
+
+## Optionele lokale verpakkingsbarcode in de mobiele bronopname
+
+Binnen een originele winkelproductregel kun je desgewenst **Scan originele
+verpakkingsbarcode op dit apparaat** kiezen. Hiervoor hergebruikt Supa de
+bestaande lokale camera-/EAN-/UPC-scanner zonder remote afbeeldingsherkenning,
+prijsopvraag of automatische netwerkrequest. Alleen na afzonderlijke
+bevestiging door de gebruiker verschijnt de afgelezen code in het
+SKU-conceptveld. Een barcode is niet automatisch de artikelcode van PLUS of
+DekaMarkt; echte pakinhoud, naam, beschikbaarheid, prijs en het
+waarnemingsmoment moeten nog steeds persoonlijk worden ingevuld. De
+bestaande bronimport, controle op unieke SKU en menselijke matching blijven
+vereist. Handmatige code-invoer blijft mogelijk zonder camera.

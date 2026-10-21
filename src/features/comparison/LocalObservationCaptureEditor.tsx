@@ -1,4 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+// Reuse the established device-only scanner, but load no camera code until
+// the shopper explicitly chooses to scan their physical product.
+const LocalDeviceBarcodeScanner = lazy(() =>
+  import('./LocalDeviceBarcodeScanner.tsx')
+    .then(module => ({ default: module.LocalDeviceBarcodeScanner })))
 import type { CaptureStore } from './plannerPriceCaptureSheet.ts'
 import type { PlannerCaptureGuideNeed } from './plannerPriceCaptureGuide.ts'
 import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
@@ -67,6 +72,9 @@ export function LocalObservationCaptureEditor({
   const [onlyOpen, setOnlyOpen] = useState(false)
   const [euroDrafts, setEuroDrafts] = useState<Record<string, string>>({})
   const [euroErrors, setEuroErrors] = useState<Record<string, string>>({})
+  const [scanTarget, setScanTarget] = useState<{
+    store: CaptureStore; index: number; fingerprint: string
+  } | null>(null)
   const [draftPaste, setDraftPaste] = useState('')
   const [draftCopy, setDraftCopy] = useState('')
   const [portable, setPortable] = useState<{ store: CaptureStore; text: string } | null>(null)
@@ -147,6 +155,7 @@ export function LocalObservationCaptureEditor({
       ++latestRestore.current
       setRows(stored.rows)
       setMoments(stored.moments)
+      setScanTarget(null)
       setPortable(null); setDraftCopy(''); setDraftPaste(''); setEuroDrafts({}); setEuroErrors({})
       invalidatePreviewOnce()
       setStatus('Eerdere invoer uit dit tabblad hervat. Alle winkelproducten en prijzen moeten nog door broncontrole.')
@@ -244,6 +253,7 @@ export function LocalObservationCaptureEditor({
     ++changes.current
     ++latestRestore.current
     setSnapshot({ fingerprint: currentFingerprint, needs: [...needs], stores: [...stores] })
+    setScanTarget(null)
     setRows({}); setMoments({}); setStatus(''); setSearch(''); setOnlyOpen(false); setPortable(null); setDraftPaste(''); setDraftCopy(''); setEuroDrafts({}); setEuroErrors({})
     // A new physical week must not quietly overwrite the previous tab copy.
     setTabAutosave(false)
@@ -324,6 +334,7 @@ export function LocalObservationCaptureEditor({
       }
       ++changes.current
       setRows(restored.rows); setMoments(restored.moments)
+      setScanTarget(null)
       setPortable(null); setDraftCopy(''); setDraftPaste(''); setEuroDrafts({}); setEuroErrors({})
       setStatus('Privéconcept op dit toestel hersteld. Alle SKU’s, bronmomenten en prijzen moeten nog via de gewone broncontrole.')
       invalidatePreviewOnce()
@@ -639,6 +650,29 @@ export function LocalObservationCaptureEditor({
               <input type="text" value={value.sku} maxLength={100}
                 onChange={event => edit(store, index, 'sku', event.currentTarget.value)} />
             </label>
+            <button type="button" className="ghost-button" disabled={changed}
+              aria-expanded={scanTarget?.store === store && scanTarget.index === index}
+              onClick={() => setScanTarget({
+                store, index, fingerprint: snapshot.fingerprint,
+              })}>Scan originele verpakkingsbarcode op dit apparaat (optioneel)</button>
+            {scanTarget?.store === store && scanTarget.index === index &&
+              scanTarget.fingerprint === snapshot.fingerprint && !changed &&
+              <Suspense fallback={<p role="status">Lokale scanner laden…</p>}>
+                <LocalDeviceBarcodeScanner
+                  onAccept={code => {
+                    if (currentScope.current !== snapshot.fingerprint ||
+                        row(store, index).state === 'unseen' ||
+                        row(store, index).state === 'reuse') {
+                      setScanTarget(null)
+                      return
+                    }
+                    edit(store, index, 'sku', code)
+                    setScanTarget(null)
+                    setStatus('Verpakkingsbarcode ' + code +
+                      ' alleen als eigen conceptcode ingevuld. Controleer of deze echt de originele winkelartikelcode is; geen automatische match, prijs of winkelrecht.')
+                  }}
+                  onClose={() => setScanTarget(null)} />
+              </Suspense>}
             <label>Originele winkelproductnaam
               <input type="text" value={value.name} maxLength={160}
                 onChange={event => edit(store, index, 'name', event.currentTarget.value)} />
