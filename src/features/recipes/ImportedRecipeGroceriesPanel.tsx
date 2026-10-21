@@ -63,6 +63,7 @@ export function ImportedRecipeGroceriesPanel({
   const [showCookingMode, setShowCookingMode] = useState(false)
   const [cookingModeOpened, setCookingModeOpened] = useState(false)
   const [copyableCaptureGuide, setCopyableCaptureGuide] = useState<{ identity: string; target: string; text: string } | null>(null)
+  const [copyableCaptureSheet, setCopyableCaptureSheet] = useState<{ key: string; text: string } | null>(null)
   const [copyableDayGuide, setCopyableDayGuide] = useState<{ key: string; text: string } | null>(null)
   const [capturePreview, setCapturePreview] = useState<{
     key: string; rows: { csvRow: number; store: string; id: string;
@@ -685,6 +686,47 @@ export function ImportedRecipeGroceriesPanel({
       setFeedback(cause instanceof Error ? cause.message : 'De opnamegids kon niet worden gekopieerd.')
     }
   }
+  async function copyCaptureSheet() {
+    if (!privateTransfer.ready) return
+    setFeedback('')
+    setCopyableCaptureSheet(null)
+    const key = captureKey
+    const stores = captureTarget === 'both' ? ['PLUS', 'DekaMarkt'] as const : [captureTarget]
+    try {
+      requireLatestOwnedRecipes()
+      const { combinedRecipesCaptureKit } = await import('./combinedRecipesCaptureKit.ts')
+      if (latestCaptureKey.current !== key)
+        throw new Error('Je winkelkeuze of receptenbundel is gewijzigd. Open het actuele blad opnieuw.')
+      requireLatestOwnedRecipes()
+      const csv = combinedRecipesCaptureKit(selected, portionsById, stores,
+        privateCookingDays, captureDelimiter).csv
+      if (new TextEncoder().encode(csv).length > 256_000)
+        throw new Error('Dit privé-opnameblad is te groot voor het mobiele klembord.')
+      if (latestCaptureKey.current !== key)
+        throw new Error('Het opnameblad is gewijzigd. Kopieer de actuele rijen opnieuw.')
+      if (navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(csv)
+          requireLatestOwnedRecipes()
+          if (latestCaptureKey.current !== key)
+            throw new Error('Het receptenmandje veranderde tijdens het kopiëren. Kopieer opnieuw.')
+          setFeedback('Leeg ' + (captureDelimiter === '\t' ? 'TSV' : 'CSV') +
+            '-winkelopnameblad gekopieerd. Vul uitsluitend eigen geobserveerde brongegevens in.')
+          return
+        } catch {
+          // Permission denied or changed content: offer visible manual copy,
+          // never upload or silently persist the user's physical basket.
+        }
+      }
+      requireLatestOwnedRecipes()
+      if (latestCaptureKey.current !== key)
+        throw new Error('Het opnameblad veranderde tijdens het kopiëren. Probeer opnieuw.')
+      setCopyableCaptureSheet({ key, text: csv })
+      setFeedback('Klembord niet beschikbaar: selecteer hieronder de originele lege CSV/TSV-rijen.')
+    } catch (cause) {
+      setFeedback(cause instanceof Error ? cause.message : 'Kopiëren van het bronblad is niet gelukt.')
+    }
+  }
   async function downloadCaptureKit(kind: 'csv' | 'guide') {
     if (!privateTransfer.ready) return
     setFeedback('')
@@ -1141,6 +1183,10 @@ export function ImportedRecipeGroceriesPanel({
             Download leeg winkelinvulblad (CSV/TSV)
           </button>
           <button type="button" disabled={!privateTransfer.ready}
+            onClick={() => void copyCaptureSheet()}>
+            Kopieer leeg winkelinvulblad (mobiel)
+          </button>
+          <button type="button" disabled={!privateTransfer.ready}
             onClick={() => void downloadPrintableCaptureKit()}>
             Download printbaar opnameformulier (HTML)
           </button>
@@ -1185,6 +1231,14 @@ export function ImportedRecipeGroceriesPanel({
             </table>
           </div>
         </details>}
+        {copyableCaptureSheet?.key === captureKey &&
+          <label className="recipe-collection-groceries__mobile-copy">
+            Selecteer en kopieer het lege {captureDelimiter === '\t' ? 'TSV' : 'CSV'}-winkelinvulblad
+            <textarea rows={12} readOnly value={copyableCaptureSheet.text}
+              onFocus={event => {
+                if (latestCaptureKey.current === captureKey) event.currentTarget.select()
+              }} />
+          </label>}
         {copyableCaptureGuide?.identity === captureKey &&
           copyableCaptureGuide.target === captureTarget &&
           <label className="recipe-collection-groceries__mobile-copy">
