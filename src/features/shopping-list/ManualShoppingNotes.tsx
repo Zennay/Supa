@@ -250,6 +250,52 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       if (version === readVersion.current) setMessage(error instanceof Error ? error.message : 'Kon backup niet inlezen.')
     } finally { if (version === readVersion.current) setBackupBusy(false) }
   }
+  function previewSavedCopy(kind: 'tab' | 'device') {
+    try {
+      const raw = kind === 'device'
+        ? window.localStorage.getItem(privateDeviceKey)
+        : window.sessionStorage.getItem(privateSessionKey)
+      if (!raw) throw Error('Geen opgeslagen kopie meer beschikbaar.')
+      if (new TextEncoder().encode(raw).length > PRIVATE_NOTES_BACKUP_MAX_BYTES)
+        throw Error('De bewaarde kopie is te groot. Gebruik je eigen JSON-backup.')
+      const incoming = normalizePrivateNotes(JSON.parse(raw))
+      const merged = mergePrivateNotes(notes, incoming)
+      setBackupPreview({
+        incoming, existing: serializePrivateNotes(notes),
+        additions: merged.notes.slice(notes.length),
+        duplicateCount: incoming.length - merged.added,
+      })
+      setMessage('Opgeslagen ' + (kind === 'device' ? 'apparaatkopie' : 'tabkopie') +
+        ' is veilig ter controle geopend. Kies onderaan bewust voor samenvoegen, of annuleer.')
+    } catch (error) {
+      setBackupPreview(null)
+      setMessage(error instanceof Error ? error.message : 'Opgeslagen privéversie kan niet worden bekeken.')
+    }
+  }
+  function discardProtectedCopy(kind: 'tab' | 'device') {
+    try {
+      const storage = kind === 'device' ? window.localStorage : window.sessionStorage
+      const key = kind === 'device' ? privateDeviceKey : privateSessionKey
+      const before = storage.getItem(key)
+      if (!window.confirm('Verwijder alleen deze opgeslagen ' +
+        (kind === 'device' ? 'apparaatkopie' : 'tabkopie') +
+        '? Dit kan niet ongedaan worden gemaakt. Download eerst een JSON-backup als je deze versie nodig hebt.')) return
+      if (storage.getItem(key) !== before) {
+        setMessage('De opgeslagen versie is intussen veranderd; verwijderen geweigerd.')
+        return
+      }
+      storage.removeItem(key)
+      if (kind === 'device') {
+        setDeviceEnabled(false); setDeviceProtected(false); setDeviceRaw(null)
+        setDeviceMessage('Oude apparaatkopie verwijderd. Bewaren kan weer vrijwillig worden aangezet.')
+      } else {
+        setSessionEnabled(false); setSessionProtected(false); setSessionRaw(null)
+        setSessionMessage('Oude tabkopie verwijderd. Tijdelijk bewaren kan opnieuw worden aangezet.')
+      }
+    } catch {
+      setMessage('Kon de opgeslagen kopie niet wissen; je geopende boodschappen blijven intact.')
+    }
+  }
   function backupConfirm() {
     if (!backupPreview) return
     try {
@@ -1042,6 +1088,11 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       <small>Niet automatisch ingeschakeld. Geen cloud, geen winkelprijzen; stoppen wist
         alleen deze optionele sessiekopie, niet je geopende lijst of JSON-backup.</small>
       {sessionMessage && <p role="status" aria-live="polite">{sessionMessage}</p>}
+      {sessionProtected && <div className="manual-shopping-notes__recovery" role="group"
+        aria-label="Beschermde tabkopie controleren">
+        <button type="button" onClick={() => previewSavedCopy('tab')}>Bekijk tabkopie om samen te voegen</button>
+        <button type="button" onClick={() => discardProtectedCopy('tab')}>Wis alleen oude tabkopie…</button>
+      </div>}
       <label><input type="checkbox" checked={deviceEnabled} disabled={deviceProtected}
         onChange={event => changeDeviceOptIn(event.target.checked)} />
         Bewaar mijn ongeprijsde boodschappen op dit apparaat (ook na sluiten)</label>
@@ -1051,6 +1102,11 @@ export function ManualShoppingNotes({ notes, setNotes }: {
         Uitschakelen verwijdert de apparaatkopie, niet je geopende lijst.
         Bewaar een eigen JSON-backup voordat je de browsergegevens wist.</small>
       {deviceMessage && <p role="status" aria-live="polite">{deviceMessage}</p>}
+      {deviceProtected && <div className="manual-shopping-notes__recovery" role="group"
+        aria-label="Beschermde apparaatkopie controleren">
+        <button type="button" onClick={() => previewSavedCopy('device')}>Bekijk apparaatkopie om samen te voegen</button>
+        <button type="button" onClick={() => discardProtectedCopy('device')}>Wis alleen oude apparaatkopie…</button>
+      </div>}
     </section>
     <div className="manual-shopping-notes__actions">
       <button type="button" disabled={!visible.length} onClick={() => setExportVisible(value => !value)}>

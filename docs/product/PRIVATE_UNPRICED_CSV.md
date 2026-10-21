@@ -29,3 +29,11 @@ een ander tabblad of tegenstrijdige opgeslagen versies stopt automatisch bewaren
 zonder de geopende lijst te vervangen. Gebruik dan de JSON-backup om artikelen
 expliciet te controleren en samen te voegen. De nieuwe keuze wordt nooit stilzwijgend
 ingeschakeld en uitschakelen wist alleen de gekozen bewaarde apparaatkopie.
+
+### Bij een opslagconflict
+
+De privélijst blijft in de app zichtbaar maar de conflicterende opslag wordt niet
+automatisch overschreven. De gebruiker kan de oude tab-/apparaatkopie eerst lokaal
+bekijken via dezelfde expliciete JSON-merge-voorinzage, of de betreffende oude
+kopie na een bevestiging wissen. Wissen verandert nooit de geopende lijst, andere
+opslagkopieën, prijsbronnen of handmatig gedownloade back-ups.
