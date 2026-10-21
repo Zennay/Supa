@@ -67,7 +67,17 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
   const [productSource, setProductSource] = useState<'history' | 'figma'>('figma')
   const [storeFilter, setStoreFilter] = useState<'all' | 'PLUS' | 'DekaMarkt'>('all')
   const dialog = useRef<HTMLDialogElement>(null)
-  useEffect(() => { setQuery('') }, [view])
+  useEffect(() => {
+    setQuery('')
+    // Recipe and product favorites have different IDs. Do not carry a
+    // recipe-only favorites filter into Products when the tab changes.
+    if (view === 'products') {
+      setFavoritesOnly(false)
+      setUnitFilter('all')
+      setStoreFilter('all')
+      setSortByPrice(false)
+    }
+  }, [view])
   // Search only: normalize accents/case, Dutch decimal commas and spacing
   // between a quantity and its unit. This never alters captured source data.
   const normalizeCatalogSearch = (value: string) =>

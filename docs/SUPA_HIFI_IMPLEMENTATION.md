@@ -54,4 +54,5 @@ The M2 Firefox workflow enters Planner from the new Home before replaying all ex
 - Switching between historical identities and Figma examples preserves the typed search query but clears source-specific filters, so a favorites-only selection from one catalog cannot silently make the other catalog appear empty.
 - The product-source selector appears once in the Products flow (not duplicated inside the optional filter panel) and exposes its two mutually exclusive choices as an accessible control group.
 - Empty results in recipes, historical products and Figma examples now offer a direct accessible reset action that clears the search and source-specific filters; users do not have to reopen the filter panel to recover the catalog.
+- Entering Products from another tab clears recipe-only favorites and source-specific filters because recipe and product IDs are separate domains; this prevents an unrelated favorites selection from hiding the entire catalog.
 - This is discovery-only behavior: it does not add current retailer prices, change source rights, or feed demo values into the private reviewed-basket calculator.
