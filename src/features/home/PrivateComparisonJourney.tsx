@@ -57,8 +57,8 @@ export function PrivateComparisonJourney({
 }) {
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [exportMessage, setExportMessage] = useState('')
-  const [shareFallback, setShareFallback] = useState('')
-  const [partialCopyFallback, setPartialCopyFallback] = useState('')
+  const [shareFallback, setShareFallback] = useState<{ source: PrivateReviewedBaskets | null; week: string; text: string } | null>(null)
+  const [partialCopyFallback, setPartialCopyFallback] = useState<{ source: PrivateCaptureProgress | null; reviewed: PrivateReviewedBaskets | null; week: string; text: string } | null>(null)
   const [showPasteSource, setShowPasteSource] = useState(false)
   const [captureMessage, setCaptureMessage] = useState('')
   const [partialQuery, setPartialQuery] = useState('')
@@ -388,7 +388,7 @@ export function PrivateComparisonJourney({
 
   async function handOffCompleteComparison(action: 'copy' | 'share') {
     setExportMessage('')
-    setShareFallback('')
+    setShareFallback(null)
     try {
       // Build synchronously in the original user gesture for mobile Web Share.
       const content = personalComparisonReceipt()
@@ -411,7 +411,7 @@ export function PrivateComparisonJourney({
         await navigator.clipboard.writeText(content)
         setExportMessage('Volledige eigen vergelijking met bronmomenten en SKU’s gekopieerd.')
       } catch {
-        setShareFallback(content)
+        setShareFallback({ source: reviewed, week: captureKey, text: content })
         setExportMessage('Selecteer hieronder de privévergelijking en kopieer handmatig.')
       }
     } catch (error) {
@@ -422,7 +422,7 @@ export function PrivateComparisonJourney({
 
   async function handOffPartialPriceRows(action: 'copy' | 'share') {
     setExportMessage('')
-    setPartialCopyFallback('')
+    setPartialCopyFallback(null)
     try {
       // Reuse the exact same admission as the private partial CSV export.
       // No unknown prices, subtotal or store winner may enter this message.
@@ -448,7 +448,7 @@ export function PrivateComparisonJourney({
         await navigator.clipboard.writeText(csv)
         setExportMessage('Eigen vergelijkbare regels als CSV gekopieerd. Ontbrekende winkelprijzen blijven onbekend.')
       } catch {
-        setPartialCopyFallback(csv)
+        setPartialCopyFallback({ source: progress, reviewed, week: captureKey, text: csv })
         setExportMessage('Selecteer de eigen CSV hieronder en kopieer handmatig.')
       }
     } catch (error) {
@@ -786,8 +786,9 @@ export function PrivateComparisonJourney({
           bronmomenten en eigen prijsregels. Alleen jij bepaalt welke app de
           gegevens ontvangt. Geen onafhankelijke besparingsclaim.</small>
         {exportMessage && <p role="status">{exportMessage}</p>}
-        {shareFallback && <label>Mijn vergelijking handmatig kopiëren
-          <textarea rows={8} readOnly spellCheck={false} value={shareFallback}
+        {ready && shareFallback?.source === reviewed && shareFallback.week === captureKey &&
+          <label>Mijn vergelijking handmatig kopiëren
+          <textarea rows={8} readOnly spellCheck={false} value={shareFallback.text}
             onFocus={event => event.currentTarget.select()} />
         </label>}
       </> : <>
@@ -932,8 +933,10 @@ export function PrivateComparisonJourney({
         met beide winkels vergelijkbaar zijn. Dit is nooit een mandtotaal of besparingsbewijs.
         Alleen jij kiest welke app je eigen brondata ontvangt.</small>
       {exportMessage && <p role="status">{exportMessage}</p>}
-      {partialCopyFallback && <label>Mijn losse bronregels handmatig kopiëren
-        <textarea rows={8} readOnly spellCheck={false} value={partialCopyFallback}
+      {!ready && partialPairs.length > 0 && partialCopyFallback?.source === progress &&
+        partialCopyFallback?.reviewed === reviewed && partialCopyFallback.week === captureKey &&
+        <label>Mijn losse bronregels handmatig kopiëren
+        <textarea rows={8} readOnly spellCheck={false} value={partialCopyFallback.text}
           onFocus={event => event.currentTarget.select()} />
       </label>}
     </section>}
