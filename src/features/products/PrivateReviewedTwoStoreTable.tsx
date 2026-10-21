@@ -901,8 +901,11 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       {topDrivers.length > 0 && <div>
         <h5>Grootste verschillen in je huidige selectie</h5>
         <ol>{topDrivers.map(line => <li key={line.id}>
-          <button type="button" onClick={() => document.getElementById(
-            driverAnchor(line.id))?.scrollIntoView({ block: 'center', behavior: 'smooth' })}>
+          <button type="button" onClick={() => {
+            const target = document.getElementById(driverAnchor(line.id))
+            target?.focus({ preventScroll: true })
+            target?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+          }}>
             {line.label}: {exactEuro.formatCents(BigInt(Math.abs(line.plusCents - line.dekaCents)))}
             {' '}goedkoper bij {line.plusCents < line.dekaCents ? 'PLUS' : 'DekaMarkt'}
           </button>
@@ -1026,7 +1029,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       gebaseerd op het volledige weekmenu, niet alleen de gefilterde producten.</p>
     <div className="private-reviewed-products__paired-rows">
       {advantaged.map(({ plus: first, deka: second }) => <article
-        key={first.id} id={driverAnchor(first.id)}>
+        key={first.id} id={driverAnchor(first.id)} tabIndex={-1}>
         <h4>{first.ingredientLabel} · {first.requirement.amount} {first.requirement.unit}</h4>
         <div className="private-reviewed-products__paired-options">
           {product(first, 'PLUS')}{product(second, 'DekaMarkt')}
