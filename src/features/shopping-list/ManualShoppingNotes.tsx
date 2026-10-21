@@ -38,6 +38,9 @@ export function ManualShoppingNotes({ notes, setNotes }: {
   const [exportVisible, setExportVisible] = useState(false)
   const [message, setMessage] = useState('')
   const [lastRemoved, setLastRemoved] = useState<{ note: UnpricedShoppingNote; index: number } | null>(null)
+  const [pendingDuplicateChoice, setPendingDuplicateChoice] = useState<{
+    plus: UnpricedShoppingNote; deka: UnpricedShoppingNote; keep: 'PLUS' | 'DekaMarkt'
+  } | null>(null)
   const [pendingCleared, setPendingCleared] = useState<UnpricedShoppingNote[] | null>(null)
   const [pendingNextRound, setPendingNextRound] = useState<UnpricedShoppingNote[] | null>(null)
   const [lastNextRound, setLastNextRound] = useState<UnpricedShoppingNote[] | null>(null)
@@ -550,13 +553,16 @@ export function ManualShoppingNotes({ notes, setNotes }: {
   }
   function undoRemove() {
     if (!lastRemoved) return
-    if (notes.length >= 100 || notes.some(note => note.id === lastRemoved.note.id)) {
-      setMessage('Herstellen kan niet: de lijst is vol of dit artikel bestaat inmiddels opnieuw.')
+    if (notes.length >= 100 || notes.some(note =>
+      note.id === lastRemoved.note.id ||
+      duplicateKey(note.store, note.label) === duplicateKey(lastRemoved.note.store, lastRemoved.note.label))) {
+      setMessage('Herstellen kan niet: de lijst is vol of dit artikel staat inmiddels al bij deze winkel.')
       return
     }
     const { note, index } = lastRemoved
     setNotes(current => {
-      if (current.length >= 100 || current.some(entry => entry.id === note.id)) return current
+      if (current.length >= 100 || current.some(entry => entry.id === note.id ||
+        duplicateKey(entry.store, entry.label) === duplicateKey(note.store, note.label))) return current
       const next = [...current]
       next.splice(Math.min(index, next.length), 0, note)
       return next
@@ -573,6 +579,44 @@ export function ManualShoppingNotes({ notes, setNotes }: {
     openDekaLabels.has(note.label.normalize('NFC').toLocaleLowerCase('nl-NL')))
   const duplicateOpenLabels = Array.from(new Map(duplicatedOpenRetailerNotes.map(note =>
     [note.label.normalize('NFC').toLocaleLowerCase('nl-NL'), note.label] as const)).values())
+  function proposeDuplicateChoice(label: string, keep: 'PLUS' | 'DekaMarkt') {
+    const key = label.normalize('NFC').toLocaleLowerCase('nl-NL')
+    const plus = notes.find(note => note.store === 'PLUS' && !note.done &&
+      note.label.normalize('NFC').toLocaleLowerCase('nl-NL') === key)
+    const deka = notes.find(note => note.store === 'DekaMarkt' && !note.done &&
+      note.label.normalize('NFC').toLocaleLowerCase('nl-NL') === key)
+    if (!plus || !deka) {
+      setPendingDuplicateChoice(null)
+      setMessage('Deze dubbele boodschap is inmiddels veranderd. Bekijk de huidige lijst opnieuw.')
+      return
+    }
+    setPendingDuplicateChoice({ plus: { ...plus }, deka: { ...deka }, keep })
+  }
+  function confirmDuplicateChoice() {
+    const choice = pendingDuplicateChoice
+    if (!choice) return
+    const unchanged = (original: UnpricedShoppingNote) => notes.some(item =>
+      item.id === original.id && item.label === original.label &&
+      item.store === original.store && !item.done)
+    if (!unchanged(choice.plus) || !unchanged(choice.deka)) {
+      setPendingDuplicateChoice(null)
+      setMessage('De dubbele boodschappen zijn veranderd; er is niets verwijderd.')
+      return
+    }
+    const discarded = choice.keep === 'PLUS' ? choice.deka : choice.plus
+    const index = notes.findIndex(item => item.id === discarded.id)
+    if (index < 0) return
+    setNotes(current => {
+      const same = [choice.plus, choice.deka].every(original => current.some(item =>
+        item.id === original.id && item.label === original.label &&
+        item.store === original.store && !item.done))
+      return same ? current.filter(item => item.id !== discarded.id) : current
+    })
+    setLastRemoved({ note: discarded, index })
+    setPendingDuplicateChoice(null)
+    setMessage('Eigen boodschap blijft alleen bij ' + choice.keep +
+      '. De andere ongeprijsde regel is verwijderd; herstel via de knop onder de lijst.')
+  }
   const selected = notes.filter(note => filterStore === 'Alle winkels' ||
     note.store === filterStore || note.store === 'Algemeen')
   // Search only the shopper's own notes. Never infer a retailer identity.
@@ -1011,10 +1055,28 @@ export function ManualShoppingNotes({ notes, setNotes }: {
         Er zijn geen prijzen of automatische productmatches gebruikt. Tik op een artikel en
         verplaats of verwijder daarna zelf één van de dubbele regels.</p>
       <ul>{duplicateOpenLabels.slice(0, 8).map(label => <li key={label}>
+        <span>{label} · prijs onbekend</span>{' '}
         <button type="button" onClick={() => {
           setFilterStore('Alle winkels'); setOnlyOpen(false); setSearch(label)
-        }}>Bekijk {label} bij beide winkels</button>
+        }}>Bekijk bij beide winkels</button>{' '}
+        <button type="button" onClick={() => proposeDuplicateChoice(label, 'PLUS')}>
+          Alleen op PLUS-lijst…
+        </button>{' '}
+        <button type="button" onClick={() => proposeDuplicateChoice(label, 'DekaMarkt')}>
+          Alleen op DekaMarkt-lijst…
+        </button>
       </li>)}</ul>
+      {pendingDuplicateChoice && <div role="group"
+        aria-label="Bevestig verwijderen van dubbele ongeprijsde boodschap">
+        <p>Wil je ‘{pendingDuplicateChoice.plus.label}’ alleen bij
+          {' '}{pendingDuplicateChoice.keep} laten staan? De andere persoonlijke regel
+          verdwijnt uit je ongeprijsde lijst. Er worden geen originele geprijsde
+          producten, winkelbronnen of prijscijfers veranderd.</p>
+        <button type="button" onClick={confirmDuplicateChoice}>
+          Ja, bewaar alleen {pendingDuplicateChoice.keep}
+        </button>
+        <button type="button" onClick={() => setPendingDuplicateChoice(null)}>Annuleer</button>
+      </div>}
       {duplicateOpenLabels.length > 8 && <small>En {duplicateOpenLabels.length - 8} andere; bekijk
         alle winkels met je eigen zoekfilter.</small>}
     </section>}
