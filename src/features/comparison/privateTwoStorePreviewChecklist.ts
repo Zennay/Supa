@@ -1,4 +1,6 @@
 import { euro } from '../../lib/money.ts'
+import { calculateDecimalPackCount } from '../../domain/decimalPackArithmetic.ts'
+import type { MatchUnit } from '../../domain/matching.ts'
 import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
 import type { PreviewMatchLine } from './CaptureMatchingPreview.tsx'
 import { samePrivatePhysicalDemand } from './samePrivatePhysicalDemand.ts'
@@ -32,12 +34,19 @@ export function completePreviewProposal(line: PreviewMatchLine | null): line is
     pricePerPackCents: number; lineTotalCents: number } {
   return !!line && line.status === 'matched' && !!line.product?.trim() &&
     !!line.originalSku?.trim() &&
+    typeof line.amount === 'number' && Number.isFinite(line.amount) && line.amount > 0 &&
     Number.isFinite(line.packAmount) && (line.packAmount ?? 0) > 0 &&
     !!line.packUnit &&
     Number.isSafeInteger(line.packCount) && (line.packCount ?? 0) > 0 &&
     Number.isSafeInteger(line.packs) && (line.packs ?? 0) > 0 &&
     Number.isSafeInteger(line.pricePerPackCents) && (line.pricePerPackCents ?? -1) >= 0 &&
     Number.isSafeInteger(line.lineTotalCents) && (line.lineTotalCents ?? -1) >= 0 &&
+    // A line with arithmetically consistent cents is still not a usable
+    // shopping proposal when it underbuys the original physical demand.
+    calculateDecimalPackCount([{ amount: line.amount, unit: line.unit as MatchUnit }], {
+      amount: line.packAmount!, unit: line.packUnit as MatchUnit,
+      count: line.packCount!,
+    }) === line.packs &&
     BigInt(line.packs!) * BigInt(line.pricePerPackCents!) === BigInt(line.lineTotalCents!)
 }
 
