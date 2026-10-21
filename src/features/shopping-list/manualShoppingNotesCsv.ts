@@ -4,19 +4,31 @@ type Row = Pick<UnpricedShoppingNote, 'label' | 'store' | 'done'>
 const header = 'supa-eigen-ongeprijsd-v1;winkel;artikel;afgevinkt'
 const stores = new Set(['Algemeen', 'PLUS', 'DekaMarkt'])
 const safeLabel = (label: string) => label.replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/gu, ' ').replace(/\s+/gu, ' ').trim()
+// Inspect the canonical compatibility form, but retain the shopper's exact
+// entered label. Invisible/combining Unicode before a formula operator must
+// never silently bypass spreadsheet literal-text encoding.
+function potentialFormula(value: string): boolean {
+  return /^[\p{White_Space}\p{Default_Ignorable_Code_Point}\p{Mark}]*[=+@\-\u2212]/u
+    .test(value.normalize('NFKC'))
+}
 function spreadsheetSafe(value: string): string {
-  if (value.startsWith("'")) return "'" + value
-  return /^[\s\u200b-\u200f\ufeff]*[=+@-]/u.test(value) ? "'" + value : value
+  return value.startsWith("'") || potentialFormula(value) ? "'" + value : value
 }
 function originalCell(value: string): string {
   if (value.startsWith("''")) return value.slice(1)
-  if (/^'[\s\u200b-\u200f\ufeff]*[=+@-]/u.test(value)) return value.slice(1)
-  return value
+  return value.startsWith("'") && potentialFormula(value.slice(1)) ? value.slice(1) : value
 }
 const quote = (value: string) => '"' + spreadsheetSafe(value).replace(/"/gu, '""') + '"'
 export function exportUnpricedShoppingCsv(notes: readonly Row[]): string {
   return '\ufeff' + header + '\r\n' + notes.map(note =>
     ['eigen', note.store, note.label, note.done ? 'ja' : 'nee'].map(quote).join(';')).join('\r\n') + '\r\n'
+}
+/** Four-column clipboard roundtrip for Excel/Calc. Only private unpriced
+ * notes; never a shop's observed product, offer or price evidence. */
+export function exportUnpricedShoppingTsv(notes: readonly Row[]): string {
+  return header.replace(/;/gu, '\t') + '\r\n' + notes.map(note =>
+    ['eigen', note.store, note.label, note.done ? 'ja' : 'nee']
+      .map(spreadsheetSafe).join('\t')).join('\r\n') + '\r\n'
 }
 /** Strict bounded semicolon CSV reader; no spreadsheet formula execution. */
 export function importUnpricedShoppingCsv(source: string): Row[] {
@@ -89,7 +101,11 @@ export function importUnpricedShoppingPaste(source: string): Row[] {
     return cells
   })
   // Reuse exactly the same admitted schema, duplicate checking and length limits.
+  // TSV cells may already carry our literal-text apostrophe. Quoting them
+  // a SECOND time would double it and corrupt copy → paste roundtrips.
+  // This temporary internal CSV never leaves the parser or opens in Excel.
+  const rawQuote = (value: string) => '"' + value.replace(/"/gu, '""') + '"'
   const csv = '\ufeff' + header + '\r\n' +
-    originalRows.map(cells => cells.map(quote).join(';')).join('\r\n') + '\r\n'
+    originalRows.map(cells => cells.map(rawQuote).join(';')).join('\r\n') + '\r\n'
   return importUnpricedShoppingCsv(csv)
 }

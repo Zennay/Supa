@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type Dispatch, type SetStateAction } from 'react'
 import './manualShoppingNotes.css'
-import { exportUnpricedShoppingCsv, importUnpricedShoppingCsv, importUnpricedShoppingPaste } from './manualShoppingNotesCsv.ts'
+import { exportUnpricedShoppingCsv, exportUnpricedShoppingTsv, importUnpricedShoppingCsv, importUnpricedShoppingPaste } from './manualShoppingNotesCsv.ts'
 import { mergePrivateNotes, normalizePrivateNotes, serializePrivateNotes, PRIVATE_NOTES_BACKUP_MAX_BYTES } from './manualShoppingNotesBackup.ts'
 
 export type UnpricedShoppingNote = { id: string; label: string; store: 'Algemeen' | 'PLUS' | 'DekaMarkt'; done: boolean }
@@ -35,6 +35,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
   })
   const [filterStore, setFilterStore] = useState<'Alle winkels' | UnpricedShoppingNote['store']>('Alle winkels')
   const [exportVisible, setExportVisible] = useState(false)
+  const [spreadsheetFallback, setSpreadsheetFallback] = useState('')
   const [message, setMessage] = useState('')
   const [lastRemoved, setLastRemoved] = useState<{ note: UnpricedShoppingNote; index: number } | null>(null)
   const [pendingCleared, setPendingCleared] = useState<UnpricedShoppingNote[] | null>(null)
@@ -225,6 +226,24 @@ export function ManualShoppingNotes({ notes, setNotes }: {
         setMessage(template ? 'Leeg CSV-invulblad opgeslagen: vul het veld artikel in en behoud de vier kolommen.' : 'Alle eigen boodschappen als CSV opgeslagen, zonder prijzen of SKU’s.')
       } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
     } catch { setMessage('Kon de ongeprijsde CSV niet bewaren.') }
+  }
+  async function copyOwnSpreadsheet() {
+    // Export all privately entered notes, not the currently filtered rows.
+    // The matching import route requires all four Supa columns.
+    const snapshot = exportUnpricedShoppingTsv(notes)
+    if (new TextEncoder().encode(snapshot).length > 32768) {
+      setMessage('De spreadsheetlijst is te groot; download de CSV in plaats daarvan.')
+      return
+    }
+    setSpreadsheetFallback('')
+    try {
+      if (!navigator.clipboard?.writeText) throw Error('clipboard unavailable')
+      await navigator.clipboard.writeText(snapshot)
+      setMessage('Alle eigen ongeprijsde boodschappen als vier kolommen gekopieerd. Plak in Excel/Calc, of plak de tabel later terug in Supa. Geen winkelprijzen.')
+    } catch {
+      setSpreadsheetFallback(snapshot)
+      setMessage('Automatisch kopiëren is niet beschikbaar. Selecteer de vier kolommen hieronder en kopieer ze zelf.')
+    }
   }
   function prepareOwnCsvPreview(source: string, pasted = false) {
     const incoming = pasted ? importUnpricedShoppingPaste(source) : importUnpricedShoppingCsv(source)
@@ -966,6 +985,9 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       <button type="button" disabled={!notes.length} onClick={() => downloadOwnCsv()}>
         Eigen ongeprijsde lijst (CSV voor Excel)
       </button>
+      <button type="button" disabled={!notes.length} onClick={() => void copyOwnSpreadsheet()}>
+        Kopieer alle boodschappen als Excel-tabel (4 kolommen)
+      </button>
       <button type="button" disabled={!notes.length} onClick={backupDownload}>Backup hele lijst (JSON)</button>
       <label>Herstel lijst uit JSON-backup (max. 64 kB)
         <input type="file" accept=".json,application/json" disabled={backupBusy}
@@ -996,6 +1018,11 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       <button type="button" className="ghost-button" onClick={undoLastImport}>
         Herstel laatste import uit {lastImport.source} ({lastImport.added.length} eigen artikelen)
       </button>}
+    {spreadsheetFallback && <label>Vierkoloms Supa-tabel om handmatig te kopiëren
+      <textarea readOnly spellCheck={false} rows={7} value={spreadsheetFallback}
+        onFocus={event => event.currentTarget.select()} />
+      <small>Persoonlijke, ongeprijsde lijst op het moment van kopiëren; geen actuele winkelsnapshot.</small>
+    </label>}
     {exportVisible && visible.length > 0 && <label>Kopieer mijn ongeprijsde boodschappen
       <textarea rows={Math.min(selected.length + 6, 15)} readOnly value={exportText}
         onFocus={event => event.currentTarget.select()} /></label>}
