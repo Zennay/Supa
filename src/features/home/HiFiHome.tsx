@@ -68,12 +68,17 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
   const [storeFilter, setStoreFilter] = useState<'all' | 'PLUS' | 'DekaMarkt'>('all')
   const dialog = useRef<HTMLDialogElement>(null)
   useEffect(() => { setQuery('') }, [view])
-  // Treat each typed word as a separate constraint so users can combine a
-  // product, retailer and package term without those words sharing one field.
-  const queryTerms = productSearchText(query.trim()).split(/\s+/u).filter(Boolean)
+  // Search only: normalize accents/case, Dutch decimal commas and spacing
+  // between a quantity and its unit. This never alters captured source data.
+  const normalizeCatalogSearch = (value: string) =>
+    productSearchText(value).replace(/(\d),(?=\d)/gu, '$1.')
+      .replace(/(\d)\s+([a-z])/gu, '$1$2')
+  // Each word is a separate constraint, allowing product + retailer + pack
+  // terms to match across fields without inventing a combined product identity.
+  const queryTerms = normalizeCatalogSearch(query.trim()).split(/\s+/u).filter(Boolean)
   const includesQuery = (values: readonly (string | null | undefined)[]) =>
     queryTerms.every(term => values.some(value => typeof value === 'string' &&
-      productSearchText(value).includes(term)))
+      normalizeCatalogSearch(value).includes(term)))
   const recipes = designRecipes.filter(recipe =>
     includesQuery([recipe.title]) && (!favoritesOnly || favorites.includes(recipe.id)))
   const matchingProducts = filterDemoProductsByUnit(designProducts.filter(product =>
