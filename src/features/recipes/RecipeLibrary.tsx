@@ -480,7 +480,13 @@ export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
       assertCurrent()
       const remaining = ownShopping.lines.filter(line =>
         line.needsReview || shoppingChecks[line.key] !== true)
-      const labels = personalRecipeShoppingNoteLabels(remaining)
+      // The per-line scaler does not represent *global* import warnings.
+      // Respect the same source-review admission as the combined recipe List:
+      // a not-yet-admitted recipe can only contribute explicitly unreviewed
+      // questions, never seemingly confirmed quantities.
+      const sourceReviewed = !!toPlannerRecipe(source, { usage: 'unpriced-demand' })
+      const labels = personalRecipeShoppingNoteLabels(sourceReviewed ? remaining :
+        remaining.map(line => ({ ...line, needsReview: true })))
       if (!window.confirm('Voeg ' + labels.length +
           ' nog openstaande ingrediënten van dit eigen recept toe aan je ongeprijsde Lijst? ' +
           'De gekozen porties gelden alleen voor deze lijst; je Planner, winkelprijzen en oude vinkjes blijven intact.')) return
