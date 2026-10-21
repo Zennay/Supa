@@ -36,8 +36,10 @@ function cell(value: string | number): string {
 }
 
 function lineFields(line: BasketTraceLine): (string | number)[] {
+  // Ten fields per store, even when no source product or price is known.
+  // A short row shifts the next store's columns into the wrong money fields.
   if (line.status !== 'matched') return [
-    'niet gekoppeld', '', '', '', '', '', '', '', '',
+    'niet gekoppeld', '', '', '', '', '', '', '', '', '',
   ]
   return [
     line.reasons.includes('explicit local user selection; not an automatic or verified retailer match')
@@ -116,7 +118,12 @@ function buildCsv(plus: OneStoreBasket, deka: OneStoreBasket,
     ]
   })
   const header = COLUMNS.map(cell).join(',')
-  const csvLines = rows.map(values => values.map(cell).join(','))
+  const csvLines = rows.map(values => {
+    if (values.length !== COLUMNS.length) {
+      throw new Error('De privévergelijking bevat onvolledige CSV-kolommen.')
+    }
+    return values.map(cell).join(',')
+  })
   return '\uFEFF' + [header, ...csvLines].join('\r\n') + '\r\n'
 }
 
