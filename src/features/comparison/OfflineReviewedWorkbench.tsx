@@ -380,6 +380,7 @@ export function OfflineReviewedWorkbench({
     source: object; week: string; text: string
   } | null>(null)
   const [captureSheetStore, setCaptureSheetStore] = useState<'both' | CaptureStore>('both')
+  const [captureDelimiter, setCaptureDelimiter] = useState<',' | ';' | '\t'>(',')
   const [capturePreviewShown, setCapturePreviewShown] = useState<Record<CaptureStore, number>>({ PLUS: 20, DekaMarkt: 20 })
   const [capturePreview, setCapturePreview] = useState<{
     files: File[]; week: string
@@ -769,7 +770,7 @@ export function OfflineReviewedWorkbench({
     const selectedWeek = captureWeek
     try {
       const content = kind === 'csv'
-        ? (await import('./plannerPriceCaptureSheet.ts')).makeBlankPlannerCaptureCsv(needs, [store])
+        ? (await import('./plannerPriceCaptureSheet.ts')).makeBlankPlannerCaptureCsv(needs, [store], captureDelimiter)
         : (await import('./plannerPriceCaptureGuide.ts')).makePlannerCaptureGuide(needs, [store])
       if (revision !== importRevision.current || selectedWeek !== captureWeekRef.current) {
         setWeekExportMessage('Weekmenu of bronimport is veranderd. Bekijk eerst de actuele ontbrekende regels.')
@@ -841,14 +842,16 @@ export function OfflineReviewedWorkbench({
       const storesToCapture: readonly CaptureStore[] = target === 'both'
         ? stores : [target]
       const { makeBlankPlannerCaptureCsv } = await import('./plannerPriceCaptureSheet.ts')
-      const csv = makeBlankPlannerCaptureCsv(plannerCaptureNeeds, storesToCapture)
-      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+      const csv = makeBlankPlannerCaptureCsv(plannerCaptureNeeds, storesToCapture, captureDelimiter)
+      const url = URL.createObjectURL(new Blob([csv], { type: captureDelimiter === '\t'
+        ? 'text/tab-separated-values;charset=utf-8' : 'text/csv;charset=utf-8' }))
       try {
         const link = document.createElement('a')
         link.href = url
-        link.download = target === 'both'
-          ? 'supa-weekmenu-eigen-prijsopname-PLUS-DekaMarkt.csv'
-          : 'supa-weekmenu-eigen-prijsopname-' + target + '.csv'
+        link.download = 'supa-weekmenu-eigen-prijsopname-' +
+          (target === 'both' ? 'PLUS-DekaMarkt' : target) +
+          (captureDelimiter === ';' ? '-excel' : '') +
+          (captureDelimiter === '\t' ? '.tsv' : '.csv')
         document.body.append(link)
         try { link.click() } finally { link.remove() }
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
@@ -2286,13 +2289,14 @@ export function OfflineReviewedWorkbench({
         ? (await import('./plannerPriceCaptureSheet.ts')).makeBlankPlannerCaptureCsv(needs, [store])
         : (await import('./plannerPriceCaptureGuide.ts')).makePlannerCaptureGuide(needs, [store])
       const url = URL.createObjectURL(new Blob([text], {
-        type: kind === 'csv' ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8',
+        type: kind === 'csv' ? (captureDelimiter === '\t'
+          ? 'text/tab-separated-values;charset=utf-8' : 'text/csv;charset=utf-8') : 'text/plain;charset=utf-8',
       }))
       try {
         const link = document.createElement('a')
         link.href = url
         link.download = 'supa-' + store.toLowerCase() + '-ontbrekende-' + needs.length +
-          (kind === 'csv' ? '.csv' : '-gids.txt')
+          (kind === 'csv' ? (captureDelimiter === '\t' ? '.tsv' : '.csv') : '-gids.txt')
         document.body.append(link)
         try { link.click() } finally { link.remove() }
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
@@ -2498,6 +2502,14 @@ export function OfflineReviewedWorkbench({
               <option value="DekaMarkt">Alleen DekaMarkt</option>
             </select>
           </label>
+          <label>Bestandsindeling voor spreadsheet
+            <select value={captureDelimiter}
+              onChange={event => setCaptureDelimiter(event.target.value as ',' | ';' | '\t')}>
+              <option value=",">CSV met komma's</option>
+              <option value=";">Excel Nederlands met puntkomma's</option>
+              <option value={'\t'}>TSV met tabs</option>
+            </select>
+          </label>
           <button type="button" className="ghost-button"
             disabled={plannerCaptureNeeds.length === 0}
             onClick={downloadBlankPlannerCaptureCsv}>
@@ -2515,7 +2527,8 @@ export function OfflineReviewedWorkbench({
           </button>
           <PortableBlankCapture needs={plannerCaptureNeeds}
             stores={captureSheetStore === 'both' ? stores : [captureSheetStore]}
-            captureKey={captureWeek + ':' + captureSheetStore} />
+            delimiter={captureDelimiter}
+            captureKey={captureWeek + ':' + captureSheetStore + ':' + captureDelimiter} />
           <a className="ghost-button" href={`${import.meta.env.BASE_URL}private-basket-mapping.html`} target="_blank" rel="noopener noreferrer">
             Open uitgebreide privévergelijker
           </a>
@@ -3215,7 +3228,8 @@ export function OfflineReviewedWorkbench({
                           needs={missingPriceCaptureNeeds[store]}
                           needsAtClick={() => missingCaptureNeedsNow(store)}
                           stores={[store]}
-                          captureKey={captureWeek + ':missing:' + store + ':' +
+                          delimiter={captureDelimiter}
+                          captureKey={captureWeek + ':missing:' + store + ':' + captureDelimiter + ':' +
                             (imported?.captures[store]?.observedAt ?? 'none') + ':' +
                             Math.floor(clockMs / 60000)} />}
                     </div>)}

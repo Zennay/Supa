@@ -10,13 +10,14 @@ type Displayed = { key: string; kind: CaptureDocument; text: string }
  * blank-capture documents. No offer, SKU, timestamp or price is inferred.
  */
 export function PortableBlankCapture({
-  needs, stores, captureKey, needsAtClick, purpose = 'blank',
+  needs, stores, captureKey, needsAtClick, purpose = 'blank', delimiter = ',',
 }: {
   needs: readonly PlannerCaptureGuideNeed[]
   stores: readonly CaptureStore[]
   captureKey: string
   needsAtClick?: () => readonly PlannerCaptureGuideNeed[]
   purpose?: 'blank' | 'missing'
+  delimiter?: ',' | ';' | '\t'
 }) {
   const [displayed, setDisplayed] = useState<Displayed | null>(null)
   const [feedback, setFeedback] = useState<{key: string; message: string} | null>(null)
@@ -29,7 +30,7 @@ export function PortableBlankCapture({
     const currentNeeds = needsAtClick ? needsAtClick() : needs
     if (!currentNeeds.length) throw new Error('Geen ontbrekende winkelproducten voor dit invulblad.')
     const value = kind === 'csv'
-      ? makeBlankPlannerCaptureCsv(currentNeeds, stores)
+      ? makeBlankPlannerCaptureCsv(currentNeeds, stores, delimiter)
       : makePlannerCaptureGuide(currentNeeds, stores)
     if (new TextEncoder().encode(value).byteLength > 256000) {
       throw new Error('Dit invulblad is te groot om veilig lokaal te delen.')
@@ -84,7 +85,8 @@ export function PortableBlankCapture({
       ? 'Alleen nog ontbrekende bronregels, of een volledige nieuwe winkelopname wanneer de oude bron verlopen is. Een nieuwe opname krijgt nooit stilzwijgend een oud bronmoment.'
       : 'Gebruik exact dezelfde blanco PLUS-/DekaMarkt-CSV en regelnummergids als de downloads.'}
       {' '}Op je telefoon kun je deze lege bronkolommen en originele Planner-hoeveelheden
-      kopiëren of bewust delen. Er worden geen winkelprijzen, artikelcodes,
+      kopiëren of bewust delen. Je gekozen kolomscheiding (komma, puntkomma of tab) blijft behouden.
+      Er worden geen winkelprijzen, artikelcodes,
       waarnemingstijden of bronrechten ingevuld.</p>
     <div className="offline-price-workbench__actions">
       <button type="button" className="ghost-button" disabled={!needs.length}
