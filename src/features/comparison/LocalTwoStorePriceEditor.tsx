@@ -195,6 +195,7 @@ const captureStatusNames: Record<CaptureStatus, string> = {
 }
 
 const privateDraftStorageKey = 'supa:local-two-store-price-draft:v1'
+const privateDeviceDraftKey = 'supa:local-two-store-price-device-draft:v1'
 
 type StoredDraft = {
   saved: boolean
@@ -393,21 +394,45 @@ export function LocalTwoStorePriceEditor({
   const [draftFingerprint, setDraftFingerprint] = useState('')
   const [draftProtected, setDraftProtected] = useState(false)
   const [draftStatus, setDraftStatus] = useState('')
+  const [deviceDraftOptIn, setDeviceDraftOptIn] = useState(false)
+  const [deviceDraftRaw, setDeviceDraftRaw] = useState<string | null>(null)
+  const [deviceDraftProtected, setDeviceDraftProtected] = useState(false)
+  const [deviceDraftStatus, setDeviceDraftStatus] = useState('')
 
-  // Explicitly opt-in to *session-only* recovery. A different planner or
-  // unknown/future record can never silently be reinterpreted or replaced.
+  // Restore only snapshots explicitly saved earlier, never promote their
+  // self-entered prices to reviewed source evidence. Two divergent copies
+  // are not resolved by precedence: both original bytes remain protected.
   useEffect(() => {
-    const old = readPrivateDraft(selectedPlanFingerprint, allowedDraftRows)
-    setRows(old.rows)
-    setSourceSelection(old.sourceSelection)
-    setCapturedAt(old.capturedAt)
-    setDraftOptIn(old.saved)
+    const tab = readPrivateDraft(selectedPlanFingerprint, allowedDraftRows)
+    let deviceRaw: string | null = null
+    let deviceUnavailable = false
+    try { deviceRaw = window.localStorage.getItem(privateDeviceDraftKey) }
+    catch { deviceUnavailable = true }
+    const device = deviceRaw === null ? null
+      : readPrivateDraft(selectedPlanFingerprint, allowedDraftRows, deviceRaw)
+    const diverged = Boolean(tab.saved && device?.saved && JSON.stringify([
+      tab.rows, tab.capturedAt, tab.sourceSelection,
+    ]) !== JSON.stringify([
+      device.rows, device.capturedAt, device.sourceSelection,
+    ]))
+    const chosen = diverged ? null : tab.saved ? tab : device?.saved ? device : null
+    setRows(chosen?.rows ?? {})
+    setSourceSelection(chosen?.sourceSelection ?? 'both')
+    setCapturedAt(chosen?.capturedAt ?? { PLUS: '', DekaMarkt: '' })
+    setDraftOptIn(tab.saved && !diverged)
     setDraftFingerprint(selectedPlanFingerprint)
-    setDraftProtected(old.protected)
-    setSavedDraftRaw(old.raw)
-    if (old.saved) setDraftStatus('Je vorige privéconcept voor deze week is hersteld in deze browsertab.')
-    else if (old.protected) setDraftStatus('Een eerder concept voor een andere week of versie is beschermd tegen overschrijven.')
-    else setDraftStatus('')
+    setDraftProtected(tab.protected || diverged)
+    setSavedDraftRaw(tab.raw)
+    setDeviceDraftOptIn(Boolean(device?.saved && !diverged))
+    setDeviceDraftProtected(deviceUnavailable || Boolean(device?.protected) || diverged)
+    setDeviceDraftRaw(deviceRaw)
+    setDraftStatus(diverged ? 'Tab- en apparaatkopie verschillen. Beide zijn beschermd; open je eigen JSON-backup voordat je een versie wist.'
+      : tab.saved ? 'Je eerdere tabconcept is hersteld, nog NIET als prijsbron bevestigd.'
+        : tab.protected ? 'Een opgeslagen tabconcept voor een andere week of versie blijft beschermd.' : '')
+    setDeviceDraftStatus(diverged ? 'Conflicterende apparaatkopie blijft onaangeroerd.'
+      : device?.saved ? 'Je eigen prijsconcept is vanaf dit apparaat hersteld. Bronmomenten en prijzen moeten opnieuw worden gecontroleerd.'
+        : deviceUnavailable ? 'Apparaatopslag niet beschikbaar.'
+          : device?.protected ? 'Oude apparaatkopie hoort niet veilig bij deze Planner-week.' : '')
   }, [selectedPlanFingerprint])
 
   useEffect(() => {
@@ -430,6 +455,81 @@ export function LocalTwoStorePriceEditor({
       setDraftStatus('Kon dit privéconcept niet bewaren. Gebruik desgewenst de lokale JSON-download.')
     }
   }, [draftOptIn, draftProtected, draftFingerprint, rows, capturedAt, sourceSelection, selectedPlanFingerprint])
+
+  // Persistent local copy is completely separate from the existing temporary
+  // tab snapshot. Both use the SAME strict selected-week draft admission.
+  useEffect(() => {
+    if (!deviceDraftOptIn || deviceDraftProtected ||
+        draftFingerprint !== selectedPlanFingerprint) return
+    try {
+      const actual = window.localStorage.getItem(privateDeviceDraftKey)
+      if (actual !== deviceDraftRaw) {
+        setDeviceDraftOptIn(false)
+        setDeviceDraftProtected(true)
+        setDeviceDraftStatus('De apparaatkopie is elders veranderd; er is niets overschreven.')
+        return
+      }
+      const next = JSON.stringify({
+        schemaVersion: 1, fingerprint: selectedPlanFingerprint,
+        rows, capturedAt, sourceSelection,
+      })
+      if (new TextEncoder().encode(next).length > 256000) throw Error('oversized')
+      if (next !== actual) window.localStorage.setItem(privateDeviceDraftKey, next)
+      if (deviceDraftRaw !== next) setDeviceDraftRaw(next)
+    } catch {
+      setDeviceDraftOptIn(false)
+      setDeviceDraftProtected(true)
+      setDeviceDraftStatus('Apparaatopslag geweigerd of vol; download je privéconcept als JSON.')
+    }
+  }, [deviceDraftOptIn, deviceDraftProtected, deviceDraftRaw, draftFingerprint,
+    selectedPlanFingerprint, rows, capturedAt, sourceSelection])
+
+  useEffect(() => {
+    const changedExternally = (event: StorageEvent) => {
+      if (!deviceDraftOptIn || deviceDraftProtected ||
+          (event.key !== privateDeviceDraftKey && event.key !== null)) return
+      if (event.newValue !== deviceDraftRaw) {
+        setDeviceDraftOptIn(false)
+        setDeviceDraftProtected(true)
+        setDeviceDraftStatus('Andere tab wijzigde de opgeslagen prijsinvoer; controleer de JSON-backup.')
+      }
+    }
+    window.addEventListener('storage', changedExternally)
+    return () => window.removeEventListener('storage', changedExternally)
+  }, [deviceDraftOptIn, deviceDraftProtected, deviceDraftRaw])
+
+  function setDeviceDraftConsent(checked: boolean) {
+    if (deviceDraftProtected) return
+    try {
+      const current = window.localStorage.getItem(privateDeviceDraftKey)
+      if (current !== deviceDraftRaw) {
+        setDeviceDraftOptIn(false)
+        setDeviceDraftProtected(true)
+        setDeviceDraftStatus('Er is een andere apparaatkopie: geen overschrijving toegestaan.')
+        return
+      }
+      if (checked) {
+        const next = JSON.stringify({
+          schemaVersion: 1, fingerprint: selectedPlanFingerprint,
+          rows, capturedAt, sourceSelection,
+        })
+        if (new TextEncoder().encode(next).length > 256000) throw Error('oversized')
+        window.localStorage.setItem(privateDeviceDraftKey, next)
+        setDeviceDraftRaw(next)
+      } else {
+        window.localStorage.removeItem(privateDeviceDraftKey)
+        setDeviceDraftRaw(null)
+      }
+      setDeviceDraftOptIn(checked)
+      setDeviceDraftStatus(checked
+        ? 'Onvoltooid prijsconcept privé bewaard op dit apparaat. Alleen oorspronkelijke bronreview mag prijzen later bevestigen.'
+        : 'Alleen de apparaatkopie gewist; dit invulscherm en tabkopie blijven behouden.')
+    } catch {
+      setDeviceDraftOptIn(false)
+      setDeviceDraftProtected(true)
+      setDeviceDraftStatus('Opslaan op dit apparaat niet toegestaan. Download je JSON-concept.')
+    }
+  }
 
   function clearDraft() {
     if (typeof window !== 'undefined') {
@@ -467,6 +567,27 @@ export function LocalTwoStorePriceEditor({
     }
   }
 
+  // Deliberate recovery from an old or conflicting local snapshot. Never
+  // delete the tab version, visible editor, or other stored private records.
+  function discardProtectedDeviceDraft() {
+    if (!deviceDraftProtected || !window.confirm(
+      'Wis uitsluitend de oude, beschermde prijsconceptkopie op dit apparaat? Download eerst je eigen JSON-backup als je die oude week nodig hebt. De geopende invoer blijft behouden.')) return
+    try {
+      const current = window.localStorage.getItem(privateDeviceDraftKey)
+      if (current !== deviceDraftRaw) {
+        setDeviceDraftRaw(current)
+        setDeviceDraftStatus('De opgeslagen apparaatkopie is veranderd. Annuleer en controleer de actuele gegevens.')
+        return
+      }
+      window.localStorage.removeItem(privateDeviceDraftKey)
+      setDeviceDraftRaw(null)
+      setDeviceDraftOptIn(false)
+      setDeviceDraftProtected(false)
+      setDeviceDraftStatus('Beschermde apparaatkopie na je toestemming verwijderd. Bewaren kan nu opnieuw worden ingeschakeld.')
+    } catch {
+      setDeviceDraftStatus('Verwijderen geweigerd. De oude apparaatkopie blijft behouden.')
+    }
+  }
   function prefillReviewedSources() {
     const seeds = Object.entries(reviewedRecaptureSeeds)
     if (!seeds.length || !window.confirm(
@@ -1048,6 +1169,20 @@ export function LocalTwoStorePriceEditor({
           Onvoltooide invoer bewaren in deze browsertab (optioneel, niet naar een server)
         </label>
         <span role="status">{draftStatus}</span>
+        <label><input type="checkbox" checked={deviceDraftOptIn} disabled={deviceDraftProtected}
+          onChange={event => setDeviceDraftConsent(event.currentTarget.checked)} />
+          Bewaar mijn onvoltooide PLUS/Deka-prijsinvoer op dit apparaat (ook na sluiten van de tab)
+        </label>
+        <small>Standaard uit. Alleen dit browserprofiel, zonder server of cloud.
+          Op een gedeeld apparaat kunnen anderen in jouw profiel de ingevoerde bedragen zien.
+          Bewaren maakt een prijs, winkelcode, bronmoment of productmatch niet officieel,
+          actueel of goedgekeurd. Een andere Planner-week wordt nooit stilzwijgend overgenomen.
+          Wis je browsergegevens pas na het downloaden van je eigen JSON-concept.</small>
+        {deviceDraftStatus && <span role="status">{deviceDraftStatus}</span>}
+        {deviceDraftProtected && <button type="button" className="ghost-button"
+          onClick={discardProtectedDeviceDraft}>
+          Wis alleen oude beschermde apparaatkopie na bevestiging
+        </button>}
         <div className="offline-manual-editor__progress-actions">
           <button type="button" className="ghost-button" onClick={downloadMissingCaptureList}>
             Download open winkelwaarnemingen (TXT)
@@ -1102,7 +1237,7 @@ export function LocalTwoStorePriceEditor({
           Alleen een exact gelijk weekmenu wordt geaccepteerd; import activeert
           nooit automatisch prijsvergelijking of opslag.</small>
         {draftOptIn && <button type="button" className="ghost-button" onClick={clearDraft}>
-          Stop automatisch bewaren en wis concept
+          Stop tabopslag en wis alleen tijdelijke tabkopie
         </button>}
         {draftProtected && <button type="button" className="ghost-button"
           onClick={discardProtectedDraft}>
