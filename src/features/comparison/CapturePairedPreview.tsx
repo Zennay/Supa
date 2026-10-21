@@ -81,9 +81,16 @@ export function CapturePairedPreview({
 }) {
   const [query, setQuery] = useState('')
   const [openOnly, setOpenOnly] = useState(false)
+  const [storeFilter, setStoreFilter] = useState<'all' | 'PLUS' | 'DekaMarkt'>('all')
   const [limit, setLimit] = useState(25)
   const [exportMessage, setExportMessage] = useState('')
   const [printable, setPrintable] = useState<string | null>(null)
+  const plusMoment = observedInstant(plusObservedAt)
+  const dekaMoment = observedInstant(dekaObservedAt)
+  const olderStore = plusMoment && dekaMoment
+    ? plusMoment.ns <= dekaMoment.ns ? 'PLUS' : 'DekaMarkt' : null
+  const plusUsable = plusFresh && (within24h || olderStore !== 'PLUS')
+  const dekaUsable = dekaFresh && (within24h || olderStore !== 'DekaMarkt')
   const rows = useMemo(() => {
     const byDeka = new Map(deka.map(line => [line.id, line]))
     const joined: Array<{
@@ -113,19 +120,20 @@ export function CapturePairedPreview({
   // A field reviewer first needs to find the physical items that still
   // prevent a complete two-store match. Sorting only changes presentation;
   // original source row order and identifiers remain intact in exports.
+  const perStoreOpen = (row: (typeof rows)[number], store: 'PLUS' | 'DekaMarkt') =>
+    !row.sameDemand || (store === 'PLUS'
+      ? !plusUsable || !completePreviewProposal(row.left)
+      : !dekaUsable || !completePreviewProposal(row.right))
+  const plusOpen = rows.filter(row => perStoreOpen(row, 'PLUS')).length
+  const dekaOpen = rows.filter(row => perStoreOpen(row, 'DekaMarkt')).length
   const visible = rows.filter(row => (!openOnly || row.open) &&
+    (storeFilter === 'all' || perStoreOpen(row, storeFilter)) &&
     (!filter || norm([
       row.label, row.left?.product ?? '', row.left?.originalSku ?? '',
       row.right?.product ?? '', row.right?.originalSku ?? '',
     ].join(' ')).includes(filter)))
     .sort((a, b) => Number(b.open) - Number(a.open))
   const missing = rows.filter(row => row.open).length
-  const plusMoment = observedInstant(plusObservedAt)
-  const dekaMoment = observedInstant(dekaObservedAt)
-  const olderStore = plusMoment && dekaMoment
-    ? plusMoment.ns <= dekaMoment.ns ? 'PLUS' : 'DekaMarkt' : null
-  const plusUsable = plusFresh && (within24h || olderStore !== 'PLUS')
-  const dekaUsable = dekaFresh && (within24h || olderStore !== 'DekaMarkt')
 
   function reviewText() {
     return privateTwoStorePreviewChecklist({
@@ -299,9 +307,21 @@ export function CapturePairedPreview({
       <label><input type="checkbox" checked={openOnly}
         onChange={event => { setOpenOnly(event.currentTarget.checked); setLimit(25) }} />
         {' '}Alleen openstaande of opnieuw op te nemen regels ({missing})</label>
+      <label>Filter op winkel waar nog controle nodig is
+        <select value={storeFilter} onChange={event => {
+          setStoreFilter(event.currentTarget.value as 'all' | 'PLUS' | 'DekaMarkt')
+          setLimit(25)
+        }}>
+          <option value="all">Beide winkels ({missing} open)</option>
+          <option value="PLUS">Alleen PLUS-controles ({plusOpen})</option>
+          <option value="DekaMarkt">Alleen DekaMarkt-controles ({dekaOpen})</option>
+        </select>
+      </label>
     </div>
     <p role="status">{Math.min(limit, visible.length)} van {visible.length} regels zichtbaar.
-      Openstaande regels staan bovenaan; filters en volgorde wijzigen geen originele bron of productreview.</p>
+      {storeFilter !== 'all' ? ' Alleen fysieke regels waar ' + storeFilter +
+        ' nog broncontrole of heropname nodig heeft.' : ' Openstaande regels staan bovenaan.'}
+      {' '}Filters en volgorde wijzigen geen originele bron of productreview.</p>
     <div className="offline-price-workbench__breakdown-scroll">
       <table>
         <caption>Privé bronvoorinzage: dezelfde fysieke Planner-vraag, twee winkels.
