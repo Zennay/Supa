@@ -5,8 +5,16 @@ const PlannerView = lazy(async () => {
   const module = await import('./features/planner/PlannerView')
   return { default: module.PlannerView }
 })
-import { WeekShareManualCopy } from './features/planner/WeekShareManualCopy'
-import { PlannerPortableWeek } from './features/planner/PlannerPortableWeek.tsx'
+const PlannerPortableWeek = lazy(async () => {
+  const module = await import('./features/planner/PlannerPortableWeek.tsx')
+  return { default: module.PlannerPortableWeek }
+})
+const WeekShareManualCopy = lazy(async () => {
+  const module = await import('./features/planner/WeekShareManualCopy')
+  return { default: module.WeekShareManualCopy }
+})
+
+
 import { currentWeekSharePreview, formatShareableWeek } from './features/planner/weekPlanShare'
 import type { WeekSharePreview } from './features/planner/weekPlanShare'
 // The private price workbench is sizeable and is not needed for Home, Recipes
@@ -15,7 +23,10 @@ const BasketView = lazy(async () => {
   const module = await import('./features/basket/BasketView')
   return { default: module.BasketView }
 })
-import { ShoppingListView } from './features/shopping-list/ShoppingListView'
+const ShoppingListView = lazy(async () => {
+  const module = await import('./features/shopping-list/ShoppingListView')
+  return { default: module.ShoppingListView }
+})
 import type { UnpricedShoppingNote } from './features/shopping-list/ManualShoppingNotes.tsx'
 const ManualShoppingNotes = lazy(async () => {
   const module = await import('./features/shopping-list/ManualShoppingNotes.tsx')
@@ -51,7 +62,10 @@ import type { PrivateExtraVisitCostIntent } from './features/comparison/privateE
 import type { PrivateSourceFileHandoff } from './features/comparison/privateSourceFileHandoff.ts'
 import { parsePrivateExtraVisitCostCents } from './features/comparison/privateExtraVisitCost.ts'
 import { recentOwnCaptureInstant, freshReviewedBaskets, type PrivateReviewedBaskets, type PrivateCaptureProgress, type PrivateReviewFocus, type OwnStore, type PrivateRouteChoice } from './features/comparison/privateReviewedBasketBridge.ts'
-import { ObservationView } from './features/observation/ObservationView'
+const ObservationView = lazy(async () => {
+  const module = await import('./features/observation/ObservationView')
+  return { default: module.ObservationView }
+})
 import { IdentityAvatar } from './components/IdentityAvatar.tsx'
 import { HiFiHome, HiFiDemoList } from './features/home/HiFiHome'
 // Actual-source comparison is a separate, lazy Home route, never historical demo pricing.
@@ -919,8 +933,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               : 'Je weekbudget en maaltijdkeuzes zijn tijdelijk en niet opgeslagen omdat browseropslag niet beschikbaar is.'}
           </p>
         )}
-        {tab === 'planner' && (
-          <Suspense fallback={<section className="screen" role="status">Weekplanner laden…</section>}>
+        {tab === 'planner' && <Suspense fallback={<section className="screen" role="status" aria-live="polite">Planner wordt geladen…</section>}>
           <PlannerView
             budget={budget}
             activeDays={activeDays}
@@ -987,20 +1000,21 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             onRecipeChange={changeRecipe}
             onReset={resetPlan}
           />
-          </Suspense>
-        )}
-        {tab === 'planner' && <PlannerPortableWeek
-          preferences={preferences}
-          days={m2InitialPlan.map(meal => meal.day)}
-          recipeIds={recipes.map(recipe => recipe.id)}
-          recipeNames={Object.fromEntries(recipes.map(recipe => [recipe.id, recipe.title]))}
-          storageProtected={persistenceWarning !== null}
-          onRestore={next => {
-            setPreferences(next)
-            setManualWeekCopy(null)
-            setWeekCopyMessage('Weekplanning hersteld; controleer de nieuwe ingrediënten en prijsbronnen.')
-          }}
-        />}
+        </Suspense>}
+        {tab === 'planner' && <Suspense fallback={<p role="status">Weekherstelopties worden geladen…</p>}>
+          <PlannerPortableWeek
+            preferences={preferences}
+            days={m2InitialPlan.map(meal => meal.day)}
+            recipeIds={recipes.map(recipe => recipe.id)}
+            recipeNames={Object.fromEntries(recipes.map(recipe => [recipe.id, recipe.title]))}
+            storageProtected={persistenceWarning !== null}
+            onRestore={next => {
+              setPreferences(next)
+              setManualWeekCopy(null)
+              setWeekCopyMessage('Weekplanning hersteld; controleer de nieuwe ingrediënten en prijsbronnen.')
+            }}
+          />
+        </Suspense>}
         {tab === 'planner' && (
           <section className="week-share-panel" aria-label="Weekmenu delen">
             <div className="week-share-actions">
@@ -1034,12 +1048,9 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               Bereidingstijd en porties opnemen
             </label>
             <p role="status" aria-live="polite">{weekCopyMessage}</p>
-            {currentManualCopy !== null && (
-              <WeekShareManualCopy
-                text={currentManualCopy}
-                rows={Math.min(activeDays.length + 6, 14)}
-              />
-            )}
+            {currentManualCopy !== null && <Suspense fallback={<p role="status">Kopieertekst wordt geladen…</p>}>
+              <WeekShareManualCopy text={currentManualCopy} rows={Math.min(activeDays.length + 6, 14)} />
+            </Suspense>}
           </section>
         )}
         {visitedBasket && (
@@ -1148,12 +1159,12 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
                       Historische gegevens en Figma-voorbeelden zijn geen geverifieerde prijzen
                       en doen niet mee in een eigen winkelmandvergelijking.</p>
                     <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
-                    <ShoppingListView basket={basket} />
+                    <Suspense fallback={<p role="status">Voorbeeldlijst wordt geladen…</p>}><ShoppingListView basket={basket} /></Suspense>
                   </section>
                 : <details className="demo-comparison-disclosure">
                     <summary>Toon oude voorbeeldboodschappen (geen actuele winkelprijzen)</summary>
                     <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
-                    <ShoppingListView basket={basket} />
+                    <Suspense fallback={<p role="status">Voorbeeldlijst wordt geladen…</p>}><ShoppingListView basket={basket} /></Suspense>
                   </details>)}
             </section>
           </div>
@@ -1203,7 +1214,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             </Suspense>
           </section>
         )}
-        {tab === 'observe' && <ObservationView />}
+        {tab === 'observe' && <Suspense fallback={<section className="screen" role="status" aria-live="polite">Meten wordt geladen…</section>}><ObservationView /></Suspense>}
       </div>
 
       <nav className="bottom-nav hifi-nav" aria-label="Hoofdnavigatie">
