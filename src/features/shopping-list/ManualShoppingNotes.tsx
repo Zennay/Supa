@@ -395,7 +395,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
     if (draft.length > 15000) throw Error('Te veel tekst voor de voorinzage.')
     setBulkPreview(null)
     setBulkDraft(draft)
-    setMessage(incoming.length + ' eigen CSV-artikelen ingelezen. Bekijk en bevestig via de bestaande ongeprijsde lijstimport.')
+    setMessage(incoming.length + ' eigen spreadsheetartikelen ingelezen. Bekijk en bevestig via de bestaande ongeprijsde lijstimport.')
   }
   function preparePastedOwnCsv() {
     ++bulkFileSerial.current
@@ -406,10 +406,15 @@ export function ManualShoppingNotes({ notes, setNotes }: {
     const serial = ++bulkFileSerial.current
     if (!file) return
     try {
-      if (!file.size || file.size > 32768) throw Error('Kies een Supa-CSV van maximaal 32 kB.')
+      if (!file.size || file.size > 32768) throw Error('Kies een privé-CSV of TSV van maximaal 32 kB.')
+      const extension = file.name.toLocaleLowerCase('nl-NL').split('.').at(-1)
+      if (extension !== 'csv' && extension !== 'tsv')
+        throw Error('Kies een .csv- of .tsv-bestand; geen prijslijst of werkmap.')
       const source = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
       if (serial !== bulkFileSerial.current) return
-      prepareOwnCsvPreview(source)
+      // Existing strict spreadsheet clipboard parser also supports offline TSV files.
+      // No retailer prices or SKUs: still requires explicit review and confirmation.
+      prepareOwnCsvPreview(source, extension === 'tsv')
     } catch (error) {
       if (serial === bulkFileSerial.current) setMessage(error instanceof Error ? error.message : 'CSV geweigerd.')
     }
@@ -1069,8 +1074,8 @@ export function ManualShoppingNotes({ notes, setNotes }: {
         <button type="button" onClick={() => downloadOwnCsv('template')}>
           Download leeg CSV-invulblad voor eigen boodschappen
         </button>
-        <label>Importeer eigen ongeprijsde Supa-CSV (max. 32 kB; geen retailerprijzen)
-          <input type="file" accept=".csv,text/csv" onChange={event => {
+        <label>Importeer eigen ongeprijsde CSV of Excel/Calc-TSV (max. 32 kB; geen retailerprijzen)
+          <input type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" onChange={event => {
             void readOwnCsv(event.currentTarget.files?.[0]); event.currentTarget.value = ''
           }} />
         </label>
