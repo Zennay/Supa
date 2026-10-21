@@ -15,6 +15,8 @@ import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureG
 import { makePlannerCaptureGuide, readablePlannerDemandAmount } from '../comparison/plannerPriceCaptureGuide.ts'
 import { makeBlankPlannerCaptureCsv } from '../comparison/plannerPriceCaptureSheet.ts'
 import { pendingOwnSourceReviewCsv, pendingOwnSourceReviewText } from '../planner/pendingOwnSourceReviewCsv.ts'
+import { ownStoreWeekComparison } from '../planner/ownStoreBudgetComparison.ts'
+import { printableOwnStoreComparison } from '../planner/downloadOwnStoreComparison.ts'
 import './privateComparisonJourney.css'
 
 const PlannerQuickSourcePaste = lazy(async () => {
@@ -55,6 +57,7 @@ export function PrivateComparisonJourney({
 }) {
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [exportMessage, setExportMessage] = useState('')
+  const [shareFallback, setShareFallback] = useState('')
   const [showPasteSource, setShowPasteSource] = useState(false)
   const [captureMessage, setCaptureMessage] = useState('')
   const [partialQuery, setPartialQuery] = useState('')
@@ -362,6 +365,57 @@ export function PrivateComparisonJourney({
       } else {
         setCaptureMessage(error instanceof Error ? error.message : 'Overdragen is niet gelukt.')
       }
+    }
+  }
+
+  // Re-evaluate both original captures when the shopper deliberately shares.
+  // Never reuse a stale screenshot, preview or financial total.
+  function personalComparisonReceipt(): string {
+    const current = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
+    const summary = ownStoreWeekComparison(current)
+    if (!current?.stores.PLUS || !current.stores.DekaMarkt ||
+        summary.status !== 'comparable')
+      throw new Error('Bronnen verlopen of mandjes niet meer volledig vergelijkbaar.')
+    const content = printableOwnStoreComparison(summary, {
+      PLUS: current.stores.PLUS.observedAt,
+      DekaMarkt: current.stores.DekaMarkt.observedAt,
+    })
+    if (new TextEncoder().encode(content).length > 128000)
+      throw new Error('De persoonlijke vergelijking is te groot om te delen.')
+    return content
+  }
+
+  async function handOffCompleteComparison(action: 'copy' | 'share') {
+    setExportMessage('')
+    setShareFallback('')
+    try {
+      // Build synchronously in the original user gesture for mobile Web Share.
+      const content = personalComparisonReceipt()
+      if (action === 'share' && typeof navigator.share === 'function') {
+        try {
+          await navigator.share({
+            title: 'Supa · mijn persoonlijke PLUS/DekaMarkt-weekmand', text: content,
+          })
+          setExportMessage('Je persoonlijke vergelijking is met de gekozen app gedeeld.')
+          return
+        } catch (error) {
+          if (error instanceof Error && error.name === 'AbortError') {
+            setExportMessage('Delen geannuleerd; je winkelbronnen zijn behouden.')
+            return
+          }
+        }
+      }
+      try {
+        if (!navigator.clipboard?.writeText) throw Error('Geen klembord')
+        await navigator.clipboard.writeText(content)
+        setExportMessage('Volledige eigen vergelijking met bronmomenten en SKU’s gekopieerd.')
+      } catch {
+        setShareFallback(content)
+        setExportMessage('Selecteer hieronder de privévergelijking en kopieer handmatig.')
+      }
+    } catch (error) {
+      setExportMessage(error instanceof Error ? error.message :
+        'Vergelijking niet meer geldig; controleer je bronnen opnieuw.')
     }
   }
 
@@ -674,6 +728,14 @@ export function PrivateComparisonJourney({
             onClick={() => void downloadCompleteOwnComparison('txt')}>
             Bewaar persoonlijk prijs- en SKU-overzicht (TXT)
           </button>
+          <button type="button" className="ghost-button"
+            onClick={() => void handOffCompleteComparison('copy')}>
+            Kopieer mijn volledige winkelvergelijking
+          </button>
+          <button type="button" className="ghost-button"
+            onClick={() => void handOffCompleteComparison('share')}>
+            Deel mijn privévergelijking (mobiel)
+          </button>
         </div>
         <div className="private-comparison-journey__store-route-actions"
           role="group" aria-label="Kies een gecontroleerde winkel voor je fysieke boodschappenlijst">
@@ -682,7 +744,14 @@ export function PrivateComparisonJourney({
             Open {shop}-boodschappenlijst
           </button>)}
         </div>
+        <small>Bij kopiëren of delen bevat de tekst jouw originele winkel-SKU’s,
+          bronmomenten en eigen prijsregels. Alleen jij bepaalt welke app de
+          gegevens ontvangt. Geen onafhankelijke besparingsclaim.</small>
         {exportMessage && <p role="status">{exportMessage}</p>}
+        {shareFallback && <label>Mijn vergelijking handmatig kopiëren
+          <textarea rows={8} readOnly spellCheck={false} value={shareFallback}
+            onFocus={event => event.currentTarget.select()} />
+        </label>}
       </> : <>
         <span>Werkelijke prijsvergelijking</span>
         <strong>Volledig prijsverschil nog onbekend</strong>
