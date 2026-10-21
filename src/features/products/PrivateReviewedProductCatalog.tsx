@@ -53,11 +53,12 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, captureNeeds
   onChooseRouteLine: (choice: Omit<PrivateRouteChoice, 'serial'>) => void
   checked: Readonly<Record<string, boolean>>
   onToggleChecked: (shop: OwnStore, line: Matched) => void
-  onMarkCheckedBatch: (shop: OwnStore, lines: readonly Matched[]) => string | null
+  onMarkCheckedBatch: (shop: OwnStore, lines: readonly Matched[], marked?: boolean) => string | null
 }) {
   const [store, setStore] = useState<'all' | OwnStore>('all')
   const [query, setQuery] = useState('')
   const [onlyUnbought, setOnlyUnbought] = useState(false)
+  const [lastBulkTick, setLastBulkTick] = useState<{ shop: OwnStore; lines: readonly Matched[] } | null>(null)
   const [unitFilter, setUnitFilter] = useState<'all' | 'kg' | 'liter' | 'stuk'>('all')
   const [order, setOrder] = useState<'source' | 'unitPrice' | 'lineTotal' | 'priceGap'>('source')
   const [checkMessage, setCheckMessage] = useState('')
@@ -170,6 +171,7 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, captureNeeds
       setCheckMessage('Deze originele winkelbron is verlopen of gewijzigd. Controleer de bron opnieuw.')
       return
     }
+    setLastBulkTick(null)
     onToggleChecked(shop, line)
     setCheckMessage('Het fysieke vinkje is voor ' + shop +
       ' aangepast. Dit is geen goedkeuring van de prijs of betaalbevestiging.')
@@ -188,6 +190,7 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, captureNeeds
     if (!window.confirm('Vink ' + pending.length + ' zichtbaar openstaande ' + store +
       '-artikelen af? Dit is alleen je tijdelijke winkellijst: geen betaling, productreview of prijsclaim.')) return
     const message = onMarkCheckedBatch(store, pending)
+    if (!message) setLastBulkTick({ shop: store, lines: pending })
     setCheckMessage(message ?? 'De zichtbare ' + store +
       '-artikelen zijn afgevinkt. Je originele prijsopname blijft ongewijzigd.')
   }
@@ -244,6 +247,17 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, captureNeeds
     } catch (cause) {
       setCheckMessage(cause instanceof Error ? cause.message : 'Privéoverzicht niet gemaakt.')
     }
+  }
+  function undoLastBulkTick() {
+    if (!lastBulkTick) return
+    const message = onMarkCheckedBatch(lastBulkTick.shop, lastBulkTick.lines, false)
+    if (message) {
+      setCheckMessage(message)
+    } else {
+      setCheckMessage(lastBulkTick.lines.length + ' eerdere bulk-afvinkingen ongedaan gemaakt; bronprijzen onveranderd.')
+    }
+    // One-shot undo: it must never turn a later explicit manual tick off.
+    setLastBulkTick(null)
   }
   function openCurrentCheckedList() {
     // This action can be pressed after the seven-day price window expires.
@@ -454,6 +468,10 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, captureNeeds
           onClick={markVisibleUnbought}>
           Vink {ordered.filter(row => !isChecked(row.shop, row.line)).length}
           {' '}openstaande {store}-artikelen af
+        </button>}
+        {lastBulkTick && <button type="button" className="ghost-button"
+          onClick={undoLastBulkTick}>
+          Maak vorige bulk-afvinking van {lastBulkTick.lines.length} {lastBulkTick.shop}-artikelen ongedaan
         </button>}
         <small>Alleen fysieke winkellijst-vinkjes voor een gekozen winkel.
           Bronprijzen, oorspronkelijke SKU’s en menselijke productreviews blijven intact.</small>
