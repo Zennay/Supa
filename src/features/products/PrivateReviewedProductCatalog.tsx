@@ -191,6 +191,60 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, captureNeeds
     setCheckMessage(message ?? 'De zichtbare ' + store +
       '-artikelen zijn afgevinkt. Je originele prijsopname blijft ongewijzigd.')
   }
+  function downloadFilteredOpenTrip() {
+    if (store === 'all') {
+      setCheckMessage('Kies eerst één winkel voor je eigen privébronoverzicht.')
+      return
+    }
+    const latest = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
+    const capture = latest?.stores[store]
+    const open = ordered.filter(row => row.shop === store &&
+      !isChecked(row.shop, row.line)).map(row => row.line)
+    if (!capture || !open.length || open.length > 100 ||
+        open.some(line => !capture.basket.lines.includes(line))) {
+      setCheckMessage('De oorspronkelijke winkelbron of jouw zichtbare selectie is veranderd. Open je originele bron opnieuw.')
+      return
+    }
+    try {
+      const clean = (value: string) => value
+        .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').replace(/\s+/gu, ' ').trim()
+      const content = [
+        'Supa | alleen mijn nog openstaande ' + store + '-producten',
+        'Origineel eigen bronmoment: ' + clean(capture.observedAt),
+        'Persoonlijke, lokaal vastgelegde bronprijzen. GEEN kassabon, live prijs of winkelgarantie.',
+        'Dit is alleen mijn huidige zoek-/eenheids-/winkel-filter, NIET mijn volledige fysieke mand.',
+        '',
+        ...open.map((line, index) => [
+          String(index + 1) + '. ' + clean(line.ingredientLabel) + ' | nodig: ' +
+            line.requirement.amount + ' ' + line.requirement.unit,
+          '   ' + clean(line.productName) + ' | broncode ' + clean(line.productId) +
+            ' | ' + line.packs + ' pak(ken) van ' + line.pack.count + ' x ' +
+            line.pack.amount + ' ' + line.pack.unit,
+          '   Eigen bronprijs ' + money.format(line.pricePerPackCents / 100) +
+            ' per pak | ' + money.format(line.lineTotalCents / 100) + ' voor dit ingrediënt',
+        ].join('\n')),
+        '',
+        'Ontbrekende andere ingrediënten en extra handmatige boodschappen staan NIET in deze filterexport.',
+        'Geen totaalverschil, besparingsclaim of bewijs van betaling.',
+      ].join('\n') + '\n'
+      if (new TextEncoder().encode(content).length > 128_000)
+        throw Error('De eigen selectie is te groot voor één privéoverzicht.')
+      if (freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())?.stores[store] !== capture)
+        throw Error('De eigen winkelbron is net verlopen of gewijzigd.')
+      const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }))
+      try {
+        const a = document.createElement('a')
+        a.href = url
+        a.download = 'supa-' + store.toLowerCase() + '-gefilterd-nog-te-kopen.txt'
+        document.body.append(a)
+        try { a.click() } finally { a.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setCheckMessage(open.length + ' nog openstaande originele ' + store +
+        '-artikelen als privétekst opgeslagen; geen volledig winkelmandje.')
+    } catch (cause) {
+      setCheckMessage(cause instanceof Error ? cause.message : 'Privéoverzicht niet gemaakt.')
+    }
+  }
   function openCurrentCheckedList() {
     // This action can be pressed after the seven-day price window expires.
     // Never navigate as though a stale source still certifies a priced list.
@@ -390,6 +444,11 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, captureNeeds
       <div className="private-reviewed-products__bulk-shopping">
         <p role="status">{ordered.length} passende winkelartikelen zichtbaar.
           {' '}De volledige mandprijs wordt niet gefilterd.</p>
+        {store !== 'all' && <button type="button" className="ghost-button"
+          disabled={!ordered.some(row => !isChecked(row.shop, row.line))}
+          onClick={downloadFilteredOpenTrip}>
+          Download alleen mijn zichtbare open {store}-artikelen (TXT)
+        </button>}
         {store !== 'all' && <button type="button" className="ghost-button"
           disabled={!ordered.some(row => !isChecked(row.shop, row.line))}
           onClick={markVisibleUnbought}>
