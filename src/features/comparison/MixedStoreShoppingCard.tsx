@@ -266,16 +266,11 @@ export function MixedStoreShoppingCard({
     }
   }
 
-  async function shareStoreStop(store: MixedStore) {
-    if (block || !eligibleNow()) {
-      setMessage('Controleer eerst de actuele eigen bronopnames en extra kosten.')
-      return
-    }
+  /** Single source of truth for the selected shop's offline copy and share. */
+  function personalStoreStopText(store: MixedStore): string {
     const lines = plan.lines.filter(line => line.store === store)
-    if (!lines.length) {
-      setMessage(store + ' is geen onderdeel van de geselecteerde winkelroute.')
-      return
-    }
+    if (!lines.length)
+      throw Error(store + ' is geen onderdeel van de geselecteerde winkelroute.')
     const myNotes = validManualNotes.filter(note =>
       note.store === store || note.store === 'Algemeen')
     const clean = (value: string) => value
@@ -306,7 +301,43 @@ export function MixedStoreShoppingCard({
       'Geen onafhankelijke retailerprijs, bronrecht, kassagarantie of besparingsclaim.',
     ].join('\n')
     if (new TextEncoder().encode(text).length > 128000)
-      { setMessage('Deze winkelstop is te groot om mobiel te delen.'); return }
+      throw Error('Deze winkelstop is te groot om offline te bewaren of te delen.')
+    return text
+  }
+
+  function downloadStoreStopTxt(store: MixedStore) {
+    if (block || !eligibleNow()) {
+      setMessage('Controleer eerst de actuele eigen bronopnames en extra kosten.')
+      return
+    }
+    try {
+      const text = personalStoreStopText(store)
+      if (!eligibleNow()) throw Error('De originele bronopnames zijn veranderd.')
+      const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-mijn-' + store.toLowerCase() + '-winkelstop-prive.txt'
+        document.body.appendChild(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setMessage('Eigen ' + store + '-winkelstop offline bewaard; alleen oorspronkelijke gecontroleerde pakken geprijsd.')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Winkelstop kon niet worden bewaard.')
+    }
+  }
+
+  async function shareStoreStop(store: MixedStore) {
+    if (block || !eligibleNow()) {
+      setMessage('Controleer eerst de actuele eigen bronopnames en extra kosten.')
+      return
+    }
+    let text: string
+    try { text = personalStoreStopText(store) }
+    catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Winkelstop niet beschikbaar.')
+      return
+    }
     const fingerprint = copyFingerprint
     try {
       if (typeof navigator.share === 'function') {
@@ -742,6 +773,10 @@ export function MixedStoreShoppingCard({
           <button type="button" className="ghost-button" disabled={!all.length}
             onClick={() => { void shareStoreStop(store) }}>
             Deel of kopieer alleen mijn {store}-winkelstop
+          </button>
+          <button type="button" className="ghost-button" disabled={!all.length}
+            onClick={() => downloadStoreStopTxt(store)}>
+            Bewaar mijn {store}-winkelstop (TXT)
           </button>
           <button type="button" className="ghost-button" disabled={!all.length}
             onClick={() => { void downloadPrintHtml(false, store) }}>
