@@ -31,7 +31,7 @@ function newClientIngredientId(): string {
 }
 
 function validAmount(value: number | null): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 1_000_000_000 &&
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 1_000_000 &&
     Math.abs(value * 1000 - Math.round(value * 1000)) <= 1e-7
 }
 
@@ -47,13 +47,31 @@ export function emptyUserRecipeDraft(): EditorRecipeDraft {
 export function prepareImportedRecipeForEditor(
   draft: Omit<EditorRecipeDraft, 'ingredients'> & { ingredients: Omit<EditorIngredient, 'clientId'>[] },
 ): EditorRecipeDraft {
-  return { ...draft, ingredients: draft.ingredients.map((ingredient) => ({ ...ingredient, clientId: newClientIngredientId() })) }
+  const ingredients = draft.ingredients.map((ingredient) => {
+    const next = { ...ingredient, clientId: newClientIngredientId() }
+    const validUnit = next.unit === 'g' || next.unit === 'ml' || next.unit === 'piece'
+    const fractionalPiece = next.unit === 'piece' &&
+      typeof next.amount === 'number' && !Number.isSafeInteger(next.amount)
+    // Imported data is a proposal, not permission to bypass the editor's
+    // canonical quantity limits or the whole-physical-piece requirement.
+    if (!next.reviewReason) {
+      if (fractionalPiece) {
+        next.reviewReason = 'Een deel van een stuk: kies een heel aantal stuks.'
+      } else if (!validAmount(next.amount)) {
+        next.reviewReason = 'Vul een geldige hoeveelheid in (maximaal 1.000.000).'
+      } else if (!validUnit) {
+        next.reviewReason = 'Kies gram, milliliter of stuks.'
+      }
+    }
+    return next
+  })
+  return { ...draft, ingredients }
 }
 
 export function parseMetricEditorAmount(value: string): number | null {
   if (!/^(?:\d{1,9})(?:[.,]\d{1,3})?$/.test(value.trim())) return null
   const amount = Number(value.trim().replace(',', '.'))
-  return Number.isFinite(amount) && amount > 0 && amount <= 1_000_000_000 ? amount : null
+  return Number.isFinite(amount) && amount > 0 && amount <= 1_000_000 ? amount : null
 }
 
 /**
@@ -80,10 +98,12 @@ export function updateEditorIngredient(
     next.reviewReason = !next.label.trim()
       ? 'Vul een ingrediëntnaam in.'
       : !validAmount(next.amount)
-        ? 'Vul een geldige hoeveelheid in.'
+        ? 'Vul een geldige hoeveelheid in (maximaal 1.000.000).'
         : !['g', 'ml', 'piece'].includes(next.unit ?? '')
           ? 'Kies gram, milliliter of stuks.'
-          : null
+          : next.unit === 'piece' && !Number.isSafeInteger(next.amount)
+            ? 'Een deel van een stuk: kies een heel aantal stuks.'
+            : null
     return next
   })
   return { ...draft, ingredients }
@@ -113,6 +133,7 @@ export function canConfirmUserRecipeDraft(draft: EditorRecipeDraft): boolean {
     draft.ingredients.length >= 1 && draft.ingredients.length <= MAX_INGREDIENTS &&
     draft.ingredients.every((x) => x.label.trim().length > 0 && x.label.length <= MAX_TEXT &&
       x.reviewReason === null && validAmount(x.amount) &&
-      (x.unit === 'g' || x.unit === 'ml' || x.unit === 'piece')),
+      (x.unit === 'g' || x.unit === 'ml' || x.unit === 'piece') &&
+      (x.unit !== 'piece' || Number.isSafeInteger(x.amount))),
   )
 }
