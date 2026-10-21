@@ -1,5 +1,6 @@
 /** Private spreadsheet transfer for unpriced notes; never retailer evidence. */
 import type { UnpricedShoppingNote } from './ManualShoppingNotes.tsx'
+import { privateNoteDuplicateKey } from './manualShoppingNoteIdentity.ts'
 type Row = Pick<UnpricedShoppingNote, 'label' | 'store' | 'done'>
 const header = 'supa-eigen-ongeprijsd-v1;winkel;artikel;afgevinkt'
 const stores = new Set(['Algemeen', 'PLUS', 'DekaMarkt'])
@@ -76,7 +77,7 @@ export function importUnpricedShoppingCsv(source: string): Row[] {
     if (!label || label.length > 140 || label !== originalCell(columns[2]))
       throw Error('CSV bevat een ongeldige omschrijving (max. 140 tekens).')
     const store = columns[1] as Row['store']
-    const key = JSON.stringify([store, label.normalize('NFC').toLocaleLowerCase('nl-NL')])
+    const key = privateNoteDuplicateKey(store, label)
     if (seen.has(key)) throw Error('CSV bevat dubbele boodschappen bij dezelfde winkel.')
     seen.add(key)
     return { store, label, done: columns[3] === 'ja' }

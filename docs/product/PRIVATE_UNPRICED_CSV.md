@@ -56,3 +56,5 @@ Havermout	PLUS	ja
 De bestaande begrensde Supa-CSV-parser controleert vervolgens nogmaals de
 artikelnamen, dubbele regels en groepscodes. Het resultaat moet altijd door
 de gewone expliciete persoonlijke importvoorinzage voordat de lijst wijzigt.
+
+**Dubbele omschrijvingen:** de persoonlijke lijst vergelijkt winkel + een Unicode-genormaliseerde identiteit (NFKC, onzichtbare default-ignorable tekens verwijderd, hoofdletterongevoelig). Dit is uitsluitend voor duplicaatdetectie; de originele omschrijving blijft zichtbaar en wordt in backups bewaard. Deze normalisatie creëert geen SKU, productmatch of prijs.

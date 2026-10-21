@@ -1165,6 +1165,10 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               checked={privateShoppingTicks} setChecked={setPrivateShoppingTicks}
               plan={plannedMeals} recipes={recipes} activeDays={activeDays}
               manualNotes={manualShoppingNotes}
+              onToggleManualNote={snapshot => setManualShoppingNotes(current => current.map(note =>
+                note.id === snapshot.id && note.label === snapshot.label &&
+                note.store === snapshot.store && note.done === snapshot.done
+                  ? { ...note, done: !note.done } : note))}
               preferred={preferredOwnStore} onChooseStore={setPreferredOwnStore}
               onOpenComparison={openOwnPriceImport} routeOpenSignal={mixedRouteOpenSignal}
               routeChoice={privateRouteChoice}

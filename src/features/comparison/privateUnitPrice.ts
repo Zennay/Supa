@@ -102,6 +102,20 @@ export function formatPrivateUnitRate(rate: PrivateUnitRate): string {
   return euros.format(rate.roundedCentsPerUnit / 100) + ' / ' + rate.unit
 }
 
+/** Advisory €/kg, €/liter or €/stuk for an already selected, full-pack route line.
+ * Read only ordinary own data, as with canonical unit-price presentation. */
+export function privateMixedStoreUnitPrice(line: unknown): string | null {
+  try {
+    const rate = privatePackUnitRate({
+      amount: ownData(line, 'packAmount') as number | null,
+      unit: ownData(line, 'packUnit') as string,
+      count: ownData(line, 'packCount') as number,
+      priceCents: ownData(line, 'pricePerPackCents') as number | null,
+    })
+    return rate ? formatPrivateUnitRate(rate) : null
+  } catch { return null }
+}
+
 export function privateUnitPrice(line: Matched): string | null {
   try {
     // Do not dereference a foreign BasketTraceLine's nested pack getters.

@@ -1,5 +1,6 @@
 import type { UnpricedShoppingNote } from './ManualShoppingNotes.tsx'
 import { literalCsv } from '../../privateBasketComparisonCsv.ts'
+import { privateNoteDuplicateKey } from './manualShoppingNoteIdentity.ts'
 
 export const PRIVATE_NOTES_BACKUP_MAX_BYTES = 65536
 const MAX_NOTES = 100
@@ -49,9 +50,7 @@ export function mergePrivateNotes(current: UnpricedShoppingNote[], incoming: Unp
   // A backup from another tab can assign a new UUID to the same handwritten
   // article. Store + normalized label, not UUID alone, is its user-facing
   // duplicate identity. Never replace an existing tick during recovery.
-  const keys = new Set(current.map(item => JSON.stringify([
-    item.store, item.label.normalize('NFC').toLocaleLowerCase('nl-NL'),
-  ])))
+  const keys = new Set(current.map(item => privateNoteDuplicateKey(item.store, item.label)))
   const additional: UnpricedShoppingNote[] = []
   for (const note of incoming) {
     const found = existing.get(note.id)
@@ -60,7 +59,7 @@ export function mergePrivateNotes(current: UnpricedShoppingNote[], incoming: Unp
         throw new Error('Een bestaande boodschap heeft hetzelfde ID maar andere inhoud; niets is geïmporteerd.')
       }
     } else {
-      const key = JSON.stringify([note.store, note.label.normalize('NFC').toLocaleLowerCase('nl-NL')])
+      const key = privateNoteDuplicateKey(note.store, note.label)
       if (keys.has(key)) continue
       keys.add(key)
       additional.push(note)
