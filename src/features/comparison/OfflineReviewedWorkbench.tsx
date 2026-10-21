@@ -212,7 +212,7 @@ function searchableSourceText(value: string): string {
 function sourceOptions(products: OfflineStoreProduct[],
   unit: BasketTraceLine['requirement']['unit'], text: string, keepId: string,
   ingredient: string, requestedAmount: number | null, sort: SourceSort,
-  cheaperThanCents: number | null = null, limit = 40) {
+  cheaperThanCents: number | null = null, limit = 40, unpricedLimit = 5) {
   const query = searchableSourceText(text)
   const matchesQuery = (product: import('../../domain/basket.ts').StoreProduct) =>
     !query || searchableSourceText(product.name).includes(query) ||
@@ -251,7 +251,7 @@ function sourceOptions(products: OfflineStoreProduct[],
     unpriced.filter(matchesQuery), ingredient, requestedAmount, unit, text)
   return {
     shown, total: pricedCandidates.length, availableCount: available.length,
-    unpricedShown: unpricedFiltered.slice(0, 5),
+    unpricedShown: unpricedFiltered.slice(0, Math.min(1000, Math.max(5, unpricedLimit))),
     unpricedTotal: unpricedFiltered.length, unpricedCount: unpriced.length,
   }
 }
@@ -394,6 +394,7 @@ export function OfflineReviewedWorkbench({
   })
   const [skuFilter, setSkuFilter] = useState<Record<string, string>>({})
   const [sourceResultLimit, setSourceResultLimit] = useState<Record<string, number>>({})
+  const [sourceUnpricedLimit, setSourceUnpricedLimit] = useState<Record<string, number>>({})
   const [sourceSort, setSourceSort] = useState<Record<string, SourceSort>>({})
   const [onlyCheaper, setOnlyCheaper] = useState<Record<string, boolean>>({})
   const [doneTripItems, setDoneTripItems] = useState<Record<string, boolean>>({})
@@ -3482,7 +3483,8 @@ export function OfflineReviewedWorkbench({
                           line.ingredientLabel, line.requirement.amount,
                           sourceSort[searchKey] ?? 'relevance',
                           onlyCheaper[searchKey] && line.status === 'matched'
-                            ? line.lineTotalCents : null, sourceResultLimit[searchKey] ?? 40)
+                            ? line.lineTotalCents : null, sourceResultLimit[searchKey] ?? 40,
+                          sourceUnpricedLimit[searchKey] ?? 5)
                         return (
                         <article key={line.id} id={reviewRowId(store, line.id)} tabIndex={-1}
                           className="offline-price-workbench__line">
@@ -3507,6 +3509,7 @@ export function OfflineReviewedWorkbench({
                                     onChange={event => {
                                       setSkuFilter(current => ({ ...current, [searchKey]: event.currentTarget.value }))
                                       setSourceResultLimit(previous => ({ ...previous, [searchKey]: 40 }))
+                                      setSourceUnpricedLimit(previous => ({ ...previous, [searchKey]: 5 }))
                                     }} />
                                   <small>{choices.total} prijsklare en {choices.unpricedTotal} niet-prijsklare bronartikelen in deze zoekopdracht.</small>
                                 </label>
@@ -3603,8 +3606,22 @@ export function OfflineReviewedWorkbench({
                                         {' '}· {product.packAmount ?? '?'} {product.packUnit}
                                         <small> — {explainUnpricedSource(product)}</small></li>
                                     ))}</ul>
-                                    {choices.unpricedTotal > choices.unpricedShown.length &&
-                                      <small>Er zijn meer ongeprijsde artikelen; verfijn de zoekterm.</small>}
+                                    {choices.unpricedTotal > choices.unpricedShown.length && (
+                                      <div className="offline-price-workbench__matching-actions">
+                                        <button type="button" className="ghost-button"
+                                          onClick={() => setSourceUnpricedLimit(previous => ({
+                                            ...previous, [searchKey]: Math.min(1000, (previous[searchKey] ?? 5) + 20),
+                                          }))}>
+                                          Bekijk volgende {Math.min(20, choices.unpricedTotal - choices.unpricedShown.length)} onvolledige bronartikelen
+                                        </button>
+                                        <button type="button" className="ghost-button"
+                                          onClick={() => setSourceUnpricedLimit(previous => ({
+                                            ...previous, [searchKey]: Math.min(1000, choices.unpricedTotal),
+                                          }))}>
+                                          Bekijk alle {choices.unpricedTotal} bronartikelen met ontbrekende prijs of verpakking
+                                        </button>
+                                      </div>
+                                    )}
                                   </div>
                                 )}
                               </div>
