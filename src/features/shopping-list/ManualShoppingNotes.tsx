@@ -266,9 +266,10 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       if (!file.size || file.size > 32768) throw Error('Kies een Supa-CSV van maximaal 32 kB.')
       const source = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
       if (serial !== bulkFileSerial.current) return
-      prepareOwnCsvPreview(source)
+      // Reuse the same strict own-list parser for semicolon CSV and Excel TSV.
+      prepareOwnCsvPreview(source, true)
     } catch (error) {
-      if (serial === bulkFileSerial.current) setMessage(error instanceof Error ? error.message : 'CSV geweigerd.')
+      if (serial === bulkFileSerial.current) setMessage(error instanceof Error ? error.message : 'CSV of TSV geweigerd.')
     }
   }
   function addBulk(event: FormEvent) {
@@ -756,8 +757,8 @@ export function ManualShoppingNotes({ notes, setNotes }: {
         <button type="button" onClick={() => downloadOwnCsv(true)}>
           Download leeg CSV-invulblad voor eigen boodschappen
         </button>
-        <label>Importeer eigen ongeprijsde Supa-CSV (max. 32 kB; geen retailerprijzen)
-          <input type="file" accept=".csv,text/csv" onChange={event => {
+        <label>Importeer eigen ongeprijsde Supa-CSV of Excel-TSV (max. 32 kB; geen winkelprijzen)
+          <input type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values,text/plain" onChange={event => {
             void readOwnCsv(event.currentTarget.files?.[0]); event.currentTarget.value = ''
           }} />
         </label>
