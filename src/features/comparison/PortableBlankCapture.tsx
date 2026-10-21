@@ -20,7 +20,7 @@ export function PortableBlankCapture({
   needsAtClick?: () => readonly PlannerCaptureGuideNeed[]
   purpose?: 'blank' | 'missing'
   delimiter?: ',' | ';' | '\t'
-  onReview?: (files: File[]) => void | Promise<void>
+  onReview?: (files: File[]) => void | boolean | Promise<void | boolean>
   onDraftChange?: () => void
 }) {
   const [displayed, setDisplayed] = useState<Displayed | null>(null)

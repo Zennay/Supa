@@ -1415,3 +1415,13 @@ asynchroon openen van een eigen bronbestand de originele formulierinvoer
 wijzigt, meldt het formulier dat het oudere resultaat niet meer bij de
 huidige broninvoer hoort. Ook bronprijzen in die preview blijven
 onbevestigd, en een ontbrekende of oude tweede winkel blijft onbekend.
+
+## Geen schijnsucces bij geweigerde bronvoorinzage
+
+Het mobiele opnameformulier ontvangt voortaan een expliciet succes- of
+afwijsresultaat van de bestaande canonieke CSV-voorinzage. Als een bronbestand
+ongeldig is, verouderd raakt of na het starten door een nieuwe broninvoer
+wordt ingehaald, toont het formulier geen vals bericht dat de invoer
+bruikbaar klaarstaat. De precieze fout uit de bestaande import staat in
+het normale bronpaneel. Eerder geaccepteerde brondata en handmatige
+productreviews blijven behouden; er worden geen prijzen stil bevestigd.

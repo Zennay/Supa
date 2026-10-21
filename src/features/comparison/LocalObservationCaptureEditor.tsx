@@ -37,7 +37,7 @@ type Props = {
   needsAtClick?: () => readonly PlannerCaptureGuideNeed[]
   delimiter: ',' | ';' | '\t'
   context: string
-  onReview?: (files: File[]) => void | Promise<void>
+  onReview?: (files: File[]) => void | boolean | Promise<void | boolean>
   onDraftChange?: () => void
 }
 /**
@@ -443,7 +443,7 @@ export function LocalObservationCaptureEditor({
         const submittedRevision = changes.current
         const submittedScope = snapshot.fingerprint
         draftInvalidated.current = false
-        await onReview(files)
+        const previewReady = await onReview(files)
         if (changes.current !== submittedRevision ||
             currentScope.current !== submittedScope) {
           // A late parser must not leave an accepted-looking stale preview.
@@ -451,6 +451,10 @@ export function LocalObservationCaptureEditor({
           onDraftChange?.()
           draftInvalidated.current = true
           setStatus('De winkelinvoer is veranderd terwijl de bron werd geopend. Gebruik alleen een nieuwe controle van de huidige originele invoer.')
+          return
+        }
+        if (previewReady === false) {
+          setStatus('Dit bronbestand is niet toegelaten tot de lokale voorinzage. Lees de concrete reden in het bronpaneel; huidige formulierinvoer en eerdere geaccepteerde gegevens blijven behouden.')
           return
         }
         setStatus('Broncontrole op dit toestel gestart. Controleer hierboven de oorspronkelijke SKU’s en bronmomenten, en bevestig eventueel overnemen altijd afzonderlijk.')

@@ -489,8 +489,8 @@ export function OfflineReviewedWorkbench({
     setWeekExportMessage('Je eigen nog onbevestigde winkelinvoer is gewijzigd. Bekijk de nieuwe bron opnieuw.')
   }
 
-  async function previewFilledCsv(files: File[]) {
-    if (files.length === 0) return
+  async function previewFilledCsv(files: File[]): Promise<boolean> {
+    if (files.length === 0) return false
     const version = ++importRevision.current
     setCapturePreview(null)
     setCapturePreviewShown({ PLUS: 20, DekaMarkt: 20 })
@@ -561,7 +561,7 @@ export function OfflineReviewedWorkbench({
           ? [...previousCapture.products, ...source.products] : source.products
         entry.matching = previewMatching(entry.retailer, projectedProducts)
       }
-      if (version !== importRevision.current || captureWeek !== captureWeekRef.current) return
+      if (version !== importRevision.current || captureWeek !== captureWeekRef.current) return false
       // One newly imported store can be compared with the independently
       // retained other capture, not merely the stores inside this CSV file.
       // Never invent a missing retailer instant or silently refresh the old one.
@@ -584,17 +584,19 @@ export function OfflineReviewedWorkbench({
           }
         }
       }
-      if (version !== importRevision.current || captureWeek !== captureWeekRef.current) return
+      if (version !== importRevision.current || captureWeek !== captureWeekRef.current) return false
       setCapturePreview({
         files, week: captureWeek, stores: storesInPreview,
         unobservedOtherStoreRows: blankOtherRows,
         pairedWithin24h: combined.pairedWithin24h, retainedOther,
       })
       setWeekExportMessage('Eigen CSV-bronopnames lokaal gecontroleerd. Bekijk beide winkels en neem de brondata bewust over.')
+      return true
     } catch (e) {
       if (version === importRevision.current) setWeekExportMessage(
         (e instanceof Error ? e.message : 'CSV ongeldig.') +
         ' Vorige winkeldata en productbevestigingen zijn behouden.')
+      return false
     } finally { if (version === importRevision.current) setBusy(false) }
   }
 
