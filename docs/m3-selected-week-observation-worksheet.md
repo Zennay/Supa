@@ -17,8 +17,12 @@ API also supports locally curated inert custom weekday plans, including Friday,
 Saturday and Sunday when a corresponding actual planned meal exists.
 
 For each chosen ingredient requirement, exactly two rows are created: PLUS and
-DekaMarkt. Required quantity and unit are derived from the planner, not from
-a historical offer. The worksheet always marks each row
+DekaMarkt. Rows are ordered by stable ingredient identity, with PLUS followed by
+DekaMarkt for each pair. Compatible mass requirements always use grams and
+compatible volume requirements always use millilitres, so equivalent selected
+planner demand produces the same CSV regardless of recipe or plan iteration
+order. Required quantity is derived from the planner, not from a historical offer.
+The worksheet always marks each row
 `UNOBSERVED_TEMPLATE_NOT_EVIDENCE`; every observed field stays blank:
 date/time, store, price context, matched product and pack, observed shelf price,
 availability, collection method, evidence reference and notes. No reviewed
