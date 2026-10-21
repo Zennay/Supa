@@ -336,3 +336,18 @@ body { background: #e9eeec; }
   color: #254e38; font-weight: 750; cursor: pointer; margin-left: auto; }
 .hifi-go-to-list:focus-visible { outline: 3px solid #226f52; outline-offset: 3px; }
 @media(max-width:420px) { .hifi-go-to-list { font-size: .82rem; padding: .5rem .6rem; } }
+
+/* P0 accessibility: every Figma-derived control has a keyboard-visible focus
+   ring, including search, source tabs, filters, product actions and Shoplist. */
+.hifi-home :is(button, a, input, select, textarea, summary):focus-visible,
+.hifi-nav button:focus-visible {
+  outline: 3px solid #005135;
+  outline-offset: 3px;
+}
+
+@media (forced-colors: active) {
+  .hifi-home :is(button, a, input, select, textarea, summary):focus-visible,
+  .hifi-nav button:focus-visible {
+    outline-color: Highlight;
+  }
+}
