@@ -38,9 +38,26 @@ function quantity(line: PreviewMatchLine | undefined): string {
 function storeColumns(line: PreviewMatchLine | undefined, observedAt: string, fresh: boolean): string[] {
   if (!line) return [observedAt, ...Array<string>(9).fill(''), 'Ontbrekende bronmatch']
   if (!completePreviewProposal(line)) {
-    return [observedAt, ...Array<string>(9).fill(''),
-      line.reasons.length ? 'Handmatig controleren: ' + line.reasons.join('; ') :
-        'Onvolledige bronmatch: controleer SKU en pakprijs']
+    // Keep identifiable original product facts even if its proposed price is
+    // unusable. A blank SKU, package or price must never become invented zero.
+    const missing = [
+      !line.originalSku?.trim() ? 'productcode' : '',
+      !line.product?.trim() ? 'productnaam' : '',
+      !Number.isFinite(line.packAmount) || (line.packAmount ?? 0) <= 0 ||
+        !line.packUnit || !Number.isSafeInteger(line.packCount) ||
+        (line.packCount ?? 0) <= 0 ? 'verpakking' : '',
+      !Number.isSafeInteger(line.pricePerPackCents) ||
+        (line.pricePerPackCents ?? -1) < 0 ? 'hele-pak-prijs' : '',
+      line.status !== 'matched' ? 'ingrediëntmatch' : '',
+    ].filter(Boolean)
+    return [observedAt, line.originalSku ?? '', line.product ?? '',
+      Number.isFinite(line.packAmount) && (line.packAmount ?? 0) > 0
+        ? readablePlannerDemandAmount(line.packAmount) : '',
+      line.packUnit ?? '', Number.isSafeInteger(line.packCount) &&
+        (line.packCount ?? 0) > 0 ? String(line.packCount) : '',
+      '', '', '', '',
+      'Nog controleren: ' + (missing.join(', ') || 'fysieke pakdekking / regelberekening') +
+        (line.reasons.length ? '; ' + line.reasons.join('; ') : '')]
   }
   return [observedAt, line.originalSku, line.product,
     readablePlannerDemandAmount(line.packAmount), line.packUnit,
