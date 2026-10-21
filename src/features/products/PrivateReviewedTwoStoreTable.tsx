@@ -821,6 +821,13 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   const wholeCheapestCents = Math.min(plus.basket.totalCents, deka.basket.totalCents)
   const delta = deka.basket.totalCents - plus.basket.totalCents
   const cheapest: OwnStore = delta >= 0 ? 'PLUS' : 'DekaMarkt'
+  // Capture age is a factual browser-local prompt to refresh a personal source,
+  // never evidence of current retailer stock or a legally usable live feed.
+  const ageingSources = (['PLUS', 'DekaMarkt'] as const).filter(shop => {
+    const source = shop === 'PLUS' ? plus : deka
+    const instant = observedInstant(source.observedAt)
+    return instant !== null && Date.now() - instant.ms >= 6 * 24 * 60 * 60 * 1000
+  })
   const leader = delta === 0 ? 'Beide mandjes zijn even duur.'
     : (delta > 0 ? 'PLUS' : 'DekaMarkt') + ' is ' +
       money.format(Math.abs(delta) / 100) + ' goedkoper voor alle hele verpakkingen.'
@@ -865,6 +872,17 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         of een berekening van werkelijk afgerekende producten.</small>
     </div>}
     <strong role="status">{leader}</strong>
+    <div className="private-reviewed-products__source-revisit">
+      <p>{ageingSources.length
+        ? 'De originele opname van ' + ageingSources.join(' en ') +
+          ' is minstens zes dagen oud. Controleer de producten en prijzen opnieuw; na zeven dagen wordt een volledige vergelijking geweigerd.'
+        : 'Dit prijsverschil gebruikt uitsluitend de twee volledige, actuele en door jou gecontroleerde eigen winkelopnames.'}</p>
+      <button type="button" onClick={onOpenComparison}>
+        Herzie mijn bronproducten of voeg een nieuw winkelmoment toe
+      </button>
+      <small>Bronmomenten worden niet ververst door deze knop. Alleen een echte nieuwe,
+        door jou beoordeelde opname kan prijzen vervangen.</small>
+    </div>
     <section className="private-reviewed-products__difference-focus"
       aria-label="Waar komt het volledige winkelprijsverschil vandaan?">
       <h4>Welk mandje heeft welke goedkopere artikelen?</h4>
