@@ -21,7 +21,7 @@ const MixedStoreShoppingCard = lazy(async () => {
 })
 
 /** Private owner-reviewed baskets only. No fixture rows, browser storage or APIs. */
-export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChooseStore, onOpenComparison, checked, setChecked, plan, recipes, activeDays, routeChoice, routeCostIntent, routeOpenSignal = 0, manualNotes = [] }: {
+export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChooseStore, onOpenComparison, checked, setChecked, plan, recipes, activeDays, routeChoice, routeCostIntent, routeOpenSignal = 0, manualNotes = [], onToggleManualNote }: {
   reviewed: PrivateReviewedBaskets
   budget: number
   preferred: OwnStore
@@ -33,6 +33,7 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
   recipes: RecipeWithIngredients[]
   activeDays: string[]
   manualNotes?: readonly UnpricedShoppingNote[]
+  onToggleManualNote?: (note: UnpricedShoppingNote) => void
   routeOpenSignal?: number
   routeChoice?: PrivateRouteChoice | null
   routeCostIntent?: PrivateExtraVisitCostIntent | null
@@ -110,6 +111,7 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
     typeof note.label === 'string' && note.label.trim().length > 0 &&
     note.label.length <= 140 && typeof note.done === 'boolean')
   const visibleOwnNotes = remainingOnly ? ownNotes.filter(note => !note.done) : ownNotes
+  const ownOpenCount = ownNotes.filter(note => !note.done).length
   const textList = [
     'Supa · ' + store + ' · privé gecontroleerd boodschappenlijstje',
     'Eigen bronopname: ' + readable(capture.observedAt),
@@ -456,9 +458,9 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
         </p>}
         {unpricedExtras === null && <p role="status">De opgeslagen extra boodschappen
           zijn niet leesbaar; je uiteindelijke totale budgetruimte is onbekend.</p>}
-        {manualNotes.length > 0 && <p role="status">
-          Je hebt ook {manualNotes.length} handmatig toegevoegde ongeprijsde
-          {manualNotes.length === 1 ? ' boodschap' : ' boodschappen'} (Algemeen/PLUS/DekaMarkt).
+        {ownNotes.length > 0 && <p role="status">
+          Voor {store}: {ownNotes.length} handmatig toegevoegde ongeprijsde
+          {ownNotes.length === 1 ? ' boodschap' : ' boodschappen'}, waarvan {ownOpenCount} open.
           De echte totale uitgaven en budgetruimte blijven <strong>onbekend</strong>.
           De winkelmandbedragen tonen uitsluitend jouw bevestigde fysieke Planner-artikelen.
         </p>}
@@ -601,8 +603,28 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
             <strong>{line.status === 'matched' ? exactEuro.formatCents(line.lineTotalCents) : 'Onbekend'}</strong>
           </label>
         ))}
-        {visibleLines.length === 0 && <p>Alles voor {store} is afgevinkt.</p>}
+        {visibleLines.length === 0 && <p>Alle getoonde geprijsde winkelregels zijn afgevinkt.</p>}
       </div>
+      {ownNotes.length > 0 && <section className="private-source-shopping__unpriced"
+        aria-label={'Mijn eigen ongeprijsde boodschappen bij ' + store}>
+        <h3>Mijn andere boodschappen · prijs onbekend</h3>
+        <p>Eigen {store}- en algemene boodschappen. De vinkjes zijn gedeeld met je
+          gewone Lijst. Een vinkje bevestigt geen prijs, productmatch of betaling.</p>
+        <p role="status">{ownOpenCount} van {ownNotes.length} nog open.</p>
+        <div className="private-source-shopping__items">
+          {visibleOwnNotes.map(note => <label className="private-source-shopping__item"
+            key={note.id}>
+            <input type="checkbox" checked={note.done} disabled={!onToggleManualNote}
+              onChange={() => onToggleManualNote?.(note)}
+              aria-label={'Eigen ongeprijsde boodschap afvinken: ' + note.label} />
+            <span><strong>{note.label}</strong>
+              <small>{note.store} · zelf toegevoegd · geen SKU, bronmoment of prijs</small>
+            </span>
+            <strong>Onbekend</strong>
+          </label>)}
+          {visibleOwnNotes.length === 0 && <p>Alle eigen artikelen hier zijn afgevinkt.</p>}
+        </div>
+      </section>}
       <details>
         <summary>{remainingOnly ? 'Kopieer alleen nog te kopen artikelen' :
           'Kopieer het volledige eigen winkelmandje'}</summary>
