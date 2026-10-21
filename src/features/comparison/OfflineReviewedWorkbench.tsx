@@ -36,7 +36,9 @@ import { currentTripKey, loadTripProgress, saveTripProgress } from '../../privat
 import { createPrivateBasketComparisonCsv } from '../../privateBasketComparisonCsv.ts'
 import { UnpricedPlannerChecklist } from './UnpricedPlannerChecklist.tsx'
 import { PrivateCapturePastePreview } from './PrivateCapturePastePreview.tsx'
-import { CaptureMatchingPreview } from './CaptureMatchingPreview.tsx'
+import { PortableBlankCapture } from './PortableBlankCapture.tsx'
+import { CaptureMatchingPreview, type PreviewMatchLine } from './CaptureMatchingPreview.tsx'
+import { CapturePairedPreview } from './CapturePairedPreview.tsx'
 import { recentOwnCaptureInstant, type PrivateReviewedBaskets, type PrivateCaptureProgress, type PrivateReviewFocus } from './privateReviewedBasketBridge.ts'
 import './offlineReviewedWorkbench.css'
 const dateTime = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
@@ -73,10 +75,7 @@ type CapturePreviewStore = {
   appendableNewProducts?: number
   matching?: {
     proposed: number; unresolved: number; total: number
-    lines: { id: string; label: string; status: 'matched' | 'unresolved'
-      amount: number | null; unit: string
-      product: string | null; originalSku: string | null
-      packs: number | null; reasons: string[] }[]
+    lines: PreviewMatchLine[]
   }
   observedAt: string; observedNs?: bigint; unavailableProducts: number
   previewProducts: {
@@ -379,13 +378,15 @@ export function OfflineReviewedWorkbench({
     source: object; week: string; text: string
   } | null>(null)
   const [captureSheetStore, setCaptureSheetStore] = useState<'both' | CaptureStore>('both')
+  const [captureDelimiter, setCaptureDelimiter] = useState<',' | ';' | '\t'>(',')
   const [capturePreviewShown, setCapturePreviewShown] = useState<Record<CaptureStore, number>>({ PLUS: 20, DekaMarkt: 20 })
   const [capturePreview, setCapturePreview] = useState<{
     files: File[]; week: string
     stores: CapturePreviewStore[]
     unobservedOtherStoreRows: number
     pairedWithin24h: boolean
-    retainedOther?: { retailer: CaptureStore; within24h: boolean; observedNs: bigint }
+    retainedOther?: { retailer: CaptureStore; within24h: boolean; observedNs: bigint
+      observedAt: string; matching: NonNullable<CapturePreviewStore['matching']> }
   } | null>(null)
   const [reviewedLines, setReviewedLines] = useState<Record<string, boolean>>({})
   const [rejectedAutoReviews, setRejectedAutoReviews] = useState<Record<string, boolean>>({})
@@ -436,6 +437,46 @@ export function OfflineReviewedWorkbench({
   }
   const capturePreviewFresh = (store: CapturePreviewStore) =>
     freshPreviewInstant(store.observedNs)
+  const previewPlusLines = currentPreview?.stores.find(store => store.retailer === 'PLUS')?.matching?.lines ??
+    (currentPreview?.retainedOther?.retailer === 'PLUS' ? currentPreview.retainedOther.matching.lines : null)
+  const previewDekaLines = currentPreview?.stores.find(store => store.retailer === 'DekaMarkt')?.matching?.lines ??
+    (currentPreview?.retainedOther?.retailer === 'DekaMarkt' ? currentPreview.retainedOther.matching.lines : null)
+  const previewPlusAt = currentPreview?.stores.find(store => store.retailer === 'PLUS')?.observedAt ??
+    (currentPreview?.retainedOther?.retailer === 'PLUS' ? currentPreview.retainedOther.observedAt : '')
+  const previewDekaAt = currentPreview?.stores.find(store => store.retailer === 'DekaMarkt')?.observedAt ??
+    (currentPreview?.retainedOther?.retailer === 'DekaMarkt' ? currentPreview.retainedOther.observedAt : '')
+  const previewPairFresh = !!currentPreview && currentPreview.stores.every(capturePreviewFresh) &&
+    (!currentPreview.retainedOther || freshPreviewInstant(currentPreview.retainedOther.observedNs))
+  const previewPair24h = !!currentPreview && (currentPreview.retainedOther
+    ? currentPreview.retainedOther.within24h : currentPreview.pairedWithin24h)
+
+
+  function previewMatching(retailer: CaptureStore, products: OfflineStoreProduct[]): NonNullable<CapturePreviewStore['matching']> {
+    const basket = buildOneStoreBasket({
+      store: { id: retailer, name: retailer },
+      plan, recipes, activeDays, products,
+    })
+    return {
+      proposed: basket.matchedLineCount,
+      unresolved: basket.unresolvedLineCount,
+      total: basket.lines.length,
+      lines: basket.lines.map(line => ({
+        id: line.id, label: line.ingredientLabel,
+        amount: line.requirement.amount, unit: line.requirement.unit,
+        status: line.status,
+        product: line.status === 'matched' ? line.productName : null,
+        originalSku: line.status === 'matched' ? line.productId : null,
+        packs: line.status === 'matched' ? line.packs : null,
+        packAmount: line.status === 'matched' ? line.pack.amount : null,
+        packUnit: line.status === 'matched' ? line.pack.unit : null,
+        packCount: line.status === 'matched' ? line.pack.count : null,
+        pricePerPackCents: line.status === 'matched' ? line.pricePerPackCents : null,
+        lineTotalCents: line.status === 'matched' ? line.lineTotalCents : null,
+        unitPrice: line.status === 'matched' ? privateUnitPrice(line) : null,
+        reasons: line.reasons,
+      })),
+    }
+  }
 
   async function previewFilledCsv(files: File[]) {
     if (files.length === 0) return
@@ -507,30 +548,13 @@ export function OfflineReviewedWorkbench({
         // missing). No previous human approval is manufactured.
         const projectedProducts = entry.appendableNewProducts && previousCapture
           ? [...previousCapture.products, ...source.products] : source.products
-        const basket = buildOneStoreBasket({
-          store: { id: entry.retailer, name: entry.retailer },
-          plan, recipes, activeDays, products: projectedProducts,
-        })
-        entry.matching = {
-          proposed: basket.matchedLineCount,
-          unresolved: basket.unresolvedLineCount,
-          total: basket.lines.length,
-          lines: basket.lines.map(line => ({
-            id: line.id, label: line.ingredientLabel,
-            amount: line.requirement.amount, unit: line.requirement.unit,
-            status: line.status,
-            product: line.status === 'matched' ? line.productName : null,
-            originalSku: line.status === 'matched' ? line.productId : null,
-            packs: line.status === 'matched' ? line.packs : null,
-            reasons: line.reasons,
-          })),
-        }
+        entry.matching = previewMatching(entry.retailer, projectedProducts)
       }
       if (version !== importRevision.current || captureWeek !== captureWeekRef.current) return
       // One newly imported store can be compared with the independently
       // retained other capture, not merely the stores inside this CSV file.
       // Never invent a missing retailer instant or silently refresh the old one.
-      let retainedOther: { retailer: CaptureStore; within24h: boolean; observedNs: bigint } | undefined
+      let retainedOther: NonNullable<NonNullable<typeof capturePreview>['retainedOther']> | undefined
       if (storesInPreview.length === 1) {
         const otherStore = stores.find(store => store !== storesInPreview[0].retailer)!
         const other = imported?.captures[otherStore]
@@ -542,6 +566,10 @@ export function OfflineReviewedWorkbench({
             retailer: otherStore,
             within24h: gap <= 86_400_000_000_000n,
             observedNs: other.observedNs,
+            observedAt: other.observedAt,
+            // Existing accepted source is only a *proposed* match in this
+            // pre-import comparison; original facts, time and SKU stay intact.
+            matching: previewMatching(otherStore, other.products),
           }
         }
       }
@@ -768,7 +796,7 @@ export function OfflineReviewedWorkbench({
     const selectedWeek = captureWeek
     try {
       const content = kind === 'csv'
-        ? (await import('./plannerPriceCaptureSheet.ts')).makeBlankPlannerCaptureCsv(needs, [store])
+        ? (await import('./plannerPriceCaptureSheet.ts')).makeBlankPlannerCaptureCsv(needs, [store], captureDelimiter)
         : (await import('./plannerPriceCaptureGuide.ts')).makePlannerCaptureGuide(needs, [store])
       if (revision !== importRevision.current || selectedWeek !== captureWeekRef.current) {
         setWeekExportMessage('Weekmenu of bronimport is veranderd. Bekijk eerst de actuele ontbrekende regels.')
@@ -840,14 +868,16 @@ export function OfflineReviewedWorkbench({
       const storesToCapture: readonly CaptureStore[] = target === 'both'
         ? stores : [target]
       const { makeBlankPlannerCaptureCsv } = await import('./plannerPriceCaptureSheet.ts')
-      const csv = makeBlankPlannerCaptureCsv(plannerCaptureNeeds, storesToCapture)
-      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+      const csv = makeBlankPlannerCaptureCsv(plannerCaptureNeeds, storesToCapture, captureDelimiter)
+      const url = URL.createObjectURL(new Blob([csv], { type: captureDelimiter === '\t'
+        ? 'text/tab-separated-values;charset=utf-8' : 'text/csv;charset=utf-8' }))
       try {
         const link = document.createElement('a')
         link.href = url
-        link.download = target === 'both'
-          ? 'supa-weekmenu-eigen-prijsopname-PLUS-DekaMarkt.csv'
-          : 'supa-weekmenu-eigen-prijsopname-' + target + '.csv'
+        link.download = 'supa-weekmenu-eigen-prijsopname-' +
+          (target === 'both' ? 'PLUS-DekaMarkt' : target) +
+          (captureDelimiter === ';' ? '-excel' : '') +
+          (captureDelimiter === '\t' ? '.tsv' : '.csv')
         document.body.append(link)
         try { link.click() } finally { link.remove() }
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
@@ -2265,28 +2295,34 @@ export function OfflineReviewedWorkbench({
     return [store, plannerCaptureNeeds.filter(need => ids.has(need.id))]
   })) as Record<(typeof stores)[number], typeof plannerCaptureNeeds>
 
-  async function downloadMissingPriceCapture(store: (typeof stores)[number], kind: 'csv' | 'guide') {
-    // Freshness is checked again at click time; a sleeping tab must not
-    // quietly present expired observed prices as completed source coverage.
+  function missingCaptureNeedsNow(store: (typeof stores)[number]) {
+    // Both file download and phone clipboard use the same live source-age
+    // admission. A newly expired source needs a whole fresh capture, not a
+    // short list that misleadingly reuses old package prices or timestamps.
     const capture = imported?.captures[store]
     const nowNs = BigInt(Date.now()) * 1_000_000n
     const sourceFresh = !!capture && nowNs >= capture.observedNs - 300_000_000_000n &&
       nowNs - capture.observedNs <= 604_800_000_000_000n
-    const needs = !sourceFresh || olderPairCapture === store
+    return !sourceFresh || olderPairCapture === store
       ? plannerCaptureNeeds : missingPriceCaptureNeeds[store]
+  }
+
+  async function downloadMissingPriceCapture(store: (typeof stores)[number], kind: 'csv' | 'guide') {
+    const needs = missingCaptureNeedsNow(store)
     if (!needs.length) return
     try {
       const text = kind === 'csv'
         ? (await import('./plannerPriceCaptureSheet.ts')).makeBlankPlannerCaptureCsv(needs, [store])
         : (await import('./plannerPriceCaptureGuide.ts')).makePlannerCaptureGuide(needs, [store])
       const url = URL.createObjectURL(new Blob([text], {
-        type: kind === 'csv' ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8',
+        type: kind === 'csv' ? (captureDelimiter === '\t'
+          ? 'text/tab-separated-values;charset=utf-8' : 'text/csv;charset=utf-8') : 'text/plain;charset=utf-8',
       }))
       try {
         const link = document.createElement('a')
         link.href = url
         link.download = 'supa-' + store.toLowerCase() + '-ontbrekende-' + needs.length +
-          (kind === 'csv' ? '.csv' : '-gids.txt')
+          (kind === 'csv' ? (captureDelimiter === '\t' ? '.tsv' : '.csv') : '-gids.txt')
         document.body.append(link)
         try { link.click() } finally { link.remove() }
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
@@ -2492,6 +2528,14 @@ export function OfflineReviewedWorkbench({
               <option value="DekaMarkt">Alleen DekaMarkt</option>
             </select>
           </label>
+          <label>Bestandsindeling voor spreadsheet
+            <select value={captureDelimiter}
+              onChange={event => setCaptureDelimiter(event.target.value as ',' | ';' | '\t')}>
+              <option value=",">CSV met komma's</option>
+              <option value=";">Excel Nederlands met puntkomma's</option>
+              <option value={'\t'}>TSV met tabs</option>
+            </select>
+          </label>
           <button type="button" className="ghost-button"
             disabled={plannerCaptureNeeds.length === 0}
             onClick={downloadBlankPlannerCaptureCsv}>
@@ -2507,6 +2551,10 @@ export function OfflineReviewedWorkbench({
             onClick={downloadPrintablePlannerCapture}>
             Download printbaar opnameformulier (HTML)
           </button>
+          <PortableBlankCapture needs={plannerCaptureNeeds}
+            stores={captureSheetStore === 'both' ? stores : [captureSheetStore]}
+            delimiter={captureDelimiter}
+            captureKey={captureWeek + ':' + captureSheetStore + ':' + captureDelimiter} />
           <a className="ghost-button" href={`${import.meta.env.BASE_URL}private-basket-mapping.html`} target="_blank" rel="noopener noreferrer">
             Open uitgebreide privévergelijker
           </a>
@@ -2645,6 +2693,16 @@ export function OfflineReviewedWorkbench({
                   )}
                 </details>
               ))}
+              {previewPlusLines && previewDekaLines && (
+                  <CapturePairedPreview
+                    key={'paired:' + captureWeek + ':' +
+                      currentPreview.stores.map(store => store.observedAt).join(':') + ':' +
+                      (currentPreview.retainedOther?.observedAt ?? '')}
+                    plus={previewPlusLines} deka={previewDekaLines}
+                    within24h={previewPair24h} sourceFresh={previewPairFresh}
+                    plusObservedAt={previewPlusAt} dekaObservedAt={previewDekaAt}
+                    retainedStore={currentPreview.retainedOther?.retailer} />
+                )}
               {currentPreview.stores.map(store => store.matching && (
                 <CaptureMatchingPreview
                   key={store.retailer + ':' + store.observedAt + ':' + captureWeek}
@@ -2652,7 +2710,7 @@ export function OfflineReviewedWorkbench({
                   proposed={store.matching.proposed} unresolved={store.matching.unresolved}
                   appended={!!store.appendableNewProducts} reason={humanMatchReason} />
               ))}
-              {currentPreview.unobservedOtherStoreRows > 0 && (
+              {currentPreview.unobservedOtherStoreRows > 0 && !currentPreview.retainedOther && (
                 <p>{currentPreview.unobservedOtherStoreRows}
                   {' '}niet geobserveerde regels bij de andere winkel;
                   geen tweede winkelprijs.</p>
@@ -3201,6 +3259,15 @@ export function OfflineReviewedWorkbench({
                           {store}-regelnummergids (TXT)
                         </button>
                       </div>
+                      {missingPriceCaptureNeeds[store].length > 0 &&
+                        <PortableBlankCapture purpose="missing"
+                          needs={missingPriceCaptureNeeds[store]}
+                          needsAtClick={() => missingCaptureNeedsNow(store)}
+                          stores={[store]}
+                          delimiter={captureDelimiter}
+                          captureKey={captureWeek + ':missing:' + store + ':' + captureDelimiter + ':' +
+                            (imported?.captures[store]?.observedAt ?? 'none') + ':' +
+                            Math.floor(clockMs / 60000)} />}
                     </div>)}
                   </div>
                   <div className="offline-price-workbench__actions">

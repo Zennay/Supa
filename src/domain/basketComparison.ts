@@ -280,7 +280,8 @@ function samePhysicalDemand(
 function requiredBasket(value: unknown, label: 'baseline' | 'candidate'): OneStoreBasket {
   if (!isObjectContainer(value)) throw new Error(label + ' basket container invalid')
   if (!isObjectContainer(value.store)) throw new Error(label + ' basket store container invalid')
-  return value as unknown as OneStoreBasket
+  // The container and store have been checked above; inspectBasket performs the full line/economic validation immediately after.
+  return value as OneStoreBasket
 }
 
 export function compareFullBaskets(input: unknown): BasketComparison {

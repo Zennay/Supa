@@ -1,10 +1,21 @@
 import { useMemo, useState } from 'react'
-type Line = { id: string; label: string; status: 'matched' | 'unresolved'; amount: number | null; unit: string; product: string | null; originalSku: string | null; packs: number | null; reasons: string[] }
+import { euro } from '../../lib/money.ts'
+import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
+
+export type PreviewMatchLine = {
+  id: string; label: string; status: 'matched' | 'unresolved'
+  amount: number | null; unit: string; product: string | null
+  originalSku: string | null; packs: number | null; reasons: string[]
+  packAmount: number | null; packUnit: string | null; packCount: number | null
+  pricePerPackCents: number | null; lineTotalCents: number | null
+  unitPrice: string | null
+}
 const clean = (text: string) => text.normalize('NFKD').replace(/\p{M}/gu, '').toLocaleLowerCase('nl-NL')
 const safe = (text: unknown) => String(text ?? '').replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').replace(/\s+/gu, ' ').trim().slice(0, 180)
+
 /** Display-only matching triage: never accepts a price or SKU automatically. */
 export function CaptureMatchingPreview({ retailer, lines, proposed, unresolved, appended, reason }: {
-  retailer: 'PLUS' | 'DekaMarkt'; lines: readonly Line[]; proposed: number
+  retailer: 'PLUS' | 'DekaMarkt'; lines: readonly PreviewMatchLine[]; proposed: number
   unresolved: number; appended: boolean; reason: (text: string) => string
 }) {
   const [query, setQuery] = useState('')
@@ -24,7 +35,8 @@ export function CaptureMatchingPreview({ retailer, lines, proposed, unresolved, 
         'SUPA | ' + retailer + ' | mijn nog te controleren Planner-ingrediënten',
         'PRIVÉ CHECKLIST: geen winkelprijs, bronbewijs of besparingsclaim.', '',
         ...missing.flatMap((line, index) => [
-          String(index + 1) + '. ' + safe(line.label) + ' | nodig: ' + safe(line.amount ?? '?') + ' ' + safe(line.unit),
+          String(index + 1) + '. ' + safe(line.label) + ' | nodig: ' +
+            readablePlannerDemandAmount(line.amount) + ' ' + safe(line.unit),
           '  Controle: ' + safe(line.reasons[0] ? reason(line.reasons[0]) : 'Handmatige artikelkeuze nodig'),
         ]), '',
       ].join('\n')
@@ -59,10 +71,24 @@ export function CaptureMatchingPreview({ retailer, lines, proposed, unresolved, 
     {visible.length === 0 ? <p>Geen passende regels. Wis de zoekterm of het filter.</p> :
       <ul>{visible.slice(0, shown).map(line => <li key={line.id}>
         <strong>{line.label}</strong>: {' '}
-        {line.status === 'matched' ? 'Voorstel: ' + line.product + ' · broncode ' +
-          line.originalSku + ' · ' + line.packs + ' hele verpakking(en). Controleer zelf.' :
-          'Nog geen betrouwbare productmatch. ' +
-          (line.reasons[0] ? reason(line.reasons[0]) : 'Handmatige keuze nodig.')}
+        {line.status === 'matched' && line.packs !== null &&
+          line.pricePerPackCents !== null && line.lineTotalCents !== null ? <>
+            <span>Voorstel: {line.product} · broncode {line.originalSku}</span>
+            <span style={{ display: 'block' }}>Oorspronkelijke behoefte:{' '}
+              {readablePlannerDemandAmount(line.amount)} {line.unit}.{' '}
+              Bronverpakking: {readablePlannerDemandAmount(line.packAmount)}{' '}
+              {line.packUnit} × {line.packCount};{' '}
+              <strong>{euro.formatCents(line.pricePerPackCents)} per verpakking</strong>.
+            </span>
+            <span style={{ display: 'block' }}>Voor diezelfde Planner-vraag:{' '}
+              {line.packs} hele verpakking(en) ={' '}
+              <strong>{euro.formatCents(line.lineTotalCents)}</strong>.
+              {' '}Indicatieve eenheidsprijs: {line.unitPrice ?? 'niet berekenbaar'}.
+            </span>
+            <small>Voorstel uit jouw eigen lokale bron; prijs, SKU en pakketinhoud
+              zijn nog niet persoonlijk bevestigd. Geen mandtotaal of besparingsclaim.</small>
+          </> : 'Nog geen betrouwbare productmatch. ' +
+            (line.reasons[0] ? reason(line.reasons[0]) : 'Handmatige keuze nodig.')}
       </li>)}</ul>}
     {shown < visible.length && <div className="offline-price-workbench__matching-actions">
       <button type="button" onClick={() => setShown(n => n + 40)}>Toon volgende {Math.min(40, visible.length - shown)}</button>

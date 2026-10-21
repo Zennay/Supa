@@ -81,6 +81,28 @@ function compatibleDemandUnits(left: MatchUnit, right: MatchUnit): boolean {
   )
 }
 
+/** Stable output units keep equivalent demand independent of recipe order. */
+function canonicalDemandUnit(unit: MatchUnit): MatchUnit {
+  if (unit === 'kg') return 'g'
+  if (unit === 'l') return 'ml'
+  return unit
+}
+
+function canonicalIngredient(ingredient: AggregatedIngredient): AggregatedIngredient {
+  const unit = canonicalDemandUnit(ingredient.unit)
+  if (ingredient.amount === null || unit === ingredient.unit) {
+    return { ...ingredient, unit }
+  }
+  return {
+    ...ingredient,
+    amount: sumDecimalDemandUnits(
+      [{ amount: ingredient.amount, unit: ingredient.unit }],
+      unit,
+    ),
+    unit,
+  }
+}
+
 export function aggregatePlanIngredients(
   plan: PlannedMeal[],
   recipes: RecipeWithIngredients[],
@@ -140,7 +162,7 @@ export function aggregatePlanIngredients(
           ? null : ingredient.amount
       const current = aggregated.get(ingredient.id)
       if (!current) {
-        aggregated.set(ingredient.id, { ...ingredient, amount: physicalAmount })
+        aggregated.set(ingredient.id, canonicalIngredient({ ...ingredient, amount: physicalAmount }))
         continue
       }
 
