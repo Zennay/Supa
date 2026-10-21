@@ -1,6 +1,6 @@
 import { safeRecipeSourceUrl } from '../../domain/recipeSourceUrl.ts'
 import type { UserRecipeDraft } from '../../domain/userRecipeImport.ts'
-import { importRecipeLink } from './importRecipeLink.ts'
+import { importRecipeLink, RecipeLinkImportUnavailableError } from './importRecipeLink.ts'
 import { reviewRecipe } from './recipeLibrary.ts'
 
 /**
@@ -39,6 +39,14 @@ export async function importRecipeLinksCollection(
       onProgress(index + 1, urls.length)
     } catch (cause) {
       if (signal.aborted) throw new Error('De receptenimport is geannuleerd.')
+      if (cause instanceof RecipeLinkImportUnavailableError) {
+        throw new Error(
+          'Automatische batchimport van links is op deze statische Supa-versie niet beschikbaar. ' +
+          'Er is niets opgeslagen. Sla de receptpagina lokaal op als HTML of plak de JSON-LD-broncode; ' +
+          'kies daarna de HTML- of JSON-LD-import en controleer de recepten. Lokale HTML ondersteunt ' +
+          'schema.org Recipe JSON-LD en, als dat ontbreekt, Recipe-microdata.',
+        )
+      }
       const reason = cause instanceof Error ? cause.message : 'Recept kon niet worden opgehaald.'
       throw new Error('Receptlink ' + (index + 1) + ' kon niet worden geïmporteerd: ' + reason)
     }
