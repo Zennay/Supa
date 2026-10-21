@@ -14,7 +14,7 @@ import { ownRecipeAsMarkdown } from './ownRecipeMarkdown'
 import { prepareRecipeBackupImport, serializeRecipeBackup, type RecipeBackupPreview, RECIPE_BACKUP_MAX_BYTES } from './recipeBackup'
 import { curatedFigmaRecipes } from './curatedFigmaRecipes'
 import { m2InitialPlan } from '../../data/m2Fixture'
-import { ownRecipeShoppingChecklist, formatOwnRecipeChecklist } from './recipeShoppingChecklist'
+import { ownRecipeShoppingChecklist, formatOwnRecipeChecklist, personalRecipeShoppingNoteLabels } from './recipeShoppingChecklist'
 import { ImportedRecipeGroceriesPanel } from './ImportedRecipeGroceriesPanel'
 import { exportOwnRecipeChecklistCsv } from './recipeShoppingCsv'
 import { toPlannerRecipe } from './plannerRecipes.ts'
@@ -466,6 +466,33 @@ export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
       setMessage(cause instanceof Error ? cause.message : 'Herstellen is niet gelukt; andere recepten zijn onaangeroerd.')
     }
   }
+  function addSingleRecipeToOwnList() {
+    if (!onAddRecipeGroceries || !selected || !('savedAt' in selected) ||
+        !ownShopping?.canCopy) return
+    try {
+      const source = selected
+      const assertCurrent = () => {
+        const latest = readRecipeLibrary(window.localStorage)
+        if (latest.error || !latest.recipes.some(item =>
+          item.id === source.id && JSON.stringify(item) === JSON.stringify(source)))
+          throw Error('Dit originele recept is in een ander tabblad gewijzigd of verwijderd. Open het opnieuw.')
+      }
+      assertCurrent()
+      const remaining = ownShopping.lines.filter(line =>
+        line.needsReview || shoppingChecks[line.key] !== true)
+      const labels = personalRecipeShoppingNoteLabels(remaining)
+      if (!window.confirm('Voeg ' + labels.length +
+          ' nog openstaande ingrediënten van dit eigen recept toe aan je ongeprijsde Lijst? ' +
+          'De gekozen porties gelden alleen voor deze lijst; je Planner, winkelprijzen en oude vinkjes blijven intact.')) return
+      assertCurrent()
+      const failure = onAddRecipeGroceries(labels)
+      if (failure) setPrivateWeekMessage(failure)
+    } catch (error) {
+      setPrivateWeekMessage(error instanceof Error ? error.message :
+        'De receptboodschappen konden niet veilig worden overgenomen.')
+    }
+  }
+
   function downloadOwnRecipeChecklist() {
     if (!ownShopping?.canCopy) return
     try {
@@ -1345,6 +1372,10 @@ export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
               aria-label="Kopieer mijn ongeprijsde boodschappenlijst"
               value={selectedRecipeShoppingText} onFocus={event => event.currentTarget.select()} />}
             {showShoppingCopy && <button type="button" onClick={() => shoppingCopy.current?.select()}>Selecteer alle tekst</button>}
+            {onAddRecipeGroceries && <button type="button"
+              onClick={addSingleRecipeToOwnList}>
+              Zet openstaande ingrediënten van dit recept op Lijst
+            </button>}
             <button type="button" onClick={downloadOwnRecipeChecklist}>Download ongeprijsde lijst (TXT)</button>
             <button type="button" onClick={downloadOwnRecipeChecklistCsv}>Download ongeprijsde lijst (CSV)</button>
             <button type="button" onClick={downloadForPrivateComparison}>Gebruik dit recept in winkelvergelijker (JSON)</button>
