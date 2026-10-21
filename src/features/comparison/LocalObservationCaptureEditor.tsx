@@ -50,6 +50,7 @@ export function LocalObservationCaptureEditor({
   const [rows, setRows] = useState<Record<string, Row>>({})
   const [moments, setMoments] = useState<Record<string, string>>({})
   const [status, setStatus] = useState('')
+  const [search, setSearch] = useState('')
   const changed = snapshot.fingerprint !== currentFingerprint
   const rowKey = (store: CaptureStore, index: number) => store + ':' + index
   const row = (store: CaptureStore, index: number) => rows[rowKey(store, index)] ?? empty()
@@ -70,7 +71,7 @@ export function LocalObservationCaptureEditor({
     if (Object.values(rows).some(r => r.state !== 'unseen') &&
       !window.confirm('Vervang je nog niet bewaarde originele winkelinvoer? Bewaar eerst de ingevulde CSV.')) return
     setSnapshot({ fingerprint: currentFingerprint, needs: [...needs], stores: [...stores] })
-    setRows({}); setMoments({}); setStatus('')
+    setRows({}); setMoments({}); setStatus(''); setSearch('')
     onDraftChange?.()
   }
   function filledFiles(): File[] {
@@ -121,7 +122,7 @@ export function LocalObservationCaptureEditor({
     if (!actual.length) throw Error('Markeer minstens één werkelijk waargenomen winkelproduct.')
     return actual
   }
-  function act(method: 'download' | 'review') {
+  async function act(method: 'download' | 'review' | 'share') {
     try {
       setStatus('')
       const files = filledFiles()
@@ -137,6 +138,13 @@ export function LocalObservationCaptureEditor({
         setStatus('Eigen opname doorgestuurd naar de bestaande lokale bronvoorcontrole. Controleer daar de originele producten en bevestig eventuele overname zelf.')
         return
       }
+      if (method === 'share' && navigator.share &&
+          navigator.canShare?.({ files })) {
+        await navigator.share({ files,
+          title: 'Supa · eigen originele winkelopnames (nog niet geaccepteerd)' })
+        setStatus('Originele eigen winkelopnames bewust via je toestel gedeeld. Er is geen prijs, match of winkelrecht door Supa bevestigd.')
+        return
+      }
       for (const file of files) {
         const url = URL.createObjectURL(file)
         try {
@@ -146,9 +154,13 @@ export function LocalObservationCaptureEditor({
           try { link.click() } finally { link.remove() }
         } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
       }
-      setStatus('Originele ingevulde winkelbladen alleen op je toestel gedownload. Geen product, bedrag of bronrecht is geaccepteerd.')
+      setStatus(method === 'share'
+        ? 'Bestandsdelen is op dit toestel niet beschikbaar. Eigen winkelopnames zijn daarom lokaal gedownload; geen prijs geaccepteerd.'
+        : 'Originele ingevulde winkelbladen alleen op je toestel gedownload. Geen product, bedrag of bronrecht is geaccepteerd.')
     } catch (cause) {
-      setStatus(cause instanceof Error ? cause.message : 'Kan het originele winkelblad niet maken.')
+      setStatus(cause instanceof Error && cause.name === 'AbortError'
+        ? 'Delen geannuleerd; de eigen broninvoer blijft in dit formulier staan.'
+        : cause instanceof Error ? cause.message : 'Kan het originele winkelblad niet maken.')
     }
   }
 
@@ -162,8 +174,17 @@ export function LocalObservationCaptureEditor({
     {changed && <p role="alert">Het geselecteerde mandje of de opnamescope is inmiddels gewijzigd.
       Je originele concept blijft hieronder staan, maar kan niet meer voor het nieuwe
       mandje worden overgenomen. Bewaar het eerst lokaal en begin opnieuw.</p>}
+    <label>Zoek Planner-ingrediënt om zelf te observeren
+      <input type="search" value={search} maxLength={120}
+        placeholder="Filter ingrediënten in beide winkels"
+        onChange={event => setSearch(event.currentTarget.value)} />
+    </label>
     {snapshot.stores.map(store => <fieldset key={store}>
       <legend>{store} · originele persoonlijke bronopname</legend>
+      <p role="status">{snapshot.needs.filter((_, index) =>
+        row(store, index).state !== 'unseen').length} van {snapshot.needs.length}
+        {' '}fysieke Planner-regels hebben een door jou opgegeven bronproduct;
+        de overige blijven onbekend. Dit is nog geen geaccepteerde productmatch.</p>
       <label>Werkelijk bronmoment, inclusief tijdzone (geen automatische datum)
         <input type="text" value={moments[store] ?? ''} maxLength={40}
           placeholder="2026-10-21T16:30:00+02:00"
@@ -172,7 +193,10 @@ export function LocalObservationCaptureEditor({
       <small>Dezelfde echte waarnemingstijd geldt voor alle producten in dit
         winkelblad. Als je later een product opnieuw vastlegt, maak dan een nieuwe
         opname met het nieuwe werkelijke tijdstip; hergebruik geen oude prijs.</small>
-      {snapshot.needs.map((need, index) => {
+      {snapshot.needs.map((need, index) => ({ need, index })).filter(({ need }) =>
+        !search.trim() || [need.label, need.id].join(' ').normalize('NFKD')
+          .toLocaleLowerCase('nl-NL').includes(search.trim().normalize('NFKD')
+            .toLocaleLowerCase('nl-NL'))).map(({ need, index }) => {
         const value = row(store, index)
         const physical = readablePlannerDemandAmount(need.amount)
         return <details key={store + ':' + index + ':' + need.id}>
@@ -231,8 +255,10 @@ export function LocalObservationCaptureEditor({
     <div className="offline-price-workbench__actions">
       <button type="button" className="ghost-button"
         onClick={() => act('download')}>Bewaar ingevulde originele winkelopname op dit toestel</button>
+      <button type="button" className="ghost-button"
+        onClick={() => { void act('share') }}>Deel originele winkelopname-CSV via mijn telefoon</button>
       <button type="button" disabled={!onReview || changed}
-        onClick={() => act('review')}>Controleer mijn echte winkelopname in Supa</button>
+        onClick={() => { void act('review') }}>Controleer mijn echte winkelopname in Supa</button>
       <button type="button" className="ghost-button"
         onClick={reset}>Start nieuw leeg opnameformulier</button>
     </div>
