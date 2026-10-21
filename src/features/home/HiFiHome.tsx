@@ -37,6 +37,24 @@ const designRecipes = curatedFigmaRecipes.filter(recipe =>
   image: recipe.id === 'supa-fried-rice' ? a.imgRecepten :
     recipe.id === 'supa-bao' ? a.imgRecepten1 : a.imgRecepten2,
 }))
+const discoveryFavoritesKey = 'supa:hifi-favorites:v1'
+const discoveryFavoriteIds = new Set([...designProducts.map(p => p.id), ...historicalRetailerProducts.map(p => p.id), ...designRecipes.map(r => r.id)])
+type DiscoveryFavoritesSnapshot = { ids: string[]; raw: string | null; writable: boolean }
+function readDiscoveryFavorites(): DiscoveryFavoritesSnapshot {
+  if (typeof window === 'undefined') return { ids: [], raw: null, writable: false }
+  try {
+    const raw = window.localStorage.getItem(discoveryFavoritesKey)
+    if (raw === null) return { ids: [], raw: null, writable: true }
+    const value: unknown = JSON.parse(raw)
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return { ids: [], raw, writable: false }
+    const record = value as Record<string, unknown>, ids = record.ids
+    if (record.schemaVersion !== 1 || Object.keys(record).some(key => key !== 'schemaVersion' && key !== 'ids') ||
+        !Array.isArray(ids) || ids.length > 100 || !ids.every(id => typeof id === 'string' && id.length > 0 && id.length <= 100) ||
+        new Set(ids).size !== ids.length) return { ids: [], raw, writable: false }
+    return { ids: ids.filter((id): id is string => discoveryFavoriteIds.has(id)), raw, writable: true }
+  } catch { return { ids: [], raw: null, writable: false } }
+}
+
 
 type Props = {
   view: HiFiTab
@@ -57,7 +75,10 @@ export function HiFiHome(props: Props) {
 
 function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activeDays = [] }: Props) {
   const [query, setQuery] = useState('')
-  const [favorites, setFavorites] = useState<string[]>([])
+  const [initialFavorites] = useState(readDiscoveryFavorites)
+  const [favorites, setFavorites] = useState<string[]>(initialFavorites.ids)
+  const [favoritesRaw, setFavoritesRaw] = useState(initialFavorites.raw)
+  const [favoritesWritable, setFavoritesWritable] = useState(initialFavorites.writable)
   const [filterOpen, setFilterOpen] = useState(false)
   const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [selectedRecipe, setSelectedRecipe] = useState<typeof designRecipes[number] | null>(null)
@@ -102,7 +123,30 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
   const historical = filterHistoricalProducts(historicalRetailerProducts, '', storeFilter).filter(item =>
     includesQuery([item.name, item.pack, item.store, item.capturedAt, item.sourceUrl, item.id]) &&
     (!favoritesOnly || favorites.includes(item.id)))
-  const toggleFavorite = (id: string) => setFavorites(current => current.includes(id) ? current.filter(x => x !== id) : [...current, id])
+  const toggleFavorite = (id: string) => {
+    if (!discoveryFavoriteIds.has(id)) return
+    const next = favorites.includes(id) ? favorites.filter(item => item !== id) : [...favorites, id]
+    if (typeof window === 'undefined' || !favoritesWritable) {
+      setFavorites(next)
+      setMessage('Favoriet alleen voor deze sessie gewijzigd; bestaande opgeslagen gegevens zijn beschermd.')
+      return
+    }
+    try {
+      if (window.localStorage.getItem(discoveryFavoritesKey) !== favoritesRaw) {
+        setFavoritesWritable(false)
+        setMessage('Favorieten zijn elders gewijzigd. De opgeslagen versie is niet overschreven; laad de pagina om die op te halen.')
+        return
+      }
+      const raw = JSON.stringify({ schemaVersion: 1, ids: next })
+      window.localStorage.setItem(discoveryFavoritesKey, raw)
+      setFavoritesRaw(raw)
+      setFavorites(next)
+    } catch {
+      setFavorites(next)
+      setFavoritesWritable(false)
+      setMessage('Favoriet alleen voor deze sessie gewijzigd; browseropslag is niet beschikbaar.')
+    }
+  }
   const switchProductSource = (source: 'history' | 'figma') => {
     setProductSource(source)
     // Keep the user's search intent while resetting filters that only make
