@@ -14,7 +14,7 @@ Supa kan eigen recepten lokaal bewaren en omzetten naar het interne receptformaa
 
 - **schema.org/Recipe JSON-LD** in een lokaal opgeslagen HTML-bestand.
 - **schema.org Recipe-microdata** (itemscope/itemprop) wanneer de HTML geen JSON-LD-scriptblokken bevat.
-- Losse JSON/JSON-LD-bestanden, gewone tekst en Markdown via de bijbehorende importkeuze.
+- Losse JSON/JSON-LD-bestanden, arrays, @graph en schema.org ItemList → ListItem → item-wrappers met Recipe-objecten, plus gewone tekst en Markdown via de bijbehorende importkeuze.
 
 Bij HTML met JSON-LD gebruikt Supa eerst de JSON-LD-bron. Microdata is de terugvalroute wanneer er geen JSON-LD-scriptblokken aanwezig zijn. Niet iedere website publiceert bruikbare receptmetadata; gebruik dan de gewone tekstimport of voer het recept handmatig in.
 
