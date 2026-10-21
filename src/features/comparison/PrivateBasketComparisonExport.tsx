@@ -23,7 +23,7 @@ function cell(value: string | number): string {
   return '"' + text.replace(/"/g, '""') + '"'
 }
 
-function unitPriceFields(line: BasketTraceLine): [number | '', string] {
+function unitPriceFields(line: BasketTraceLine): [string, string] {
   if (line.status !== 'matched' ||
       !Number.isSafeInteger(line.pricePerPackCents) || line.pricePerPackCents < 0 ||
       !Number.isFinite(line.pack.amount) || line.pack.amount <= 0 ||
@@ -51,7 +51,7 @@ function unitPriceFields(line: BasketTraceLine): [number | '', string] {
     return ['', '']
   }
   if (!Number.isFinite(baseQuantity) || baseQuantity <= 0) return ['', '']
-  return [Number((line.pricePerPackCents / 100 / baseQuantity).toFixed(4)), basis]
+  return [(line.pricePerPackCents / 100 / baseQuantity).toFixed(4).replace('.', ','), basis]
 }
 
 function lineFields(line: BasketTraceLine): (string | number)[] {
