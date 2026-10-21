@@ -1,6 +1,14 @@
 import { safeRecipeSourceUrl } from '../../domain/recipeSourceUrl.ts'
 import type { UserRecipeDraft } from '../../domain/userRecipeImport'
 
+/** The static Pages build has no same-origin Node API; callers can offer local HTML/JSON-LD import. */
+export class RecipeLinkImportUnavailableError extends Error {
+  constructor() {
+    super('De automatische linkimportserver is op deze website niet beschikbaar.')
+    this.name = 'RecipeLinkImportUnavailableError'
+  }
+}
+
 /** Only this explicitly user-triggered, same-origin POST crosses the UI boundary. */
 export async function importRecipeLink(url: string, signal: AbortSignal): Promise<UserRecipeDraft> {
   // Never send copied OAuth/PKCE/session credentials to a recipe endpoint:
