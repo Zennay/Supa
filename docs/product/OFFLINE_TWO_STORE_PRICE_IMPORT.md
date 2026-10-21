@@ -1258,3 +1258,29 @@ Op **Home → Vergelijk dezelfde boodschappen** gebruikt Supa uitsluitend de lok
 Als **alleen afzonderlijke ingrediënten** al gepaard en geprijsd zijn, verschijnen in plaats daarvan **Kopieer bekende PLUS/Deka-regelprijzen voor Excel** en **Deel alleen bekende winkelregels (mobiel)**. Deze acties gebruiken exact de bestaande gedeeltelijke CSV-export. Zij tonen nooit een onvolledig mandtotaal of winkelwinnaar. Verlopen prijzen, ontbrekende SKU’s en niet-gecontroleerde bronregels verschijnen niet in een nieuw kostenbedrag. De handmatig selecteerbare deeltekst is gebonden aan de actuele week, bronopname en reviewstatus; bij wijziging verdwijnt een oude kopie.
 
 Het delen en kopiëren gebeurt uitsluitend na een gebruikersactie. Een gekozen externe app kan dan de eigen brongegevens in de tekst ontvangen: Supa uploadt deze niet zelfstandig. De oorspronkelijke PLUS/Deka-bronrechten, onafhankelijke veldvalidatie, kassaprijzen en publicatie van besparingsclaims worden hierdoor **niet** vastgesteld of versoepeld.
+
+## Op pad met je telefoon: nog ontbrekende PLUS/Deka-velden
+
+Open **Planner → Vul zelf originele winkelproducten op je telefoon in**. De
+rijnummers en metrische hoeveelheden komen uitsluitend uit de gekozen
+Planner-vraag, niet uit de supermarkt. Kies **Alleen nog niet waargenomen of
+onvolledige invoerregels tonen** om de nog open punten te zien. Onder iedere
+winkel staan een actuele telling, **Kopieer**, **Download TXT** en **Deel via
+mijn telefoon**. De tekst noemt het oorspronkelijke Planner-rij-/artikel en de
+concrete ontbrekende velden; hij is géén artikelmatch, actueel prijsbewijs of
+volledig winkelmandje. Wanneer OS-delen of klembord niet beschikbaar is, blijft
+de tekst in een selecteerbaar lokaal veld staan. Er is geen automatische
+retailerrequest of upload.
+
+Geobserveerde originele SKU, productnaam, verpakking, aantal, hele-pakprijs
+in **eurocenten** en werkelijk ISO-bronmoment met tijdzone vul je zelf in.
+Een eerdere waarneming expliciet terugzetten naar **Niet waargenomen** wist
+na bevestiging de gekoppelde oude brongegevens en prijs. **Niet beschikbaar**
+wist de oude pakprijs en inhoud; de werkelijk geziene artikelidentiteit mag
+blijven staan. Onveilige oude JSON-concepten waarin niet-waargenomen of
+niet-beschikbare regels toch verborgen prijzen hebben, worden geweigerd bij
+herstel. Ongeldige of dubbel gebruikte SKU's, numerieke velden en tijdzones
+worden als nog te controleren gemarkeerd; alleen voldoende ingevulde
+geselecteerde waarnemingen kunnen naar de bestaande originele negenkoloms
+CSV/TSV-broncontrole. Een onvolledig of verlopen winkelmandje blijft
+**prijsverschil onbekend** tot beide echte bronsets afzonderlijk zijn beoordeeld.

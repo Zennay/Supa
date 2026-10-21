@@ -162,7 +162,7 @@ export function LocalObservationCaptureEditor({
       setStatus(cause instanceof Error ? cause.message : 'Kon het lokale concept niet herstellen.')
     }
   }
-  async function carryOpen(store: CaptureStore, method: 'copy' | 'download') {
+  async function carryOpen(store: CaptureStore, method: 'copy' | 'download' | 'share') {
     try {
       setStatus('')
       const text = offlineCaptureFieldChecklist(store, snapshot.needs, rows,
@@ -175,6 +175,24 @@ export function LocalObservationCaptureEditor({
         }
         await navigator.clipboard.writeText(text)
         setStatus(store + ': openstaande winkelopnamepunten gekopieerd; geen prijs geaccepteerd.')
+        return
+      }
+      if (method === 'share') {
+        if (!navigator.share) {
+          setStatus('Deelblad niet beschikbaar. Selecteer de openstaande regels hieronder om ze zelf te versturen.')
+          return
+        }
+        try {
+          await navigator.share({
+            title: 'Supa · ' + store + ' nog te observeren (privé, zonder winkelprijzen)',
+            text,
+          })
+          setStatus(store + ': openstaande controlepunten bewust vanaf je toestel gedeeld.')
+        } catch (cause) {
+          setStatus(cause instanceof Error && cause.name === 'AbortError'
+            ? 'Delen geannuleerd; de privécontrolelijst blijft hieronder beschikbaar.'
+            : 'Delen niet gelukt. Selecteer de privécontrolelijst hieronder om die te kopiëren.')
+        }
         return
       }
       const uri = URL.createObjectURL(new Blob([text], {
@@ -201,7 +219,14 @@ export function LocalObservationCaptureEditor({
         .filter(entry => entry.row.state !== 'unseen')
       if (!selected.length) continue
       const observedAt = moments[store]?.trim() ?? ''
-      if (!observedAt) throw Error(store + ': noteer eerst het werkelijke ISO-bronmoment met expliciete tijdzone.')
+      // Refuse a malformed selected observation before producing a nominally
+      // importable source file. Unseen Planner lines are legitimately omitted.
+      const incompleteSelected = incompleteCaptureFields(store, snapshot.needs,
+        rows, observedAt).find(({ index }) => row(store, index).state !== 'unseen')
+      if (incompleteSelected) throw Error(store + ' regel ' +
+        (incompleteSelected.index + 2) + ': controleer eerst ' +
+        incompleteSelected.missing.join(', ') +
+        '. De huidige broninvoer blijft in het formulier staan.')
       const seen = new Set<string>()
       const lines: string[][] = [header]
       for (const { row: source, index } of selected) {
@@ -323,6 +348,10 @@ export function LocalObservationCaptureEditor({
             <button type="button" className="ghost-button"
               onClick={() => { void carryOpen(store, 'download') }}>
               Download {store}-controlelijst zonder prijzen (TXT)
+            </button>
+            <button type="button" className="ghost-button"
+              onClick={() => { void carryOpen(store, 'share') }}>
+              Deel {store}-controlelijst via mijn telefoon
             </button>
           </div>}
           {portable?.store === store && <label>
