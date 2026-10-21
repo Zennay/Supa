@@ -530,3 +530,48 @@ border-radius:10px;padding:.65rem;scroll-margin-top:1.25rem}
 .offline-manual-editor__source-conflicts p { margin:0; }
 .offline-manual-editor__source-conflicts ul { margin:0; padding-left:1.5rem; }
 .offline-manual-editor__source-conflicts li { margin:.5rem 0; }
+
+/* Mobile first: each self-observed SKU is an expandable, touch-friendly card.
+   No synthetic offers or dates are implied by the physical Planner hint. */
+.offline-price-workbench__local-editor {
+  min-width:0; margin:.85rem 0; border:1px solid #a8c4b1;
+  background:#f5faf5; border-radius:14px; padding:clamp(.8rem,2vw,1.2rem);
+  overflow-wrap:anywhere;
+}
+.offline-price-workbench__local-editor > summary {
+  font-weight:750; line-height:1.45; cursor:pointer; min-height:44px;
+  padding:.4rem .2rem;
+}
+.offline-price-workbench__local-editor fieldset {
+  box-sizing:border-box; min-width:0; border:1px solid #d2dfd4;
+  border-radius:12px; margin:1rem 0; padding:.9rem;
+  background:white; display:grid; gap:.65rem;
+}
+.offline-price-workbench__local-editor legend {font-weight:700; padding:0 .4rem;}
+.offline-price-workbench__local-editor fieldset > details {
+  min-width:0; border:1px solid #d8e4d9; border-radius:10px;
+  padding:.65rem; background:#fafdf9;
+}
+.offline-price-workbench__local-editor fieldset > details > summary {
+  cursor:pointer; font-weight:650; line-height:1.45; min-height:44px;
+  padding:.25rem 0;
+}
+.offline-price-workbench__local-editor label {
+  display:grid; gap:.3rem; min-width:0; margin:.5rem 0; font-weight:600;
+}
+.offline-price-workbench__local-editor :is(input,select) {
+  box-sizing:border-box; width:100%; max-width:100%; min-width:0;
+  min-height:44px; border:1px solid #98a9a0; border-radius:9px;
+  padding:.55rem .65rem; background:#fff; color:#1e3327; font:inherit;
+}
+.offline-price-workbench__local-editor small {line-height:1.45; color:#516358;}
+.offline-price-workbench__local-editor :is(button,input,select,summary):focus-visible {
+  outline:3px solid #236d4d; outline-offset:3px;
+}
+@media(max-width:640px){
+  .offline-price-workbench__local-editor fieldset {padding:.55rem;}
+  .offline-price-workbench__local-editor .offline-price-workbench__actions {display:grid;}
+  .offline-price-workbench__local-editor .offline-price-workbench__actions > * {
+    width:100%; box-sizing:border-box; min-width:0;
+  }
+}

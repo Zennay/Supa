@@ -47,6 +47,8 @@ export function LocalObservationCaptureEditor({
   const currentFingerprint = fingerprintOf(stores, needs, context)
   const currentScope = useRef(currentFingerprint)
   currentScope.current = currentFingerprint
+  const changes = useRef(0)
+  const latestRestore = useRef(0)
   const [snapshot, setSnapshot] = useState<Snapshot>(() => ({
     fingerprint: currentFingerprint, needs: [...needs], stores: [...stores],
   }))
@@ -64,6 +66,7 @@ export function LocalObservationCaptureEditor({
     if (droppingPrice && !window.confirm(
       'Niet-beschikbaar kiezen wist de eerdere pakinhoud en prijs uit deze lokale conceptregel. Toch wijzigen?'
     )) return
+    ++changes.current
     setRows(old => {
       const key = rowKey(store, index)
       const next = { ...(old[key] ?? empty()), [field]: value }
@@ -74,6 +77,7 @@ export function LocalObservationCaptureEditor({
     onDraftChange?.()
   }
   function moment(store: CaptureStore, value: string) {
+    ++changes.current
     setMoments(old => ({ ...old, [store]: value }))
     setStatus('')
     onDraftChange?.()
@@ -81,6 +85,8 @@ export function LocalObservationCaptureEditor({
   function reset() {
     if (Object.values(rows).some(r => r.state !== 'unseen') &&
       !window.confirm('Vervang je nog niet bewaarde originele winkelinvoer? Bewaar eerst de ingevulde CSV.')) return
+    ++changes.current
+    ++latestRestore.current
     setSnapshot({ fingerprint: currentFingerprint, needs: [...needs], stores: [...stores] })
     setRows({}); setMoments({}); setStatus(''); setSearch('')
     onDraftChange?.()
@@ -102,13 +108,16 @@ export function LocalObservationCaptureEditor({
     }
   }
   async function restoreDraft(file: File) {
+    const request = ++latestRestore.current
+    const revision = changes.current
     try {
       if (changed) throw Error('Planner-week of winkelkeuze veranderd. Begin bewust een nieuw leeg formulier voordat je een passende back-up herstelt.')
       if (!/\.json$/iu.test(file.name) || !file.size || file.size > 256000)
         throw Error('Kies een JSON-conceptbestand tot 256 kB dat je eerder zelf hebt opgeslagen.')
       const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
-      if (currentScope.current !== snapshot.fingerprint) {
-        throw Error('De actuele Planner-selectie is tijdens het openen gewijzigd. Bestaande invoer blijft behouden.')
+      if (currentScope.current !== snapshot.fingerprint ||
+          latestRestore.current !== request || changes.current !== revision) {
+        throw Error('De actuele Planner-selectie of broninvoer is tijdens het openen gewijzigd. Bestaande invoer blijft behouden.')
       }
       const restored = restoreLocalCaptureDraft(raw, currentScope.current,
         snapshot.stores, snapshot.needs.length)
@@ -118,9 +127,11 @@ export function LocalObservationCaptureEditor({
           return
         }
       }
-      if (currentScope.current !== snapshot.fingerprint) {
-        throw Error('De Planner-selectie is tijdens je bevestiging gewijzigd. Oude invoer behouden.')
+      if (currentScope.current !== snapshot.fingerprint ||
+          latestRestore.current !== request || changes.current !== revision) {
+        throw Error('De Planner-selectie of invoer is tijdens je bevestiging gewijzigd. Oude invoer behouden.')
       }
+      ++changes.current
       setRows(restored.rows); setMoments(restored.moments)
       setStatus('Privéconcept op dit toestel hersteld. Alle SKU’s, bronmomenten en prijzen moeten nog via de gewone broncontrole.')
       onDraftChange?.()
