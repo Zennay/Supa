@@ -73,6 +73,17 @@ export function restoreLocalCaptureDraft(raw: string, fingerprint: string,
           (value[field] as string).length > max)
         return reject('ongeldig bronconceptveld: ' + field + '.')
     }
+    // A dismissed or unavailable observation cannot carry a hidden old price
+    // that silently reappears when somebody changes its status on the phone.
+    if (value.state === 'unseen' &&
+        ['sku', 'name', 'amount', 'unit', 'count', 'cents'].some(
+          field => !!(value[field] as string).trim())) {
+      return reject('niet-waargenomen regel bewaart oude brongegevens.')
+    }
+    if (value.state === 'unavailable' &&
+        ['amount', 'count', 'cents'].some(field => !!(value[field] as string).trim())) {
+      return reject('niet-beschikbaar product bewaart een oude pakprijs.')
+    }
     rows[key] = {
       state: value.state as LocalCaptureEntry['state'],
       sku: value.sku as string, name: value.name as string,

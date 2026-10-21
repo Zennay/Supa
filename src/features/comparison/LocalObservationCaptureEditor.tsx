@@ -61,6 +61,9 @@ export function LocalObservationCaptureEditor({
   const [onlyOpen, setOnlyOpen] = useState(false)
   const [portable, setPortable] = useState<{ store: CaptureStore; text: string } | null>(null)
   const changed = snapshot.fingerprint !== currentFingerprint
+  const missingByStore = new Map(snapshot.stores.map(store =>
+    [store, incompleteCaptureFields(store, snapshot.needs, rows,
+      moments[store] ?? '')] as const))
   const rowKey = (store: CaptureStore, index: number) => store + ':' + index
   const row = (store: CaptureStore, index: number) => rows[rowKey(store, index)] ?? empty()
   function invalidatePreviewOnce() {
@@ -73,8 +76,13 @@ export function LocalObservationCaptureEditor({
   }
   function edit(store: CaptureStore, index: number, field: Field, value: string) {
     const oldEntry = row(store, index)
+    const discardingObservation = field === 'state' && value === 'unseen' &&
+      oldEntry.state !== 'unseen'
     const droppingPrice = field === 'state' && value === 'unavailable' &&
       !!(oldEntry.amount || oldEntry.count || oldEntry.cents)
+    if (discardingObservation && !window.confirm(
+      'Niet waargenomen kiezen wist de oude SKU, productnaam, verpakking en prijs uit deze conceptregel. Eerst lokaal bewaren?'
+    )) return
     if (droppingPrice && !window.confirm(
       'Niet-beschikbaar kiezen wist de eerdere pakinhoud en prijs uit deze lokale conceptregel. Toch wijzigen?'
     )) return
@@ -82,15 +90,17 @@ export function LocalObservationCaptureEditor({
     setRows(old => {
       const key = rowKey(store, index)
       const next = { ...(old[key] ?? empty()), [field]: value }
-      return { ...old, [key]: droppingPrice
+      return { ...old, [key]: discardingObservation ? empty() : droppingPrice
         ? { ...next, amount: '', count: '', cents: '' } : next }
     })
     setStatus('')
+    setPortable(null)
     invalidatePreviewOnce()
   }
   function moment(store: CaptureStore, value: string) {
     ++changes.current
     setMoments(old => ({ ...old, [store]: value }))
+    setPortable(null)
     setStatus('')
     invalidatePreviewOnce()
   }
@@ -145,6 +155,7 @@ export function LocalObservationCaptureEditor({
       }
       ++changes.current
       setRows(restored.rows); setMoments(restored.moments)
+      setPortable(null)
       setStatus('Privéconcept op dit toestel hersteld. Alle SKU’s, bronmomenten en prijzen moeten nog via de gewone broncontrole.')
       invalidatePreviewOnce()
     } catch (cause) {
@@ -298,8 +309,7 @@ export function LocalObservationCaptureEditor({
     {snapshot.stores.map(store => <fieldset key={store}>
       <legend>{store} · originele persoonlijke bronopname</legend>
       {(() => {
-        const open = incompleteCaptureFields(store, snapshot.needs, rows,
-          moments[store] ?? '')
+        const open = missingByStore.get(store) ?? []
         return <div>
           <p role="status">{open.length} van {snapshot.needs.length} Planner-regels
             hebben nog ontbrekende originele waarnemingsvelden.
@@ -336,10 +346,8 @@ export function LocalObservationCaptureEditor({
         winkelblad. Als je later een product opnieuw vastlegt, maak dan een nieuwe
         opname met het nieuwe werkelijke tijdstip; hergebruik geen oude prijs.</small>
       {snapshot.needs.map((need, index) => ({ need, index }))
-        .filter(({ index }) => !onlyOpen || incompleteCaptureFields(
-          store, [snapshot.needs[index]], {
-            [store + ':0']: row(store, index),
-          }, moments[store] ?? '').length > 0)
+        .filter(({ index }) => !onlyOpen ||
+          (missingByStore.get(store)?.some(item => item.index === index) ?? false))
         .filter(({ need }) =>
         !search.trim() || [need.label, need.id].join(' ').normalize('NFKD')
           .toLocaleLowerCase('nl-NL').includes(search.trim().normalize('NFKD')
@@ -353,6 +361,10 @@ export function LocalObservationCaptureEditor({
             {' '}· {value.state === 'unseen' ? 'niet waargenomen' :
               value.state === 'available' ? 'bronproduct beschikbaar' : 'bronproduct niet beschikbaar'}
           </summary>
+          {missingByStore.get(store)?.find(item => item.index === index)?.missing &&
+            <p role="status"><small>Voor deze originele regel nog nodig:{' '}
+              {missingByStore.get(store)?.find(item => item.index === index)?.missing.join('; ')}.
+              {' '}Dit is geen geaccepteerde winkelprijs.</small></p>}
           <label>Waarnemingsstatus
             <select value={value.state}
               onChange={event => edit(store, index, 'state', event.currentTarget.value)}>
