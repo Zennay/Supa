@@ -63,7 +63,9 @@ export function saveLocalRecipeReviewDraft(
   expectedRevision: number | null,
   explicitDeviceStorageConsent: boolean,
 ): DraftStorageWrite | { status: 'consent_required' } {
-  if (!explicitDeviceStorageConsent) return { status: 'consent_required' }
+  // Type annotations disappear at runtime: only an explicit primitive true is consent.
+  // Reject all other values before the storage adapter can be read or written.
+  if (explicitDeviceStorageConsent !== true) return { status: 'consent_required' }
   return saveRecipeDeviceDraft(storage, id, draft, expectedRevision)
 }
 
