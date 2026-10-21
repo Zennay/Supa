@@ -7,6 +7,7 @@ import { createMixedStoreShoppingPlan, formatMixedStoreShoppingPlan } from './mi
 import { MixedTripBackupControls } from './MixedTripBackupControls.tsx'
 import { PrivateRouteExtraGroceries } from './PrivateRouteExtraGroceries.tsx'
 import { MixedStoreUnitBreakdown } from './MixedStoreUnitBreakdown.tsx'
+import { privateMixedStoreUnitPrice } from './privateUnitPrice.ts'
 import { exportMixedStoreRouteCsv } from './mixedStoreRouteCsv.ts'
 import { appendManualUnpricedNotesToMixedRouteCsv } from './mixedStoreWithExtrasCsv.ts'
 import { printMixedStoreRouteHtml } from './mixedStorePrintHtml.ts'
@@ -287,7 +288,9 @@ export function MixedStoreShoppingCard({
         (done(line.key) ? '☑ ' : '☐ ') + clean(line.ingredientLabel) +
         ': ' + line.packs + ' × ' + clean(line.productName) +
         ' [SKU ' + clean(line.productId) + '] · ' +
-        exactEuro.formatCents(line.lineTotalCents)),
+        exactEuro.formatCents(line.pricePerPackCents) + '/pak · ' +
+        (privateMixedStoreUnitPrice(line) ?? 'eenheidsprijs onbekend') +
+        ' · ' + exactEuro.formatCents(line.lineTotalCents)),
       '', 'Eigen ongeprijsde boodschappen bij deze winkel:',
       ...(myNotes.length
         ? myNotes.filter(note => !onlyOpen || !note.done).map(note =>

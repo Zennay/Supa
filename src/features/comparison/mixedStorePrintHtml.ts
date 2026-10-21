@@ -2,6 +2,7 @@ import { euro as exactEuro } from '../../lib/money.ts'
 import type { OneStoreBasket } from '../../domain/basket.ts'
 import type { MixedStore, MixedStoreShoppingPlan } from './mixedStoreShoppingPlan.ts'
 import { exportMixedStoreRouteCsv } from './mixedStoreRouteCsv.ts'
+import { privateMixedStoreUnitPrice } from './privateUnitPrice.ts'
 import type { OwnExtraGrocery } from './ownExtraGroceriesCsv.ts'
 import type { UnpricedShoppingNote } from '../shopping-list/ManualShoppingNotes.tsx'
 import { normalizePrivateNotes } from '../shopping-list/manualShoppingNotesBackup.ts'
@@ -72,6 +73,7 @@ export function printMixedStoreRouteHtml(input: {
           '<br><small>Per pak: ' + clean(line.packCount) + ' × ' +
           clean(line.packAmount) + ' ' + clean(line.packUnit) +
           ' · pakprijs ' + clean(exactEuro.formatCents(line.pricePerPackCents)) +
+          ' · eenheidsprijs ' + clean(privateMixedStoreUnitPrice(line) ?? 'onbekend') +
           '</small><br><b>' + clean(exactEuro.formatCents(line.lineTotalCents)) +
           '</b></div></li>').join('')) + '</ul></section>'
   }
