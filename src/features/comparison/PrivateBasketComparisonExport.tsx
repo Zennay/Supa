@@ -4,6 +4,7 @@ import type { BasketTraceLine, OneStoreBasket } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import { privateUnitPrice } from './privateUnitPrice.ts'
 import { samePrivatePhysicalDemand } from './samePrivatePhysicalDemand.ts'
+import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
 
 const COLUMNS = [
   'plusObservedAt', 'dekaObservedAt', 'comparisonStatus',
@@ -105,7 +106,17 @@ function buildCsv(plus: OneStoreBasket, deka: OneStoreBasket,
     const dekaLine = dekaById.get(plusLine.id)!
     const sameDemand = samePrivatePhysicalDemand(
       plusLine.requirement, dekaLine.requirement)
-    if (!sameDemand) throw new Error('De fysieke ingrediëntbehoefte verschilt tussen winkels.')
+    // Both unpriced and unresolved 'unknown' demands are still useful in a
+    // local missing-items printout. Preserve that original workflow without
+    // treating unknown quantities as a physically comparable priced basket.
+    const bothUnknown = plusLine.status === 'unresolved' &&
+      dekaLine.status === 'unresolved' &&
+      plusLine.requirement.amount === null &&
+      dekaLine.requirement.amount === null &&
+      plusLine.requirement.unit === dekaLine.requirement.unit
+    if (!sameDemand && !bothUnknown) {
+      throw new Error('De fysieke ingrediëntbehoefte verschilt tussen winkels.')
+    }
     return [
       plusObservedAt, dekaObservedAt, state,
       plusLine.id, plusLine.ingredientLabel, plusLine.requirement.amount ?? '',
@@ -163,9 +174,15 @@ export function privateComparisonHtml(
     const outcome = delta === null ? 'Niet vergelijkbaar' : delta === 0 ? 'Gelijk' :
       money(Math.abs(delta)) + (delta > 0 ? ' · PLUS lager' : ' · DekaMarkt lager')
     const required = line.requirement.amount === null ? 'hoeveelheid onbekend' :
-      String(line.requirement.amount).replace('.', ',') + ' ' + line.requirement.unit
+      readablePlannerDemandAmount(line.requirement.amount) + ' ' + line.requirement.unit
+    const otherRequired = other.requirement.amount === null ? 'hoeveelheid onbekend' :
+      readablePlannerDemandAmount(other.requirement.amount) + ' ' + other.requirement.unit
+    const alias = required !== otherRequired &&
+      samePrivatePhysicalDemand(line.requirement, other.requirement)
     return '<tr><th scope="row">' + clean(line.ingredientLabel) +
-      '<small>Benodigd: ' + clean(required) + '</small></th><td>' + product(line) +
+      '<small>Benodigd: ' + clean(required) +
+      (alias ? ' = ' + clean(otherRequired) + ' (dezelfde fysieke hoeveelheid)' : '') +
+      '</small></th><td>' + product(line) +
       '</td><td>' + product(other) + '</td><td>' + clean(outcome) + '</td></tr>'
   }).join('\n')
   const totals = showDifference ? '<section class="totals"><div><span>PLUS</span><strong>' +

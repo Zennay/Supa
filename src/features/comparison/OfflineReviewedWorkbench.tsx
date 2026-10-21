@@ -39,6 +39,8 @@ import { PrivateCapturePastePreview } from './PrivateCapturePastePreview.tsx'
 import { PortableBlankCapture } from './PortableBlankCapture.tsx'
 import { CaptureMatchingPreview, type PreviewMatchLine } from './CaptureMatchingPreview.tsx'
 import { CapturePairedPreview } from './CapturePairedPreview.tsx'
+import { samePrivatePhysicalDemand } from './samePrivatePhysicalDemand.ts'
+import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
 import { recentOwnCaptureInstant, type PrivateReviewedBaskets, type PrivateCaptureProgress, type PrivateReviewFocus } from './privateReviewedBasketBridge.ts'
 import './offlineReviewedWorkbench.css'
 const dateTime = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
@@ -3475,7 +3477,13 @@ export function OfflineReviewedWorkbench({
                       <tbody>{fullDifferenceRows.map(({ delta, plus, deka }) => (
                         <tr key={delta.id}>
                           <th scope="row">{delta.ingredientLabel}
-                            <small>{plus.requirement.amount} {plus.requirement.unit} benodigd</small>
+                            <small>{readablePlannerDemandAmount(plus.requirement.amount)} {plus.requirement.unit} benodigd
+                              {samePrivatePhysicalDemand(plus.requirement, deka.requirement) &&
+                                (plus.requirement.amount !== deka.requirement.amount ||
+                                  plus.requirement.unit !== deka.requirement.unit) &&
+                                  <> = {readablePlannerDemandAmount(deka.requirement.amount)} {deka.requirement.unit}
+                                    {' '}(dezelfde fysieke behoefte)</>}
+                            </small>
                           </th>
                           <td><strong>{exactEuro.formatCents(plus.lineTotalCents)}</strong>
                             <small>{plus.productName} · broncode {plus.productId}</small>
