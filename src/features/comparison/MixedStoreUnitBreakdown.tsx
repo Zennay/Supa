@@ -24,6 +24,7 @@ export function MixedStoreUnitBreakdown({
   const dekaLines = ownMatched(deka)
   const [sortBy, setSortBy] = useState<'planner' | 'biggest-difference'>('planner')
   const [onlyDifferences, setOnlyDifferences] = useState(false)
+  const [search, setSearch] = useState('')
   const comparisons = route.lines.flatMap((chosen, index) => {
     const p = plusLines.get(chosen.id)
     const d = dekaLines.get(chosen.id)
@@ -33,8 +34,15 @@ export function MixedStoreUnitBreakdown({
     }] : []
   })
   const distinct = comparisons.filter(item => item.difference > 0).length
-  const filtered = onlyDifferences
-    ? comparisons.filter(item => item.difference > 0) : comparisons
+  const query = search.normalize('NFC').trim().toLocaleLowerCase('nl-NL')
+  const filtered = comparisons.filter(({ chosen, p, d, difference }) => {
+    if (onlyDifferences && difference === 0) return false
+    if (!query) return true
+    const haystack = [
+      chosen.ingredientLabel, p.productName, d.productName, p.productId, d.productId,
+    ].join(' ').normalize('NFC').toLocaleLowerCase('nl-NL')
+    return haystack.includes(query)
+  })
   const visible = sortBy === 'biggest-difference'
     ? [...filtered].sort((a, b) => b.difference - a.difference || a.index - b.index)
     : filtered
@@ -47,6 +55,11 @@ export function MixedStoreUnitBreakdown({
       goedkoper voor jouw benodigde hoeveelheid.</p>
     <div className="mixed-store-route__unit-controls" role="group"
       aria-label="Toon en sorteer vergeleken bronproducten">
+      <label>Zoek ingrediënt, oorspronkelijk product of SKU
+        <input type="search" value={search} maxLength={80}
+          placeholder="Bijv. tomaten of broncode" onChange={event =>
+            setSearch(event.currentTarget.value)} />
+      </label>
       <label>Sorteer de prijsverschillen
         <select value={sortBy} onChange={event =>
           setSortBy(event.currentTarget.value as 'planner' | 'biggest-difference')}>
@@ -62,7 +75,8 @@ export function MixedStoreUnitBreakdown({
       <p role="status">{distinct} van {comparisons.length} ingrediënten hebben
         een verschillend pakbedrag voor dezelfde benodigde hoeveelheid.
         {onlyDifferences ? ' Gelijke bedragen zijn tijdelijk verborgen.' : ''}
-        {' '}Dit filter verandert je mandje, brongegevens en winkelroute niet.</p>
+        {' '}Er zijn {visible.length} ingrediënten zichtbaar.
+        Zoeken en sorteren veranderen je mandje, brongegevens en winkelroute niet.</p>
     </div>
     <div className="mixed-store-route__unit-rows">
       {visible.map(({ chosen, p, d, difference }) => {
@@ -89,10 +103,18 @@ export function MixedStoreUnitBreakdown({
             {row('DekaMarkt', d)}
           </div>
           <p>{lessExpensive}</p>
+          {difference > 0 && chosen.store !==
+            (p.lineTotalCents < d.lineTotalCents ? 'PLUS' : 'DekaMarkt') && <p>
+            Je hebt {chosen.store} gekozen. Voor deze oorspronkelijke fysieke
+            hoeveelheid is dat <strong>{exactEuro.formatCents(difference)} duurder</strong>
+            dan het andere beoordeelde product. Dit is alleen een vergelijking
+            van jouw bronopnames, niet een actuele kassaprijs.
+          </p>}
         </article>
       })}
-      {visible.length === 0 && <p>Er zijn geen verschillen binnen deze selectie.
-        Toon alle ingrediënten om ook de gelijke winkelbedragen te bekijken.</p>}
+      {visible.length === 0 && <p>Geen ingrediënten gevonden binnen deze selectie.
+        Wis je zoekterm of schakel 'alleen verschillen' uit om de complete
+        vergelijking uit jouw eigen bronopnames te bekijken.</p>}
     </div>
     <small>De originele productkeuzes zijn privé door jou bevestigd tegen eigen bronmateriaal.
       Eenheidsprijzen zijn rekenhulp, geen toezegging van actuele winkelvoorraad
