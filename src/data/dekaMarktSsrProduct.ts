@@ -188,7 +188,11 @@ function corroborateDekaOffer(offer: JsonObject, expectedCents: number): boolean
   }
   if (!sawPrice || !sawEuroCurrency) return false
   const known = availabilities.map(normalizeSchemaOrgAvailability)
-  if (known.length > 0 && (known.includes('unknown') ||
+  // One non-Schema.org lookalike conveys no availability fact: retain the
+  // independently corroborated product/price with availability='unknown'.
+  // Multiple competing availability declarations are evidence of ambiguity,
+  // however; an unknown alias must not mask an explicit InStock/OutOfStock.
+  if (known.length > 1 && (known.includes('unknown') ||
       new Set(known).size !== 1)) return false
   return true
 }
@@ -423,7 +427,7 @@ export function parseDekaMarktSsrProductEvidence(
     !corroborateDekaOffer(offers, currentPriceCents) ||
     !corroborateDekaWeight(jsonLd.weight, normalizedPack)
   ) {
-    return { type: 'abstain', reason: 'DekaMarkt JSON-LD does not corroborate Nuxt source, identity, package, price, currency or availability' }
+    return { type: 'abstain', reason: 'DekaMarkt JSON-LD does not corroborate Nuxt product identity/price' }
   }
 
   const observation: RawProductObservation = {
