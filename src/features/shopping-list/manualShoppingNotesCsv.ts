@@ -4,13 +4,21 @@ type Row = Pick<UnpricedShoppingNote, 'label' | 'store' | 'done'>
 const header = 'supa-eigen-ongeprijsd-v1;winkel;artikel;afgevinkt'
 const stores = new Set(['Algemeen', 'PLUS', 'DekaMarkt'])
 const safeLabel = (label: string) => label.replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/gu, ' ').replace(/\s+/gu, ' ').trim()
+// Spreadsheet apps interpret some invisible/control prefixes and compatibility
+// forms before deciding whether a cell is a formula. Inspect a conservative
+// normalized copy only; preserve the original user label byte-for-byte in CSV.
+function formulaShaped(value: string): boolean {
+  const inspected = value.normalize('NFKC')
+    .replace(/^[\p{Cc}\p{Cf}\p{Mn}\p{Me}\p{Zs}\p{Zl}\p{Zp}\u2800]*/u, '')
+  return /^[=+@-]/u.test(inspected)
+}
 function spreadsheetSafe(value: string): string {
-  if (value.startsWith("'")) return "'" + value
-  return /^[\s\u200b-\u200f\ufeff]*[=+@-]/u.test(value) ? "'" + value : value
+  if (value.startsWith("'") || formulaShaped(value)) return "'" + value
+  return value
 }
 function originalCell(value: string): string {
   if (value.startsWith("''")) return value.slice(1)
-  if (/^'[\s\u200b-\u200f\ufeff]*[=+@-]/u.test(value)) return value.slice(1)
+  if (value.startsWith("'") && formulaShaped(value.slice(1))) return value.slice(1)
   return value
 }
 const quote = (value: string) => '"' + spreadsheetSafe(value).replace(/"/gu, '""') + '"'
