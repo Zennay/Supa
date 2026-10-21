@@ -25,6 +25,12 @@ const MixedStoreShoppingCard = lazy(async () => {
   const module = await import('./MixedStoreShoppingCard.tsx')
   return { default: module.MixedStoreShoppingCard }
 })
+// Use the already built standalone one-store trip component, even when
+// the other retailer still has missing prices or unreviewed products.
+const PrivateStoreTripChecklist = lazy(async () => {
+  const module = await import('./PrivateStoreTripChecklist.tsx')
+  return { default: module.PrivateStoreTripChecklist }
+})
 import { privatePackUnitRate, formatPrivateUnitRate, privateUnitPrice } from './privateUnitPrice.ts'
 import { rankOwnSourceSuggestions } from './ownSourceSuggestions.ts'
 import { automaticallyAcceptedSourceLine } from './automaticSourceMatch.ts'
@@ -42,7 +48,7 @@ import { CapturePairedPreview } from './CapturePairedPreview.tsx'
 import { completePreviewProposal } from './privateTwoStorePreviewChecklist.ts'
 import { samePrivatePhysicalDemand } from './samePrivatePhysicalDemand.ts'
 import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
-import { recentOwnCaptureInstant, type PrivateReviewedBaskets, type PrivateCaptureProgress, type PrivateReviewFocus } from './privateReviewedBasketBridge.ts'
+import { freshReviewedBaskets, recentOwnCaptureInstant, type PrivateReviewedBaskets, type PrivateCaptureProgress, type PrivateReviewFocus } from './privateReviewedBasketBridge.ts'
 import './offlineReviewedWorkbench.css'
 const dateTime = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
 const stores = ['PLUS', 'DekaMarkt'] as const
@@ -3410,6 +3416,29 @@ export function OfflineReviewedWorkbench({
                   )
                 })}
               </div>
+              {reviewedBridge && <section className="offline-price-workbench__own-trips"
+                aria-label="Mijn afzonderlijke gecontroleerde winkellijsten">
+                <h4>Een winkel klaar? Neem die boodschappen alvast mee</h4>
+                <p>Een volledig gecontroleerd winkelmandje kun je al afvinken en offline
+                  bewaren. De andere winkel mag nog onvolledig zijn. Onbevestigde of
+                  verlopen bedragen komen niet in deze lijst.</p>
+                {stores.map(store => {
+                  const original = reviewedBridge.stores[store]
+                  if (!original) return null
+                  return <Suspense key={JSON.stringify([planKey, store,
+                    original.observedAt, original.basket.lines])}
+                    fallback={<p role="status">Privélijst voor {store} laden…</p>}>
+                    <PrivateStoreTripChecklist
+                      basket={original.basket}
+                      observedAt={original.observedAt}
+                      fresh
+                      eligibleNow={() => {
+                        const current = freshReviewedBaskets(reviewedBridge, reviewedBridge.planKey, Date.now())
+                        return current?.stores[store]?.basket === original.basket
+                      }} />
+                  </Suspense>
+                })}
+              </section>}
               {((basketPair.plus?.unresolvedLineCount ?? 0) > 0 || (basketPair.deka?.unresolvedLineCount ?? 0) > 0) && (
                 <p className="offline-price-workbench__missing" role="status">
                   Deze vergelijking is nog niet volledig. Vul onbekende artikelen in beide winkels in.
