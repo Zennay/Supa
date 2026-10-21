@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { euro } from '../../lib/money.ts'
+import { samePhysicalDemand } from '../../domain/basketComparison.ts'
 import { observedInstant } from '../../domain/offlineReviewedImport.ts'
 import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
 import type { PreviewMatchLine } from './CaptureMatchingPreview.tsx'
@@ -57,14 +58,15 @@ export function CapturePairedPreview({
       right: PreviewMatchLine | null; sameDemand: boolean; open: boolean
     }> = plus.map(left => {
       const right = byDeka.get(left.id) ?? null
-      const sameDemand = !!right && left.amount === right.amount &&
-        left.unit === right.unit && left.label === right.label
+      const sameDemand = !!right && left.label === right.label &&
+        samePhysicalDemand(left, right)
       return { id: left.id, label: left.label, left, right, sameDemand,
         open: !sameDemand || left.status !== 'matched' ||
           right?.status !== 'matched' }
     })
+    const plusIds = new Set(plus.map(line => line.id))
     for (const right of deka) {
-      if (!plus.some(left => left.id === right.id)) joined.push({
+      if (!plusIds.has(right.id)) joined.push({
         id: right.id, label: right.label, left: null,
         right, sameDemand: false, open: true,
       })

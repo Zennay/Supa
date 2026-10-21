@@ -1,5 +1,6 @@
 import type { BasketTraceLine, OneStoreBasket } from './basket.ts'
 import { calculateDecimalPackCount } from './decimalPackArithmetic.ts'
+import type { MatchUnit } from './matching.ts'
 
 type MatchedBasketLine = Extract<BasketTraceLine, { status: 'matched' }>
 
@@ -264,13 +265,28 @@ function unknownComparison(
 
 // Compare the exact physical quantity rather than a display-unit spelling.
 // Bidirectional exact ceiling=1 refuses even the tiniest true discrepancy.
-function samePhysicalDemand(
-  left: MatchedBasketLine['requirement'],
-  right: MatchedBasketLine['requirement'],
+function physicalUnit(unit: string): unit is MatchUnit {
+  return unit === 'g' || unit === 'kg' || unit === 'ml' ||
+    unit === 'l' || unit === 'piece'
+}
+
+/** Share canonical physical demand across preview, review and export. */
+export function samePhysicalDemand(
+  left: { amount: number | null; unit: string },
+  right: { amount: number | null; unit: string },
 ): boolean {
+  if (left.amount === null || right.amount === null ||
+      !Number.isFinite(left.amount) || left.amount <= 0 ||
+      !Number.isFinite(right.amount) || right.amount <= 0 ||
+      !physicalUnit(left.unit) || !physicalUnit(right.unit)) return false
   if (left.amount === right.amount && left.unit === right.unit) return true
-  return calculateDecimalPackCount([left], { amount: right.amount, unit: right.unit }) === 1 &&
-    calculateDecimalPackCount([right], { amount: left.amount, unit: left.unit }) === 1
+  return calculateDecimalPackCount(
+    [{ amount: left.amount, unit: left.unit }],
+    { amount: right.amount, unit: right.unit },
+  ) === 1 && calculateDecimalPackCount(
+    [{ amount: right.amount, unit: right.unit }],
+    { amount: left.amount, unit: left.unit },
+  ) === 1
 }
 
 /** Reuse the validated source-only container guard from #419 (#417/#420).

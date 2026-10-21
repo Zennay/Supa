@@ -1,5 +1,5 @@
 import { observedInstant } from '../../domain/offlineReviewedImport.ts'
-import { isCoherentPricedBasket } from '../../domain/basketComparison.ts'
+import { isCoherentPricedBasket, samePhysicalDemand } from '../../domain/basketComparison.ts'
 import type { BasketTraceLine, OneStoreBasket } from '../../domain/basket.ts'
 
 /** Transient, human-reviewed own-source baskets. No storage, no retailer rights. */
@@ -39,8 +39,9 @@ export function samePartialPhysicalDemand(left: OneStoreBasket, right: OneStoreB
   return byId.size === right.lines.length && left.lines.every(line => {
     const other = byId.get(line.id)
     return !!other && line.ingredientLabel === other.ingredientLabel &&
-      line.requirement.amount === other.requirement.amount &&
-      line.requirement.unit === other.requirement.unit
+      (samePhysicalDemand(line.requirement, other.requirement) ||
+        (line.requirement.amount === null && other.requirement.amount === null &&
+          line.requirement.unit === other.requirement.unit))
   })
 }
 

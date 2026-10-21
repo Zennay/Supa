@@ -1,4 +1,5 @@
 import { euro } from '../../lib/money.ts'
+import { samePhysicalDemand } from '../../domain/basketComparison.ts'
 import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
 import type { PreviewMatchLine } from './CaptureMatchingPreview.tsx'
 
@@ -53,9 +54,8 @@ export function privateTwoStorePreviewChecklist({
     '',
   ]
   const append = (left: PreviewMatchLine | null, right: PreviewMatchLine | null, index: number) => {
-    const demandEqual = !!left && !!right &&
-      left.amount === right.amount && left.unit === right.unit &&
-      left.label === right.label
+    const demandEqual = !!left && !!right && left.label === right.label &&
+      samePhysicalDemand(left, right)
     output.push(String(index + 1) + '. ' + clean(left?.label ?? right?.label))
     if (!demandEqual) {
       output.push('  Planner-vraag ongelijk of niet aanwezig in beide bronnen: controleren.')

@@ -1,7 +1,7 @@
 import { euro as exactEuro } from '../../lib/money.ts'
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { aggregatePlanIngredients, buildOneStoreBasket, type RecipeWithIngredients, type BasketTraceLine, type OneStoreBasket } from '../../domain/basket.ts'
-import { compareFullBaskets } from '../../domain/basketComparison.ts'
+import { compareFullBaskets, samePhysicalDemand } from '../../domain/basketComparison.ts'
 import { calculateDecimalPackCount } from '../../domain/decimalPackArithmetic.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots, type OfflineStoreProduct } from '../../domain/offlineReviewedImport.ts'
@@ -2222,8 +2222,7 @@ export function OfflineReviewedWorkbench({
     let singleLineDelta: string | null = null
     if (imported?.pairedWithin24h && plus.confirmedPrice && deka.confirmedPrice &&
         plusLine?.status === 'matched' && dekaLine?.status === 'matched' &&
-        plusLine.requirement.amount === dekaLine.requirement.amount &&
-        plusLine.requirement.unit === dekaLine.requirement.unit) {
+        samePhysicalDemand(plusLine.requirement, dekaLine.requirement)) {
       const cents = dekaLine.lineTotalCents - plusLine.lineTotalCents
       if (Number.isSafeInteger(cents)) {
         singleLineDelta = cents === 0 ? 'Gelijk voor deze ingrediëntregel' :
@@ -2432,8 +2431,7 @@ export function OfflineReviewedWorkbench({
         const plus = exactLine('PLUS', need.id)
         const deka = exactLine('DekaMarkt', need.id)
         const both = imported.pairedWithin24h && plus.line && deka.line &&
-          plus.line.requirement.amount === deka.line.requirement.amount &&
-          plus.line.requirement.unit === deka.line.requirement.unit
+          samePhysicalDemand(plus.line.requirement, deka.line.requirement)
         const delta = both ? deka.line!.lineTotalCents - plus.line!.lineTotalCents : null
         const comparable = delta !== null && Number.isSafeInteger(delta)
         rows.push([need.id, need.label, need.amount === null ? '' : String(need.amount),

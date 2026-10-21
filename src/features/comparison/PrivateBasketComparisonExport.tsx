@@ -1,7 +1,7 @@
 import { euro as exactEuro } from '../../lib/money.ts'
 import { useState } from 'react'
 import type { BasketTraceLine, OneStoreBasket } from '../../domain/basket.ts'
-import { compareFullBaskets } from '../../domain/basketComparison.ts'
+import { compareFullBaskets, samePhysicalDemand } from '../../domain/basketComparison.ts'
 import { privateUnitPrice } from './privateUnitPrice.ts'
 
 const COLUMNS = [
@@ -102,8 +102,9 @@ function buildCsv(plus: OneStoreBasket, deka: OneStoreBasket,
     'geen volledig of actueel vergelijkbaar prijsverschil'
   const rows = plus.lines.map(plusLine => {
     const dekaLine = dekaById.get(plusLine.id)!
-    const sameDemand = plusLine.requirement.amount === dekaLine.requirement.amount &&
-      plusLine.requirement.unit === dekaLine.requirement.unit
+    const sameDemand = samePhysicalDemand(plusLine.requirement, dekaLine.requirement) ||
+      (plusLine.requirement.amount === null && dekaLine.requirement.amount === null &&
+        plusLine.requirement.unit === dekaLine.requirement.unit)
     if (!sameDemand) throw new Error('De fysieke ingrediëntbehoefte verschilt tussen winkels.')
     return [
       plusObservedAt, dekaObservedAt, state,
