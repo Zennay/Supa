@@ -21,12 +21,26 @@ function localOffer(line: PreviewMatchLine | null,
       De oude bedragen worden niet als prijsvoorstel getoond.</small>
   </span>
   if (!completePreviewProposal(line)) {
-    return <span>Geen complete betrouwbare productmatch. Prijs onbekend.
+    return <span><strong>Bronmatch onvolledig. Prijs onbekend.</strong>
+      {line?.product?.trim() && <small style={{ display: 'block' }}>
+        Oorspronkelijk voorgesteld product: {line.product}
+      </small>}
+      {line?.originalSku?.trim() && <small style={{ display: 'block' }}>
+        Oorspronkelijke artikelcode: {line.originalSku}
+      </small>}
+      {line && Number.isFinite(line.packAmount) && (line.packAmount ?? 0) > 0 &&
+        line.packUnit && Number.isSafeInteger(line.packCount) && (line.packCount ?? 0) > 0 &&
+        <small style={{ display: 'block' }}>
+          Oorspronkelijk ingevulde verpakking: {line.packCount} ×{' '}
+          {readablePlannerDemandAmount(line.packAmount)} {line.packUnit}; opnieuw controleren.
+        </small>}
       {line?.reasons?.length ? <small style={{ display: 'block' }}>
         {describeReason(line.reasons[0])}
       </small> : <small style={{ display: 'block' }}>
         Controleer de originele productcode, verpakking en de hele-pak-prijs.
       </small>}
+      <small>Onvolledige prijzen, hele-pakregels en eenheidsprijzen worden niet getoond.
+        Een origineel artikelnummer is nog geen bevestigde match.</small>
     </span>
   }
   return <span>
