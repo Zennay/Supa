@@ -763,6 +763,30 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               navigate('basket')
             }}
             checked={privateShoppingTicks}
+            onMarkCheckedBatch={(shop, rows) => {
+              // A bulk physical tick is never a retailer-source approval.
+              // Every original line must still belong to the exact currently
+              // valid source and same current Planner demand at click time.
+              const latest = freshReviewedBaskets(livePrivateReviewed, privatePlanKey, Date.now())
+              const capture = latest?.stores[shop]
+              if (!capture || !Array.isArray(rows) || rows.length < 1 ||
+                  rows.length > 100 || new Set(rows).size !== rows.length ||
+                  rows.some(line => line.status !== 'matched' ||
+                    !capture.basket.lines.includes(line))) {
+                return 'De winkelbron of productselectie is veranderd. Open de actuele originele bron opnieuw.'
+              }
+              const keys = rows.map(line => privatePhysicalShoppingTick(
+                privatePlanKey, shop, capture.basket.store.id, line))
+              if (new Set(keys).size !== keys.length) {
+                return 'Twee producten verwijzen naar dezelfde fysieke winkelregel; niets aangepast.'
+              }
+              setPrivateShoppingTicks(before => {
+                const next = { ...before }
+                for (const key of keys) next[key] = true
+                return next
+              })
+              return null
+            }}
             onToggleChecked={(shop, selected) => {
               // No checkout progress can be created from expired or replaced
               // source products. Existing local checkmarks remain untouched.

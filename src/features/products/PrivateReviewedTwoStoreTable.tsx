@@ -30,7 +30,7 @@ function privateCheckedSignature(ticks: Readonly<Record<string, boolean>>): stri
 /** Both sides are the exact SAME human-reviewed physical weekly demand.
  * No independent source authorization, live pricing or retail claim is implied.
  */
-export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, order, budget, onOpenComparison, onReviewIngredient, onOpenList, onOpenMixedRoute, onChooseRouteLine, checked }: {
+export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, order, budget, onOpenComparison, onReviewIngredient, onOpenList, onOpenMixedRoute, onChooseRouteLine, checked, onlyUnbought = false }: {
   reviewed: PrivateReviewedBaskets
   search: string
   unitFilter: 'all' | 'kg' | 'liter' | 'stuk'
@@ -42,6 +42,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   onOpenMixedRoute: () => void
   onChooseRouteLine: (choice: Omit<PrivateRouteChoice, 'serial'>) => void
   checked: Readonly<Record<string, boolean>>
+  onlyUnbought?: boolean
 }) {
   const reviewedRef = useRef(reviewed)
   reviewedRef.current = reviewed
@@ -498,6 +499,10 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
     // or store route follows from it.
     const partialPairs = partialReviewedLinePairs(plus, deka)
     const partialShown = partialPairs.filter(({ plus: first, deka: second }) => {
+      if (onlyUnbought && plus && deka &&
+          checked[privatePhysicalShoppingTick(reviewed.planKey, 'PLUS', plus.basket.store.id, first)] &&
+          checked[privatePhysicalShoppingTick(reviewed.planKey, 'DekaMarkt', deka.basket.store.id, second)])
+        return false
       if (search && ![first.ingredientLabel, first.productName, first.productId,
         second.productName, second.productId].some(value =>
           productSearchText(value).includes(search))) return false
@@ -881,6 +886,10 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   const rows = plus.basket.lines.flatMap(line => {
     const alternate = dekaById.get(line.id)
     if (line.status !== 'matched' || !alternate) return []
+    if (onlyUnbought &&
+        checked[privatePhysicalShoppingTick(reviewed.planKey, 'PLUS', plus.basket.store.id, line)] &&
+        checked[privatePhysicalShoppingTick(reviewed.planKey, 'DekaMarkt', deka.basket.store.id, alternate)])
+      return []
     if (unitFilter !== 'all' && family(line, alternate) !== unitFilter) return []
     if (search && ![line.ingredientLabel, line.productId, line.productName,
       alternate.productId, alternate.productName].some(value =>
@@ -1104,7 +1113,8 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       Geen kassagarantie of onafhankelijk bewezen besparing; oorspronkelijke producten en
       prijzen kunnen veranderen.</small>
     <p role="status">{advantaged.length} van {plus.basket.lines.length} vergelijkbare ingrediënten
-      bij je zoek-, eenheids- en sorteerselectie. Alle mandtotalen hierboven blijven
+      bij je zoek-, eenheids-, winkelvoordeel- en {onlyUnbought ? 'nog-te-kopen-' : ''}filter.
+      Alle mandtotalen hierboven blijven
       gebaseerd op het volledige weekmenu, niet alleen de gefilterde producten.</p>
     <div className="private-reviewed-products__paired-rows">
       {advantaged.map(({ plus: first, deka: second }) => <article key={first.id}>

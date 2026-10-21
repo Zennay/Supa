@@ -250,3 +250,12 @@ background:#e7f4eb!important}
 .private-reviewed-products__partial-cards>.private-reviewed-products__grid{margin:.25rem 0}
 .private-reviewed-products__partial-cards article{align-content:start}
 .private-reviewed-products__partial-cards article button{margin-top:auto}
+
+/* Grocery in-store controls; never mistaken for retailer price approvals. */
+.private-reviewed-products__open-filter { display:flex!important; flex-direction:row;
+  align-items:center; gap:.55rem; min-width:min(220px,100%); }
+.private-reviewed-products__open-filter input { width:auto; flex:none; }
+.private-reviewed-products__bulk-shopping { display:flex; flex-wrap:wrap; align-items:center;
+  gap:.65rem 1rem; margin-block:.8rem 1.2rem; }
+.private-reviewed-products__bulk-shopping p { margin:0; }
+.private-reviewed-products__bulk-shopping small { flex:1 1 100%; }

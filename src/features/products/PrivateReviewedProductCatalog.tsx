@@ -38,7 +38,7 @@ const PlannerQuickSourcePaste = lazy(async () => {
 })
 
 /** Read-only personally reviewed basket sources, never an inferred live catalog. */
-export function PrivateReviewedProductCatalog({ reviewed, progress, captureNeeds, budget, onOpenComparison, onOpenList, onOpenMixedRoute, onChooseRouteLine, onReviewIngredient, onAddMissingToOwnList, onImportSourceFiles, fileWarning, checked, onToggleChecked }: {
+export function PrivateReviewedProductCatalog({ reviewed, progress, captureNeeds, budget, onOpenComparison, onOpenList, onOpenMixedRoute, onChooseRouteLine, onReviewIngredient, onAddMissingToOwnList, onImportSourceFiles, fileWarning, checked, onToggleChecked, onMarkCheckedBatch }: {
   reviewed: PrivateReviewedBaskets | null
   progress: PrivateCaptureProgress | null
   captureNeeds: readonly PlannerCaptureGuideNeed[]
@@ -53,9 +53,11 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, captureNeeds
   onChooseRouteLine: (choice: Omit<PrivateRouteChoice, 'serial'>) => void
   checked: Readonly<Record<string, boolean>>
   onToggleChecked: (shop: OwnStore, line: Matched) => void
+  onMarkCheckedBatch: (shop: OwnStore, lines: readonly Matched[]) => string | null
 }) {
   const [store, setStore] = useState<'all' | OwnStore>('all')
   const [query, setQuery] = useState('')
+  const [onlyUnbought, setOnlyUnbought] = useState(false)
   const [unitFilter, setUnitFilter] = useState<'all' | 'kg' | 'liter' | 'stuk'>('all')
   const [order, setOrder] = useState<'source' | 'unitPrice' | 'lineTotal' | 'priceGap'>('source')
   const [checkMessage, setCheckMessage] = useState('')
@@ -123,8 +125,14 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, captureNeeds
     amount: line.pack.amount, unit: line.pack.unit, count: line.pack.count,
     priceCents: line.pricePerPackCents,
   })
+  const isChecked = (shop: OwnStore, line: Matched) => {
+    const capture = currentReviewed?.stores[shop]
+    return !!capture && checked[
+      privatePhysicalShoppingTick(reviewed!.planKey, shop, capture.basket.store.id, line)] === true
+  }
   const visible = sources.filter(row =>
     (store === 'all' || row.shop === store) &&
+    (!onlyUnbought || !isChecked(row.shop, row.line)) &&
     (unitFilter === 'all' || rate(row.line)?.unit === unitFilter) &&
     (!search || [row.line.productName, row.line.productId, row.line.ingredientLabel]
       .some(value => productSearchText(value).includes(search))))
@@ -141,11 +149,6 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, captureNeeds
         ? a.line.lineTotalCents - b.line.lineTotalCents
       : group(a.line) - group(b.line) ||
         (rate(a.line)?.centsPerUnit ?? Infinity) - (rate(b.line)?.centsPerUnit ?? Infinity))
-  const isChecked = (shop: OwnStore, line: Matched) => {
-    const capture = currentReviewed?.stores[shop]
-    return !!capture && checked[
-      privatePhysicalShoppingTick(reviewed!.planKey, shop, capture.basket.store.id, line)] === true
-  }
   function chooseProductInRoute(shop: OwnStore, line: Matched) {
     // Do not promote a newly replaced SKU merely because its ingredient ID
     // coincides with the older visible card. The ORIGINAL card row is required.
@@ -170,6 +173,23 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, captureNeeds
     onToggleChecked(shop, line)
     setCheckMessage('Het fysieke vinkje is voor ' + shop +
       ' aangepast. Dit is geen goedkeuring van de prijs of betaalbevestiging.')
+  }
+  function markVisibleUnbought() {
+    if (store === 'all') {
+      setCheckMessage('Kies eerst één winkel: een afvinking hoort bij fysieke PLUS- of DekaMarkt-producten.')
+      return
+    }
+    const pending = ordered.filter(row => row.shop === store &&
+      !isChecked(row.shop, row.line)).map(row => row.line)
+    if (!pending.length || pending.length > 100) {
+      setCheckMessage('Er zijn geen openstaande producten in deze selectie.')
+      return
+    }
+    if (!window.confirm('Vink ' + pending.length + ' zichtbaar openstaande ' + store +
+      '-artikelen af? Dit is alleen je tijdelijke winkellijst: geen betaling, productreview of prijsclaim.')) return
+    const message = onMarkCheckedBatch(store, pending)
+    setCheckMessage(message ?? 'De zichtbare ' + store +
+      '-artikelen zijn afgevinkt. Je originele prijsopname blijft ongewijzigd.')
   }
   function openCurrentCheckedList() {
     // This action can be pressed after the seven-day price window expires.
@@ -361,6 +381,23 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, captureNeeds
         </select></label>
         <label>Zoek eigen product <input type="search" value={query}
           onChange={event => setQuery(event.target.value)} maxLength={120} placeholder="Product, SKU of ingrediënt" /></label>
+        <label className="private-reviewed-products__open-filter">
+          <input type="checkbox" checked={onlyUnbought}
+            onChange={event => setOnlyUnbought(event.currentTarget.checked)} />
+          Alleen nog te kopen originele artikelen
+        </label>
+      </div>
+      <div className="private-reviewed-products__bulk-shopping">
+        <p role="status">{ordered.length} passende winkelartikelen zichtbaar.
+          {' '}De volledige mandprijs wordt niet gefilterd.</p>
+        {store !== 'all' && <button type="button" className="ghost-button"
+          disabled={!ordered.some(row => !isChecked(row.shop, row.line))}
+          onClick={markVisibleUnbought}>
+          Vink {ordered.filter(row => !isChecked(row.shop, row.line)).length}
+          {' '}openstaande {store}-artikelen af
+        </button>}
+        <small>Alleen fysieke winkellijst-vinkjes voor een gekozen winkel.
+          Bronprijzen, oorspronkelijke SKU’s en menselijke productreviews blijven intact.</small>
       </div>
       <div className="private-reviewed-products__progress" aria-label="Mijn nog te kopen artikelen per winkel">
         {shops.filter(shop => store === 'all' || store === shop).map(shop => {
@@ -459,7 +496,7 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, captureNeeds
       onOpenComparison={onOpenComparison} onReviewIngredient={onReviewIngredient}
       onOpenList={onOpenList}
       onOpenMixedRoute={onOpenMixedRoute} onChooseRouteLine={onChooseRouteLine}
-      checked={checked} />}
+      checked={checked} onlyUnbought={onlyUnbought} />}
     {checkMessage && <p role="status">{checkMessage}</p>}
     <button type="button" onClick={onOpenComparison}>Open prijsinvoer en productmatching</button>
     <small>Ontbrekende of verlopen bronproducten krijgen nooit een verzonnen prijs.</small>
