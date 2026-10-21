@@ -36,6 +36,27 @@ export function PrivateCapturePastePreview({
       setError(cause instanceof Error ? cause.message : 'Bronblad ongeldig.')
     }
   }
+  function downloadDraft(raw: string, index: 1 | 2) {
+    setError('')
+    setFeedback('')
+    try {
+      if (disabled || !available(raw)) throw Error('Er is geen eigen bronconcept om te bewaren.')
+      if (new TextEncoder().encode(raw).length > maxBytes)
+        throw Error('Bronconcept is groter dan 256 kB; maak een kleiner bestand.')
+      // This is the unmodified human text, NOT a successful source admission.
+      const uri = URL.createObjectURL(new Blob([raw], { type: 'text/plain;charset=utf-8' }))
+      try {
+        const a = document.createElement('a')
+        a.href = uri
+        a.download = 'supa-origineel-winkelconcept-' + index + '-niet-gecontroleerd.txt'
+        document.body.append(a)
+        try { a.click() } finally { a.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
+      setFeedback('Origineel concept lokaal bewaard. Dit bestand is nog geen geldige import of bronbewijs; controleer en bevestig later de prijzen opnieuw.')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Kon het lokale concept niet bewaren.')
+    }
+  }
   async function readSpreadsheetClipboard(target: 'first' | 'second') {
     // Only a user gesture may access the clipboard. This is a local, untrusted
     // draft; never apply source prices or infer the retailer at this stage.
@@ -80,6 +101,10 @@ export function PrivateCapturePastePreview({
       onClick={() => void readSpreadsheetClipboard('first')}>
       Lees gekopieerde Excel-/CSV-tabel in eerste concept (na toestemming)
     </button>
+    <button type="button" className="ghost-button" disabled={disabled || !available(first)}
+      onClick={() => downloadDraft(first, 1)}>
+      Bewaar eerste ongecontroleerde bronconcept lokaal (TXT)
+    </button>
     <label>Tweede originele winkelbron (optioneel)
       <textarea rows={5} spellCheck={false} maxLength={256000}
         value={second} disabled={disabled} onChange={event => {
@@ -90,6 +115,10 @@ export function PrivateCapturePastePreview({
     <button type="button" className="ghost-button" disabled={disabled}
       onClick={() => void readSpreadsheetClipboard('second')}>
       Lees gekopieerde tabel in tweede concept (na toestemming)
+    </button>
+    <button type="button" className="ghost-button" disabled={disabled || !available(second)}
+      onClick={() => downloadDraft(second, 2)}>
+      Bewaar tweede ongecontroleerde bronconcept lokaal (TXT)
     </button>
     <div className="offline-price-workbench__capture-paste-actions">
       <button type="button" disabled={disabled || !available(first)}
