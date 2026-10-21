@@ -1,5 +1,6 @@
 import { makeBlankPlannerCaptureCsv, type CaptureStore } from '../comparison/plannerPriceCaptureSheet.ts'
 import { readablePlannerDemandAmount, type PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
+import { captureWorksheetText } from '../comparison/captureWorksheetText.ts'
 
 export type MissingStoreNeeds = Readonly<Record<CaptureStore, readonly PlannerCaptureGuideNeed[]>>
 const shops: readonly CaptureStore[] = ['PLUS', 'DekaMarkt']
@@ -61,8 +62,7 @@ export function selectiveTwoStoreCaptureGuide(needs: MissingStoreNeeds): string 
   validate(needs)
   // Source workbook is the authoritative row-numbering contract.
   selectiveTwoStoreCaptureCsv(needs)
-  const clean = (value: string) => value
-    .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim().slice(0, 160)
+  const clean = (value: string) => captureWorksheetText(value, 160)
   let row = 2
   const output = [
     'SUPA · alleen ontbrekende PLUS en DekaMarkt bronproducten',

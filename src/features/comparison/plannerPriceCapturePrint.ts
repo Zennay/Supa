@@ -1,15 +1,9 @@
 import { makeBlankPlannerCaptureCsv, type CaptureStore } from './plannerPriceCaptureSheet.ts'
 import { readablePlannerDemandAmount, type PlannerCaptureGuideNeed } from './plannerPriceCaptureGuide.ts'
+import { captureWorksheetHtml } from './captureWorksheetText.ts'
 
 // Only an inert local document is emitted; it never fetches external content.
-const htmlText = (raw: string): string => raw
-  .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ')
-  .slice(0, 180)
-  .replaceAll('&', '&amp;')
-  .replaceAll('<', '&lt;')
-  .replaceAll('>', '&gt;')
-  .replaceAll('"', '&quot;')
-  .replaceAll("'", '&#39;')
+const htmlText = (raw: string): string => captureWorksheetHtml(raw, 180)
 
 type PrintableSection = Readonly<{
   store: CaptureStore
