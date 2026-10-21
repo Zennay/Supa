@@ -152,3 +152,24 @@
 .private-comparison-journey__source-window>p{margin:0;max-width:70ch;line-height:1.5}
 .private-comparison-journey__source-window>small{overflow-wrap:anywhere}
 .private-comparison-journey__source-window>button{justify-self:start;min-height:44px}
+/* Explicitly copied original source records need a readable, selectable
+   mobile fallback; never hide or truncate a price/SKU in a cramped field. */
+.private-comparison-journey__result label,
+.private-comparison-journey__partial>label:has(textarea) {
+  display:grid;gap:.45rem;min-width:0;font-weight:700;line-height:1.4;
+}
+.private-comparison-journey__result textarea,
+.private-comparison-journey__partial textarea {
+  width:100%;max-width:100%;min-width:0;box-sizing:border-box;
+  min-height:150px;padding:.8rem;border-radius:10px;
+  border:1px solid #94b29c;background:#fff;color:#233c2a;
+  font: .86rem/1.55 ui-monospace,monospace;resize:vertical;
+  overflow-wrap:anywhere;
+}
+.private-comparison-journey__result textarea:focus-visible,
+.private-comparison-journey__partial textarea:focus-visible {
+  outline:3px solid #cf9738;outline-offset:2px;
+}
+.private-comparison-journey__result .private-comparison-journey__actions button {
+  flex:1 1 220px;
+}
