@@ -19,6 +19,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
 }) {
   const [name, setName] = useState('')
   const [bulkDraft, setBulkDraft] = useState('')
+  const [ownCsvPaste, setOwnCsvPaste] = useState('')
   const [bulkPreview, setBulkPreview] = useState<{
     draft: string; existing: string; selectedStore: UnpricedShoppingNote['store'];
     incoming: Array<Pick<UnpricedShoppingNote, 'label' | 'store' | 'done'>>;
@@ -225,6 +226,20 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
     } catch { setMessage('Kon de ongeprijsde CSV niet bewaren.') }
   }
+  function prepareOwnCsvPreview(source: string) {
+    const incoming = importUnpricedShoppingCsv(source)
+    const draft = incoming.map(item => (item.done ? '☑ ' : '☐ ') +
+      '[' + item.store + '] ' + item.label).join('\n')
+    if (draft.length > 15000) throw Error('Te veel tekst voor de voorinzage.')
+    setBulkPreview(null)
+    setBulkDraft(draft)
+    setMessage(incoming.length + ' eigen CSV-artikelen ingelezen. Bekijk en bevestig via de bestaande ongeprijsde lijstimport.')
+  }
+  function preparePastedOwnCsv() {
+    ++bulkFileSerial.current
+    try { prepareOwnCsvPreview(ownCsvPaste) }
+    catch (error) { setMessage(error instanceof Error ? error.message : 'Geplakte CSV geweigerd.') }
+  }
   async function readOwnCsv(file?: File) {
     const serial = ++bulkFileSerial.current
     if (!file) return
@@ -232,13 +247,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       if (!file.size || file.size > 32768) throw Error('Kies een Supa-CSV van maximaal 32 kB.')
       const source = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
       if (serial !== bulkFileSerial.current) return
-      const incoming = importUnpricedShoppingCsv(source)
-      const draft = incoming.map(item => (item.done ? '☑ ' : '☐ ') +
-        '[' + item.store + '] ' + item.label).join('\n')
-      if (draft.length > 15000) throw Error('Te veel tekst voor de voorinzage.')
-      setBulkPreview(null)
-      setBulkDraft(draft)
-      setMessage(incoming.length + ' eigen CSV-artikelen ingelezen. Bekijk en bevestig in de bestaande ongeprijsde lijstimport.')
+      prepareOwnCsvPreview(source)
     } catch (error) {
       if (serial === bulkFileSerial.current) setMessage(error instanceof Error ? error.message : 'CSV geweigerd.')
     }
@@ -733,6 +742,19 @@ export function ManualShoppingNotes({ notes, setNotes }: {
             void readOwnCsv(event.currentTarget.files?.[0]); event.currentTarget.value = ''
           }} />
         </label>
+        <details>
+          <summary>Of plak eigen Supa-CSV uit je spreadsheet</summary>
+          <p>Uitsluitend het eigen ongeprijsde Supa-formaat, geen winkelprijs-CSV.
+            Na voorbereiden verschijnt de lijst hierboven; bevestig daarna zelf de voorinzage.</p>
+          <label>Privé-CSV-tekst
+            <textarea rows={4} maxLength={32768} value={ownCsvPaste}
+              onChange={event => setOwnCsvPaste(event.target.value)}
+              placeholder="supa-eigen-ongeprijsd-v1;winkel;artikel;afgevinkt" />
+          </label>
+          <button type="button" disabled={!ownCsvPaste.trim()} onClick={preparePastedOwnCsv}>
+            Zet mijn CSV klaar voor controle
+          </button>
+        </details>
         <button type="submit" disabled={!bulkDraft.trim() || notes.length >= 100}>
           Bekijk artikelen vóór toevoegen
         </button>
