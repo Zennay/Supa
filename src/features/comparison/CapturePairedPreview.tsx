@@ -5,6 +5,7 @@ import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
 import type { PreviewMatchLine } from './CaptureMatchingPreview.tsx'
 import { completePreviewProposal, privateTwoStoreMissingChecklist, privateTwoStorePreviewChecklist } from './privateTwoStorePreviewChecklist.ts'
 import { privateTwoStorePreviewPrintHtml } from './privateTwoStorePreviewPrintHtml.ts'
+import { privateTwoStoreReviewCsv } from './privateTwoStoreReviewCsv.ts'
 import { samePrivatePhysicalDemand } from './samePrivatePhysicalDemand.ts'
 
 function labelQuantity(line: PreviewMatchLine): string {
@@ -113,6 +114,21 @@ export function CapturePairedPreview({
       document.body.append(a)
       try { a.click() } finally { a.remove() }
     } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
+  }
+  function downloadSpreadsheet(onlyOpen: boolean) {
+    try {
+      setExportMessage('')
+      const csv = privateTwoStoreReviewCsv({
+        plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh, onlyOpen,
+      })
+      downloadLocal(csv, 'text/csv;charset=utf-8',
+        onlyOpen ? 'supa-PLUS-Deka-openstaande-bronvoorstellen-prive.csv' :
+          'supa-PLUS-Deka-volledige-bronvoorstellen-prive.csv')
+      setExportMessage('Excel-geschikt lokaal bronoverzicht bewaard. Alle SKU’s, pakbedragen en eenheidsprijzen zijn uitsluitend onbevestigde voorstellen; deze CSV kan niet als bronprijsimport worden gebruikt.')
+    } catch (cause) {
+      setExportMessage(cause instanceof Error ? cause.message :
+        'Kan het eigen winkelbronoverzicht niet bewaren.')
+    }
   }
   function downloadMissingReview() {
     try {
@@ -268,6 +284,13 @@ export function CapturePairedPreview({
       Toon volgende {Math.min(25, visible.length - limit)} regels
     </button>}
     <div className="offline-price-workbench__matching-actions">
+      <button type="button" className="ghost-button" onClick={() => downloadSpreadsheet(false)}>
+        Download beide originele winkelbronvoorstellen in Excel-CSV
+      </button>
+      <button type="button" className="ghost-button" disabled={missing === 0}
+        onClick={() => downloadSpreadsheet(true)}>
+        Download {missing} openstaande of opnieuw op te nemen regels in Excel-CSV
+      </button>
       <button type="button" className="ghost-button" onClick={downloadReview}>
         Download privécontrole van beide bronvoorstellen (TXT)
       </button>
@@ -303,6 +326,10 @@ export function CapturePairedPreview({
       </button>
     </label>}
     {exportMessage && <p role="status" aria-live="polite">{exportMessage}</p>}
+    <small>De Excel-CSV is uitsluitend voor menselijke broncontrole en heeft
+      andere kolommen dan het originele negenkoloms bronopnameblad. Importeer dit
+      controleoverzicht niet als winkelprijsbron; gebruik de originele opname-CSV hierboven.
+      Er wordt nooit automatisch een match goedgekeurd.</small>
     <small>Niet geprijsde, ontbrekende, oude of ongecontroleerde bronwaarden worden
       niet als € 0,00 of bewezen besparing gepresenteerd. Bevestig de officiële
       import hieronder pas na controle van je eigen waarnemingen.</small>
