@@ -59,7 +59,10 @@ export function createRecipeServer({
   root = resolve('dist'),
   fetchHtml = fetchRecipeHtml,
   origin = process.env.APP_ORIGIN,
-  syncStore = createFileSyncStore({ dir: resolve(process.env.SUPA_DATA_DIR || '.data/sync') }),
+  syncStore = createFileSyncStore({
+    dir: resolve(process.env.SUPA_DATA_DIR || '.data/sync'),
+    validateApplicationEntriesOnRead: true,
+  }),
 } = {}) {
   let activeImports = 0
   const importQuota = rateLimiter(10)

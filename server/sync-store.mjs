@@ -4,7 +4,7 @@ import { chmod, lstat, mkdir, open, readdir, readFile, rename, stat, unlink, wri
 import { hostname } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
-import { MAX_SNAPSHOT_BYTES, SYNC_KEYS } from './sync-validation.mjs'
+import { MAX_SNAPSHOT_BYTES, validateSyncEntries } from './sync-validation.mjs'
 
 /** Anonymous device keys are random bearer secrets created by the browser. */
 export function validDeviceKey(value) {
@@ -23,13 +23,21 @@ function canonicalTimestamp(value) {
 }
 
 /** A record read back from disk is untrusted until it has this exact shape. */
-function admitRecord(value) {
+function admitRecord(value, validateApplicationEntriesOnRead) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   if (Object.keys(value).sort().join() !== 'entries,revision,updatedAt') return false
   if (!Number.isSafeInteger(value.revision) || value.revision < 1 || !canonicalTimestamp(value.updatedAt)) return false
   const { entries } = value
   if (!entries || typeof entries !== 'object' || Array.isArray(entries) || Object.getPrototypeOf(entries) !== Object.prototype) return false
-  return Object.entries(entries).every(([key, entry]) => SYNC_KEYS.includes(key) && (entry === null || typeof entry === 'string'))
+  // Even low-level callers must never read the private M3 observation draft
+  // as synced device data. Other direct callers retain the established opaque
+  // string/CAS contract; the HTTP application opts into the complete schema
+  // gate because only it owns the planner/recipe/checklist key contract.
+  if (Object.hasOwn(entries, 'supa:m3-observation-draft:v1')) return false
+  // In production this gate runs before a restored record can be returned or
+  // its revision can be adopted by a subsequent compare-and-swap write.
+  if (validateApplicationEntriesOnRead !== true) return true
+  return !validateSyncEntries(entries, { complete: true }).error
 }
 const LOCK_WAIT_MS = 5_000
 // A lock is only considered for recovery once it is older than this; it is
@@ -77,7 +85,7 @@ async function lockHolderAlive(lock, info) {
  * publishes the new record through a uniquely named O_EXCL temp file plus an
  * atomic rename. The losing writer gets `conflict` with the stored record.
  */
-export function createFileSyncStore({ dir }) {
+export function createFileSyncStore({ dir, validateApplicationEntriesOnRead = false }) {
   const queues = new Map()
   const baseFor = key => join(dir, createHash('sha256').update(key).digest('hex'))
 
@@ -143,7 +151,7 @@ export function createFileSyncStore({ dir }) {
         if (length > info.size) throw new Error('sync record changed while reading')
       }
       const value = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(buffer.subarray(0, length)))
-      if (!admitRecord(value)) throw new Error('corrupt sync record')
+      if (!admitRecord(value, validateApplicationEntriesOnRead)) throw new Error('corrupt sync record')
       return value
     } finally { await handle.close() }
   }
