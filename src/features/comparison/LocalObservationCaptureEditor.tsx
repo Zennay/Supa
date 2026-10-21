@@ -75,17 +75,34 @@ export function LocalObservationCaptureEditor({
   // survival of page refresh while leaving the normal JSON export available.
   useEffect(() => {
     if (!tabAutosave || changed) return
-    const timer = window.setTimeout(() => {
+    function persist(reportError: boolean) {
       try {
         saveLocalCaptureTab(snapshot.fingerprint, { rows, moments })
-        setTabError('')
+        if (reportError) setTabError('')
       } catch (cause) {
-        setTabAutosave(false)
-        setTabError(cause instanceof Error ? cause.message :
-          'Tijdelijk bewaren in dit tabblad lukt niet; download het JSON-concept.')
+        if (reportError) {
+          setTabAutosave(false)
+          setTabError(cause instanceof Error ? cause.message :
+            'Tijdelijk bewaren in dit tabblad lukt niet; download het JSON-concept.')
+        }
       }
-    }, 400)
-    return () => window.clearTimeout(timer)
+    }
+    const timer = window.setTimeout(() => persist(true), 400)
+    // A refresh can happen within the normal 400 ms debounce. Make a
+    // best-effort synchronous final save before the page is hidden/unloaded.
+    // Mobile browsers may still terminate without either event; a downloaded
+    // private JSON backup remains the only portable durable copy.
+    const onPageHide = () => persist(false)
+    const onHidden = () => {
+      if (document.visibilityState === 'hidden') persist(false)
+    }
+    window.addEventListener('pagehide', onPageHide)
+    document.addEventListener('visibilitychange', onHidden)
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener('pagehide', onPageHide)
+      document.removeEventListener('visibilitychange', onHidden)
+    }
   }, [tabAutosave, changed, snapshot.fingerprint, rows, moments])
   function enableTabAutosave() {
     if (tabAutosave) {

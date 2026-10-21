@@ -1333,3 +1333,5 @@ exact-week-fingerprint, winkel-/regeltelling, veldinspectie en expliciete
 vervangingsbevestiging. Ongeldige of tussentijds verouderde invoer kan geen
 oude mobiele formuliergegevens overschrijven; herstel is nooit een
 prijsbevestiging of winkelautorisatie.
+
+**Snelle refresh:** bij ingeschakelde tabopslag bewaart Supa ook bij het verbergen of verlaten van de pagina direct een lokale versie. Sommige mobiele browsers sluiten zonder event; download voor duurzaam behoud zelf je privé-JSON. Een andere Planner-week overschrijft de vorige sessie niet.
