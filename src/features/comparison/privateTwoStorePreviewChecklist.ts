@@ -7,11 +7,7 @@ const clean = (value: unknown) => String(value ?? '')
   .replace(/\s+/gu, ' ').trim().slice(0, 180)
 
 function offer(line: PreviewMatchLine | null): string {
-  if (!line || line.status !== 'matched' || !line.originalSku ||
-    !Number.isSafeInteger(line.packs) || line.packs! <= 0 ||
-    !Number.isSafeInteger(line.pricePerPackCents) ||
-    !Number.isSafeInteger(line.lineTotalCents) ||
-    line.pricePerPackCents! < 0 || line.lineTotalCents! < 0) {
+  if (!completePreviewProposal(line)) {
     return 'geen bruikbare voorgestelde match; prijs onbekend'
   }
   return [
@@ -23,6 +19,22 @@ function offer(line: PreviewMatchLine | null): string {
       euro.formatCents(line.lineTotalCents!) + ' (NIET BEVESTIGD)',
     'Indicatief ' + clean(line.unitPrice ?? 'eenheidsprijs niet berekenbaar'),
   ].join(' | ')
+}
+
+/** A draft labelled 'matched' can still lack a complete original pack-price fact. */
+export function completePreviewProposal(line: PreviewMatchLine | null): line is
+  PreviewMatchLine & { product: string; originalSku: string; packAmount: number;
+    packUnit: string; packCount: number; packs: number;
+    pricePerPackCents: number; lineTotalCents: number } {
+  return !!line && line.status === 'matched' && !!line.product?.trim() &&
+    !!line.originalSku?.trim() &&
+    Number.isFinite(line.packAmount) && (line.packAmount ?? 0) > 0 &&
+    !!line.packUnit &&
+    Number.isSafeInteger(line.packCount) && (line.packCount ?? 0) > 0 &&
+    Number.isSafeInteger(line.packs) && (line.packs ?? 0) > 0 &&
+    Number.isSafeInteger(line.pricePerPackCents) && (line.pricePerPackCents ?? -1) >= 0 &&
+    Number.isSafeInteger(line.lineTotalCents) && (line.lineTotalCents ?? -1) >= 0 &&
+    BigInt(line.packs!) * BigInt(line.pricePerPackCents!) === BigInt(line.lineTotalCents!)
 }
 
 /** Portable, user-initiated source-review notes. No comparator and no total. */
@@ -80,4 +92,33 @@ export function privateTwoStorePreviewChecklist({
     throw Error('Privécontroleblad is te groot; gebruik de interactieve voorinzage.')
   }
   return result
+}
+
+/** Only physical demand rows missing a complete two-store proposal. Full preflight and
+ * original timestamps remain in the export. This is NOT a priced comparison.
+ */
+export function privateTwoStoreMissingChecklist(
+  input: Parameters<typeof privateTwoStorePreviewChecklist>[0],
+): string {
+  if (!Array.isArray(input.plus) || !Array.isArray(input.deka) ||
+      input.plus.length > 200 || input.deka.length > 200) {
+    throw Error('Het oorspronkelijke controleblad is te groot.')
+  }
+  const plusById = new Map(input.plus.map(line => [line.id, line]))
+  const dekaById = new Map(input.deka.map(line => [line.id, line]))
+  const incomplete = new Set([...plusById.keys(), ...dekaById.keys()].filter(id => {
+    const left = plusById.get(id) ?? null
+    const right = dekaById.get(id) ?? null
+    return !left || !right || left.amount !== right.amount ||
+      left.unit !== right.unit || left.label !== right.label ||
+      !completePreviewProposal(left) || !completePreviewProposal(right)
+  }))
+  if (incomplete.size === 0) {
+    throw Error('Geen incomplete voorgestelde twee-winkelmatches.')
+  }
+  return privateTwoStorePreviewChecklist({
+    ...input,
+    plus: input.plus.filter(line => incomplete.has(line.id)),
+    deka: input.deka.filter(line => incomplete.has(line.id)),
+  })
 }

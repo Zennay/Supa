@@ -3,16 +3,14 @@ import { euro } from '../../lib/money.ts'
 import { observedInstant } from '../../domain/offlineReviewedImport.ts'
 import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
 import type { PreviewMatchLine } from './CaptureMatchingPreview.tsx'
-import { privateTwoStorePreviewChecklist } from './privateTwoStorePreviewChecklist.ts'
+import { completePreviewProposal, privateTwoStoreMissingChecklist, privateTwoStorePreviewChecklist } from './privateTwoStorePreviewChecklist.ts'
 import { privateTwoStorePreviewPrintHtml } from './privateTwoStorePreviewPrintHtml.ts'
 
 function labelQuantity(line: PreviewMatchLine): string {
   return readablePlannerDemandAmount(line.amount) + ' ' + line.unit
 }
 function localOffer(line: PreviewMatchLine | null) {
-  if (!line || line.status !== 'matched' || !line.product ||
-      line.originalSku === null || line.packs === null ||
-      line.pricePerPackCents === null || line.lineTotalCents === null) {
+  if (!completePreviewProposal(line)) {
     return <span>Ontbrekende of niet betrouwbare productmatch. Prijs onbekend.</span>
   }
   return <span>
@@ -61,8 +59,8 @@ export function CapturePairedPreview({
       const sameDemand = !!right && left.amount === right.amount &&
         left.unit === right.unit && left.label === right.label
       return { id: left.id, label: left.label, left, right, sameDemand,
-        open: !sameDemand || left.status !== 'matched' ||
-          right?.status !== 'matched' }
+        open: !sameDemand || !completePreviewProposal(left) ||
+          !completePreviewProposal(right) }
     })
     for (const right of deka) {
       if (!plus.some(left => left.id === right.id)) joined.push({
@@ -101,6 +99,19 @@ export function CapturePairedPreview({
       document.body.append(a)
       try { a.click() } finally { a.remove() }
     } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
+  }
+  function downloadMissingReview() {
+    try {
+      setExportMessage('')
+      const text = privateTwoStoreMissingChecklist({
+        plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh,
+      })
+      downloadLocal(text, 'text/plain;charset=utf-8',
+        'supa-PLUS-Deka-ontbrekende-bronmatches-prive.txt')
+      setExportMessage('Alleen ontbrekende of incomplete bronvoorstellen lokaal bewaard. Nog geen winkelprijzen bevestigd.')
+    } catch (cause) {
+      setExportMessage(cause instanceof Error ? cause.message : 'Kan de ontbrekende bronregels niet bewaren.')
+    }
   }
   function downloadReview() {
     try {
@@ -192,8 +203,10 @@ export function CapturePairedPreview({
             {row.sameDemand
               ? <><td>{localOffer(row.left)}</td><td>{localOffer(row.right)}</td></>
               : <td colSpan={2}>De originele fysieke vraag is niet eenduidig
-                voor beide winkels. Geen prijsweergave totdat de Planner-regel
-                en beide bronkeuzes overeenkomen.</td>}
+                voor beide winkels. PLUS: {row.left ? labelQuantity(row.left) : 'ontbreekt'}.
+                {' '}DekaMarkt: {row.right ? labelQuantity(row.right) : 'ontbreekt'}.
+                {' '}Herstel de Planner-vraag of de oorspronkelijke bronregels vóór
+                prijsweergave of bevestiging.</td>}
           </tr>)}</tbody>
       </table>
     </div>
@@ -208,6 +221,10 @@ export function CapturePairedPreview({
       </button>
       <button type="button" className="ghost-button" onClick={downloadPrintableReview}>
         Bewaar offline printblad van beide originele bronvoorstellen (HTML)
+      </button>
+      <button type="button" className="ghost-button" onClick={downloadMissingReview}
+        disabled={missing === 0}>
+        Download alleen {missing} incomplete twee-winkelmatches (TXT)
       </button>
       <button type="button" className="ghost-button" onClick={() => void copyReview()}>
         Kopieer broncontrole voor onderweg
