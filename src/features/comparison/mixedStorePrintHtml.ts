@@ -3,6 +3,8 @@ import type { OneStoreBasket } from '../../domain/basket.ts'
 import type { MixedStore, MixedStoreShoppingPlan } from './mixedStoreShoppingPlan.ts'
 import { exportMixedStoreRouteCsv } from './mixedStoreRouteCsv.ts'
 import type { OwnExtraGrocery } from './ownExtraGroceriesCsv.ts'
+import type { UnpricedShoppingNote } from '../shopping-list/ManualShoppingNotes.tsx'
+import { normalizePrivateNotes } from '../shopping-list/manualShoppingNotesBackup.ts'
 const clean = (input: string | number) => String(input)
   .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ')
   .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
@@ -21,6 +23,7 @@ export function printMixedStoreRouteHtml(input: {
   extraVisitCostCents: number | null
   strategy: 'auto' | 'mixed' | 'single'
   extras?: readonly OwnExtraGrocery[]
+  manualNotes?: readonly UnpricedShoppingNote[]
 }): string {
   exportMixedStoreRouteCsv(input)
   const { route, captured, checked } = input
@@ -29,6 +32,9 @@ export function printMixedStoreRouteHtml(input: {
       Number.isFinite(item.quantity) && item.quantity > 0 && item.quantity <= 100000 &&
       ['piece', 'g', 'ml'].includes(item.unit) && typeof item.done === 'boolean')))
     throw Error('Eigen ongeprijsde boodschappen zijn niet geldig.')
+  const manual = input.manualNotes?.length
+    ? normalizePrivateNotes({ schema: 'supa-private-unpriced-notes-v1',
+        notes: [...input.manualNotes] }) : []
   const both = route.lines.some(line => line.store === 'PLUS') &&
     route.lines.some(line => line.store === 'DekaMarkt')
   const totalWithCost = !both ? BigInt(route.totalCents) : input.extraVisitCostCents === null
@@ -67,6 +73,20 @@ export function printMixedStoreRouteHtml(input: {
       (item.unit === 'piece' ? 'stuks' : clean(item.unit)) +
       ' · geen gecontroleerde winkelprijs</small></div></li>').join('') +
     '</ul></section>' : ''
+  const manualSection = manual.length
+    ? '<section><h2>Mijn ongeprijsde boodschappen · persoonlijke herinneringen</h2>' +
+      '<p><strong>Bedrag onbekend.</strong> Los van alle gecontroleerde ' +
+      'winkelregels, hele-verpakkingsbedragen en mogelijke prijsverschillen.</p>' +
+      ['PLUS', 'DekaMarkt', 'Algemeen'].map(store => {
+        const items = manual.filter(note => note.store === store)
+        if (!items.length) return ''
+        return '<h3>' + clean(store) + '</h3><ul>' +
+          items.map(note => '<li><span class="tick">' +
+            (note.done ? '&#9745;' : '&#9744;') +
+            '</span><div><strong>' + clean(note.label) +
+            '</strong><br><small>Zelf toegevoegd · prijs, SKU en bronmoment onbekend' +
+            '</small></div></li>').join('') + '</ul>'
+      }).join('') + '</section>' : ''
   const summary = '<div class="totals"><p>PLUS hele mand <b>' +
     clean(exactEuro.formatCents(route.plusWholeCents)) + '</b></p>' +
     '<p>DekaMarkt hele mand <b>' + clean(exactEuro.formatCents(route.dekaWholeCents)) +
@@ -106,7 +126,7 @@ export function printMixedStoreRouteHtml(input: {
     'Dit bestand bevat geen scripts of internetbronnen.</p></header>' +
     '<div class="meta">' + paragraphs.map(item =>
       '<p>' + clean(item) + '</p>').join('') + '</div>' + summary +
-    storeSection('PLUS') + storeSection('DekaMarkt') + extrasSection +
+    storeSection('PLUS') + storeSection('DekaMarkt') + extrasSection + manualSection +
     '<footer><p>Handmatige winkelkeuzes en afvinkingen zijn uitsluitend voor ' +
     'je eigen boodschappen. Verouderde prijsopnames kunnen andere actuele ' +
     'winkelprijzen hebben. Print via je browser.</p></footer></body></html>'

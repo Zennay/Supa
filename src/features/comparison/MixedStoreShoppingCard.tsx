@@ -8,6 +8,7 @@ import { MixedTripBackupControls } from './MixedTripBackupControls.tsx'
 import { PrivateRouteExtraGroceries } from './PrivateRouteExtraGroceries.tsx'
 import { MixedStoreUnitBreakdown } from './MixedStoreUnitBreakdown.tsx'
 import { exportMixedStoreRouteCsv } from './mixedStoreRouteCsv.ts'
+import { appendManualUnpricedNotesToMixedRouteCsv } from './mixedStoreWithExtrasCsv.ts'
 import { printMixedStoreRouteHtml } from './mixedStorePrintHtml.ts'
 import { validCustomWeekBudgetEuros } from '../planner/customWeekBudget.ts'
 import { parsePrivateExtraVisitCostCents, type PrivateExtraVisitCostIntent } from './privateExtraVisitCost.ts'
@@ -324,11 +325,12 @@ export function MixedStoreShoppingCard({
       return
     }
     try {
-      const csv = exportMixedStoreRouteCsv({
+      const csv = appendManualUnpricedNotesToMixedRouteCsv(exportMixedStoreRouteCsv({
         plus, deka, route: plan, captured,
         checked: new Set(plan.lines.filter(line => done(line.key)).map(line => line.key)),
         extraVisitCostCents: appliedCostCents, strategy: mode,
-      })
+      }), validManualNotes)
+      if (!eligibleNow()) throw Error('De bronopnames zijn inmiddels verlopen.')
       const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
       try {
         const link = document.createElement('a')
@@ -336,7 +338,7 @@ export function MixedStoreShoppingCard({
         link.download = 'supa-mijn-gekozen-winkelroute-prive.csv'
         document.body.appendChild(link)
         try { link.click() } finally { link.remove() }
-        setMessage('De gekozen winkelroute is met beide originele productprijzen als veilige lokale CSV bewaard.')
+        setMessage('Je gekozen route is als lokale CSV bewaard; eigen ongeprijsde regels staan zonder winkelprijs onderaan.')
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Deze privéwinkelroute kan niet worden geëxporteerd.')
@@ -355,8 +357,10 @@ export function MixedStoreShoppingCard({
           import('./mixedStoreWithExtrasCsv.ts'),
         ])
       const saved = readSavedExtrasForPlan(privatePlanKey)
-      if (!saved.available || !saved.items.length) {
-        setMessage('Bewaar eerst je eigen extra boodschappen in deze tab om ze aan de route-CSV toe te voegen.')
+      if (!saved.available)
+        throw Error('De bewaarde extra boodschappen zijn niet leesbaar.')
+      if (!saved.items.length && !validManualNotes.length) {
+        setMessage('Voeg eerst eigen ongeprijsde boodschappen toe in je Lijst.')
         return
       }
       if (!eligibleNow()) throw Error('Originele opnames zijn verlopen.')
@@ -365,14 +369,16 @@ export function MixedStoreShoppingCard({
         checked: new Set(plan.lines.filter(line => done(line.key)).map(line => line.key)),
         extraVisitCostCents: appliedCostCents, strategy: mode,
       })
-      const csv = appendUnpricedExtrasToMixedRouteCsv(reviewedCsv, saved.items)
+      const withExtras = saved.items.length
+        ? appendUnpricedExtrasToMixedRouteCsv(reviewedCsv, saved.items) : reviewedCsv
+      const csv = appendManualUnpricedNotesToMixedRouteCsv(withExtras, validManualNotes)
       if (!eligibleNow()) throw Error('Bronopnames zijn intussen verlopen.')
       const url = URL.createObjectURL(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' }))
       try {
         const link = document.createElement('a'); link.href = url
         link.download = 'supa-gekozen-winkelroute-met-ongeprijsde-extra-boodschappen.csv'
         document.body.append(link); try { link.click() } finally { link.remove() }
-        setMessage('28-koloms CSV gedownload: gecontroleerde routebedragen en losse ongeprijsde extras; zonder bedragen voor extras.')
+        setMessage('28-koloms route-CSV gedownload: originele prijsregels en aparte ongeprijsde eigen boodschappen zonder eurobedragen.')
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
     } catch {
       setMessage('Kon de samengestelde route-CSV niet veilig maken. Herzie de bronnen en extra boodschappen.')
@@ -390,8 +396,10 @@ export function MixedStoreShoppingCard({
         if (!privatePlanKey) throw Error('Geen huidig Planner-weekmandje beschikbaar.')
         const { readSavedExtrasForPlan } = await import('./ownExtraGroceriesStorage.ts')
         const saved = readSavedExtrasForPlan(privatePlanKey)
-        if (!saved.available || !saved.items.length)
-          throw Error('Bewaar eerst je eigen extra boodschappen in de Lijst-tab.')
+        if (!saved.available)
+          throw Error('Opgeslagen extra boodschappen zijn niet leesbaar.')
+        if (!saved.items.length && !validManualNotes.length)
+          throw Error('Voeg eerst eigen ongeprijsde boodschappen toe in de Lijst-tab.')
         extras = saved.items
       }
       if (!eligibleNow()) throw Error('De oorspronkelijke bronopnames zijn verlopen.')
@@ -399,7 +407,7 @@ export function MixedStoreShoppingCard({
         plus, deka, route: plan, captured,
         checked: new Set(plan.lines.filter(line => done(line.key)).map(line => line.key)),
         extraVisitCostCents: appliedCostCents, strategy: mode,
-        extras,
+        extras, manualNotes: validManualNotes,
       })
       if (!eligibleNow()) throw Error('Deze opnames zijn inmiddels verlopen.')
       const url = URL.createObjectURL(new Blob([page], { type: 'text/html;charset=utf-8' }))
@@ -573,18 +581,18 @@ export function MixedStoreShoppingCard({
         Download gekozen winkelroute + bewaarde ongeprijsde extras (TXT)
       </button>}
       <button type="button" className="ghost-button" onClick={downloadRouteCsv}>
-        Download volledige route met beide winkelprijzen (CSV)
+        Download route: bronprijzen + eigen ongeprijsde regels (CSV)
       </button>
       {privatePlanKey && <button type="button" className="ghost-button"
         onClick={() => { void downloadRouteCsvWithExtras() }}>
-        Download gecontroleerde route + ongeprijsde extras (CSV)
+        Download route + alle eigen ongeprijsde boodschappen (CSV)
       </button>}
       <button type="button" className="ghost-button" onClick={() => { void downloadPrintHtml(false) }}>
-        Bewaar / print volledige route (HTML)
+        Bewaar / print route inclusief eigen ongeprijsde regels (HTML)
       </button>
       {privatePlanKey && <button type="button" className="ghost-button"
         onClick={() => { void downloadPrintHtml(true) }}>
-        Print gekozen route én bewaarde extra boodschappen (HTML)
+        Print route met alle eigen ongeprijsde boodschappen (HTML)
       </button>}
       <button type="button" className="ghost-button" onClick={() => {
         if (block) { setMessage('Corrigeer eerst je extra kosten.'); return }
@@ -596,8 +604,9 @@ export function MixedStoreShoppingCard({
       boodschappen van exact deze Planner-week. Extra kosten zijn onbekend en
       niet in de winkelvergelijking opgeteld.</small>
     <small>TXT en kopieerweergave volgen 'Alleen nog te kopen'. CSV en printbare
-      HTML bewaren steeds de volledige gecontroleerde route inclusief vinkjes,
-      originele SKU’s, pakprijzen en bronmomenten.</small>
+      HTML bewaren de volledige gecontroleerde route inclusief vinkjes, originele
+      SKU’s, pakprijzen en bronmomenten. Persoonlijke ongeprijsde herinneringen
+      staan daarbij in een aparte sectie zonder gekozen bronproduct of eurobedrag.</small>
     <div className="offline-price-workbench__dates mixed-store-route__shops">
       {stores.map(store => {
         const all = plan.lines.filter(item => item.store === store)
