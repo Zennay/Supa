@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { euro } from '../../lib/money.ts'
+import { observedInstant } from '../../domain/offlineReviewedImport.ts'
 import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
 import type { PreviewMatchLine } from './CaptureMatchingPreview.tsx'
 import { privateTwoStorePreviewChecklist } from './privateTwoStorePreviewChecklist.ts'
@@ -79,6 +80,10 @@ export function CapturePairedPreview({
       row.right?.product ?? '', row.right?.originalSku ?? '',
     ].join(' ')).includes(filter)))
   const missing = rows.filter(row => row.open).length
+  const plusMoment = observedInstant(plusObservedAt)
+  const dekaMoment = observedInstant(dekaObservedAt)
+  const olderStore = plusMoment && dekaMoment
+    ? plusMoment.ns <= dekaMoment.ns ? 'PLUS' : 'DekaMarkt' : null
 
   function reviewText() {
     return privateTwoStorePreviewChecklist({
@@ -131,7 +136,9 @@ export function CapturePairedPreview({
       controle van beide originele SKU’s en bronmomenten kan de bestaande
       vergelijking een volledig prijsverschil bepalen.</p>
     {!within24h && <p role="status">De echte opname-tijden verschillen meer dan 24 uur.
-      Er is geen vergelijkbaar prijsverschil totdat de oudste winkel werkelijk opnieuw is opgenomen.</p>}
+      {olderStore ? ' Vernieuw de bron van ' + olderStore + ' met een werkelijke nieuwe opname.' :
+        ' Controleer beide oorspronkelijke bronmomenten.'}
+      {' '}Er is geen volledig vergelijkbaar prijsverschil zolang het bronpaar te ver uiteenligt.</p>}
     {!sourceFresh && <p role="status">Minstens één bronmoment is ouder dan zeven
       dagen of ongeldig. Vermeld deze getallen niet als actuele prijzen.</p>}
     <div className="offline-price-workbench__matching-controls">
@@ -152,8 +159,14 @@ export function CapturePairedPreview({
           Dit zijn geen bevestigde prijzen of totaalmandbedragen.</caption>
         <thead><tr>
           <th scope="col">Ingrediënt</th>
-          <th scope="col">PLUS</th>
-          <th scope="col">DekaMarkt</th>
+          <th scope="col">PLUS<small style={{ display: 'block' }}>
+            Origineel bronmoment: <time dateTime={plusObservedAt}>{plusObservedAt}</time>
+            {!within24h && olderStore === 'PLUS' && ' · oudste opname'}
+          </small></th>
+          <th scope="col">DekaMarkt<small style={{ display: 'block' }}>
+            Origineel bronmoment: <time dateTime={dekaObservedAt}>{dekaObservedAt}</time>
+            {!within24h && olderStore === 'DekaMarkt' && ' · oudste opname'}
+          </small></th>
         </tr></thead>
         <tbody>{visible.slice(0, limit).map(row =>
           <tr key={row.id}>
