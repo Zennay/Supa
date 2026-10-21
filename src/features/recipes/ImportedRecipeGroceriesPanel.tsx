@@ -125,6 +125,11 @@ export function ImportedRecipeGroceriesPanel({
       })) : []
   const plannerDaysDistinct = plannerAssignments.length > 0 &&
     new Set(plannerAssignments.map(assignment => assignment.day)).size === plannerAssignments.length
+  // Preserve the user's real cooking-day choices when transferring up to
+  // seven recipes to the existing private price mapper. Larger bundles keep
+  // its neutral 14-slot labels rather than inventing actual Planner days.
+  const privateCookingDays = plannerDaysDistinct
+    ? plannerAssignments.map(assignment => assignment.day) : undefined
   const variantInputKey = JSON.stringify(selected.map(recipe =>
     [recipe, Object.hasOwn(portionsById, recipe.id) ? portionsById[recipe.id] : recipe.servings]))
   // A delayed download must also bind the *day assignments*, not just the
@@ -758,7 +763,7 @@ export function ImportedRecipeGroceriesPanel({
     if (!list?.canCopy) return
     try {
       requireLatestOwnedRecipes()
-      const json = exportCombinedRecipesPrivateWeek(selected, portionsById)
+      const json = exportCombinedRecipesPrivateWeek(selected, portionsById, privateCookingDays)
       savePrivateFile('supa-meerdere-recepten-privewinkelmandje.json',
         json, 'application/json;charset=utf-8')
       setFeedback('Je fysieke receptenmandje is veilig geëxporteerd, zonder prijzen. Open de privévergelijker en koppel daar je eigen actuele winkelproducten en waarnemingen.')
@@ -770,7 +775,7 @@ export function ImportedRecipeGroceriesPanel({
     if (!list?.canCopy) return
     try {
       requireLatestOwnedRecipes()
-      const json = exportCombinedRecipesPrivateWeek(selected, portionsById)
+      const json = exportCombinedRecipesPrivateWeek(selected, portionsById, privateCookingDays)
       if (!window.confirm('Open dit ongeprijsde mandje in de privéwinkelvergelijker? ' +
         'Je controleert daar eerst alle fysieke ingrediënten en bevestigt daarna zelf de bronproducten. ' +
         'Oude winkelprijzen en artikelkeuzes worden niet automatisch meegenomen.')) return
