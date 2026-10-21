@@ -35,8 +35,11 @@ export function completePreviewProposal(line: PreviewMatchLine | null): line is
   return !!line && line.status === 'matched' && !!line.product?.trim() &&
     !!line.originalSku?.trim() &&
     typeof line.amount === 'number' && Number.isFinite(line.amount) && line.amount > 0 &&
+    // Physical pieces cannot be bought as an unreviewed fractional demand.
+    (line.unit !== 'piece' || Number.isSafeInteger(line.amount)) &&
     Number.isFinite(line.packAmount) && (line.packAmount ?? 0) > 0 &&
-    !!line.packUnit &&
+    !!line.packUnit && (line.packUnit !== 'piece' ||
+      Number.isSafeInteger(line.packAmount)) &&
     Number.isSafeInteger(line.packCount) && (line.packCount ?? 0) > 0 &&
     Number.isSafeInteger(line.packs) && (line.packs ?? 0) > 0 &&
     Number.isSafeInteger(line.pricePerPackCents) && (line.pricePerPackCents ?? -1) >= 0 &&

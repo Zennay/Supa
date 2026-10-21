@@ -13,7 +13,9 @@ export function samePrivatePhysicalDemand(left: Demand, right: Demand): boolean 
   if (!left || !right ||
       typeof left.amount !== 'number' || typeof right.amount !== 'number' ||
       !Number.isFinite(left.amount) || !Number.isFinite(right.amount) ||
-      left.amount <= 0 || right.amount <= 0) return false
+      left.amount <= 0 || right.amount <= 0 ||
+      (left.unit === 'piece' && !Number.isSafeInteger(left.amount)) ||
+      (right.unit === 'piece' && !Number.isSafeInteger(right.amount))) return false
   if (left.unit === right.unit && left.amount === right.amount) {
     return ['g', 'kg', 'ml', 'l', 'piece'].includes(left.unit)
   }
