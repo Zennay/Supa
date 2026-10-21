@@ -198,7 +198,7 @@ export function ManualStoreComparison({
         summary.totals.PLUS === null || summary.totals.DekaMarkt === null) return
     try {
       const clean = (text: string): string =>
-        text.replace(/[\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]/gu, ' ').trim().slice(0, 160)
+        text.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim().slice(0, 160)
       const rows = [
         'SUPA · alleen mijn eigen handmatig berekende twee-winkelmandje',
         'NIET onafhankelijk geverifieerd: geen bronrechten, originele SKU, opnamebewijs of besparingsclaim.',
@@ -241,7 +241,7 @@ export function ManualStoreComparison({
         'Rekenkundig mandverschil (Deka minus PLUS): ' + exactEuro.formatCents(
           summary.totals.DekaMarkt - summary.totals.PLUS),
         '', 'Alleen op dit apparaat gemaakt. Controleer echte winkelproductgelijkheid en bronmomenten apart.')
-      const content = rows.join('\\n') + '\\n'
+      const content = rows.join('\n') + '\n'
       if (new TextEncoder().encode(content).length > 128000)
         throw new Error('De persoonlijke berekening is te groot om lokaal te exporteren.')
       const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }))
