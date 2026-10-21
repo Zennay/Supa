@@ -4,7 +4,7 @@ import { observedInstant } from '../../domain/offlineReviewedImport.ts'
 import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import { privateKnownPricePairs, privateProgressProductRows, formatKnownUnitGap, type PrivateKnownProduct, type PrivateKnownUnitGap } from '../products/privateProgressProductRows.ts'
 import { euro } from '../../lib/money.ts'
-import { downloadPrivateKnownLinePriceCsv } from '../products/privateKnownLinePriceCsv.ts'
+import { privateKnownLinePriceCsv, downloadPrivateKnownLinePriceCsv } from '../products/privateKnownLinePriceCsv.ts'
 import { downloadPrivateKnownLinePricePrint } from '../products/privateKnownLinePricePrint.ts'
 import {
   privateReviewedPairWithin24Hours, freshReviewedBaskets,
@@ -58,6 +58,7 @@ export function PrivateComparisonJourney({
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [exportMessage, setExportMessage] = useState('')
   const [shareFallback, setShareFallback] = useState('')
+  const [partialCopyFallback, setPartialCopyFallback] = useState('')
   const [showPasteSource, setShowPasteSource] = useState(false)
   const [captureMessage, setCaptureMessage] = useState('')
   const [partialQuery, setPartialQuery] = useState('')
@@ -416,6 +417,43 @@ export function PrivateComparisonJourney({
     } catch (error) {
       setExportMessage(error instanceof Error ? error.message :
         'Vergelijking niet meer geldig; controleer je bronnen opnieuw.')
+    }
+  }
+
+  async function handOffPartialPriceRows(action: 'copy' | 'share') {
+    setExportMessage('')
+    setPartialCopyFallback('')
+    try {
+      // Reuse the exact same admission as the private partial CSV export.
+      // No unknown prices, subtotal or store winner may enter this message.
+      const csv = privateKnownLinePriceCsv(progress, reviewed, Date.now())
+      if (new TextEncoder().encode(csv).length > 128000)
+        throw Error('Teveel persoonlijke bronregels om te delen. Download de CSV.')
+      if (action === 'share' && typeof navigator.share === 'function') {
+        try {
+          await navigator.share({
+            title: 'Supa · mijn afzonderlijk vergelijkbare winkelregels', text: csv,
+          })
+          setExportMessage('Alleen afzonderlijk vergelijkbare bronregels gedeeld; totaalprijs blijft onbekend.')
+          return
+        } catch (error) {
+          if (error instanceof Error && error.name === 'AbortError') {
+            setExportMessage('Delen geannuleerd; eigen bronprijzen zijn behouden.')
+            return
+          }
+        }
+      }
+      try {
+        if (!navigator.clipboard?.writeText) throw Error('Geen klembord')
+        await navigator.clipboard.writeText(csv)
+        setExportMessage('Eigen vergelijkbare regels als CSV gekopieerd. Ontbrekende winkelprijzen blijven onbekend.')
+      } catch {
+        setPartialCopyFallback(csv)
+        setExportMessage('Selecteer de eigen CSV hieronder en kopieer handmatig.')
+      }
+    } catch (error) {
+      setExportMessage(error instanceof Error ? error.message :
+        'Bronprijzen verlopen of niet meer afzonderlijk vergelijkbaar.')
     }
   }
 
@@ -874,6 +912,14 @@ export function PrivateComparisonJourney({
           setExportMessage('De bron of prijsvergelijking is gewijzigd of verlopen. Open Producten of Vergelijk voor een actuele controle.')
         }
       }}>Download mijn bekende regelprijzen voor beide winkels (CSV)</button>
+      <button type="button" className="ghost-button"
+        onClick={() => void handOffPartialPriceRows('copy')}>
+        Kopieer bekende PLUS/Deka-regelprijzen voor Excel
+      </button>
+      <button type="button" className="ghost-button"
+        onClick={() => void handOffPartialPriceRows('share')}>
+        Deel alleen bekende winkelregels (mobiel)
+      </button>
       <button type="button" className="ghost-button" onClick={() => {
         try {
           downloadPrivateKnownLinePricePrint(progress, reviewed)
@@ -882,7 +928,14 @@ export function PrivateComparisonJourney({
           setExportMessage('De originele bron is verlopen of gewijzigd; controleer je winkelopnames opnieuw.')
         }
       }}>Bewaar mijn bekende winkelprijzen als offline afdruk (HTML)</button>
+      <small>Deelbare CSV bevat alleen persoonlijke bronregels die individueel
+        met beide winkels vergelijkbaar zijn. Dit is nooit een mandtotaal of besparingsbewijs.
+        Alleen jij kiest welke app je eigen brondata ontvangt.</small>
       {exportMessage && <p role="status">{exportMessage}</p>}
+      {partialCopyFallback && <label>Mijn losse bronregels handmatig kopiëren
+        <textarea rows={8} readOnly spellCheck={false} value={partialCopyFallback}
+          onFocus={event => event.currentTarget.select()} />
+      </label>}
     </section>}
     {!hasAnySource && captureNeeds.length > 0 && <section
       className="private-comparison-journey__unpriced-start"
