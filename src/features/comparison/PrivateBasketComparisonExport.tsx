@@ -8,9 +8,9 @@ const COLUMNS = [
   'plusObservedAt', 'dekaObservedAt', 'comparisonStatus',
   'ingredientId', 'ingredient', 'requiredAmount', 'requiredUnit',
   'plusStatus', 'plusProduct', 'plusPacks', 'plusPackAmount', 'plusPackUnit',
-  'plusPackCount', 'plusPackPriceCents', 'plusLineCents',
+  'plusPackCount', 'plusPackPriceCents', 'plusUnitPrice', 'plusLineCents',
   'dekaStatus', 'dekaProduct', 'dekaPacks', 'dekaPackAmount', 'dekaPackUnit',
-  'dekaPackCount', 'dekaPackPriceCents', 'dekaLineCents',
+  'dekaPackCount', 'dekaPackPriceCents', 'dekaUnitPrice', 'dekaLineCents',
   'deltaCentsDekaMinusPlus',
 ]
 
@@ -43,7 +43,8 @@ function lineFields(line: BasketTraceLine): (string | number)[] {
     line.reasons.includes('explicit local user selection; not an automatic or verified retailer match')
       ? 'door gebruiker gekoppeld' : 'automatisch gekoppeld',
     line.productName, line.packs, line.pack.amount,
-    line.pack.unit, line.pack.count, line.pricePerPackCents, line.lineTotalCents,
+    line.pack.unit, line.pack.count, line.pricePerPackCents,
+    privateUnitPrice(line) ?? 'eenheidsprijs onbekend', line.lineTotalCents,
   ]
 }
 
