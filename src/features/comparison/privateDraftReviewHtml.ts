@@ -12,6 +12,8 @@ export type PrivateDraftUnpairedLine = {
   demand: string
   plusStatus: string
   dekaStatus: string
+  plus?: PrivateDraftReviewLine['plus']
+  deka?: PrivateDraftReviewLine['deka']
 }
 
 const escapeHtml = (input: string): string => input
@@ -28,12 +30,26 @@ export function privateDraftReviewHtml(
   capturedAt: { PLUS: string; DekaMarkt: string },
   totalPhysicalNeeds: number,
   unpaired: readonly PrivateDraftUnpairedLine[],
+  pairEligible: boolean,
 ): string {
-  if (!lines.length || lines.length > 1000 ||
+  const observedStatuses = new Set([
+    'Zelf gecontroleerd niet beschikbaar', 'Verpakking past niet bij de vraag',
+    'Oorspronkelijke productcode conflicteert met andere winkelregel',
+  ])
+  const hasActualOwnInput = lines.length > 0 || unpaired.some(item =>
+    item.plus || item.deka || observedStatuses.has(item.plusStatus) ||
+    observedStatuses.has(item.dekaStatus))
+  if (!hasActualOwnInput || lines.length > 1000 ||
+      (lines.length > 0 && !pairEligible) ||
       !Number.isSafeInteger(totalPhysicalNeeds) ||
       lines.length + unpaired.length !== totalPhysicalNeeds ||
       unpaired.some(line => !line.ingredient.trim() || !line.demand.trim() ||
-        !line.plusStatus.trim() || !line.dekaStatus.trim()) ||
+        !line.plusStatus.trim() || !line.dekaStatus.trim() ||
+        [line.plus, line.deka].some(item => item && (!item.code.trim() ||
+          !item.product.trim() || !Number.isSafeInteger(item.packs) ||
+          item.packs <= 0 || !Number.isSafeInteger(item.packCents) ||
+          item.packCents < 0 || !Number.isSafeInteger(item.totalCents) ||
+          item.totalCents !== item.packs * item.packCents))) ||
       lines.some(line => !line.ingredient.trim() || !line.demand.trim() ||
         [line.plus, line.deka].some(item => !item.code.trim() || !item.product.trim() ||
           !Number.isSafeInteger(item.packs) || item.packs <= 0 ||
@@ -63,14 +79,22 @@ export function privateDraftReviewHtml(
   }).join('')
 
   const missing = unpaired.length
-    ? '<section><h2>Nog niet als twee volledige prijsregels berekenbaar</h2>' +
-      '<p>Geen verschil of winkelwinnaar op deze regels. Expliciet niet beschikbaar ' +
-      'is iets anders dan een onbekende of onvolledige eigen waarneming.</p>' +
-      '<ul>' + unpaired.map(line =>
-        '<li><strong>' + escapeHtml(line.ingredient) + '</strong> · ' +
-        escapeHtml(line.demand) + '<br>PLUS: ' + escapeHtml(line.plusStatus) +
-        ' · DekaMarkt: ' + escapeHtml(line.dekaStatus) + '</li>').join('') +
-      '</ul></section>'
+    ? '<section><h2>Niet als twee prijsregels vergelijkbaar</h2>' +
+      '<p>Geen prijsverschil of winkelwinnaar op deze regels. Hieronder kunnen ' +
+      'alleen persoonlijk ingevoerde losse pakberekeningen staan, ook als ' +
+      'de andere winkel nog geen geldige opname heeft. Expliciet niet beschikbaar ' +
+      'is iets anders dan onbekend.</p>' +
+      '<ul class="unpaired">' + unpaired.map(line => {
+        const captures = [
+          line.plus ? renderStore('PLUS', line.plus) : '',
+          line.deka ? renderStore('DekaMarkt', line.deka) : '',
+        ].join('')
+        return '<li><strong>' + escapeHtml(line.ingredient) + '</strong> · ' +
+          escapeHtml(line.demand) + '<br>PLUS: ' + escapeHtml(line.plusStatus) +
+          ' · DekaMarkt: ' + escapeHtml(line.dekaStatus) +
+          (captures ? '<div class="shops">' + captures + '</div>' : '') +
+          '</li>'
+      }).join('') + '</ul></section>'
     : ''
 
   const html = '<!doctype html><html lang="nl"><head><meta charset="utf-8">' +
@@ -82,14 +106,20 @@ export function privateDraftReviewHtml(
     '.shops{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1rem}' +
     '.shop{padding:.8rem;border:1px solid #c4d4c7;border-radius:9px;overflow-wrap:anywhere}' +
     '.shop p{margin:.35rem 0}.notice{background:#f7f5e7;padding:.65rem;overflow-wrap:anywhere}' +
+    '.unpaired{padding-left:1.5rem}.unpaired li{margin:1rem 0;break-inside:avoid}' +
     'header{border-bottom:2px solid #658c74;padding-bottom:1rem}small{color:#526457}' +
     '@media print{body{padding:0}section{break-inside:avoid}}</style></head><body>' +
     '<header><h1>Mijn lokale PLUS/Deka-prijsconcepten</h1>' +
     '<p><strong>ALLEEN PRIVÉWERKBLAD — NIET GEVERIFIEERD</strong></p>' +
-    '<p>PLUS: ' + escapeHtml(capturedAt.PLUS) +
-    ' · DekaMarkt: ' + escapeHtml(capturedAt.DekaMarkt) + ' (eigen invoer)</p>' +
+    '<p>PLUS: ' + escapeHtml(capturedAt.PLUS || 'bronmoment onbekend / niet geselecteerd') +
+    ' · DekaMarkt: ' + escapeHtml(capturedAt.DekaMarkt || 'bronmoment onbekend / niet geselecteerd') +
+    ' (eigen invoer)</p>' +
     '<p>' + lines.length + ' van ' + totalPhysicalNeeds +
     ' fysieke Planner-behoeften met twee voorlopige pakberekeningen.</p>' +
+    '<p class="notice">' + (pairEligible
+      ? 'De twee ingevoerde bronmomenten liggen voorlopig binnen 24 uur en zeven dagen; SKU- en productreviews zijn nog verplicht.'
+      : 'Er is geen bruikbaar paar van twee actuele, maximaal 24 uur gescheiden bronmomenten. Daarom zijn uitsluitend losse persoonlijke productprijzen zichtbaar en is ieder prijsverschil verborgen.') +
+    '</p>' +
     '<p>Ontbrekende of ongeschikte producten blijven onbekend. Geen volledig mandtotaal, ' +
     'geen bevestigde SKU-equivalentie, geen actuele retailerrechten en geen bewezen besparing. ' +
     'Vervolg in de echte Supa bron-/productreview.</p></header>' + sections + missing +

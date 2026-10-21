@@ -893,13 +893,18 @@ export function LocalTwoStorePriceEditor({
         return original === null ? Number.NaN : Date.parse(original)
       })
       const now = Date.now()
-      if (sourceSelection !== 'both' || !provisionalDifferences.length ||
-          instants.some(time => !Number.isFinite(time) ||
-            now - time < -300000 || now - time > 604800000) ||
-          Math.abs(instants[0] - instants[1]) > 86400000) {
-        throw Error('Deze twee bronmomenten zijn niet vergelijkbaar. Controleer de originele tijd en prijs opnieuw.')
+      const pairEligibleNow = sourceSelection === 'both' &&
+        instants.every(time => Number.isFinite(time) &&
+          now - time >= -300000 && now - time <= 604800000) &&
+        Math.abs(instants[0] - instants[1]) <= 86400000
+      if (!selectedStores.some(store => activeNeeds.some(need =>
+        isEnteredOwnCapture(rows[key(store, need.id)] ?? emptyDraft(need.unit))))) {
+        throw Error('Vul eerst een eigen werkelijk gecontroleerd product of voorraadstatus in; leeg winkelblad is al beschikbaar.')
       }
-      const records = provisionalDifferences.map(item => {
+      // Missing / aged store moments can still produce an OFFLINE personal
+      // collection report, but never an inter-store numeric difference.
+      const comparableDrafts = pairEligibleNow ? provisionalDifferences : []
+      const records = comparableDrafts.map(item => {
         const plus = rows[key('PLUS', item.need.id)]!
         const deka = rows[key('DekaMarkt', item.need.id)]!
         return {
@@ -913,32 +918,53 @@ export function LocalTwoStorePriceEditor({
             totalCents: item.deka.lineTotalCents, unitRate: item.deka.unitRate },
         }
       })
-      const alreadyPaired = new Set(provisionalDifferences.map(item => item.need.id))
+      const alreadyPaired = new Set(comparableDrafts.map(item => item.need.id))
       const unpaired = activeNeeds.flatMap((need, index) => {
         if (alreadyPaired.has(need.id)) return []
-        const status = (store: OfflineRetailer) => conflictingCodes.some(conflict =>
+        const conflicted = (store: OfflineRetailer) => conflictingCodes.some(conflict =>
           conflict.store === store && conflict.indices.includes(index))
-          ? 'Oorspronkelijke productcode conflicteert met andere winkelregel'
-          : captureStatusNames[ownCaptureStatus(
-            rows[key(store, need.id)] ?? emptyDraft(need.unit), need)]
+        const status = (store: OfflineRetailer) => !selectedStores.includes(store)
+          ? 'Geen huidige bron geselecteerd; prijs onbekend'
+          : conflicted(store)
+            ? 'Oorspronkelijke productcode conflicteert met andere winkelregel'
+            : captureStatusNames[ownCaptureStatus(
+              rows[key(store, need.id)] ?? emptyDraft(need.unit), need)]
+        const priced = (store: OfflineRetailer) => {
+          if (!selectedStores.includes(store) || conflicted(store)) return undefined
+          const row = rows[key(store, need.id)] ?? emptyDraft(need.unit)
+          const math = currentDraftPackMath(row, need)
+          if (!math) return undefined
+          return { code: row.sourceId ?? '', product: row.name,
+            packs: math.packagesNeeded, packCents: math.pricePerPackCents,
+            totalCents: math.lineTotalCents, unitRate: math.unitRate }
+        }
         return [{
           ingredient: need.label, demand: String(need.amount ?? 'onbekend') + ' ' + need.unit,
           plusStatus: status('PLUS'), dekaStatus: status('DekaMarkt'),
+          plus: priced('PLUS'), deka: priced('DekaMarkt'),
         }]
       })
       const { privateDraftReviewHtml } = await import('./privateDraftReviewHtml.ts')
       if (identity !== currentDraftReviewIdentity.current ||
-          Date.now() - Math.min(...instants) > 604800000) {
+          (pairEligibleNow && instants.some(time =>
+            Date.now() - time > 604800000))) {
         throw Error('Je winkel- of Planner-invoer is ondertussen gewijzigd of verouderd. Open het overzicht opnieuw.')
       }
-      const html = privateDraftReviewHtml(records, capturedAt, activeNeeds.length, unpaired)
+      const reportCapturedAt = {
+        PLUS: selectedStores.includes('PLUS') ? capturedAt.PLUS : '',
+        DekaMarkt: selectedStores.includes('DekaMarkt') ? capturedAt.DekaMarkt : '',
+      }
+      const html = privateDraftReviewHtml(
+        records, reportCapturedAt, activeNeeds.length, unpaired, pairEligibleNow)
       const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
       try {
         const link = document.createElement('a')
         link.href = url
         link.download = 'supa-twee-winkels-prive-conceptcontrole.html'
         document.body.append(link); link.click(); link.remove()
-        setDraftStatus(records.length + ' voorlopige regelvergelijkingen lokaal als controleblad bewaard. Geen officieel prijsbewijs of volledig mandtotaal.')
+        setDraftStatus(records.length + ' voorlopige prijsregels en ' +
+          unpaired.length + ' nog niet vergelijkbare Planner-regels lokaal afgedrukt. ' +
+          'De status is persoonlijk en niet onafhankelijk geverifieerd; geen volledig mandtotaal.')
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
     } catch (cause) {
       setDraftStatus(cause instanceof Error ? cause.message : 'Privé-controleblad niet opgeslagen.')
@@ -1345,6 +1371,16 @@ export function LocalTwoStorePriceEditor({
           <button type="button" className="ghost-button" onClick={downloadMissingCaptureList}>
             Download open winkelwaarnemingen (TXT)
           </button>
+          <button type="button" className="ghost-button"
+            disabled={!selectedStores.some(store => activeNeeds.some(need =>
+              isEnteredOwnCapture(rows[key(store, need.id)] ?? emptyDraft(need.unit))))}
+            onClick={() => void downloadProvisionalReview()}>
+            Download mijn privéprijs- en winkelstatus (offline HTML)
+          </button>
+          <small>Ook voor een gedeeltelijk ingevulde winkel: toont alleen eigen
+            bronconcepten, de overige onbekende regels en eventuele oude bronmomenten.
+            Een twee-winkelprijsverschil verschijnt uitsluitend bij voorlopig
+            passende originele tijden en twee rekenbare, niet-conflicterende producten.</small>
           <button type="button" className="ghost-button" onClick={downloadUnfinishedDraft}>
             Download onvoltooid invulconcept (JSON)
           </button>
@@ -1539,7 +1575,7 @@ export function LocalTwoStorePriceEditor({
               staan hieronder in de volledige twee-winkelmatrix.</small>}
             <button type="button" className="ghost-button"
               onClick={() => void downloadProvisionalReview()}>
-              Download deze voorlopige twee-winkelcontrole (offline HTML)
+              Download alle eigen prijs- en winkelstatusregels (offline HTML)
             </button>
             <small>Scriptvrij lokaal werkblad met jouw oorspronkelijke productcodes,
               bronmomenten, hele pakken, eenheidsprijzen en rekenverschillen.
