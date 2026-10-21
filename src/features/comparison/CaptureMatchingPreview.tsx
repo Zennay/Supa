@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { euro } from '../../lib/money.ts'
 import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
 import { completePreviewProposal } from './privateTwoStorePreviewChecklist.ts'
@@ -23,15 +23,16 @@ export function CaptureMatchingPreview({ retailer, lines, appended, reason }: {
   const [missingOnly, setMissingOnly] = useState(false)
   const [shown, setShown] = useState(40)
   const [message, setMessage] = useState('')
+  const [portable, setPortable] = useState<{ source: readonly PreviewMatchLine[]; text: string } | null>(null)
+  const currentLines = useRef(lines)
+  currentLines.current = lines
   const incomplete = useMemo(() => lines.filter(line =>
     !completePreviewProposal(line)), [lines])
   const visible = useMemo(() => lines.filter(line =>
     (!missingOnly || !completePreviewProposal(line)) &&
     (!query.trim() || clean([line.label, line.product ?? '', line.originalSku ?? ''].join(' ')).includes(clean(query.trim())))
   ), [lines, missingOnly, query])
-  function downloadMissing() {
-    try {
-      setMessage('')
+  function missingReviewText(): string {
       const missing = incomplete
       if (!missing.length) throw Error('Geen onopgeloste ingrediënten.')
       const text = [
@@ -44,6 +45,12 @@ export function CaptureMatchingPreview({ retailer, lines, appended, reason }: {
         ]), '',
       ].join('\n')
       if (new TextEncoder().encode(text).length > 128000) throw Error('Controlelijst te groot.')
+      return text
+  }
+  function downloadMissing() {
+    try {
+      setMessage('')
+      const text = missingReviewText()
       const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }))
       try {
         const link = document.createElement('a')
@@ -52,6 +59,28 @@ export function CaptureMatchingPreview({ retailer, lines, appended, reason }: {
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Kon controlelijst niet maken.')
+    }
+  }
+  async function carryMissing(method: 'copy' | 'share') {
+    try {
+      setMessage('')
+      const text = missingReviewText()
+      setPortable({ source: lines, text })
+      if (method === 'copy') {
+        if (!navigator.clipboard?.writeText) throw Error('Selecteer de tekst hieronder om te kopiëren.')
+        await navigator.clipboard.writeText(text)
+      } else {
+        if (!navigator.share) throw Error('Mobiel delen is niet beschikbaar. Selecteer de tekst hieronder.')
+        await navigator.share({ title: 'Supa · eigen ontbrekende ' + retailer + '-matches', text })
+      }
+      if (currentLines.current === lines) setMessage(
+        'Privécontrole van openstaande ' + retailer + '-matches ' +
+        (method === 'copy' ? 'gekopieerd.' : 'gedeeld via jouw toestel.') +
+        ' Er is geen prijs bevestigd.')
+    } catch (cause) {
+      if (currentLines.current === lines) setMessage(cause instanceof Error && cause.name === 'AbortError'
+        ? 'Delen geannuleerd. De lokale lijst blijft selecteerbaar.'
+        : cause instanceof Error ? cause.message : 'Gebruik de selecteerbare lijst hieronder.')
     }
   }
   return <details className="offline-price-workbench__capture-matching">
@@ -96,9 +125,25 @@ export function CaptureMatchingPreview({ retailer, lines, appended, reason }: {
       <button type="button" onClick={() => setShown(n => n + 40)}>Toon volgende {Math.min(40, visible.length - shown)}</button>
       <button type="button" className="ghost-button" onClick={() => setShown(visible.length)}>Toon alle {visible.length}</button>
     </div>}
-    {incomplete.length > 0 && <button type="button" className="ghost-button" onClick={downloadMissing}>
-      Download alle {incomplete.length} onvolledige voorstellen als privécontrolelijst
-    </button>}
-    {message && <p role="alert">{message}</p>}
+    {incomplete.length > 0 && <div className="offline-price-workbench__matching-actions">
+      <button type="button" className="ghost-button" onClick={downloadMissing}>
+        Download alle {incomplete.length} onvolledige voorstellen als privécontrolelijst
+      </button>
+      <button type="button" className="ghost-button" onClick={() => void carryMissing('copy')}>
+        Kopieer {incomplete.length} openstaande {retailer}-matches voor onderweg
+      </button>
+      <button type="button" className="ghost-button" onClick={() => void carryMissing('share')}>
+        Deel alleen openstaande {retailer}-matches via mijn telefoon
+      </button>
+    </div>}
+    {portable?.source === lines && <label>Privécontrolelijst op dit apparaat, ook zonder klembord- of deeltoestemming
+      <textarea rows={9} spellCheck={false} readOnly value={portable.text}
+        onFocus={event => event.currentTarget.select()}
+        style={{ display: 'block', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }} />
+      <button type="button" className="ghost-button" onClick={() => setPortable(null)}>
+        Sluit kopieertekst
+      </button>
+    </label>}
+    {message && <p role="status" aria-live="polite">{message}</p>}
   </details>
 }
