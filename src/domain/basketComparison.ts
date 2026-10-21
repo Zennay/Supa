@@ -49,7 +49,9 @@ function baseQuantity(
       : null
   }
   if (unit === 'ml') return { amount, family: 'volume' }
-  if (unit === 'piece') return { amount, family: 'piece' }
+  // Do not price half an indivisible item without an explicit human review.
+  if (unit === 'piece') return Number.isSafeInteger(amount)
+    ? { amount, family: 'piece' } : null
   return null
 }
 
@@ -278,7 +280,9 @@ export function samePhysicalDemand(
   if (left.amount === null || right.amount === null ||
       !Number.isFinite(left.amount) || left.amount <= 0 ||
       !Number.isFinite(right.amount) || right.amount <= 0 ||
-      !physicalUnit(left.unit) || !physicalUnit(right.unit)) return false
+      !physicalUnit(left.unit) || !physicalUnit(right.unit) ||
+      (left.unit === 'piece' && !Number.isSafeInteger(left.amount)) ||
+      (right.unit === 'piece' && !Number.isSafeInteger(right.amount))) return false
   if (left.amount === right.amount && left.unit === right.unit) return true
   return calculateDecimalPackCount(
     [{ amount: left.amount, unit: left.unit }],
