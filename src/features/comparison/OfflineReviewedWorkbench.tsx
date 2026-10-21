@@ -38,6 +38,7 @@ import { UnpricedPlannerChecklist } from './UnpricedPlannerChecklist.tsx'
 import { PrivateCapturePastePreview } from './PrivateCapturePastePreview.tsx'
 import { PortableBlankCapture } from './PortableBlankCapture.tsx'
 import { CaptureMatchingPreview, type PreviewMatchLine } from './CaptureMatchingPreview.tsx'
+import { CapturePairedPreview } from './CapturePairedPreview.tsx'
 import { recentOwnCaptureInstant, type PrivateReviewedBaskets, type PrivateCaptureProgress, type PrivateReviewFocus } from './privateReviewedBasketBridge.ts'
 import './offlineReviewedWorkbench.css'
 const dateTime = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
@@ -2670,6 +2671,18 @@ export function OfflineReviewedWorkbench({
                   )}
                 </details>
               ))}
+              {currentPreview.stores.length === 2 &&
+                currentPreview.stores[0].matching && currentPreview.stores[1].matching &&
+                currentPreview.stores.some(store => store.retailer === 'PLUS') &&
+                currentPreview.stores.some(store => store.retailer === 'DekaMarkt') && (
+                  <CapturePairedPreview
+                    key={'paired:' + captureWeek + ':' +
+                      currentPreview.stores.map(store => store.observedAt).join(':')}
+                    plus={currentPreview.stores.find(store => store.retailer === 'PLUS')!.matching!.lines}
+                    deka={currentPreview.stores.find(store => store.retailer === 'DekaMarkt')!.matching!.lines}
+                    within24h={currentPreview.pairedWithin24h}
+                    sourceFresh={currentPreview.stores.every(capturePreviewFresh)} />
+                )}
               {currentPreview.stores.map(store => store.matching && (
                 <CaptureMatchingPreview
                   key={store.retailer + ':' + store.observedAt + ':' + captureWeek}
