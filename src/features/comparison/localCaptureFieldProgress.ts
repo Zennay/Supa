@@ -8,11 +8,41 @@ import { observedInstant } from '../../domain/offlineReviewedImport.ts'
 // they are quoted. Refuse potentially executable or visually manipulated
 // original identifiers rather than silently altering a retailer SKU/name.
 export function safeOriginalCaptureLabel(value: string): boolean {
-  if (!value || value !== value.trim() ||
-      !/[\p{L}\p{N}]/u.test(value) ||
-      /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(value)) return false
+  if (!value || value !== value.trim() || !/[\p{L}\p{N}]/u.test(value)) return false
+  // ZWJ/ZWNJ belong to legitimate emoji and Indic names. Other controls
+  // cannot alter the apparent SKU or create an executable spreadsheet cell.
+  if (/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(
+    value.replace(/[\u200c\u200d]/gu, ''))) return false
   const normalized = value.normalize('NFKC')
   return !/^[\p{White_Space}\p{Cf}\p{Mn}\p{Mc}\p{Me}]*[=+@-]/u.test(normalized)
+}
+
+export function captureTimeReadiness(raw: string, now = Date.now()): {
+  ok: boolean; reason: string; ns: bigint | null
+} {
+  if (!raw.trim()) return { ok: false,
+    reason: 'werkelijk bronmoment met expliciete tijdzone', ns: null }
+  const instant = observedInstant(raw.trim())
+  if (!instant) return { ok: false,
+    reason: 'geldig ISO-bronmoment met expliciete tijdzone', ns: null }
+  const nowNs = BigInt(Math.trunc(now)) * 1_000_000n
+  if (instant.ns > nowNs + 300_000_000_000n)
+    return { ok: false, reason: 'echt bronmoment ligt onveilig in de toekomst', ns: instant.ns }
+  if (nowNs - instant.ns > 604_800_000_000_000n)
+    return { ok: false, reason: 'opname ouder dan 7 dagen: nieuwe eigen waarneming nodig', ns: instant.ns }
+  return { ok: true, reason: 'tijdvak voorlopig geschikt; originele broncontrole vereist', ns: instant.ns }
+}
+
+/** This checks only entered timestamps, never proves a physical paired shop. */
+export function enteredCapturePairWarning(plus: string, deka: string): string | null {
+  const a = captureTimeReadiness(plus)
+  const b = captureTimeReadiness(deka)
+  if (!a.ns || !b.ns) return null
+  const gap = a.ns > b.ns ? a.ns - b.ns : b.ns - a.ns
+  if (gap <= 86_400_000_000_000n) return null
+  return 'De ingevoerde PLUS- en DekaMarkt-tijden liggen meer dan 24 uur uiteen. ' +
+    'Observeer ' + (a.ns < b.ns ? 'PLUS' : 'DekaMarkt') +
+    ' opnieuw voor een volledig vergelijkbaar weekmandje; oude bedragen worden niet hergebruikt.'
 }
 
 export type CaptureFieldNeed = {
@@ -39,8 +69,8 @@ export function incompleteCaptureFields(
     if (!row || row.state === 'unseen') {
       missing.push('nog niet zelf waargenomen')
     } else {
-      if (!observedInstant(observedAt.trim()))
-        missing.push('geldig werkelijk ISO-bronmoment met tijdzone')
+      const time = captureTimeReadiness(observedAt)
+      if (!time.ok) missing.push(time.reason)
       if (row.sku.trim()) {
         if (seenSku.has(row.sku.trim()))
           missing.push('dubbele artikelcode; origineel bronproduct maar één keer vastleggen')

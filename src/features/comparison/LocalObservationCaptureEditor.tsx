@@ -3,7 +3,8 @@ import type { CaptureStore } from './plannerPriceCaptureSheet.ts'
 import type { PlannerCaptureGuideNeed } from './plannerPriceCaptureGuide.ts'
 import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
 import { exportLocalCaptureDraft, restoreLocalCaptureDraft } from './localCaptureEditorBackup.ts'
-import { incompleteCaptureFields, offlineCaptureFieldChecklist } from './localCaptureFieldProgress.ts'
+import { incompleteCaptureFields, offlineCaptureFieldChecklist,
+  captureTimeReadiness, enteredCapturePairWarning } from './localCaptureFieldProgress.ts'
 import { saveLocalCaptureTab, readLocalCaptureTab, clearLocalCaptureTab } from './localCaptureSessionDraft.ts'
 import { shopLabelEuroCents } from './shopLabelEuroCents.ts'
 
@@ -490,6 +491,9 @@ export function LocalObservationCaptureEditor({
       onChange={event => setOnlyOpen(event.currentTarget.checked)} />
       {' '}Alleen nog niet waargenomen of onvolledige invoerregels tonen
     </label>
+    {enteredCapturePairWarning(moments.PLUS ?? '', moments.DekaMarkt ?? '') &&
+      <p role="alert">{enteredCapturePairWarning(
+        moments.PLUS ?? '', moments.DekaMarkt ?? '')}</p>}
     {snapshot.stores.map(store => <fieldset key={store}>
       <legend>{store} · originele persoonlijke bronopname</legend>
       {(() => {
@@ -533,6 +537,9 @@ export function LocalObservationCaptureEditor({
       <small>Dezelfde echte waarnemingstijd geldt voor alle producten in dit
         winkelblad. Als je later een product opnieuw vastlegt, maak dan een nieuwe
         opname met het nieuwe werkelijke tijdstip; hergebruik geen oude prijs.</small>
+      <p role="status">Tijdcontrole voor {store}:{' '}
+        {captureTimeReadiness(moments[store] ?? '').reason}.
+        {' '}Dit bewijst geen echte winkelwaarneming of bronrecht.</p>
       {snapshot.needs.map((need, index) => ({ need, index }))
         .filter(({ index }) => !onlyOpen ||
           (missingByStore.get(store)?.some(item => item.index === index) ?? false))

@@ -1360,3 +1360,22 @@ het huidige formulier bewerkbaar en meldt Supa welk fysiek veld moet
 worden gecorrigeerd. De bestaande bronimport en persoonlijke matchreview
 blijven daarnaast ongewijzigd verplicht; deze invoergemakken geven
 geen retailerrechten of publieke besparingsclaim.
+
+## Bronmoment en beide winkels vóór de daadwerkelijke vergelijking
+
+Het mobiele opnameformulier meldt per winkel nu meteen of het **zelf
+ingevulde** originele bronmoment syntactisch correct is, niet meer dan vijf
+minuten in de toekomst ligt en hoogstens zeven dagen oud is. Een ouder of
+ongeldig moment houdt de betreffende bronregel onvolledig; de bestaande
+canonieke importer bevestigt afzonderlijk of de hele opname werkelijk kan
+worden geaccepteerd. Het oorspronkelijke ISO-tekstveld wordt niet automatisch
+ingevuld of verplaatst naar de huidige tijd.
+
+Zodra de gebruiker twee originele bronmomenten invoert, geeft het formulier
+een afzonderlijke waarschuwing als deze meer dan **24 uur** uiteenliggen.
+De melding noemt de oudere PLUS- of DekaMarkt-waarneming die opnieuw nodig
+is voordat een volledig zelfde-weekmandje kan worden vergeleken. Onbekende
+producten, oude bedragen of lege winkelobservaties worden niet tot nul,
+actuele schapprijs of besparing gepromoveerd. Deze tijdcontrole geldt alleen
+voor de door de gebruiker ingevoerde tijden en is geen bewijs van
+bronrechten, onafhankelijke fysieke winkelobservaties of een echte korting.
