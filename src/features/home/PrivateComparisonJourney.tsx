@@ -756,7 +756,7 @@ export function PrivateComparisonJourney({
         om alle bekende oorspronkelijke winkelproducten te zien.</p>}
       <ul>{shownPartialPairs.map(item =>
         <li key={item.id}>
-          <strong>{item.name} · {item.amount} {item.unit}</strong>
+          <strong>{item.name} · {readablePlannerDemandAmount(item.amount)} {item.unit}</strong>
           {item.plusProduct && <small>
             PLUS · {item.plusProduct.productName} · SKU {item.plusProduct.productId} ·
             {' '}{item.plusProduct.unitRate ?? 'eenheidsprijs onbekend'}

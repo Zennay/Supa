@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { freshReviewedBaskets, recentOwnCaptureInstant, type PrivateCaptureProgress, type PrivateReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
 import type { CaptureStore } from '../comparison/plannerPriceCaptureSheet.ts'
-import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
+import { readablePlannerDemandAmount, type PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
 import './plannerMissingCapture.css'
 
 const stores = ['PLUS', 'DekaMarkt'] as const
@@ -265,9 +265,9 @@ export function PlannerMissingCapturePanel({ captureNeeds, captureProgress, revi
                 <ol start={2}>{pending.map((need, index) =>
                   <li key={need.id} value={index + 2}>
                     <strong>{need.label}</strong> · nodig:
-                    {' '}{need.amount === null ? 'hoeveelheid controleren' :
-                      need.amount.toLocaleString('nl-NL', { useGrouping: false, maximumFractionDigits: 3 }) +
-                      ' ' + need.unit}
+                    {' '}{readablePlannerDemandAmount(need.amount) === 'hoeveelheid nog controleren'
+                      ? 'hoeveelheid controleren'
+                      : readablePlannerDemandAmount(need.amount) + ' ' + need.unit}
                   </li>)}</ol>
               </details>
             </>}

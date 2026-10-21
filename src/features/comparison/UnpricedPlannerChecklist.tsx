@@ -25,9 +25,12 @@ const unitLabels: Record<string, string> = {
 const itemKey = (item: DemandRow) => JSON.stringify([
   item.id, item.label, item.amount, item.unit,
 ])
-const quantity = (item: DemandRow) =>
-  (item.amount === null ? 'hoeveelheid onbekend' :
-    item.amount.toLocaleString('nl-NL') + ' ' + (unitLabels[item.unit] ?? item.unit))
+const quantity = (item: DemandRow) => {
+  const amount = readablePlannerDemandAmount(item.amount)
+  return amount === 'hoeveelheid nog controleren'
+    ? 'hoeveelheid onbekend'
+    : amount.replace('.', ',') + ' ' + (unitLabels[item.unit] ?? item.unit)
+}
 // Portable TXT must never use grouping (1.250 is ambiguous with 1.25), nor
 // silently round decimal quantities. The existing strict importer decides
 // whether every original amount is physically admissible.
