@@ -29,9 +29,11 @@ function admitRecord(value, validateApplicationEntriesOnRead) {
   if (!Number.isSafeInteger(value.revision) || value.revision < 1 || !canonicalTimestamp(value.updatedAt)) return false
   const { entries } = value
   if (!entries || typeof entries !== 'object' || Array.isArray(entries) || Object.getPrototypeOf(entries) !== Object.prototype) return false
-  // The file store is also a low-level CAS primitive whose established
-  // direct callers use opaque string entries. The HTTP application must opt
-  // into the canonical browser-schema gate, because only it owns that schema.
+  // Even low-level callers must never read the private M3 observation draft
+  // as synced device data. Other direct callers retain the established opaque
+  // string/CAS contract; the HTTP application opts into the complete schema
+  // gate because only it owns the planner/recipe/checklist key contract.
+  if (Object.hasOwn(entries, 'supa:m3-observation-draft:v1')) return false
   // In production this gate runs before a restored record can be returned or
   // its revision can be adopted by a subsequent compare-and-swap write.
   if (validateApplicationEntriesOnRead !== true) return true
