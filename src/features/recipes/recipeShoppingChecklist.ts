@@ -44,13 +44,13 @@ export function formatOwnRecipeChecklist(
       : 'Eigen ongeprijsde boodschappenlijst · controleer hoeveelheden en verpakking zelf.',
     ...(remaining.length ? remaining.map(line => line.needsReview
       ? `[?] ${line.original} — hoeveelheid handmatig controleren`
-      : `${checked[line.key] ? '[x]' : '[ ]'} ${compactAmount(line.amount!)} ${line.unit === 'piece' ? 'stuks' : line.unit} ${line.label}`)
+      : `${checked[line.key] ? '[x]' : '[ ]'} ${readableRecipeShoppingAmount(line.amount!)} ${line.unit === 'piece' ? 'stuks' : line.unit} ${line.label}`)
       : ['Alle controleerbare boodschappen zijn afgevinkt.']),
     'Prijzen, winkelvoorraad en besparingen zijn onbekend.',
   ].join('\n')
 }
 
-function compactAmount(amount: number): string {
+export function readableRecipeShoppingAmount(amount: number): string {
   // Source amounts are canonical physical demand, not a price or display
   // estimate. Reuse the exact decimal formatter of the capture worksheet:
   // toFixed(3) could otherwise round a positive quantity to zero or alter a
@@ -139,7 +139,7 @@ export function personalRecipeShoppingNoteLabels(
               !['g', 'ml', 'piece'].includes(line.unit ?? '') ||
               (line.unit === 'piece' && !Number.isSafeInteger(line.amount)))
             throw new Error('De fysieke hoeveelheid is veranderd; controleer het recept opnieuw.')
-          return compactAmount(line.amount) +
+          return readableRecipeShoppingAmount(line.amount) +
             (line.unit === 'piece' ? ' stuks ' : ' ' + line.unit + ' ') + clean(line.label)
         })()
     const label = clean(raw)
