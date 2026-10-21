@@ -39,6 +39,7 @@ import { PrivateCapturePastePreview } from './PrivateCapturePastePreview.tsx'
 import { PortableBlankCapture } from './PortableBlankCapture.tsx'
 import { CaptureMatchingPreview, type PreviewMatchLine } from './CaptureMatchingPreview.tsx'
 import { CapturePairedPreview } from './CapturePairedPreview.tsx'
+import { completePreviewProposal } from './privateTwoStorePreviewChecklist.ts'
 import { samePrivatePhysicalDemand } from './samePrivatePhysicalDemand.ts'
 import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
 import { recentOwnCaptureInstant, type PrivateReviewedBaskets, type PrivateCaptureProgress, type PrivateReviewFocus } from './privateReviewedBasketBridge.ts'
@@ -623,7 +624,7 @@ export function OfflineReviewedWorkbench({
       for (const need of needs) {
         count++
         lines.push('- ' + clean(need.label) + ' · benodigd ' +
-          (need.amount === null ? 'onbekend' : String(need.amount)) +
+          (need.amount === null ? 'onbekend' : readablePlannerDemandAmount(need.amount)) +
           ' ' + clean(need.unit) + ' · zelf oorspronkelijk winkelproduct controleren')
       }
       lines.push('')
@@ -771,9 +772,9 @@ export function OfflineReviewedWorkbench({
             source.observedNs < retained.observedNs)) {
         return plannerCaptureNeeds
       }
-      const unresolved = new Set(source.matching?.lines.filter(line =>
-        line.status === 'unresolved').map(line => line.id) ?? [])
-      return plannerCaptureNeeds.filter(need => unresolved.has(need.id))
+      const incomplete = new Set(source.matching?.lines.filter(line =>
+        !completePreviewProposal(line)).map(line => line.id) ?? [])
+      return plannerCaptureNeeds.filter(need => incomplete.has(need.id))
     }
     // With one new upload and one retained capture, a 24-hour mismatch
     // requires a repeat of the OLDER shop, not always the retained shop.
@@ -785,7 +786,9 @@ export function OfflineReviewedWorkbench({
       const incoming = currentPreview.stores.find(item => item.retailer !== store)
       if (!kept.within24h && incoming?.observedNs !== undefined &&
           kept.observedNs < incoming.observedNs) return plannerCaptureNeeds
-      return []
+      const incomplete = new Set(kept.matching.lines.filter(line =>
+        !completePreviewProposal(line)).map(line => line.id))
+      return plannerCaptureNeeds.filter(need => incomplete.has(need.id))
     }
     return plannerCaptureNeeds
   }
