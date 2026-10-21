@@ -38,8 +38,9 @@ const PlannerQuickSourcePaste = lazy(async () => {
 })
 
 /** Read-only personally reviewed basket sources, never an inferred live catalog. */
-export function PrivateReviewedProductCatalog({ reviewed, progress, captureNeeds, budget, onOpenComparison, onOpenList, onOpenMixedRoute, onChooseRouteLine, onReviewIngredient, onAddMissingToOwnList, onImportSourceFiles, fileWarning, checked, onToggleChecked, onMarkCheckedBatch }: {
+export function PrivateReviewedProductCatalog({ reviewed, progress, captureNeeds, budget, onOpenComparison, onOpenList, onOpenMixedRoute, onChooseRouteLine, onReviewIngredient, onAddMissingToOwnList, onImportSourceFiles, fileWarning, checked, onToggleChecked, onMarkCheckedBatch, incomingSearch }: {
   reviewed: PrivateReviewedBaskets | null
+  incomingSearch?: { serial: number; text: string }
   progress: PrivateCaptureProgress | null
   captureNeeds: readonly PlannerCaptureGuideNeed[]
   budget: number
@@ -57,6 +58,16 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, captureNeeds
 }) {
   const [store, setStore] = useState<'all' | OwnStore>('all')
   const [query, setQuery] = useState('')
+  useEffect(() => {
+    if (!incomingSearch?.serial) return
+    // Only explicit Figma-to-owned-source navigation forwards text. Never
+    // treat demo products as source matches or price information.
+    setQuery(incomingSearch.text.slice(0, 120))
+    setStore('all')
+    setOnlyUnbought(false)
+    setUnitFilter('all')
+    setOrder('source')
+  }, [incomingSearch?.serial, incomingSearch?.text])
   const [onlyUnbought, setOnlyUnbought] = useState(false)
   const [lastBulkTick, setLastBulkTick] = useState<{ shop: OwnStore; lines: readonly Matched[] } | null>(null)
   const [unitFilter, setUnitFilter] = useState<'all' | 'kg' | 'liter' | 'stuk'>('all')
