@@ -49,6 +49,34 @@ export function privateTwoStorePrintableHtml(
     ? comparison.cheapest + ' is ' + money.format(comparison.differenceCents / 100) +
       ' goedkoper voor het volledige mandje met hele verpakkingen.'
     : 'Beide complete mandjes hebben dezelfde prijs.'
+  // Explain the complete physical basket, never just rows visible through
+  // the browser search/filter. All delta cents are canonical compared packs.
+  const plusGross = comparison.lines.reduce((sum, line) =>
+    sum + Math.max(0, line.deltaCents), 0)
+  const dekaGross = comparison.lines.reduce((sum, line) =>
+    sum + Math.max(0, -line.deltaCents), 0)
+  const plusLower = comparison.lines.filter(line => line.deltaCents > 0).length
+  const dekaLower = comparison.lines.filter(line => line.deltaCents < 0).length
+  const equal = comparison.lines.length - plusLower - dekaLower
+  const drivers = [...comparison.lines].filter(line => line.deltaCents !== 0)
+    .sort((a, b) => Math.abs(b.deltaCents) - Math.abs(a.deltaCents))
+    .slice(0, 5)
+  const explanation = '<section><h2>Waarom verschillen de volledige mandjes?</h2>' +
+    '<p>PLUS: ' + plusLower + ' ingrediënten lager in hele-pakprijs (' +
+    euro(plusGross) + ' samen). DekaMarkt: ' + dekaLower +
+    ' ingrediënten lager (' + euro(dekaGross) + ' samen). ' +
+    equal + ' ingrediënten kosten evenveel.</p>' +
+    '<p>Na verrekening is het volledige rekenkundige prijsverschil ' +
+    '<strong>' + euro(Math.abs(plusGross - dekaGross)) +
+    '</strong>. Een lager bedrag per kilo is niet automatisch een lager bedrag ' +
+    'voor alle benodigde hele verpakkingen.</p>' +
+    (drivers.length ? '<h3>Grootste vijf regelverschillen</h3><ol>' +
+      drivers.map(line => '<li>' + esc(line.ingredientLabel) + ': ' +
+        euro(Math.abs(line.deltaCents)) + ' lager bij ' +
+        (line.deltaCents > 0 ? 'PLUS' : 'DekaMarkt') + '</li>').join('') +
+      '</ol>' : '<p>Geen prijsverschillen per ingrediënt.</p>') +
+    '<small>Alleen oorspronkelijke persoonlijk gecontroleerde winkelopnames, ' +
+    'geen actuele prijs of onafhankelijke besparingsclaim.</small></section>'
   const budget = Number.isSafeInteger(budgetCents) && budgetCents !== null &&
     budgetCents >= 0
     ? '<section><h2>Planner-weekbudget</h2><p>Ingesteld: ' +
@@ -98,7 +126,7 @@ export function privateTwoStorePrintableHtml(
     '<p><strong>' + esc(winner) + '</strong></p>' +
     '<p><small>Eigen PLUS-bronmoment: ' + esc(moments.PLUS) +
     '<br>Eigen DekaMarkt-bronmoment: ' + esc(moments.DekaMarkt) +
-    '</small></p></section>' + budget +
+    '</small></p></section>' + budget + explanation +
     '<section><h2>Dezelfde fysieke weekvraag per ingrediënt</h2>' +
     '<table><thead><tr><th>Ingrediënt</th><th>PLUS</th><th>DekaMarkt</th>' +
     '<th>Hele-pakverschil</th></tr></thead><tbody>' + lines + '</tbody></table></section>' +
