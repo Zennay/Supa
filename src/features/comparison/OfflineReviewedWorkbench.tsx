@@ -36,6 +36,7 @@ import { currentTripKey, loadTripProgress, saveTripProgress } from '../../privat
 import { createPrivateBasketComparisonCsv } from '../../privateBasketComparisonCsv.ts'
 import { UnpricedPlannerChecklist } from './UnpricedPlannerChecklist.tsx'
 import { PrivateCapturePastePreview } from './PrivateCapturePastePreview.tsx'
+import { PortableBlankCapture } from './PortableBlankCapture.tsx'
 import { CaptureMatchingPreview } from './CaptureMatchingPreview.tsx'
 import { recentOwnCaptureInstant, type PrivateReviewedBaskets, type PrivateCaptureProgress, type PrivateReviewFocus } from './privateReviewedBasketBridge.ts'
 import './offlineReviewedWorkbench.css'
@@ -2507,6 +2508,9 @@ export function OfflineReviewedWorkbench({
             onClick={downloadPrintablePlannerCapture}>
             Download printbaar opnameformulier (HTML)
           </button>
+          <PortableBlankCapture needs={plannerCaptureNeeds}
+            stores={captureSheetStore === 'both' ? stores : [captureSheetStore]}
+            captureKey={captureWeek + ':' + captureSheetStore} />
           <a className="ghost-button" href={`${import.meta.env.BASE_URL}private-basket-mapping.html`} target="_blank" rel="noopener noreferrer">
             Open uitgebreide privévergelijker
           </a>
