@@ -41,6 +41,12 @@ export function ManualShoppingNotes({ notes, setNotes }: {
   const [pendingDuplicateChoice, setPendingDuplicateChoice] = useState<{
     plus: UnpricedShoppingNote; deka: UnpricedShoppingNote; keep: 'PLUS' | 'DekaMarkt'
   } | null>(null)
+  const [pendingDuplicateBatch, setPendingDuplicateBatch] = useState<{
+    pairs: { plus: UnpricedShoppingNote; deka: UnpricedShoppingNote }[];
+    keep: 'PLUS' | 'DekaMarkt'
+  } | null>(null)
+  const [lastDuplicateBatch, setLastDuplicateBatch] = useState<
+    { note: UnpricedShoppingNote; index: number }[] | null>(null)
   const [pendingCleared, setPendingCleared] = useState<UnpricedShoppingNote[] | null>(null)
   const [pendingNextRound, setPendingNextRound] = useState<UnpricedShoppingNote[] | null>(null)
   const [lastNextRound, setLastNextRound] = useState<UnpricedShoppingNote[] | null>(null)
@@ -617,6 +623,66 @@ export function ManualShoppingNotes({ notes, setNotes }: {
     setMessage('Eigen boodschap blijft alleen bij ' + choice.keep +
       '. De andere ongeprijsde regel is verwijderd; herstel via de knop onder de lijst.')
   }
+  function prepareDuplicateBatch(keep: 'PLUS' | 'DekaMarkt') {
+    const pairs = duplicatedOpenRetailerNotes.map(plus => {
+      const key = plus.label.normalize('NFC').toLocaleLowerCase('nl-NL')
+      const deka = notes.find(note => note.store === 'DekaMarkt' && !note.done &&
+        note.label.normalize('NFC').toLocaleLowerCase('nl-NL') === key)
+      return deka ? { plus: { ...plus }, deka: { ...deka } } : null
+    }).filter((pair): pair is { plus: UnpricedShoppingNote; deka: UnpricedShoppingNote } =>
+      pair !== null)
+    if (!pairs.length) return
+    setPendingDuplicateBatch({ keep, pairs })
+  }
+  function confirmDuplicateBatch() {
+    const batch = pendingDuplicateBatch
+    if (!batch?.pairs.length) return
+    const unchanged = (current: UnpricedShoppingNote[]) => batch.pairs.every(pair =>
+      [pair.plus, pair.deka].every(original => current.some(item =>
+        item.id === original.id && item.store === original.store &&
+        item.label === original.label && !item.done)))
+    if (!unchanged(notes)) {
+      setPendingDuplicateBatch(null)
+      setMessage('De dubbele boodschappen zijn veranderd. Kies de winkel opnieuw.')
+      return
+    }
+    const removed = batch.pairs.map(pair => {
+      const note = batch.keep === 'PLUS' ? pair.deka : pair.plus
+      return { note, index: notes.findIndex(item => item.id === note.id) }
+    })
+    if (removed.some(item => item.index < 0)) return
+    const ids = new Set(removed.map(item => item.note.id))
+    setNotes(current => unchanged(current) ? current.filter(item => !ids.has(item.id)) : current)
+    setLastDuplicateBatch(removed)
+    setPendingDuplicateBatch(null)
+    setMessage(removed.length + ' open dubbele eigen boodschappen verwijderd van de andere winkel. ' +
+      'Je originele prijzen en geprijsde productmatches blijven onaangeraakt.')
+  }
+  function undoDuplicateBatch() {
+    const batch = lastDuplicateBatch
+    if (!batch?.length) return
+    const canRestore = (current: UnpricedShoppingNote[]) => {
+      if (current.length + batch.length > 100) return false
+      const ids = new Set(current.map(item => item.id))
+      const keys = new Set(current.map(item => duplicateKey(item.store, item.label)))
+      return batch.every(({ note }) =>
+        !ids.has(note.id) && !keys.has(duplicateKey(note.store, note.label)))
+    }
+    if (!canRestore(notes)) {
+      setLastDuplicateBatch(null)
+      setMessage('Herstel geweigerd: de lijst is gewijzigd of de winkel heeft nu al deze artikelen.')
+      return
+    }
+    setNotes(current => {
+      if (!canRestore(current)) return current
+      const restored = [...current]
+      for (const item of [...batch].sort((a, b) => a.index - b.index))
+        restored.splice(Math.min(item.index, restored.length), 0, item.note)
+      return restored
+    })
+    setLastDuplicateBatch(null)
+    setMessage('De eerdere dubbele eigen boodschappen zijn met hun originele winkel en vinkjes hersteld.')
+  }
   const selected = notes.filter(note => filterStore === 'Alle winkels' ||
     note.store === filterStore || note.store === 'Algemeen')
   // Search only the shopper's own notes. Never infer a retailer identity.
@@ -1052,8 +1118,30 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       <strong>{duplicateOpenLabels.length} {duplicateOpenLabels.length === 1
         ? 'eigen boodschap staat' : 'eigen boodschappen staan'} nog open bij PLUS én DekaMarkt</strong>
       <p>Controleer of je deze persoonlijke artikelen écht bij beide winkels wilt kopen.
-        Er zijn geen prijzen of automatische productmatches gebruikt. Tik op een artikel en
-        verplaats of verwijder daarna zelf één van de dubbele regels.</p>
+        Er zijn geen prijzen of automatische productmatches gebruikt. Kies per artikel
+        of houd na controle alle dubbele open regels bij één winkel.</p>
+      <div role="group" aria-label="Alle dubbele eigen winkelregels afhandelen">
+        <button type="button" onClick={() => prepareDuplicateBatch('PLUS')}>
+          Houd {duplicateOpenLabels.length} dubbelen alleen bij PLUS…
+        </button>
+        <button type="button" onClick={() => prepareDuplicateBatch('DekaMarkt')}>
+          Houd {duplicateOpenLabels.length} dubbelen alleen bij DekaMarkt…
+        </button>
+      </div>
+      {pendingDuplicateBatch && <div role="group" aria-label="Bevestig eigen dubbelen per winkel">
+        <p>Let op: {pendingDuplicateBatch.pairs.length} dubbele, nog open persoonlijke
+          artikelen blijven alleen bij {pendingDuplicateBatch.keep}. De andere regels
+          worden verwijderd, zonder prijs-, SKU- of bronwijziging. Je kunt deze actie herstellen.</p>
+        <ul>{pendingDuplicateBatch.pairs.slice(0, 8).map(pair =>
+          <li key={pair.plus.id}>{pair.plus.label}</li>)}</ul>
+        {pendingDuplicateBatch.pairs.length > 8 && <small>
+          En {pendingDuplicateBatch.pairs.length - 8} andere.
+        </small>}
+        <button type="button" onClick={confirmDuplicateBatch}>
+          Ja, verwijder {pendingDuplicateBatch.pairs.length} dubbele regels
+        </button>
+        <button type="button" onClick={() => setPendingDuplicateBatch(null)}>Annuleer</button>
+      </div>}
       <ul>{duplicateOpenLabels.slice(0, 8).map(label => <li key={label}>
         <span>{label} · prijs onbekend</span>{' '}
         <button type="button" onClick={() => {
@@ -1080,6 +1168,11 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       {duplicateOpenLabels.length > 8 && <small>En {duplicateOpenLabels.length - 8} andere; bekijk
         alle winkels met je eigen zoekfilter.</small>}
     </section>}
+    {lastDuplicateBatch && <p className="manual-shopping-notes__undo-duplicates">
+      <button type="button" onClick={undoDuplicateBatch}>
+        Herstel {lastDuplicateBatch.length} eerder verwijderde dubbele eigen boodschappen
+      </button>
+    </p>}
     <nav className="manual-shopping-notes__trip-nav" aria-label="Mijn persoonlijke winkelroute">
       <strong>Winkelroute · alleen mijn eigen ongeprijsde artikelen</strong>
       <div className="manual-shopping-notes__trip-nav-stores">
