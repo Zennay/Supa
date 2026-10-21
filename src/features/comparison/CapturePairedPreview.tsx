@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { euro } from '../../lib/money.ts'
 import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
 import type { PreviewMatchLine } from './CaptureMatchingPreview.tsx'
+import { privateTwoStorePreviewChecklist } from './privateTwoStorePreviewChecklist.ts'
 
 function labelQuantity(line: PreviewMatchLine): string {
   return readablePlannerDemandAmount(line.amount) + ' ' + line.unit
@@ -33,17 +34,21 @@ function localOffer(line: PreviewMatchLine | null) {
  * is not a whole-basket financial comparison or a right to publish prices.
  */
 export function CapturePairedPreview({
-  plus, deka, within24h, sourceFresh, retainedStore,
+  plus, deka, within24h, sourceFresh, retainedStore, plusObservedAt, dekaObservedAt,
 }: {
   plus: readonly PreviewMatchLine[]
   deka: readonly PreviewMatchLine[]
   within24h: boolean
   sourceFresh: boolean
   retainedStore?: 'PLUS' | 'DekaMarkt'
+  plusObservedAt: string
+  dekaObservedAt: string
 }) {
   const [query, setQuery] = useState('')
   const [openOnly, setOpenOnly] = useState(false)
   const [limit, setLimit] = useState(25)
+  const [exportMessage, setExportMessage] = useState('')
+  const [printable, setPrintable] = useState<string | null>(null)
   const rows = useMemo(() => {
     const byDeka = new Map(deka.map(line => [line.id, line]))
     const joined: Array<{
@@ -74,6 +79,43 @@ export function CapturePairedPreview({
       row.right?.product ?? '', row.right?.originalSku ?? '',
     ].join(' ')).includes(filter)))
   const missing = rows.filter(row => row.open).length
+
+  function reviewText() {
+    return privateTwoStorePreviewChecklist({
+      plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh,
+    })
+  }
+  function downloadReview() {
+    try {
+      setExportMessage('')
+      const note = reviewText()
+      const uri = URL.createObjectURL(new Blob([note], { type: 'text/plain;charset=utf-8' }))
+      try {
+        const a = document.createElement('a')
+        a.href = uri
+        a.download = 'supa-PLUS-Deka-bronmatch-voorcontrole-prive.txt'
+        document.body.append(a)
+        try { a.click() } finally { a.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
+      setExportMessage('Voorcontrole lokaal gedownload, zonder bevestigde prijsverschillen.')
+    } catch (cause) {
+      setExportMessage(cause instanceof Error ? cause.message : 'Kan het privécontroleblad niet bewaren.')
+    }
+  }
+  async function copyReview() {
+    try {
+      setExportMessage('')
+      const note = reviewText()
+      // Keep a selectable fallback even if clipboard permission is denied.
+      setPrintable(note)
+      if (!navigator.clipboard?.writeText) throw Error(
+        'Automatisch kopiëren niet beschikbaar. Selecteer de tekst hieronder.')
+      await navigator.clipboard.writeText(note)
+      setExportMessage('Onbevestigde bronvoorcontrole gekopieerd. Geen prijzen geaccepteerd.')
+    } catch (cause) {
+      setExportMessage(cause instanceof Error ? cause.message : 'Gebruik de selecteerbare tekst hieronder.')
+    }
+  }
 
   return <details className="offline-price-workbench__capture-pair"
     aria-label="Beide winkels naast elkaar vóór bronovername">
@@ -132,6 +174,23 @@ export function CapturePairedPreview({
       onClick={() => setLimit(Math.min(limit + 25, visible.length))}>
       Toon volgende {Math.min(25, visible.length - limit)} regels
     </button>}
+    <div className="offline-price-workbench__matching-actions">
+      <button type="button" className="ghost-button" onClick={downloadReview}>
+        Download privécontrole van beide bronvoorstellen (TXT)
+      </button>
+      <button type="button" className="ghost-button" onClick={() => void copyReview()}>
+        Kopieer broncontrole voor onderweg
+      </button>
+    </div>
+    {printable !== null && <label>Alle originele onzekere bronregels als selecteerbare tekst
+      <textarea readOnly rows={9} spellCheck={false} value={printable}
+        onFocus={event => event.currentTarget.select()}
+        style={{ display: 'block', boxSizing: 'border-box', maxWidth: '100%', width: '100%' }} />
+      <button type="button" className="ghost-button" onClick={() => setPrintable(null)}>
+        Sluit kopieertekst
+      </button>
+    </label>}
+    {exportMessage && <p role="status" aria-live="polite">{exportMessage}</p>}
     <small>Niet geprijsde, ontbrekende, oude of ongecontroleerde bronwaarden worden
       niet als € 0,00 of bewezen besparing gepresenteerd. Bevestig de officiële
       import hieronder pas na controle van je eigen waarnemingen.</small>

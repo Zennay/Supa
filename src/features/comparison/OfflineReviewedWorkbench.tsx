@@ -441,6 +441,10 @@ export function OfflineReviewedWorkbench({
     (currentPreview?.retainedOther?.retailer === 'PLUS' ? currentPreview.retainedOther.matching.lines : null)
   const previewDekaLines = currentPreview?.stores.find(store => store.retailer === 'DekaMarkt')?.matching?.lines ??
     (currentPreview?.retainedOther?.retailer === 'DekaMarkt' ? currentPreview.retainedOther.matching.lines : null)
+  const previewPlusAt = currentPreview?.stores.find(store => store.retailer === 'PLUS')?.observedAt ??
+    (currentPreview?.retainedOther?.retailer === 'PLUS' ? currentPreview.retainedOther.observedAt : '')
+  const previewDekaAt = currentPreview?.stores.find(store => store.retailer === 'DekaMarkt')?.observedAt ??
+    (currentPreview?.retainedOther?.retailer === 'DekaMarkt' ? currentPreview.retainedOther.observedAt : '')
   const previewPairFresh = !!currentPreview && currentPreview.stores.every(capturePreviewFresh) &&
     (!currentPreview.retainedOther || freshPreviewInstant(currentPreview.retainedOther.observedNs))
   const previewPair24h = !!currentPreview && (currentPreview.retainedOther
@@ -2696,6 +2700,7 @@ export function OfflineReviewedWorkbench({
                       (currentPreview.retainedOther?.observedAt ?? '')}
                     plus={previewPlusLines} deka={previewDekaLines}
                     within24h={previewPair24h} sourceFresh={previewPairFresh}
+                    plusObservedAt={previewPlusAt} dekaObservedAt={previewDekaAt}
                     retainedStore={currentPreview.retainedOther?.retailer} />
                 )}
               {currentPreview.stores.map(store => store.matching && (
