@@ -385,7 +385,8 @@ export function OfflineReviewedWorkbench({
     stores: CapturePreviewStore[]
     unobservedOtherStoreRows: number
     pairedWithin24h: boolean
-    retainedOther?: { retailer: CaptureStore; within24h: boolean; observedNs: bigint }
+    retainedOther?: { retailer: CaptureStore; within24h: boolean; observedNs: bigint
+      observedAt: string; matching: NonNullable<CapturePreviewStore['matching']> }
   } | null>(null)
   const [reviewedLines, setReviewedLines] = useState<Record<string, boolean>>({})
   const [rejectedAutoReviews, setRejectedAutoReviews] = useState<Record<string, boolean>>({})
@@ -436,6 +437,42 @@ export function OfflineReviewedWorkbench({
   }
   const capturePreviewFresh = (store: CapturePreviewStore) =>
     freshPreviewInstant(store.observedNs)
+  const previewPlusLines = currentPreview?.stores.find(store => store.retailer === 'PLUS')?.matching?.lines ??
+    (currentPreview?.retainedOther?.retailer === 'PLUS' ? currentPreview.retainedOther.matching.lines : null)
+  const previewDekaLines = currentPreview?.stores.find(store => store.retailer === 'DekaMarkt')?.matching?.lines ??
+    (currentPreview?.retainedOther?.retailer === 'DekaMarkt' ? currentPreview.retainedOther.matching.lines : null)
+  const previewPairFresh = !!currentPreview && currentPreview.stores.every(capturePreviewFresh) &&
+    (!currentPreview.retainedOther || freshPreviewInstant(currentPreview.retainedOther.observedNs))
+  const previewPair24h = !!currentPreview && (currentPreview.retainedOther
+    ? currentPreview.retainedOther.within24h : currentPreview.pairedWithin24h)
+
+
+  function previewMatching(retailer: CaptureStore, products: OfflineStoreProduct[]): NonNullable<CapturePreviewStore['matching']> {
+    const basket = buildOneStoreBasket({
+      store: { id: retailer, name: retailer },
+      plan, recipes, activeDays, products,
+    })
+    return {
+      proposed: basket.matchedLineCount,
+      unresolved: basket.unresolvedLineCount,
+      total: basket.lines.length,
+      lines: basket.lines.map(line => ({
+        id: line.id, label: line.ingredientLabel,
+        amount: line.requirement.amount, unit: line.requirement.unit,
+        status: line.status,
+        product: line.status === 'matched' ? line.productName : null,
+        originalSku: line.status === 'matched' ? line.productId : null,
+        packs: line.status === 'matched' ? line.packs : null,
+        packAmount: line.status === 'matched' ? line.pack.amount : null,
+        packUnit: line.status === 'matched' ? line.pack.unit : null,
+        packCount: line.status === 'matched' ? line.pack.count : null,
+        pricePerPackCents: line.status === 'matched' ? line.pricePerPackCents : null,
+        lineTotalCents: line.status === 'matched' ? line.lineTotalCents : null,
+        unitPrice: line.status === 'matched' ? privateUnitPrice(line) : null,
+        reasons: line.reasons,
+      })),
+    }
+  }
 
   async function previewFilledCsv(files: File[]) {
     if (files.length === 0) return
@@ -507,36 +544,13 @@ export function OfflineReviewedWorkbench({
         // missing). No previous human approval is manufactured.
         const projectedProducts = entry.appendableNewProducts && previousCapture
           ? [...previousCapture.products, ...source.products] : source.products
-        const basket = buildOneStoreBasket({
-          store: { id: entry.retailer, name: entry.retailer },
-          plan, recipes, activeDays, products: projectedProducts,
-        })
-        entry.matching = {
-          proposed: basket.matchedLineCount,
-          unresolved: basket.unresolvedLineCount,
-          total: basket.lines.length,
-          lines: basket.lines.map(line => ({
-            id: line.id, label: line.ingredientLabel,
-            amount: line.requirement.amount, unit: line.requirement.unit,
-            status: line.status,
-            product: line.status === 'matched' ? line.productName : null,
-            originalSku: line.status === 'matched' ? line.productId : null,
-            packs: line.status === 'matched' ? line.packs : null,
-            packAmount: line.status === 'matched' ? line.pack.amount : null,
-            packUnit: line.status === 'matched' ? line.pack.unit : null,
-            packCount: line.status === 'matched' ? line.pack.count : null,
-            pricePerPackCents: line.status === 'matched' ? line.pricePerPackCents : null,
-            lineTotalCents: line.status === 'matched' ? line.lineTotalCents : null,
-            unitPrice: line.status === 'matched' ? privateUnitPrice(line) : null,
-            reasons: line.reasons,
-          })),
-        }
+        entry.matching = previewMatching(entry.retailer, projectedProducts)
       }
       if (version !== importRevision.current || captureWeek !== captureWeekRef.current) return
       // One newly imported store can be compared with the independently
       // retained other capture, not merely the stores inside this CSV file.
       // Never invent a missing retailer instant or silently refresh the old one.
-      let retainedOther: { retailer: CaptureStore; within24h: boolean; observedNs: bigint } | undefined
+      let retainedOther: NonNullable<NonNullable<typeof capturePreview>['retainedOther']> | undefined
       if (storesInPreview.length === 1) {
         const otherStore = stores.find(store => store !== storesInPreview[0].retailer)!
         const other = imported?.captures[otherStore]
@@ -548,6 +562,10 @@ export function OfflineReviewedWorkbench({
             retailer: otherStore,
             within24h: gap <= 86_400_000_000_000n,
             observedNs: other.observedNs,
+            observedAt: other.observedAt,
+            // Existing accepted source is only a *proposed* match in this
+            // pre-import comparison; original facts, time and SKU stay intact.
+            matching: previewMatching(otherStore, other.products),
           }
         }
       }
@@ -2671,17 +2689,14 @@ export function OfflineReviewedWorkbench({
                   )}
                 </details>
               ))}
-              {currentPreview.stores.length === 2 &&
-                currentPreview.stores[0].matching && currentPreview.stores[1].matching &&
-                currentPreview.stores.some(store => store.retailer === 'PLUS') &&
-                currentPreview.stores.some(store => store.retailer === 'DekaMarkt') && (
+              {previewPlusLines && previewDekaLines && (
                   <CapturePairedPreview
                     key={'paired:' + captureWeek + ':' +
-                      currentPreview.stores.map(store => store.observedAt).join(':')}
-                    plus={currentPreview.stores.find(store => store.retailer === 'PLUS')!.matching!.lines}
-                    deka={currentPreview.stores.find(store => store.retailer === 'DekaMarkt')!.matching!.lines}
-                    within24h={currentPreview.pairedWithin24h}
-                    sourceFresh={currentPreview.stores.every(capturePreviewFresh)} />
+                      currentPreview.stores.map(store => store.observedAt).join(':') + ':' +
+                      (currentPreview.retainedOther?.observedAt ?? '')}
+                    plus={previewPlusLines} deka={previewDekaLines}
+                    within24h={previewPair24h} sourceFresh={previewPairFresh}
+                    retainedStore={currentPreview.retainedOther?.retailer} />
                 )}
               {currentPreview.stores.map(store => store.matching && (
                 <CaptureMatchingPreview
@@ -2690,7 +2705,7 @@ export function OfflineReviewedWorkbench({
                   proposed={store.matching.proposed} unresolved={store.matching.unresolved}
                   appended={!!store.appendableNewProducts} reason={humanMatchReason} />
               ))}
-              {currentPreview.unobservedOtherStoreRows > 0 && (
+              {currentPreview.unobservedOtherStoreRows > 0 && !currentPreview.retainedOther && (
                 <p>{currentPreview.unobservedOtherStoreRows}
                   {' '}niet geobserveerde regels bij de andere winkel;
                   geen tweede winkelprijs.</p>

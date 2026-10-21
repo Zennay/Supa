@@ -33,12 +33,13 @@ function localOffer(line: PreviewMatchLine | null) {
  * is not a whole-basket financial comparison or a right to publish prices.
  */
 export function CapturePairedPreview({
-  plus, deka, within24h, sourceFresh,
+  plus, deka, within24h, sourceFresh, retainedStore,
 }: {
   plus: readonly PreviewMatchLine[]
   deka: readonly PreviewMatchLine[]
   within24h: boolean
   sourceFresh: boolean
+  retainedStore?: 'PLUS' | 'DekaMarkt'
 }) {
   const [query, setQuery] = useState('')
   const [openOnly, setOpenOnly] = useState(false)
@@ -78,6 +79,10 @@ export function CapturePairedPreview({
     aria-label="Beide winkels naast elkaar vóór bronovername">
     <summary>Zelfde Planner-vraag bij PLUS en DekaMarkt · bekijk de bronproducten naast elkaar
       {' '}({rows.length - missing} met twee voorstellen; {missing} nog te controleren)</summary>
+    {retainedStore && <p role="status">{retainedStore}: de vergelijking gebruikt
+      de reeds ingevoerde originele opname van deze winkel (ongewijzigd tijdstip).
+      De nieuw ingevoerde andere winkel blijft een concept en heeft nog geen review.
+      Bronmomenten worden niet automatisch gelijkgetrokken.</p>}
     <p className="disclaimer">Twee onafhankelijke <strong>nog niet geaccepteerde</strong>{' '}
       opnameconcepten voor dezelfde Planner-behoefte. De getoonde prijzen zijn uitsluitend
       de ingevoerde lokale bronwaarden, niet persoonlijk bevestigd. Pas ná
