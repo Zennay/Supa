@@ -71,11 +71,6 @@ function sourceReviewReasonOf(ingredient: EditorIngredient): string | null {
     ? ingredient.reviewReason : null
 }
 
-function combinedReviewReason(validation: string | null, source: string | null): string | null {
-  if (validation && source) return validation + ' ' + source
-  return validation ?? source
-}
-
 function validAmount(value: number | null): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 &&
     value <= MAX_CANONICAL_METRIC_AMOUNT &&
@@ -100,7 +95,7 @@ export function prepareImportedRecipeForEditor(
     next.sourceReviewReason = sourceReviewReason
     // Imported data is a proposal, not permission to bypass the editor's
     // canonical quantity limits, whole-piece rule, or source review hold.
-    next.reviewReason = combinedReviewReason(editorValidationReason(next), sourceReviewReason)
+    next.reviewReason = editorValidationReason(next)
     return next
   })
   return { ...draft, ingredients }
@@ -144,7 +139,7 @@ export function updateEditorIngredient(
       (next.unit !== 'piece' || Number.isSafeInteger(next.amount))
     const sourceReviewReason = correctedMeasurementIsValid ? null : previousSourceReview
     next.sourceReviewReason = sourceReviewReason
-    next.reviewReason = combinedReviewReason(validation, sourceReviewReason)
+    next.reviewReason = validation
     return next
   })
   // Only retire the exact parser-generated warning for THIS ingredient after

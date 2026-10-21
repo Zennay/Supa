@@ -74,7 +74,10 @@ export function UserRecipeDraftEditor({
                 <label htmlFor={'recipe-ingredient-amount-' + index}>Hoeveelheid</label>
                 <input id={'recipe-ingredient-amount-' + index} type="text" inputMode="decimal"
                   value={displayMetricEditorAmount(rawAmounts[ingredient.clientId], ingredient.amount)}
-                  aria-describedby={ingredient.reviewReason ? 'recipe-ingredient-warning-' + index : undefined}
+                  aria-describedby={[
+                    ingredient.reviewReason ? 'recipe-ingredient-warning-' + index : '',
+                    ingredient.sourceReviewReason ? 'recipe-ingredient-source-warning-' + index : '',
+                  ].filter(Boolean).join(' ') || undefined}
                   onChange={(event) => {
                     const value = event.target.value.slice(0, 24)
                     setRawAmounts((current) => ({ ...current, [ingredient.clientId]: value }))
@@ -90,6 +93,11 @@ export function UserRecipeDraftEditor({
                 </select>
                 {ingredient.reviewReason && (
                   <p id={'recipe-ingredient-warning-' + index} role="status">{ingredient.reviewReason}</p>
+                )}
+                {ingredient.sourceReviewReason && (
+                  <p id={'recipe-ingredient-source-warning-' + index} role="status">
+                    Bronwaarschuwing: {ingredient.sourceReviewReason}
+                  </p>
                 )}
                 <button type="button" onClick={() => {
                   onChange(removeEditorIngredient(draft, index))
