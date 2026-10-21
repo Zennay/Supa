@@ -239,6 +239,27 @@
 .mixed-store-route__backup h4,.mixed-store-route__backup p { margin:.2rem 0; }
 .mixed-store-route__backup input[type=file] { width:100%; max-width:100%; min-width:0; }
 
+/* Personal comparison discovery controls; never recalculate original totals. */
+.mixed-store-route__unit-controls {
+  display:grid;gap:.7rem;padding:.8rem 1rem;margin:.8rem 0;
+  border:1px solid #d2dfd4;border-radius:12px;background:#f3f8f3;
+}
+.mixed-store-route__unit-controls label {display:grid;gap:.35rem;min-width:0;}
+.mixed-store-route__unit-controls label:has(input[type=checkbox]) {
+  display:flex;align-items:center;gap:.6rem;
+}
+.mixed-store-route__unit-controls input[type=checkbox] {width:20px;height:20px;flex-shrink:0;}
+.mixed-store-route__unit-controls select,
+.mixed-store-route__unit-controls input[type=search] {
+  min-height:44px;max-width:100%;width:100%;box-sizing:border-box;
+  padding:.65rem;border:1px solid #849e89;border-radius:9px;background:white;
+  color:#203f2b;font:inherit;
+}
+.mixed-store-route__unit-controls p {margin:.15rem 0;font-size:.93rem;line-height:1.4;}
+.mixed-store-route__unit-controls :is(input,select):focus-visible {
+  outline:3px solid #226f52;outline-offset:3px;
+}
+
 /* Personal side-by-side unit/whole-pack prices, still legible on narrow phones. */
 .mixed-store-route__unit-breakdown { background:#fff; }
 .mixed-store-route__unit-rows { display:grid; gap:.8rem; }
