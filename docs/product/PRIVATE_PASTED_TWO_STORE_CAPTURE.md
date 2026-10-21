@@ -14,6 +14,8 @@ beide originele opnamemomenten en geeft uitsluitend vrijblijvende conservatieve
 SKU-matching voorstellen. Pas het bestaande aparte *bron overnemen*-proces
 kan resultaten opnemen; persoonlijke product- en prijsreviews blijven vereist.
 
+**Bewerken na voorinzage:** zodra iemand in een geplakt bronblad iets wijzigt, vervalt de vorige nog-niet-overgenomen prijsvoorinzage. Het oorspronkelijke reeds geaccepteerde winkelmandje wordt niet gewist en nieuwe overname vergt weer de oorspronkelijke broncontroles.
+
 **Bronintegriteit:** de volgorde van de twee tekstvakken geeft geen
 supermarkt-identiteit; het bronrecord zelf bepaalt die. Er wordt geen bronmoment,
 retailervergunning, artikelcode, eenheidsprijs, heel-pak prijs of menselijke

@@ -2547,6 +2547,13 @@ export function OfflineReviewedWorkbench({
               Een gedeeltelijk ingevulde regel wordt nooit stilzwijgend weggegooid.</small>
           </label>
           <PrivateCapturePastePreview disabled={busy || plannerCaptureNeeds.length === 0}
+            onDraftChange={() => {
+              // A changed pasted sheet invalidates only the unaccepted
+              // price preview, never a separately accepted active source.
+              ++importRevision.current
+              setCapturePreview(null)
+              setWeekExportMessage('De geplakte bron is gewijzigd. Controleer het hele bronblad opnieuw voordat je prijzen overneemt.')
+            }}
             onPreview={sources => {
               // File identity is used only to reuse the already-reviewed CSV
               // preview route; source identity and facts come from its parser.

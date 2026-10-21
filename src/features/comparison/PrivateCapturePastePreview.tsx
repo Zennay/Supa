@@ -2,10 +2,11 @@ import { useState } from 'react'
 
 /** Human-entered source text, never permission evidence or an accepted price. */
 export function PrivateCapturePastePreview({
-  disabled, onPreview,
+  disabled, onPreview, onDraftChange,
 }: {
   disabled: boolean
   onPreview: (sources: string[]) => void
+  onDraftChange: () => void
 }) {
   const [first, setFirst] = useState('')
   const [second, setSecond] = useState('')
@@ -39,12 +40,16 @@ export function PrivateCapturePastePreview({
       Er worden geen prijzen automatisch geaccepteerd.</p>
     <label>Eerste originele winkelbron
       <textarea rows={5} spellCheck={false} maxLength={256000}
-        value={first} onChange={event => setFirst(event.currentTarget.value)}
+        value={first} disabled={disabled} onChange={event => {
+          onDraftChange(); setFirst(event.currentTarget.value)
+        }}
         placeholder="retailer;observedAt;id;name;packAmount;packUnit;packCount;priceCents;available" />
     </label>
     <label>Tweede originele winkelbron (optioneel)
       <textarea rows={5} spellCheck={false} maxLength={256000}
-        value={second} onChange={event => setSecond(event.currentTarget.value)}
+        value={second} disabled={disabled} onChange={event => {
+          onDraftChange(); setSecond(event.currentTarget.value)
+        }}
         placeholder="Tweede onafhankelijke bronopname, inclusief kopregel" />
     </label>
     <div className="offline-price-workbench__capture-paste-actions">
