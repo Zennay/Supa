@@ -321,13 +321,19 @@ function readablePrivateComparison(
   ].join('\n')
 }
 
-function shoppingChecklist(basket: OneStoreBasket, store: typeof stores[number], done: Record<string, boolean>): string {
+function shoppingChecklist(basket: OneStoreBasket, store: typeof stores[number],
+  done: Record<string, boolean>, currentAndReviewed: boolean): string {
+  // The original source may still contain historic prices. A practical trip
+  // remains exportable without presenting stale/unreviewed euros as today's.
   return [
-    `Supa · boodschappen voor ${basket.store.name} · privé ingevoerde prijzen, niet geverifieerd`,
+    `Supa · boodschappen voor ${basket.store.name} · eigen bron, geen kassagarantie`,
+    currentAndReviewed ? 'Alle regels van dit winkelmandje persoonlijk bevestigd; eigen bronopname nog geldig.' :
+      'Prijsinformatie ONBEKEND: bron verlopen of niet alle regels bevestigd. Geen actueel mandtotaal.',
     ...basket.lines.map(line => line.status === 'matched'
-      ? `${done[shoppingTaskKey(store, line)] ? '☑' : '☐'} ${line.ingredientLabel}: ${line.packs} × ${line.productName} (${exactEuro.formatCents(line.lineTotalCents)})`
-      : `${done[shoppingTaskKey(store, line)] ? '☑' : '☐'} ${line.ingredientLabel}: handmatig kiezen, hoeveelheid ${line.requirement.amount ?? '?'} ${line.requirement.unit}`),
-    'Prijzen zijn alleen indicatief op basis van lokaal aangeleverde gegevens.',
+      ? `${done[shoppingTaskKey(store, line)] ? '☑' : '☐'} ${line.ingredientLabel}: ${line.packs} × ${line.productName} (` +
+        (currentAndReviewed ? exactEuro.formatCents(line.lineTotalCents) : 'prijs onbekend / opnieuw controleren') + ')'
+      : `${done[shoppingTaskKey(store, line)] ? '☑' : '☐'} ${line.ingredientLabel}: handmatig kiezen, hoeveelheid ${line.requirement.amount ?? '?'} ${line.requirement.unit} · prijs onbekend`),
+    'Alleen eigen brongegevens; geen publieke winkelprijs- of besparingsclaim.',
   ].join('\n')
 }
 
@@ -1252,7 +1258,11 @@ export function OfflineReviewedWorkbench({
 
   function downloadShoppingTrip(basket: OneStoreBasket, store: typeof stores[number]) {
     try {
-      const content = shoppingChecklist(basket, store, doneTripItems)
+      const latest = freshReviewedBaskets(reviewedBridge, reviewedBridge?.planKey ?? '', Date.now())
+      // A complete, still-authoritative *identical* source is required for any
+      // monetary cells. Missing or expired sources still export unpriced needs.
+      const eligible = latest?.stores[store]?.basket === basket
+      const content = shoppingChecklist(basket, store, doneTripItems, eligible)
       const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }))
       try {
         const link = document.createElement('a')
@@ -3626,7 +3636,9 @@ export function OfflineReviewedWorkbench({
                         <p>Selecteer en kopieer deze lijst; de tekst blijft op je apparaat.</p>
                         <textarea readOnly rows={Math.min(18, basket.lines.length + 4)}
                           aria-label={`Boodschappenlijst ${store}`}
-                          value={shoppingChecklist(basket, store, doneTripItems)} onFocus={event => event.currentTarget.select()} />
+                          value={shoppingChecklist(basket, store, doneTripItems,
+                            freshReviewedBaskets(reviewedBridge, reviewedBridge?.planKey ?? '', Date.now())?.stores[store]?.basket === basket)}
+                          onFocus={event => event.currentTarget.select()} />
                       </details>
                       {visible.length === 0 && basket.lines.length > 0 &&
                         <p className="offline-price-workbench__trip-complete" role="status">
