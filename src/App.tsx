@@ -4,8 +4,16 @@ const PlannerView = lazy(async () => {
   const module = await import('./features/planner/PlannerView')
   return { default: module.PlannerView }
 })
-import { WeekShareManualCopy } from './features/planner/WeekShareManualCopy'
-import { PlannerPortableWeek } from './features/planner/PlannerPortableWeek.tsx'
+const PlannerPortableWeek = lazy(async () => {
+  const module = await import('./features/planner/PlannerPortableWeek.tsx')
+  return { default: module.PlannerPortableWeek }
+})
+const WeekShareManualCopy = lazy(async () => {
+  const module = await import('./features/planner/WeekShareManualCopy')
+  return { default: module.WeekShareManualCopy }
+})
+
+
 import { currentWeekSharePreview, formatShareableWeek } from './features/planner/weekPlanShare'
 import type { WeekSharePreview } from './features/planner/weekPlanShare'
 // The private price workbench is sizeable and is not needed for Home, Recipes
@@ -790,18 +798,20 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             onReset={resetPlan}
           />
         </Suspense>}
-        {tab === 'planner' && <PlannerPortableWeek
-          preferences={preferences}
-          days={m2InitialPlan.map(meal => meal.day)}
-          recipeIds={recipes.map(recipe => recipe.id)}
-          recipeNames={Object.fromEntries(recipes.map(recipe => [recipe.id, recipe.title]))}
-          storageProtected={persistenceWarning !== null}
-          onRestore={next => {
-            setPreferences(next)
-            setManualWeekCopy(null)
-            setWeekCopyMessage('Weekplanning hersteld; controleer de nieuwe ingrediënten en prijsbronnen.')
-          }}
-        />}
+        {tab === 'planner' && <Suspense fallback={<p role="status">Weekherstelopties worden geladen…</p>}>
+          <PlannerPortableWeek
+            preferences={preferences}
+            days={m2InitialPlan.map(meal => meal.day)}
+            recipeIds={recipes.map(recipe => recipe.id)}
+            recipeNames={Object.fromEntries(recipes.map(recipe => [recipe.id, recipe.title]))}
+            storageProtected={persistenceWarning !== null}
+            onRestore={next => {
+              setPreferences(next)
+              setManualWeekCopy(null)
+              setWeekCopyMessage('Weekplanning hersteld; controleer de nieuwe ingrediënten en prijsbronnen.')
+            }}
+          />
+        </Suspense>}
         {tab === 'planner' && (
           <section className="week-share-panel" aria-label="Weekmenu delen">
             <div className="week-share-actions">
@@ -835,12 +845,9 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               Bereidingstijd en porties opnemen
             </label>
             <p role="status" aria-live="polite">{weekCopyMessage}</p>
-            {currentManualCopy !== null && (
-              <WeekShareManualCopy
-                text={currentManualCopy}
-                rows={Math.min(activeDays.length + 6, 14)}
-              />
-            )}
+            {currentManualCopy !== null && <Suspense fallback={<p role="status">Kopieertekst wordt geladen…</p>}>
+              <WeekShareManualCopy text={currentManualCopy} rows={Math.min(activeDays.length + 6, 14)} />
+            </Suspense>}
           </section>
         )}
         {visitedBasket && (
