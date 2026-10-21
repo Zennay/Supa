@@ -1284,3 +1284,31 @@ worden als nog te controleren gemarkeerd; alleen voldoende ingevulde
 geselecteerde waarnemingen kunnen naar de bestaande originele negenkoloms
 CSV/TSV-broncontrole. Een onvolledig of verlopen winkelmandje blijft
 **prijsverschil onbekend** tot beide echte bronsets afzonderlijk zijn beoordeeld.
+
+## Vrijwillig tijdelijk hervatten na pagina verversen
+
+Het telefoonformulier heeft nu drie expliciete acties: **Schakel tijdelijk
+bewaren in dit tabblad in**, **Hervat tijdelijk concept in dit tabblad** en
+**Wis tijdelijke tabopslag**. Standaard staat automatisch bewaren **uit**.
+Pas na inschakelen schrijft de browser de huidige originele conceptgegevens
+naar **sessionStorage** van dit tabblad, zonder HTTP, cookies, sync of server.
+Als je na het verversen terugkomt, kies je zelf *Hervat*; er wordt niets
+automatisch als retailerbron geopend of als prijs goedgekeurd. Een hersteld
+concept moet nog de bestaande originele broncontrole doorlopen.
+
+De aparte tijdelijke opslag is gebonden aan exact dezelfde week, fysieke
+Planner-vraag en winkelkeuze als het bestaande, streng gevalideerde JSON-
+concept. Concepten ouder dan twaalf uur of met afwijkende tijd-/bestands-
+integriteit worden geweigerd; verlopen of corrupte exemplaren worden bij
+een herstelpoging verwijderd. Bij bewust stoppen wordt de laatste invoer nog
+eenmaal in dit tabblad bewaard, en via *Wis* wordt hij bewust gewist. Begin
+je een nieuw opnameformulier, dan wordt de automatische opslag uitgezet om
+een vorige week niet stilzwijgend te overschrijven.
+
+Dit is een **privé gemaksfunctie**, geen duurzame of versleutelde externe
+back-up. De browser kan sessieopslag wissen; op gedeelde apparaten kunnen
+andere personen met toegang tot hetzelfde tabblad de inhoud zien. Download
+voor bewaardoeleinden expliciet een **eigen JSON-concept**. Een prijs blijft
+onbekend totdat een werkelijk waargenomen bronbestand afzonderlijk lokaal is
+gecontroleerd en de match is geaccepteerd; supermarktbronrechten zijn niet
+automatisch aanwezig.

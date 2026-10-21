@@ -1,9 +1,10 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { CaptureStore } from './plannerPriceCaptureSheet.ts'
 import type { PlannerCaptureGuideNeed } from './plannerPriceCaptureGuide.ts'
 import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
 import { exportLocalCaptureDraft, restoreLocalCaptureDraft } from './localCaptureEditorBackup.ts'
 import { incompleteCaptureFields, offlineCaptureFieldChecklist } from './localCaptureFieldProgress.ts'
+import { saveLocalCaptureTab, readLocalCaptureTab, clearLocalCaptureTab } from './localCaptureSessionDraft.ts'
 
 type Row = {
   state: 'unseen' | 'available' | 'unavailable'
@@ -57,6 +58,8 @@ export function LocalObservationCaptureEditor({
   const [rows, setRows] = useState<Record<string, Row>>({})
   const [moments, setMoments] = useState<Record<string, string>>({})
   const [status, setStatus] = useState('')
+  const [tabAutosave, setTabAutosave] = useState(false)
+  const [tabError, setTabError] = useState('')
   const [search, setSearch] = useState('')
   const [onlyOpen, setOnlyOpen] = useState(false)
   const [portable, setPortable] = useState<{ store: CaptureStore; text: string } | null>(null)
@@ -66,6 +69,79 @@ export function LocalObservationCaptureEditor({
       moments[store] ?? '')] as const))
   const rowKey = (store: CaptureStore, index: number) => store + ':' + index
   const row = (store: CaptureStore, index: number) => rows[rowKey(store, index)] ?? empty()
+  // Saving in this tab is never enabled silently. A deliberate opt-in allows
+  // survival of page refresh while leaving the normal JSON export available.
+  useEffect(() => {
+    if (!tabAutosave || changed) return
+    const timer = window.setTimeout(() => {
+      try {
+        saveLocalCaptureTab(snapshot.fingerprint, { rows, moments })
+        setTabError('')
+      } catch (cause) {
+        setTabAutosave(false)
+        setTabError(cause instanceof Error ? cause.message :
+          'Tijdelijk bewaren in dit tabblad lukt niet; download het JSON-concept.')
+      }
+    }, 400)
+    return () => window.clearTimeout(timer)
+  }, [tabAutosave, changed, snapshot.fingerprint, rows, moments])
+  function enableTabAutosave() {
+    if (tabAutosave) {
+      try {
+        if (!changed) saveLocalCaptureTab(snapshot.fingerprint, { rows, moments })
+        setTabAutosave(false)
+        setStatus('Automatisch tabblad-bewaren uitgeschakeld. Laatste concept blijft tijdelijk herstelbaar.')
+      } catch (cause) {
+        setTabError(cause instanceof Error ? cause.message : 'Bewaren mislukt. Download het privéconcept als JSON.')
+      }
+      return
+    }
+    try {
+      if (changed) throw Error('Planner-selectie gewijzigd. Start eerst bewust een nieuw leeg formulier.')
+      const stored = readLocalCaptureTab(snapshot.fingerprint,
+        snapshot.stores, snapshot.needs.length)
+      if (stored && !window.confirm(
+        'Er bestaat al tijdelijke winkelinvoer in dit tabblad. Zet je automatische opslag aan, dan overschrijf je deze met het huidige formulier. Kies Annuleren om die invoer eerst te hervatten.'
+      )) return
+      setTabAutosave(true)
+      setTabError('')
+      setStatus('Tijdelijke automatische opslag ingeschakeld voor dit tabblad. Geen upload of geaccepteerde bron.')
+    } catch (cause) {
+      setTabError(cause instanceof Error ? cause.message : 'Tijdelijke tabopslag niet beschikbaar.')
+    }
+  }
+  function resumeTabDraft() {
+    try {
+      if (changed) throw Error('Planner-selectie gewijzigd. Tijdelijk hervatten is alleen toegestaan voor de oorspronkelijke week.')
+      const stored = readLocalCaptureTab(snapshot.fingerprint,
+        snapshot.stores, snapshot.needs.length)
+      if (!stored) throw Error('Geen passend tijdelijk privéconcept in dit tabblad.')
+      if ((Object.values(rows).some(value => value.state !== 'unseen') ||
+           Object.values(moments).some(Boolean)) &&
+          !window.confirm('Bestaande formulierinvoer vervangen door je tijdelijke privéconcept?')) return
+      ++changes.current
+      ++latestRestore.current
+      setRows(stored.rows)
+      setMoments(stored.moments)
+      setPortable(null)
+      invalidatePreviewOnce()
+      setStatus('Eerdere invoer uit dit tabblad hervat. Alle winkelproducten en prijzen moeten nog door broncontrole.')
+      setTabError('')
+    } catch (cause) {
+      setTabError(cause instanceof Error ? cause.message : 'Tijdelijk concept niet hervat.')
+    }
+  }
+  function deleteTabDraft() {
+    if (!window.confirm('Tijdelijke tabopslag wissen? Je huidige formulier en zelf gedownloade bestanden blijven staan.')) return
+    try {
+      clearLocalCaptureTab()
+      setTabAutosave(false)
+      setTabError('')
+      setStatus('Tijdelijke tabopslag gewist. De huidige formulierinvoer blijft open.')
+    } catch (cause) {
+      setTabError(cause instanceof Error ? cause.message : 'Kan tijdelijke tabopslag niet verwijderen.')
+    }
+  }
   function invalidatePreviewOnce() {
     // Typing on a phone should not repeatedly rebuild the entire Planner and
     // invalidate the same accepted preview hundreds of times per product.
@@ -111,6 +187,8 @@ export function LocalObservationCaptureEditor({
     ++latestRestore.current
     setSnapshot({ fingerprint: currentFingerprint, needs: [...needs], stores: [...stores] })
     setRows({}); setMoments({}); setStatus(''); setSearch(''); setOnlyOpen(false); setPortable(null)
+    // A new physical week must not quietly overwrite the previous tab copy.
+    setTabAutosave(false)
     invalidatePreviewOnce()
   }
   function backupDraft() {
@@ -440,6 +518,27 @@ export function LocalObservationCaptureEditor({
         </details>
       })}
     </fieldset>)}
+    <section aria-label="Vrijwillige tijdelijke opslag van eigen winkelinvoer">
+      <p><strong>Pagina vernieuwen zonder je winkelinvoer kwijt te raken?</strong>{' '}
+        Alleen wanneer je dit zelf inschakelt bewaart Supa je bronconcept tijdelijk
+        in de sessieopslag van dit tabblad. Herstel is maximaal 12 uur na je
+        laatste invoer toegestaan; daarna wordt het concept bij openen gewist.
+        Dit is geen synchronisatie, retailerbron of prijsacceptatie; op een ander
+        toestel blijft een eigen gedownload JSON-bestand nodig.</p>
+      <div className="offline-price-workbench__actions">
+        <button type="button" className="ghost-button" disabled={changed}
+          aria-pressed={tabAutosave} onClick={enableTabAutosave}>
+          {tabAutosave ? 'Schakel tijdelijk bewaren uit' : 'Schakel tijdelijk bewaren in dit tabblad in'}
+        </button>
+        <button type="button" className="ghost-button" disabled={changed}
+          onClick={resumeTabDraft}>Hervat tijdelijk concept in dit tabblad</button>
+        <button type="button" className="ghost-button"
+          onClick={deleteTabDraft}>Wis tijdelijke tabopslag</button>
+      </div>
+      {tabError && <p role="alert">{tabError}</p>}
+      {tabAutosave && <p role="status">Tijdelijke opslag staat aan voor dit tabblad;
+        download ook een eigen JSON-bestand voor bewaren buiten deze sessie.</p>}
+    </section>
     <div className="offline-price-workbench__actions">
       <button type="button" className="ghost-button" onClick={backupDraft}>
         Bewaar ook onvolledige invoer als privéconcept (JSON)
