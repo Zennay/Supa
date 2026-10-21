@@ -7,6 +7,7 @@ export type UnpricedShoppingNote = { id: string; label: string; store: 'Algemeen
 type SetNotes = Dispatch<SetStateAction<UnpricedShoppingNote[]>>
 const stores = ['Algemeen', 'PLUS', 'DekaMarkt'] as const
 const privateSessionKey = 'supa:unpriced-notes:session:v1'
+const privateDeviceKey = 'supa:unpriced-notes:device:v1'
 const safeLabel = (value: string) => value.replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/gu, ' ')
   .replace(/\s+/g, ' ').trim()
 const duplicateKey = (store: UnpricedShoppingNote['store'], label: string) =>
@@ -52,23 +53,51 @@ export function ManualShoppingNotes({ notes, setNotes }: {
   const [sessionProtected, setSessionProtected] = useState(false)
   const [sessionRaw, setSessionRaw] = useState<string | null>(null)
   const [sessionMessage, setSessionMessage] = useState('')
-  // A stored record exists only after a previous explicit user opt-in.
+  const [deviceEnabled, setDeviceEnabled] = useState(false)
+  const [deviceProtected, setDeviceProtected] = useState(false)
+  const [deviceRaw, setDeviceRaw] = useState<string | null>(null)
+  const [deviceMessage, setDeviceMessage] = useState('')
+  // Never silently choose between two different private copies. A saved record
+  // proves an earlier explicit opt-in, never permission to replace live notes.
   useEffect(() => {
+    let tabRaw: string | null = null
+    let persistentRaw: string | null = null
+    try { tabRaw = window.sessionStorage.getItem(privateSessionKey) }
+    catch {
+      setSessionProtected(true)
+      setSessionMessage('Tabopslag is niet beschikbaar. Je kunt een JSON-backup gebruiken.')
+    }
+    try { persistentRaw = window.localStorage.getItem(privateDeviceKey) }
+    catch {
+      setDeviceProtected(true)
+      setDeviceMessage('Apparaatopslag is niet beschikbaar; er is niets opgeslagen.')
+    }
     try {
-      const raw = window.sessionStorage.getItem(privateSessionKey)
-      if (raw === null) return
-      if (new TextEncoder().encode(raw).length > PRIVATE_NOTES_BACKUP_MAX_BYTES) throw Error('size')
-      const restored = normalizePrivateNotes(JSON.parse(raw))
-      if (notes.length !== 0 && serializePrivateNotes(notes) !== serializePrivateNotes(restored)) {
-        throw Error('different-current-list')
+      const sources = [tabRaw, persistentRaw].filter((raw): raw is string => raw !== null)
+      if (!sources.length) return
+      const normalized = sources.map(raw => {
+        if (new TextEncoder().encode(raw).length > PRIVATE_NOTES_BACKUP_MAX_BYTES) throw Error('size')
+        return serializePrivateNotes(normalizePrivateNotes(JSON.parse(raw)))
+      })
+      if (normalized.some(value => value !== normalized[0]) ||
+          (notes.length > 0 && serializePrivateNotes(notes) !== normalized[0])) {
+        throw Error('conflicting-private-copies')
       }
+      const restored = normalizePrivateNotes(JSON.parse(sources[0]))
       if (notes.length === 0) setNotes(current => current.length ? current : restored)
-      setSessionRaw(raw)
-      setSessionEnabled(true)
-      setSessionMessage('Je eerder bewust bewaarde lijst is uit dit browsertabblad hersteld.')
+      if (tabRaw !== null) {
+        setSessionRaw(tabRaw); setSessionEnabled(true)
+        setSessionMessage('De eerder bewaarde tablijst is veilig hersteld.')
+      }
+      if (persistentRaw !== null) {
+        setDeviceRaw(persistentRaw); setDeviceEnabled(true)
+        setDeviceMessage('Je bewust bewaarde apparaatlijst is hersteld, ook na het sluiten van de tab.')
+      }
     } catch {
       setSessionProtected(true)
-      setSessionMessage('Onbekende of afwijkende sessielijst blijft onaangeroerd. Gebruik de JSON-backup.')
+      setDeviceProtected(true)
+      setSessionMessage('Twee privéversies verschillen of opslag is ongeldig: niets overschreven. Herstel via je JSON-backup.')
+      setDeviceMessage('Opgeslagen privéversies blijven beschermd tot je ze handmatig controleert.')
     }
   }, [])
   useEffect(() => {
@@ -91,6 +120,69 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       setSessionMessage('Opslaan in dit tabblad is geweigerd; download je JSON-backup.')
     }
   }, [sessionEnabled, sessionProtected, sessionRaw, notes])
+  // Device persistence is separate from the tab: explicit opt-in only,
+  // private browser storage, no retailer source data and no cloud writes.
+  useEffect(() => {
+    if (!deviceEnabled || deviceProtected) return
+    try {
+      const raw = window.localStorage.getItem(privateDeviceKey)
+      if (raw !== deviceRaw) {
+        setDeviceProtected(true)
+        setDeviceEnabled(false)
+        setDeviceMessage('Een ander tabblad heeft de apparaatlijst gewijzigd; deze versie wordt niet overschreven.')
+        return
+      }
+      const next = serializePrivateNotes(notes)
+      if (new TextEncoder().encode(next).length > PRIVATE_NOTES_BACKUP_MAX_BYTES) throw Error('size')
+      if (raw !== next) window.localStorage.setItem(privateDeviceKey, next)
+      if (deviceRaw !== next) setDeviceRaw(next)
+    } catch {
+      setDeviceEnabled(false)
+      setDeviceProtected(true)
+      setDeviceMessage('Bewaren op dit apparaat is gestopt. Exporteer je huidige lijst als JSON-backup.')
+    }
+  }, [deviceEnabled, deviceProtected, deviceRaw, notes])
+  useEffect(() => {
+    const onOtherTab = (event: StorageEvent) => {
+      if (!deviceEnabled || deviceProtected || (event.key !== privateDeviceKey && event.key !== null)) return
+      if (event.newValue !== deviceRaw) {
+        setDeviceEnabled(false)
+        setDeviceProtected(true)
+        setDeviceMessage('Een andere tab heeft de opgeslagen boodschappen veranderd. Je huidige lijst blijft open; gebruik JSON voor veilig samenvoegen.')
+      }
+    }
+    window.addEventListener('storage', onOtherTab)
+    return () => window.removeEventListener('storage', onOtherTab)
+  }, [deviceEnabled, deviceProtected, deviceRaw])
+  function changeDeviceOptIn(checked: boolean) {
+    if (deviceProtected) return
+    try {
+      const actual = window.localStorage.getItem(privateDeviceKey)
+      if (actual !== deviceRaw) {
+        setDeviceEnabled(false)
+        setDeviceProtected(true)
+        setDeviceMessage('Er bestaat een andere apparaatversie. Je huidige boodschappen worden niet overschreven.')
+        return
+      }
+      if (!checked) {
+        if (actual !== null) window.localStorage.removeItem(privateDeviceKey)
+        setDeviceRaw(null)
+      } else {
+        const next = serializePrivateNotes(notes)
+        if (new TextEncoder().encode(next).length > PRIVATE_NOTES_BACKUP_MAX_BYTES) throw Error('size')
+        window.localStorage.setItem(privateDeviceKey, next)
+        setDeviceRaw(next)
+      }
+      setDeviceEnabled(checked)
+      setDeviceMessage(checked
+        ? 'Boodschappen staan privé op dit apparaat en komen terug na sluiten van de tab. Geen server of prijsdata.'
+        : 'Apparaatkopie gewist. De geopende lijst en eventuele JSON-backup blijven behouden.')
+    } catch {
+      setDeviceEnabled(false)
+      setDeviceProtected(true)
+      setDeviceMessage('Apparaatopslag is geweigerd. Je geopende lijst blijft onaangeroerd.')
+    }
+  }
   function changeSessionOptIn(checked: boolean) {
     if (sessionProtected) return
     try {
@@ -707,8 +799,9 @@ export function ManualShoppingNotes({ notes, setNotes }: {
   return <section className="manual-shopping-notes" aria-label="Mijn ongeprijsde boodschappen">
     <h2>Zelf toevoegen, zonder prijs</h2>
     <p>Ook zonder prijsbestanden boodschappen toevoegen. Standaard tijdelijk; alleen met
-      jouw toestemming blijven de vinkjes en artikelen na verversen in deze browsertab.
-      Nooit meegenomen in weekbudget, twee winkelmanden of prijsverschil.</p>
+      jouw toestemming kunnen de vinkjes en artikelen in deze browsertab of langer
+      op dit apparaat blijven staan. Nooit meegenomen in weekbudget, twee winkelmanden
+      of prijsverschil; sluit je de tab zonder apparaatopslag, dan vervalt de lijst.</p>
     <form onSubmit={add} className="manual-shopping-notes__add">
       <label>Wat wil je meenemen?<input value={name} maxLength={140} autoComplete="off"
         placeholder="Bijv. vuilniszakken" onChange={event => setName(event.target.value)} /></label>
@@ -949,6 +1042,15 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       <small>Niet automatisch ingeschakeld. Geen cloud, geen winkelprijzen; stoppen wist
         alleen deze optionele sessiekopie, niet je geopende lijst of JSON-backup.</small>
       {sessionMessage && <p role="status" aria-live="polite">{sessionMessage}</p>}
+      <label><input type="checkbox" checked={deviceEnabled} disabled={deviceProtected}
+        onChange={event => changeDeviceOptIn(event.target.checked)} />
+        Bewaar mijn ongeprijsde boodschappen op dit apparaat (ook na sluiten)</label>
+      <small>Alleen na jouw keuze. Versleuteling is afhankelijk van dit apparaat en
+        browserprofiel; anderen met toegang tot dit profiel kunnen de lijst zien.
+        Geen account, cloud, retailerprijzen, automatische synchronisatie of server.
+        Uitschakelen verwijdert de apparaatkopie, niet je geopende lijst.
+        Bewaar een eigen JSON-backup voordat je de browsergegevens wist.</small>
+      {deviceMessage && <p role="status" aria-live="polite">{deviceMessage}</p>}
     </section>
     <div className="manual-shopping-notes__actions">
       <button type="button" disabled={!visible.length} onClick={() => setExportVisible(value => !value)}>

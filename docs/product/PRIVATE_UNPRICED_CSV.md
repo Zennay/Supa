@@ -14,3 +14,18 @@ CSV-uitvoer zet potentieel uitvoerbare spreadsheetformules om naar letterlijke t
 De JSON-backup blijft de volledige private gegevensbackup. TXT, kopieertekst, mobiel delen en offline HTML-print blijven onafhankelijk beschikbaar.
 
 **Releasegrens:** deze functionaliteit is pas op main beschikbaar na een daadwerkelijk gemergede PR; een bouw- of branch-commit op zichzelf is niet live.
+
+## Optionele lokale bewaarmogelijkheden
+
+Persoonlijke ongeprijsde artikelen blijven standaard alleen in de geopende app. Er zijn
+nu **twee aparte, vrijwillige** keuzes: in dit browsertabblad bewaren
+(`sessionStorage`) of duurzaam in dit browserprofiel op het apparaat bewaren
+(`localStorage`, ook na sluiten van de tab). Beide kopieën bevatten uitsluitend
+privéartikelen/winkels/vinkjes met maximaal 100 regels, geen supermarktprijzen,
+bronmoment, SKU of toestemming. Er is geen server- of cloudsync.
+
+De app controleert een bestaande kopie vóór overschrijven. Bij een wijziging vanuit
+een ander tabblad of tegenstrijdige opgeslagen versies stopt automatisch bewaren
+zonder de geopende lijst te vervangen. Gebruik dan de JSON-backup om artikelen
+expliciet te controleren en samen te voegen. De nieuwe keuze wordt nooit stilzwijgend
+ingeschakeld en uitschakelen wist alleen de gekozen bewaarde apparaatkopie.
