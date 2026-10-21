@@ -352,9 +352,36 @@ export function LocalTwoStorePriceEditor({
     return []
   })
   const activeNeeds = needs.filter(item => item.label.trim() && item.query.trim())
+  // Two distinct draft product definitions must not claim the same original
+  // store SKU. The canonical source generator already refuses this conflict;
+  // surface it BEFORE it can imply a plausible two-store difference.
+  const conflictingCodes = selectedStores.flatMap(store => {
+    const byCode = new Map<string, { signature: string; index: number; label: string }[]>()
+    activeNeeds.forEach((need, index) => {
+      const row = rows[key(store, need.id)] ?? emptyDraft(need.unit)
+      if (!isEnteredOwnCapture(row)) return
+      const code = row.sourceId ?? ''
+      const signature = JSON.stringify([
+        row.name, row.packAmount ? amountOrNull(row.packAmount.trim()) : null,
+        row.packUnit, Number(row.packCount), row.available,
+        row.available ? eurosToCents(row.priceEuros.trim()) : null,
+      ])
+      const group = byCode.get(code) ?? []
+      group.push({ signature, index, label: need.label })
+      byCode.set(code, group)
+    })
+    return [...byCode].flatMap(([sourceId, group]) => {
+      if (group.length < 2 || group.every(item =>
+        item.signature === group[0].signature)) return []
+      return [{ store, sourceId, indices: group.map(item => item.index),
+        labels: group.map(item => item.label) }]
+    })
+  })
+  const conflictingNeedIndices = new Set(conflictingCodes.flatMap(item => item.indices))
   // Count the SAME physical ingredient needs with two complete provisional
   // price entries. No partial total or store winner may be inferred from this.
-  const readyPairedDraftIds = new Set(activeNeeds.filter(need =>
+  const readyPairedDraftIds = new Set(activeNeeds.filter((need, index) =>
+    !conflictingNeedIndices.has(index) &&
     currentDraftPackMath(rows[key('PLUS', need.id)] ?? emptyDraft(need.unit), need) &&
     currentDraftPackMath(rows[key('DekaMarkt', need.id)] ?? emptyDraft(need.unit), need),
   ).map(need => need.id))
@@ -362,6 +389,7 @@ export function LocalTwoStorePriceEditor({
   // shopper-typed candidate SKUs have not passed the actual source matcher or
   // human product-equivalence review, so the result is never a basket winner.
   const provisionalDifferences = sameTimePair ? activeNeeds.flatMap((need, index) => {
+    if (conflictingNeedIndices.has(index)) return []
     const plus = currentDraftPackMath(rows[key('PLUS', need.id)] ?? emptyDraft(need.unit), need)
     const deka = currentDraftPackMath(rows[key('DekaMarkt', need.id)] ?? emptyDraft(need.unit), need)
     if (!plus || !deka) return []
@@ -886,14 +914,18 @@ export function LocalTwoStorePriceEditor({
         }
       })
       const alreadyPaired = new Set(provisionalDifferences.map(item => item.need.id))
-      const unpaired = activeNeeds.filter(need => !alreadyPaired.has(need.id)).map(need => ({
-        ingredient: need.label,
-        demand: String(need.amount ?? 'onbekend') + ' ' + need.unit,
-        plusStatus: captureStatusNames[ownCaptureStatus(
-          rows[key('PLUS', need.id)] ?? emptyDraft(need.unit), need)],
-        dekaStatus: captureStatusNames[ownCaptureStatus(
-          rows[key('DekaMarkt', need.id)] ?? emptyDraft(need.unit), need)],
-      }))
+      const unpaired = activeNeeds.flatMap((need, index) => {
+        if (alreadyPaired.has(need.id)) return []
+        const status = (store: OfflineRetailer) => conflictingCodes.some(conflict =>
+          conflict.store === store && conflict.indices.includes(index))
+          ? 'Oorspronkelijke productcode conflicteert met andere winkelregel'
+          : captureStatusNames[ownCaptureStatus(
+            rows[key(store, need.id)] ?? emptyDraft(need.unit), need)]
+        return [{
+          ingredient: need.label, demand: String(need.amount ?? 'onbekend') + ' ' + need.unit,
+          plusStatus: status('PLUS'), dekaStatus: status('DekaMarkt'),
+        }]
+      })
       const { privateDraftReviewHtml } = await import('./privateDraftReviewHtml.ts')
       if (identity !== currentDraftReviewIdentity.current ||
           Date.now() - Math.min(...instants) > 604800000) {
@@ -1387,6 +1419,29 @@ export function LocalTwoStorePriceEditor({
         </select>
       </label>
       <p className="disclaimer">Voer alleen winkels in die je werkelijk hebt waargenomen. De andere winkel blijft onbekend; je kunt zijn aparte bronopname later toevoegen.</p>
+      {conflictingCodes.length > 0 && <section className="offline-manual-editor__source-conflicts"
+        role="alert" aria-label="Tegenstrijdige originele winkelcodes">
+        <strong>{conflictingCodes.length} tegenstrijdige winkelcode(s) gevonden</strong>
+        <p>Dezelfde code is bij dezelfde winkel met verschillende productnamen,
+          verpakkingen, prijzen of voorraad ingevoerd. Deze regels krijgen
+          geen voorlopig twee-winkelprijsverschil en kunnen niet samen als
+          één echte broncode worden geïmporteerd. Corrigeer aan de hand van de
+          originele winkelwaarneming, niet door codes te verzinnen.</p>
+        <ul>{conflictingCodes.map(conflict => <li key={key(conflict.store, conflict.sourceId)}>
+          <strong>{conflict.store}: {conflict.sourceId}</strong>
+          <div className="offline-manual-editor__review-actions">
+            {conflict.indices.map((index, position) => <button type="button"
+              key={index} className="ghost-button" onClick={() => {
+                setOnlyOpenRows(false)
+                window.requestAnimationFrame(() => {
+                  const field = document.getElementById('own-price-' + conflict.store + '-' + index)
+                  field?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                  field?.querySelector('input')?.focus({ preventScroll: true })
+                })
+              }}>Controleer {conflict.labels[position]}</button>)}
+          </div>
+        </li>)}</ul>
+      </section>}
       {sourceSelection === 'both' && activeNeeds.length > 0 && (
         <section className="offline-manual-editor__pair-matrix" aria-label="PLUS en DekaMarkt per ingrediënt">
           <h4>Hetzelfde weekmandje · voortgang per winkel</h4>
