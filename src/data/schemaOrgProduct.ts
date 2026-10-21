@@ -279,15 +279,35 @@ function extractPack(product: JsonObject): RawPack {
   const rawValue = weight ? asString(weight.value) : null
   if (!rawValue) return unknownPack()
 
-  const normalized = normalizePackText(rawValue)
-  if (normalized.amount === null || normalized.unit === 'unknown') {
-    return unknownPack()
+  const parsePack = (text: string): RawPack | null => {
+    const normalized = normalizePackText(text)
+    if (normalized.amount === null || normalized.unit === 'unknown') return null
+    return { rawText: normalized.rawText, amount: normalized.amount, unit: normalized.unit }
   }
 
+  const direct = parsePack(rawValue)
+  const unitFromCode = weight ? schemaUnitCode(weight.unitCode) : null
+  const unitText = weight ? asString(weight.unitText) : null
+  const fromCode = unitFromCode ? parsePack(rawValue + ' ' + unitFromCode) : null
+  const fromUnitText = unitText
+    ? (parsePack(unitText) ?? parsePack(rawValue + ' ' + unitText))
+    : null
+  const candidates = [direct, fromCode, fromUnitText].filter(
+    (candidate): candidate is RawPack => candidate !== null,
+  )
+  if (candidates.length === 0) return unknownPack()
+
+  // Contradictory explicit value/unit evidence is not resolved by choosing
+  // whichever field happens to be encountered first.
+  const signatures = new Set(candidates.map(candidate => candidate.amount + ':' + candidate.unit))
+  if (signatures.size !== 1) return unknownPack()
+
+  const selected = direct ?? fromCode ?? fromUnitText
+  if (!selected) return unknownPack()
   return {
-    rawText: normalized.rawText,
-    amount: normalized.amount,
-    unit: normalized.unit,
+    rawText: direct?.rawText ?? (rawValue + ' ' + (unitText ?? unitFromCode ?? '')),
+    amount: selected.amount,
+    unit: selected.unit,
   }
 }
 
