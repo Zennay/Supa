@@ -11,22 +11,17 @@ const htmlText = (raw: string): string => raw
   .replaceAll('"', '&quot;')
   .replaceAll("'", '&#39;')
 
-export function makePrintablePlannerCaptureHtml(
-  needs: readonly PlannerCaptureGuideNeed[],
-  selectedStores: readonly CaptureStore[],
-  // Optional private recipe provenance, aligned with the same canonical needs
-  // order as the CSV. Never derived from retailer product names or prices.
-  originalRecipeLines?: readonly (readonly string[])[],
-): string {
-  makeBlankPlannerCaptureCsv(needs, selectedStores)
-  if (originalRecipeLines && (
-    originalRecipeLines.length !== needs.length ||
-    originalRecipeLines.some(lines => !Array.isArray(lines) ||
-      lines.length > 1_000 || lines.some(line => typeof line !== 'string' || line.length > 2_000))
-  )) throw new Error('De recept-herkomst komt niet overeen met de fysieke CSV-rijen.')
-  const sections = selectedStores.map((store, storeIndex) => {
+type PrintableSection = Readonly<{
+  store: CaptureStore
+  needs: readonly PlannerCaptureGuideNeed[]
+  rowStart: number
+  originalRecipeLines?: readonly (readonly string[])[]
+}>
+
+function renderCaptureSections(entries: readonly PrintableSection[]): string {
+  return entries.map(({ store, needs, rowStart, originalRecipeLines }) => {
     const rows = needs.map((need, index) => {
-      const rowNumber = 2 + storeIndex * needs.length + index
+      const rowNumber = rowStart + index
       const amount = readablePlannerDemandAmount(need.amount)
       const physical = amount === 'hoeveelheid nog controleren'
         ? 'Hoeveelheid nog controleren' : amount + ' ' + need.unit
@@ -59,7 +54,9 @@ export function makePrintablePlannerCaptureHtml(
       '<p class="disclaimer">Niet gevonden? Laat de bronvelden leeg. ' +
       'Een oningevulde rij is geen geprijsd product.</p></section>'
   }).join('\n')
+}
 
+function printableDocument(sections: string, intro: string): string {
   return `<!doctype html>
 <html lang="nl">
 <head>
@@ -93,7 +90,7 @@ td { height: 70px; }
 </head>
 <body>
 <h1>SUPA · persoonlijke prijsopname</h1>
-<p>Dit formulier hoort bij het door jou gekozen Planner-weekmenu.</p>
+<p>${htmlText(intro)}</p>
 <div class="notice"><strong>Leeg formulier, géén bewijs van winkelprijzen of besparing.</strong>
 Noteer uitsluitend werkelijk geobserveerde originele bronartikelen, verpakkingen,
 beschikbaarheid en prijzen die je rechtmatig mag vastleggen. Vul dezelfde echte
@@ -103,4 +100,55 @@ Voor een privé-tweewinkelverschil zijn twee complete recente mandjes en jouw br
 ${sections}
 </body>
 </html>`
+}
+
+export function makePrintablePlannerCaptureHtml(
+  needs: readonly PlannerCaptureGuideNeed[],
+  selectedStores: readonly CaptureStore[],
+  // Optional private recipe provenance, aligned with the same canonical needs
+  // order as the CSV. Never derived from retailer product names or prices.
+  originalRecipeLines?: readonly (readonly string[])[],
+): string {
+  makeBlankPlannerCaptureCsv(needs, selectedStores)
+  if (originalRecipeLines && (
+    originalRecipeLines.length !== needs.length ||
+    originalRecipeLines.some(lines => !Array.isArray(lines) ||
+      lines.length > 1_000 || lines.some(line => typeof line !== 'string' || line.length > 2_000))
+  )) throw new Error('De recept-herkomst komt niet overeen met de fysieke CSV-rijen.')
+  const sections = renderCaptureSections(selectedStores.map((store, storeIndex) => ({
+    store,
+    needs,
+    rowStart: 2 + storeIndex * needs.length,
+    originalRecipeLines,
+  })))
+  return printableDocument(sections, 'Dit formulier hoort bij het door jou gekozen Planner-weekmenu.')
+}
+
+/**
+ * Printable counterpart of the selective two-store CSV. Each retailer may have
+ * a different number of missing products; row numbers must follow the exact
+ * store-grouped CSV, not repeat the same Planner demand for both stores.
+ */
+export function makePrintableSelectivePlannerCaptureHtml(
+  needsByStore: Readonly<Record<CaptureStore, readonly PlannerCaptureGuideNeed[]>>,
+): string {
+  if (!needsByStore || !Array.isArray(needsByStore.PLUS) ||
+      !Array.isArray(needsByStore.DekaMarkt)) {
+    throw new Error('De ontbrekende winkelbehoeften zijn ongeldig.')
+  }
+  const sections: PrintableSection[] = []
+  let rowStart = 2
+  for (const store of ['PLUS', 'DekaMarkt'] as const) {
+    const needs = needsByStore[store]
+    if (needs.length > 200) throw new Error('Maximaal 200 originele ingrediënten per winkel.')
+    if (!needs.length) continue
+    makeBlankPlannerCaptureCsv(needs, [store])
+    sections.push({ store, needs, rowStart })
+    rowStart += needs.length
+  }
+  if (!sections.length) throw new Error('Geen openstaande winkelproducten.')
+  return printableDocument(
+    renderCaptureSections(sections),
+    'Dit gecombineerde formulier bevat per winkel alleen de ontbrekende producten uit jouw geselecteerde Planner-week. De rijnummers volgen het bijbehorende gecombineerde CSV-bestand.',
+  )
 }
