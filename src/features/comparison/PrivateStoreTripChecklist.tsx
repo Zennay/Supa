@@ -160,15 +160,22 @@ function readSavedTrip(basket: OneStoreBasket, observedAt: string): SavedState {
 /** In-memory checklist, with optional per-tab recovery for the SAME basket. */
 export function PrivateStoreTripChecklist({
   basket, observedAt, fresh, eligibleNow = () => fresh,
+  checkedIds, onToggleChecked, onClearChecked,
 }: {
   basket: OneStoreBasket
   observedAt: string
   fresh: boolean
   eligibleNow?: () => boolean
+  /** Reuse the host workbench's existing per-shop ticks when supplied. */
+  checkedIds?: ReadonlySet<string>
+  onToggleChecked?: (id: string) => void
+  onClearChecked?: () => void
 }) {
   const copyDetailsRef = useRef<HTMLDetailsElement>(null)
   const copyTextareaRef = useRef<HTMLTextAreaElement>(null)
-  const [initial] = useState(() => readSavedTrip(basket, observedAt))
+  const [initial] = useState(() => checkedIds === undefined
+    ? readSavedTrip(basket, observedAt)
+    : { enabled: false, protected: false, raw: null, done: [] as string[] })
   const [done, setDone] = useState<ReadonlySet<string>>(() => new Set(initial.done))
   const [saveEnabled, setSaveEnabled] = useState(initial.enabled)
   const [storageProtected, setStorageProtected] = useState(initial.protected)
@@ -177,7 +184,7 @@ export function PrivateStoreTripChecklist({
     ? 'Een eerder concept voor een andere winkelmand of versie is beschermd tegen overschrijven.'
     : initial.enabled ? 'Vinkjes voor ditzelfde mandje hersteld uit de huidige browsertab.' : '')
   useEffect(() => {
-    if (!saveEnabled || storageProtected || typeof window === 'undefined') return
+    if (checkedIds !== undefined || !saveEnabled || storageProtected || typeof window === 'undefined') return
     try {
       const current = readProgressStorage(basket)
       if (current !== savedRaw) {
@@ -197,7 +204,7 @@ export function PrivateStoreTripChecklist({
       setSaveEnabled(false)
       setMessage('Vinkjes kunnen niet worden bewaard in dit tabblad. Download je lijst.')
     }
-  }, [saveEnabled, storageProtected, savedRaw, basket, observedAt, done])
+  }, [checkedIds, saveEnabled, storageProtected, savedRaw, basket, observedAt, done])
 
   function changeOptIn(checked: boolean) {
     if (checked) {
@@ -239,8 +246,9 @@ export function PrivateStoreTripChecklist({
 
   const consistent = useMemo(() => basketConsistent(basket), [basket])
   const lines = consistent ? basket.lines : []
-  const completed = lines.filter(line => done.has(line.id)).length
-  const text = consistent ? checklistText(basket, done, observedAt, fresh) : ''
+  const visibleDone = checkedIds ?? done
+  const completed = lines.filter(line => visibleDone.has(line.id)).length
+  const text = consistent ? checklistText(basket, visibleDone, observedAt, fresh) : ''
 
   if (!consistent) {
     return <div className="private-store-trip" role="alert">
@@ -250,6 +258,12 @@ export function PrivateStoreTripChecklist({
 
   function toggle(id: string) {
     if (!eligibleNow()) { setMessage('De winkelbron is verlopen of vervangen. Vernieuw de opname in Vergelijk.'); return }
+    if (checkedIds !== undefined) {
+      if (!onToggleChecked) { setMessage('Vinkje kon niet worden bijgewerkt.'); return }
+      onToggleChecked(id)
+      setMessage('Deze vinkjes staan ook in de bronlijst beneden.')
+      return
+    }
     setDone(previous => {
       const next = new Set(previous)
       if (next.has(id)) next.delete(id)
@@ -301,12 +315,12 @@ export function PrivateStoreTripChecklist({
     </div>
     <progress value={completed} max={Math.max(lines.length, 1)}
       aria-label={'Boodschappenvoortgang ' + basket.store.name} />
-    <label className="private-store-trip__save">
+    {checkedIds === undefined && <label className="private-store-trip__save">
       <input type="checkbox" checked={saveEnabled} disabled={storageProtected}
         onChange={event => changeOptIn(event.target.checked)} />
       <span>Bewaar mijn vinkjes in dit browsertabblad (optioneel)</span>
-    </label>
-    {storageProtected && <div className="private-store-trip__warning" role="status">
+    </label>}
+    {checkedIds === undefined && storageProtected && <div className="private-store-trip__warning" role="status">
       <p>Een eerder concept voor een andere opname of onbekende versie is beschermd.
         Je kunt deze lijst gewoon afvinken en downloaden.</p>
       <button type="button" className="ghost-button" onClick={releaseProtectedConcept}>
@@ -320,8 +334,8 @@ export function PrivateStoreTripChecklist({
     <ul className="private-store-trip__items">
       {lines.map(line => <li key={line.id}>
         <label>
-          <input type="checkbox" checked={done.has(line.id)} onChange={() => toggle(line.id)} />
-          <span className={done.has(line.id) ? 'private-store-trip__checked' : ''}>
+          <input type="checkbox" checked={visibleDone.has(line.id)} onChange={() => toggle(line.id)} />
+          <span className={visibleDone.has(line.id) ? 'private-store-trip__checked' : ''}>
             <strong>{line.ingredientLabel}</strong>
             <small>{line.status === 'matched'
               ? line.packs + ' × ' + line.productName + ' · ' + euro.format(line.lineTotalCents / 100)
@@ -338,7 +352,7 @@ export function PrivateStoreTripChecklist({
       <button type="button" className="ghost-button" disabled={!lines.length}
         onClick={selectListText}>Selecteer lijsttekst</button>
       <button type="button" className="ghost-button" disabled={!completed}
-        onClick={() => { setDone(new Set()); setMessage('Alle vinkjes in dit scherm gewist.') }}>
+        onClick={() => { if (checkedIds !== undefined) onClearChecked?.(); else setDone(new Set()); setMessage('Alle vinkjes voor deze winkel gewist.') }}>
         Wis vinkjes
       </button>
     </div>
@@ -350,10 +364,12 @@ export function PrivateStoreTripChecklist({
         onFocus={event => event.currentTarget.select()} />
     </details>
     <p className="private-store-trip__notice">
+      {checkedIds !== undefined ? 'Deze vinkjes zijn dezelfde als in de originele bronlijst beneden. Bewaar ze via de bestaande JSON-download van de winkelmand; de snelle lijst maakt geen tweede opgeslagen concept.' : <>
       Zonder jouw toestemming blijven vinkjes alleen in dit scherm. Met opt-in worden uitsluitend
       de vinkjes en een mandgebonden sleutel lokaal in de sessieopslag van dit tabblad bewaard;
       een andere bronopname of week krijgt nooit automatisch jouw oude vinkjes.
       Deze privéopname wordt niet vermengd met demo-/algemene lijsten en gaat niet naar de server.
+      </>}
     </p>
   </section>
 }

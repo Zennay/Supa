@@ -3432,6 +3432,20 @@ export function OfflineReviewedWorkbench({
                       basket={original.basket}
                       observedAt={original.observedAt}
                       fresh
+                      checkedIds={new Set(original.basket.lines.filter(line =>
+                        doneTripItems[shoppingTaskKey(store, line)]).map(line => line.id))}
+                      onToggleChecked={id => {
+                        const line = original.basket.lines.find(item => item.id === id)
+                        if (!line) return
+                        const key = shoppingTaskKey(store, line)
+                        setDoneTripItems(previous => ({ ...previous, [key]: !previous[key] }))
+                      }}
+                      onClearChecked={() => setDoneTripItems(previous => {
+                        const next = { ...previous }
+                        for (const line of original.basket.lines)
+                          delete next[shoppingTaskKey(store, line)]
+                        return next
+                      })}
                       eligibleNow={() => {
                         const current = freshReviewedBaskets(reviewedBridge, reviewedBridge.planKey, Date.now())
                         return current?.stores[store]?.basket === original.basket
