@@ -2317,7 +2317,7 @@ export function OfflineReviewedWorkbench({
     if (!needs.length) return
     try {
       const text = kind === 'csv'
-        ? (await import('./plannerPriceCaptureSheet.ts')).makeBlankPlannerCaptureCsv(needs, [store])
+        ? (await import('./plannerPriceCaptureSheet.ts')).makeBlankPlannerCaptureCsv(needs, [store], captureDelimiter)
         : (await import('./plannerPriceCaptureGuide.ts')).makePlannerCaptureGuide(needs, [store])
       const url = URL.createObjectURL(new Blob([text], {
         type: kind === 'csv' ? (captureDelimiter === '\t'
