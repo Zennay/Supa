@@ -119,7 +119,7 @@ export function PlannerMissingCapturePanel({ captureNeeds, captureProgress, revi
       setLocalMessage(cause instanceof Error ? cause.message : 'Gecombineerde lijst niet beschikbaar.')
     }
   }
-  async function downloadCombinedMissingCapture(kind: 'csv' | 'csv-excel' | 'guide') {
+  async function downloadCombinedMissingCapture(kind: 'csv' | 'csv-excel' | 'guide' | 'print') {
     setLocalMessage('')
     try {
       const fingerprint = captureFingerprint
@@ -134,27 +134,34 @@ export function PlannerMissingCapturePanel({ captureNeeds, captureProgress, revi
         await import('./selectiveTwoStoreCapture.ts')
       const content = kind === 'guide'
         ? selectiveTwoStoreCaptureGuide(byStore)
-        : selectiveTwoStoreCaptureCsv(byStore, kind === 'csv-excel' ? ';' : ',')
+        : kind === 'print'
+          ? (await import('../comparison/plannerPriceCapturePrint.ts'))
+            .makePrintableSelectivePlannerCaptureHtml(byStore)
+          : selectiveTwoStoreCaptureCsv(byStore, kind === 'csv-excel' ? ';' : ',')
       if (latestCaptureFingerprint.current !== fingerprint ||
           JSON.stringify(byStore) !== JSON.stringify({
             PLUS: missingCaptureFor('PLUS', Date.now()),
             DekaMarkt: missingCaptureFor('DekaMarkt', Date.now()),
           })) throw new Error('Je weekmenu of winkelbron is gewijzigd. Download het actuele blad opnieuw.')
       const url = URL.createObjectURL(new Blob([content], {
-        type: kind === 'guide' ? 'text/plain;charset=utf-8' : 'text/csv;charset=utf-8',
+        type: kind === 'guide' ? 'text/plain;charset=utf-8' :
+          kind === 'print' ? 'text/html;charset=utf-8' : 'text/csv;charset=utf-8',
       }))
       try {
         const link = document.createElement('a')
         link.href = url
         link.download = 'supa-plus-deka-alleen-ontbrekende-producten' +
-          (kind === 'csv-excel' ? '-spreadsheet.csv' :
-            kind === 'guide' ? '-meeneemlijst.txt' : '.csv')
+          (kind === 'print' ? '-printbaar.html' :
+            kind === 'csv-excel' ? '-spreadsheet.csv' :
+              kind === 'guide' ? '-meeneemlijst.txt' : '.csv')
         document.body.append(link)
         try { link.click() } finally { link.remove() }
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
-      setLocalMessage('Een gecombineerd leeg blad voor ' + byStore.PLUS.length +
-        ' PLUS- en ' + byStore.DekaMarkt.length + ' DekaMarkt-producten is lokaal gedownload. ' +
-        'De originele weekvraag blijft gelijk en ontbrekende bronprijzen blijven onbekend.')
+      setLocalMessage(kind === 'print'
+        ? 'Het gecombineerde printbare opnameblad is lokaal gedownload. De winkelregels en CSV-rijnummers volgen dezelfde volgorde; ontbrekende bronprijzen blijven onbekend.'
+        : 'Een gecombineerd leeg blad voor ' + byStore.PLUS.length +
+          ' PLUS- en ' + byStore.DekaMarkt.length + ' DekaMarkt-producten is lokaal gedownload. ' +
+          'De originele weekvraag blijft gelijk en ontbrekende bronprijzen blijven onbekend.')
     } catch (cause) {
       setLocalMessage(cause instanceof Error ? cause.message : 'Het gecombineerde invulblad is niet beschikbaar.')
     }
@@ -214,6 +221,9 @@ export function PlannerMissingCapturePanel({ captureNeeds, captureProgress, revi
             </button>
             <button type="button" className="ghost-button" onClick={() => void downloadCombinedMissingCapture('guide')}>
               Download één bijbehorende rijgids (TXT)
+            </button>
+            <button type="button" className="ghost-button" onClick={() => void downloadCombinedMissingCapture('print')}>
+              Printbaar gecombineerd opnameblad (HTML)
             </button>
             <button type="button" className="ghost-button" onClick={() => void copyCombinedMissingCapture()}>
               Kopieer gecombineerde meeneemlijst (mobiel)

@@ -14,7 +14,7 @@ import { ownRecipeAsMarkdown } from './ownRecipeMarkdown'
 import { prepareRecipeBackupImport, serializeRecipeBackup, type RecipeBackupPreview, RECIPE_BACKUP_MAX_BYTES } from './recipeBackup'
 import { curatedFigmaRecipes } from './curatedFigmaRecipes'
 import { m2InitialPlan } from '../../data/m2Fixture'
-import { ownRecipeShoppingChecklist, formatOwnRecipeChecklist, personalRecipeShoppingNoteLabels } from './recipeShoppingChecklist'
+import { ownRecipeShoppingChecklist, formatOwnRecipeChecklist, personalRecipeShoppingNoteLabels, readableRecipeShoppingAmount } from './recipeShoppingChecklist'
 import { ImportedRecipeGroceriesPanel } from './ImportedRecipeGroceriesPanel'
 import { exportOwnRecipeChecklistCsv } from './recipeShoppingCsv'
 import { toPlannerRecipe } from './plannerRecipes.ts'
@@ -1375,7 +1375,7 @@ export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
                 <input type="checkbox" checked={!!shoppingChecks[line.key]}
                   onChange={event => setShoppingChecks(current => ({ ...current, [line.key]: event.currentTarget.checked }))} />
                 <span>{line.needsReview ? `${line.original} — hoeveelheid controleren`
-                  : `${line.amount?.toLocaleString('nl-NL', { maximumFractionDigits: 3 })} ${line.unit === 'piece' ? 'stuks' : line.unit} ${line.label}`}</span>
+                  : `${line.amount === null ? 'hoeveelheid controleren' : readableRecipeShoppingAmount(line.amount)} ${line.unit === 'piece' ? 'stuks' : line.unit} ${line.label}`}</span>
               </label>
             </li>)}</ul>
             {!shoppingVisible.length && <p role="status">Alle boodschappen voor dit recept afgevinkt.</p>}

@@ -1,8 +1,10 @@
 import { euro as exactEuro } from '../../lib/money.ts'
 import { useState } from 'react'
 import type { BasketTraceLine, OneStoreBasket } from '../../domain/basket.ts'
-import { compareFullBaskets, samePhysicalDemand } from '../../domain/basketComparison.ts'
+import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import { privateUnitPrice } from './privateUnitPrice.ts'
+import { samePrivatePhysicalDemand } from './samePrivatePhysicalDemand.ts'
+import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
 
 const COLUMNS = [
   'plusObservedAt', 'dekaObservedAt', 'comparisonStatus',
@@ -39,6 +41,9 @@ function lineFields(line: BasketTraceLine): (string | number)[] {
   // Ten fields per store, even when no source product or price is known.
   // A short row shifts the next store's columns into the wrong money fields.
   if (line.status !== 'matched') return [
+    // All ten store fields, including the last line-total cents cell, must
+    // remain present. Otherwise a partial two-store export shifts the next
+    // shop's columns and can present source values under the wrong headers.
     'niet gekoppeld', '', '', '', '', '', '', '', '', '',
   ]
   return [
@@ -104,10 +109,19 @@ function buildCsv(plus: OneStoreBasket, deka: OneStoreBasket,
     'geen volledig of actueel vergelijkbaar prijsverschil'
   const rows = plus.lines.map(plusLine => {
     const dekaLine = dekaById.get(plusLine.id)!
-    const sameDemand = samePhysicalDemand(plusLine.requirement, dekaLine.requirement) ||
-      (plusLine.requirement.amount === null && dekaLine.requirement.amount === null &&
-        plusLine.requirement.unit === dekaLine.requirement.unit)
-    if (!sameDemand) throw new Error('De fysieke ingrediëntbehoefte verschilt tussen winkels.')
+    const sameDemand = samePrivatePhysicalDemand(
+      plusLine.requirement, dekaLine.requirement)
+    // Both unpriced and unresolved 'unknown' demands are still useful in a
+    // local missing-items printout. Preserve that original workflow without
+    // treating unknown quantities as a physically comparable priced basket.
+    const bothUnknown = plusLine.status === 'unresolved' &&
+      dekaLine.status === 'unresolved' &&
+      plusLine.requirement.amount === null &&
+      dekaLine.requirement.amount === null &&
+      plusLine.requirement.unit === dekaLine.requirement.unit
+    if (!sameDemand && !bothUnknown) {
+      throw new Error('De fysieke ingrediëntbehoefte verschilt tussen winkels.')
+    }
     return [
       plusObservedAt, dekaObservedAt, state,
       plusLine.id, plusLine.ingredientLabel, plusLine.requirement.amount ?? '',
@@ -170,9 +184,15 @@ export function privateComparisonHtml(
     const outcome = delta === null ? 'Niet vergelijkbaar' : delta === 0 ? 'Gelijk' :
       money(Math.abs(delta)) + (delta > 0 ? ' · PLUS lager' : ' · DekaMarkt lager')
     const required = line.requirement.amount === null ? 'hoeveelheid onbekend' :
-      String(line.requirement.amount).replace('.', ',') + ' ' + line.requirement.unit
+      readablePlannerDemandAmount(line.requirement.amount) + ' ' + line.requirement.unit
+    const otherRequired = other.requirement.amount === null ? 'hoeveelheid onbekend' :
+      readablePlannerDemandAmount(other.requirement.amount) + ' ' + other.requirement.unit
+    const alias = required !== otherRequired &&
+      samePrivatePhysicalDemand(line.requirement, other.requirement)
     return '<tr><th scope="row">' + clean(line.ingredientLabel) +
-      '<small>Benodigd: ' + clean(required) + '</small></th><td>' + product(line) +
+      '<small>Benodigd: ' + clean(required) +
+      (alias ? ' = ' + clean(otherRequired) + ' (dezelfde fysieke hoeveelheid)' : '') +
+      '</small></th><td>' + product(line) +
       '</td><td>' + product(other) + '</td><td>' + clean(outcome) + '</td></tr>'
   }).join('\n')
   const totals = showDifference ? '<section class="totals"><div><span>PLUS</span><strong>' +

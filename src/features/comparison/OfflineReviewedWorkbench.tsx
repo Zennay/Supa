@@ -39,6 +39,9 @@ import { PrivateCapturePastePreview } from './PrivateCapturePastePreview.tsx'
 import { PortableBlankCapture } from './PortableBlankCapture.tsx'
 import { CaptureMatchingPreview, type PreviewMatchLine } from './CaptureMatchingPreview.tsx'
 import { CapturePairedPreview } from './CapturePairedPreview.tsx'
+import { completePreviewProposal } from './privateTwoStorePreviewChecklist.ts'
+import { samePrivatePhysicalDemand } from './samePrivatePhysicalDemand.ts'
+import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
 import { recentOwnCaptureInstant, type PrivateReviewedBaskets, type PrivateCaptureProgress, type PrivateReviewFocus } from './privateReviewedBasketBridge.ts'
 import './offlineReviewedWorkbench.css'
 const dateTime = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
@@ -478,8 +481,16 @@ export function OfflineReviewedWorkbench({
     }
   }
 
-  async function previewFilledCsv(files: File[]) {
-    if (files.length === 0) return
+  function invalidateOwnMobileSourcePreview() {
+    // When an original mobile draft changes, discard the asynchronous
+    // candidate instead of letting a late import overwrite newer input.
+    ++importRevision.current
+    setCapturePreview(null)
+    setWeekExportMessage('Je eigen nog onbevestigde winkelinvoer is gewijzigd. Bekijk de nieuwe bron opnieuw.')
+  }
+
+  async function previewFilledCsv(files: File[]): Promise<boolean> {
+    if (files.length === 0) return false
     const version = ++importRevision.current
     setCapturePreview(null)
     setCapturePreviewShown({ PLUS: 20, DekaMarkt: 20 })
@@ -550,7 +561,7 @@ export function OfflineReviewedWorkbench({
           ? [...previousCapture.products, ...source.products] : source.products
         entry.matching = previewMatching(entry.retailer, projectedProducts)
       }
-      if (version !== importRevision.current || captureWeek !== captureWeekRef.current) return
+      if (version !== importRevision.current || captureWeek !== captureWeekRef.current) return false
       // One newly imported store can be compared with the independently
       // retained other capture, not merely the stores inside this CSV file.
       // Never invent a missing retailer instant or silently refresh the old one.
@@ -573,17 +584,19 @@ export function OfflineReviewedWorkbench({
           }
         }
       }
-      if (version !== importRevision.current || captureWeek !== captureWeekRef.current) return
+      if (version !== importRevision.current || captureWeek !== captureWeekRef.current) return false
       setCapturePreview({
         files, week: captureWeek, stores: storesInPreview,
         unobservedOtherStoreRows: blankOtherRows,
         pairedWithin24h: combined.pairedWithin24h, retainedOther,
       })
       setWeekExportMessage('Eigen CSV-bronopnames lokaal gecontroleerd. Bekijk beide winkels en neem de brondata bewust over.')
+      return true
     } catch (e) {
       if (version === importRevision.current) setWeekExportMessage(
         (e instanceof Error ? e.message : 'CSV ongeldig.') +
         ' Vorige winkeldata en productbevestigingen zijn behouden.')
+      return false
     } finally { if (version === importRevision.current) setBusy(false) }
   }
 
@@ -621,7 +634,7 @@ export function OfflineReviewedWorkbench({
       for (const need of needs) {
         count++
         lines.push('- ' + clean(need.label) + ' · benodigd ' +
-          (need.amount === null ? 'onbekend' : String(need.amount)) +
+          (need.amount === null ? 'onbekend' : readablePlannerDemandAmount(need.amount)) +
           ' ' + clean(need.unit) + ' · zelf oorspronkelijk winkelproduct controleren')
       }
       lines.push('')
@@ -769,9 +782,9 @@ export function OfflineReviewedWorkbench({
             source.observedNs < retained.observedNs)) {
         return plannerCaptureNeeds
       }
-      const unresolved = new Set(source.matching?.lines.filter(line =>
-        line.status === 'unresolved').map(line => line.id) ?? [])
-      return plannerCaptureNeeds.filter(need => unresolved.has(need.id))
+      const incomplete = new Set(source.matching?.lines.filter(line =>
+        !completePreviewProposal(line)).map(line => line.id) ?? [])
+      return plannerCaptureNeeds.filter(need => incomplete.has(need.id))
     }
     // With one new upload and one retained capture, a 24-hour mismatch
     // requires a repeat of the OLDER shop, not always the retained shop.
@@ -783,7 +796,9 @@ export function OfflineReviewedWorkbench({
       const incoming = currentPreview.stores.find(item => item.retailer !== store)
       if (!kept.within24h && incoming?.observedNs !== undefined &&
           kept.observedNs < incoming.observedNs) return plannerCaptureNeeds
-      return []
+      const incomplete = new Set(kept.matching.lines.filter(line =>
+        !completePreviewProposal(line)).map(line => line.id))
+      return plannerCaptureNeeds.filter(need => incomplete.has(need.id))
     }
     return plannerCaptureNeeds
   }
@@ -2311,7 +2326,7 @@ export function OfflineReviewedWorkbench({
     if (!needs.length) return
     try {
       const text = kind === 'csv'
-        ? (await import('./plannerPriceCaptureSheet.ts')).makeBlankPlannerCaptureCsv(needs, [store])
+        ? (await import('./plannerPriceCaptureSheet.ts')).makeBlankPlannerCaptureCsv(needs, [store], captureDelimiter)
         : (await import('./plannerPriceCaptureGuide.ts')).makePlannerCaptureGuide(needs, [store])
       const url = URL.createObjectURL(new Blob([text], {
         type: kind === 'csv' ? (captureDelimiter === '\t'
@@ -2552,6 +2567,8 @@ export function OfflineReviewedWorkbench({
           <PortableBlankCapture needs={plannerCaptureNeeds}
             stores={captureSheetStore === 'both' ? stores : [captureSheetStore]}
             delimiter={captureDelimiter}
+            onReview={files => previewFilledCsv(files)}
+            onDraftChange={invalidateOwnMobileSourcePreview}
             captureKey={captureWeek + ':' + captureSheetStore + ':' + captureDelimiter} />
           <a className="ghost-button" href={`${import.meta.env.BASE_URL}private-basket-mapping.html`} target="_blank" rel="noopener noreferrer">
             Open uitgebreide privévergelijker
@@ -2698,8 +2715,18 @@ export function OfflineReviewedWorkbench({
                       (currentPreview.retainedOther?.observedAt ?? '')}
                     plus={previewPlusLines} deka={previewDekaLines}
                     within24h={previewPair24h} sourceFresh={previewPairFresh}
+                    delimiter={captureDelimiter}
+                    plusFresh={freshPreviewInstant(
+                      currentPreview.stores.find(store => store.retailer === 'PLUS')?.observedNs ??
+                      (currentPreview.retainedOther?.retailer === 'PLUS'
+                        ? currentPreview.retainedOther.observedNs : undefined))}
+                    dekaFresh={freshPreviewInstant(
+                      currentPreview.stores.find(store => store.retailer === 'DekaMarkt')?.observedNs ??
+                      (currentPreview.retainedOther?.retailer === 'DekaMarkt'
+                        ? currentPreview.retainedOther.observedNs : undefined))}
                     plusObservedAt={previewPlusAt} dekaObservedAt={previewDekaAt}
-                    retainedStore={currentPreview.retainedOther?.retailer} />
+                    retainedStore={currentPreview.retainedOther?.retailer}
+                    describeReason={humanMatchReason} />
                 )}
               {currentPreview.stores.map(store => store.matching && (
                 <CaptureMatchingPreview
@@ -2713,8 +2740,9 @@ export function OfflineReviewedWorkbench({
                   {' '}niet geobserveerde regels bij de andere winkel;
                   geen tweede winkelprijs.</p>
               )}
-              <div className="offline-price-workbench__capture-followup">
-                <strong>Vul alleen de nog ontbrekende winkelproducten aan</strong>
+              <div id="supa-two-store-capture-followup" tabIndex={-1}
+                className="offline-price-workbench__capture-followup">
+                <strong>Vul ontbrekende of verlopen winkelproducten aan</strong>
                 <p>Per winkel kun je een kort leeg CSV-opnameblad plus de bijhorende
                   ingrediëntenrijgids downloaden. Er wordt geen winkelprijs,
                   productcode of bronmoment voor je ingevuld. Bij een verlopen
@@ -2726,7 +2754,8 @@ export function OfflineReviewedWorkbench({
                   prijzen nooit kunstmatig het oudere bronmoment om de import te laten passen.
                   Supa controleert vóór vervangen welke oorspronkelijke SKU’s verdwijnen.</p>
                 {stores.map(store => {
-                  const missing = missingPreviewCaptureNeeds(store).length
+                  const missingNeeds = missingPreviewCaptureNeeds(store)
+                  const missing = missingNeeds.length
                   const source = currentPreview.stores.find(item => item.retailer === store)
                   const other = currentPreview.stores.find(item => item.retailer !== store)
                   const retained = currentPreview.retainedOther
@@ -2757,6 +2786,17 @@ export function OfflineReviewedWorkbench({
                       onClick={() => { void downloadPreviewMissingCapture(store, 'guide') }}>
                       {store} rijgids (TXT)
                     </button>
+                    {missing > 0 && <details>
+                      <summary>{store}: vul ontbrekende bronregels mobiel in zonder download</summary>
+                      <PortableBlankCapture purpose="missing"
+                        onReview={files => previewFilledCsv(files)}
+                        needs={missingNeeds}
+                        needsAtClick={() => missingPreviewCaptureNeeds(store)}
+                        stores={[store]} delimiter={captureDelimiter}
+                        captureKey={captureWeek + ':preview-missing:' + store + ':' +
+                          captureDelimiter + ':' + importRevision.current + ':' +
+                          Math.floor(clockMs / 60000)} />
+                    </details>}
                   </div>
                 })}
               </div>
@@ -3259,6 +3299,8 @@ export function OfflineReviewedWorkbench({
                       </div>
                       {missingPriceCaptureNeeds[store].length > 0 &&
                         <PortableBlankCapture purpose="missing"
+                          onReview={files => previewFilledCsv(files)}
+                          onDraftChange={invalidateOwnMobileSourcePreview}
                           needs={missingPriceCaptureNeeds[store]}
                           needsAtClick={() => missingCaptureNeedsNow(store)}
                           stores={[store]}
@@ -3472,7 +3514,13 @@ export function OfflineReviewedWorkbench({
                       <tbody>{fullDifferenceRows.map(({ delta, plus, deka }) => (
                         <tr key={delta.id}>
                           <th scope="row">{delta.ingredientLabel}
-                            <small>{plus.requirement.amount} {plus.requirement.unit} benodigd</small>
+                            <small>{readablePlannerDemandAmount(plus.requirement.amount)} {plus.requirement.unit} benodigd
+                              {samePrivatePhysicalDemand(plus.requirement, deka.requirement) &&
+                                (plus.requirement.amount !== deka.requirement.amount ||
+                                  plus.requirement.unit !== deka.requirement.unit) &&
+                                  <> = {readablePlannerDemandAmount(deka.requirement.amount)} {deka.requirement.unit}
+                                    {' '}(dezelfde fysieke behoefte)</>}
+                            </small>
                           </th>
                           <td><strong>{exactEuro.formatCents(plus.lineTotalCents)}</strong>
                             <small>{plus.productName} · broncode {plus.productId}</small>

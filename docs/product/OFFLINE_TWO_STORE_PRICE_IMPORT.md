@@ -43,6 +43,17 @@ Het weekbestand gebruikt schema supa-private-planner-week-v1 (UTF-8, maximaal 25
 
 Dezelfde bestaande, strikte negenkoloms-CSV-converter is nu ook rechtstreeks via **Vergelijk → Open je eigen twee-winkel CSV of JSON** bereikbaar. De hoofdapp leest maximaal 256 kB UTF-8, converteert CSV uitsluitend in de browser via de al bestaande Supa-module en weigert een ontbrekende of ongeldige tweede winkel voor een volledige vergelijking. Het oorspronkelijke CSV-bestand blijft onveranderd; in de invoer verschijnt het geconverteerde JSON. Een ongeldige import, bewerkte bron of veranderd handmatig prijsconcept trekt onmiddellijk de oude uitkomst én alle per-SKU-bevestigingen in. Bij slechts één echte winkel gebruik je de hierboven gekoppelde uitgebreide privévergelijker; Supa verzint nooit een tweede winkel.
 
+## Nieuwe telefoonroute: oorspronkelijke winkelopname zonder spreadsheet
+
+In **Vergelijk → Gebruik ditzelfde weekmenu met jouw eigen winkelbronbestanden** kun je na het kiezen van PLUS, DekaMarkt of beide onder **Vul zelf originele winkelproducten op je telefoon in** ook zonder Excel de oorspronkelijke bronproducten vastleggen. Gebruik eerst je echte Planner-weekmenu; dit toont per winkel de ingrediënten als rijnummergids, geen aangenomen supermarktartikelen.
+
+1. Vul per winkel **zelf** het werkelijke opnamemoment inclusief UTC-Z of expliciete tijdzone-offset in. De datum wordt nooit door Supa voor je gezet. Kies per origineel waargenomen artikel **beschikbaar** of **niet beschikbaar**; niet waargenomen producten laat je ongemoeid. De echte SKU, winkelproductnaam en pakeenheid zijn altijd eigen invoer. Voor beschikbare producten vul je daarnaast gemeten pakinhoud, multipack-aantal en hele eurocenten in. Bij wisselen naar niet beschikbaar vraagt Supa toestemming voordat een eerder ingevulde pakprijs uit het lokale concept wordt gewist.
+2. Filter zo nodig op Planner-ingrediënt. De teller per winkel toont welke fysieke regels een eigen bronartikel kregen; dat aantal is **geen bevestigde productmatch**. Het formulier weigert dubbele SKU's binnen dezelfde winkel en onvolledige beschikbare productregels. De bestaande strikte importconversie blijft verantwoordelijk voor de definitieve broncontrole, inclusief de echte timestamp-, maat- en prijsgrenzen.
+3. Met **Controleer mijn echte winkelopname in Supa** maak je een of twee oorspronkelijke negenkoloms CSV/TSV-bronbestanden in het browsergeheugen en open je de **bestaande lokale voorinzage**. Er wordt nog niets geaccepteerd; SKU, verpakking, versheid en fysieke match vragen afzonderlijke controle. Je kunt de bronbestanden ook lokaal downloaden of bewust via de mobiele bestandsdeelactie versturen. Als een retailer niet werd waargenomen, verzint Supa geen tweede winkel of ontbrekende prijs.
+4. Met **Bewaar ook onvolledige invoer als privéconcept (JSON)** bewaar je zelfs half ingevulde velden uitsluitend als lokaal bestand. **Herstel eerder bewaard privéconcept** staat alleen exact hetzelfde weekmenu, dezelfde winkels en dezelfde fysieke ingrediënten toe. Een andere week of opnamecontext wordt geweigerd zonder bestaande invoer te overschrijven. Het conceptbestand is **geen negenkoloms prijsbron**, retailerrecht of onafhankelijk veldbewijs; na herstel volgt altijd opnieuw de bronvoorcontrole. Er is geen automatische browser-, server- of cloudopslag voor deze telefooneditor.
+
+Onder het afzonderlijke per-winkel vervolgformulier voor ontbrekende of verlopen producten kun je dezelfde mobiele velden invullen en downloaden; wanneer **Controleer mijn echte winkelopname in Supa** beschikbaar is, gebruikt die uitsluitend de bovenstaande bestaande strikte browserimport. Elke nieuwe waarneming vereist een echt nieuw bronmoment. Publicatie en empirische claims wachten nog op aparte rechten-, review- en veldbewijsgates.
+
 ## Leeg opnameblad invullen, nakijken en bewust importeren
 1. Maak in **Planner** je echte weekmenu, kies in **Vergelijk** één of beide winkels en download het **lege prijsinvulblad (CSV)** plus de opnamegids met dezelfde regelnummers. Geen regel bevat een verzonnen productcode, moment of prijs.
 2. Vul in het CSV-bestand uitsluitend daadwerkelijk geobserveerde bronvelden in: oorspronkelijke productcode, naam, verpakkingsinhoud/eenheid, multipack-aantal, prijs in hele centen, waarnemingstijd met UTC-offset en beschikbaarheid. Laat een niet-geobserveerde regel **helemaal leeg**, behalve de bestaande winkel/eindwaarde `false` en een optionele eenheidshint. Een deels ingevulde regel geeft nu expliciet het foutieve CSV-regelnummer in plaats van ongemerkt te verdwijnen.
@@ -50,6 +61,16 @@ Dezelfde bestaande, strikte negenkoloms-CSV-converter is nu ook rechtstreeks via
 4. Open desgewenst **Planner-productmatching vooraf bekijken** per winkel: Supa berekent met dezelfde bestaande conservatieve matching alvast welke echte ingevoerde bronproducten voorstelbaar zijn voor hetzelfde fysieke weekmenu, welke ingrediënten nog onbekend zijn en hoeveel hele verpakkingen een voorstel vergt. **Er is dan nog geen match geaccepteerd, winkelmandtotaal of prijsverschil bewezen.** Met **Download alleen ontbrekende winkelproducten (TXT)** kun je alle niet-gematchte fysieke ingrediënten per winkel apart meenemen, ook als de andere winkel nog geheel ontbreekt. Dit bestand bevat géén aangenomen productcodes, prijzen of toestemming. Dezelfde preview waarschuwt apart wanneer een bronmoment meer dan zeven dagen oud of toekomstig is en wanneer twee werkelijk ingevoerde winkelopnames meer dan 24 uur uit elkaar liggen; deze voorwaarden kunnen nooit met een automatisch ingevulde datum worden omzeild. Bij het openen van slechts één nieuwe winkel-CSV vergelijkt de preview ook met het **daadwerkelijk bewaarde andere winkelbronmoment** (indien aanwezig), zonder die tweede bron, identiteit, tijd of prijs te vervangen.
 5. Klik pas na eigen controle op **Neem eigen brondata over**. Voor een ontbrekende tweede winkel wordt dezelfde bestaande veilige toevoegroute gebruikt; voor een al geladen winkel de **bronverschillen-preview** vóór vervanging. Wanneer je één CSV met uitsluitend **nieuwe** oorspronkelijke artikelcodes en exact hetzelfde eerdere waarnemingstijdstip aanlevert, sluit de preview nu direct aan op de bestaande **veilig aanvullen**-route: de eerdere productregels, echte prijzen en het onveranderde bronmoment blijven intact. De matching-preview gebruikt bij deze aanvulroute de gecombineerde lijst van bestaande én nieuwe originele bronproducten, zodat eerdere productmatches niet ten onrechte als ontbrekend worden weergegeven. Bij een andere opnametijd of reeds bestaande broncode gebruikt Supa uitsluitend de bestaande expliciete **winkelvervanging** met bronverschillencontrole; er worden geen oude prijzen doorgeschoven naar een nieuwer moment. Als er al bronnen en controles zijn, vraagt het tegelijk inladen van twee vervangende winkelbestanden expliciet om bevestiging, nadat beide bestanden geldig zijn verklaard. Annuleren behoudt de bestaande brongegevens en vinkjes. Geaccepteerde productcodes zijn niet automatisch met Planner-ingrediënten gematcht: elk fysieke match en de oorspronkelijke prijs moeten apart worden beoordeeld.
 6. Verlopen, ontbrekende of niet-geprijsde winkelobservaties blijven **onbekend**. Een volledig prijsverschil verschijnt alleen als beide complete, brongebonden mandjes aan bestaande voorwaarden voldoen. Dit werkblad is geen toestemming van retailers en geen onafhankelijk veldbewijs.
+
+## Originele bronmatches gericht controleren, afdrukken of meenemen
+
+Na **Controleer beide winkels samen** toont **Zelfde Planner-vraag bij PLUS en DekaMarkt** de oorspronkelijke artikelen en verpakkingsvoorstellen naast elkaar. Een onvolledige match houdt de wel bekende bronproductnaam, SKU en oorspronkelijke verpakking zichtbaar zodat je het juiste artikel kunt terugvinden; de ontbrekende of niet-consistente hele-pak-prijs en eenheidsprijs blijven onbekend. Twee verschillende fysieke Planner-behoeften mogen niet worden vergeleken: je ziet dan afzonderlijk beide oorspronkelijke hoeveelheden en productidentiteiten, maar geen bedrag of winnaar. Een fractie van een fysiek stuk vereist menselijke review en wordt niet als complete winkelmatch behandeld.
+
+Gebruik het **winkelgerichte filter** om alleen openstaande PLUS- of DekaMarkt-regels te bekijken. **Download openstaande ... in Excel-CSV** volgt dat filter: andere originele winkelgegevens blijven als context staan, maar de selectie gaat alleen over de ontbrekende fysieke regels van de gekozen winkel. **Deel ... via mijn telefoon** geeft na jouw klik een echt CSV/TSV-bestand aan het besturingssysteem; als bestanden delen niet kan, volgt een lokale download. De geselecteerde komma-, puntkomma- of tab-scheiding blijft behouden (bij tabs `.tsv`).
+
+De review-CSV is **niet** het originele negenkoloms-opnamebestand en kan niet als officiële bronopname worden teruggeïmporteerd. Hij bevat referenties naar oorspronkelijke SKU's, opnametijden, voorstel-verpakkingen, eigen fysieke vraag en de specifieke volgende controleactie. De TXT-export en scriptvrije offline HTML-print gebruiken dezelfde strikte bronversheidslogica. Prijzen uit een bron ouder dan zeven dagen, met ongeldig tijdstip of uit de oudste winkel van een >24-uursverschil worden niet als bruikbare bedragen/eenheidsprijzen herhaald. Werkelijke bronwaarden blijven in de originele gebruikersopname bewaard, maar niet als actuele besparingsclaim weergegeven.
+
+Via **Ga naar de lege PLUS-/Deka-invulbladen** kun je de ontbrekende of opnieuw te observeren winkelregels direct opnieuw opnemen. Vul een nieuw waarnemingsmoment altijd zelf in en gebruik nooit een oud tijdstip om een later geobserveerde prijs met een bestaande bron te laten samenvoegen. Pas na geldige bronimport en menselijke productcontrole kan de normale privémandjesvergelijking een prijsverschil tonen.
 
 ## Eén winkel klaar terwijl de tweede nog ontbreekt
 
@@ -1237,3 +1258,204 @@ Op **Home → Vergelijk dezelfde boodschappen** gebruikt Supa uitsluitend de lok
 Als **alleen afzonderlijke ingrediënten** al gepaard en geprijsd zijn, verschijnen in plaats daarvan **Kopieer bekende PLUS/Deka-regelprijzen voor Excel** en **Deel alleen bekende winkelregels (mobiel)**. Deze acties gebruiken exact de bestaande gedeeltelijke CSV-export. Zij tonen nooit een onvolledig mandtotaal of winkelwinnaar. Verlopen prijzen, ontbrekende SKU’s en niet-gecontroleerde bronregels verschijnen niet in een nieuw kostenbedrag. De handmatig selecteerbare deeltekst is gebonden aan de actuele week, bronopname en reviewstatus; bij wijziging verdwijnt een oude kopie.
 
 Het delen en kopiëren gebeurt uitsluitend na een gebruikersactie. Een gekozen externe app kan dan de eigen brongegevens in de tekst ontvangen: Supa uploadt deze niet zelfstandig. De oorspronkelijke PLUS/Deka-bronrechten, onafhankelijke veldvalidatie, kassaprijzen en publicatie van besparingsclaims worden hierdoor **niet** vastgesteld of versoepeld.
+
+## Op pad met je telefoon: nog ontbrekende PLUS/Deka-velden
+
+Open **Planner → Vul zelf originele winkelproducten op je telefoon in**. De
+rijnummers en metrische hoeveelheden komen uitsluitend uit de gekozen
+Planner-vraag, niet uit de supermarkt. Kies **Alleen nog niet waargenomen of
+onvolledige invoerregels tonen** om de nog open punten te zien. Onder iedere
+winkel staan een actuele telling, **Kopieer**, **Download TXT** en **Deel via
+mijn telefoon**. De tekst noemt het oorspronkelijke Planner-rij-/artikel en de
+concrete ontbrekende velden; hij is géén artikelmatch, actueel prijsbewijs of
+volledig winkelmandje. Wanneer OS-delen of klembord niet beschikbaar is, blijft
+de tekst in een selecteerbaar lokaal veld staan. Er is geen automatische
+retailerrequest of upload.
+
+Geobserveerde originele SKU, productnaam, verpakking, aantal, hele-pakprijs
+in **eurocenten** en werkelijk ISO-bronmoment met tijdzone vul je zelf in.
+Een eerdere waarneming expliciet terugzetten naar **Niet waargenomen** wist
+na bevestiging de gekoppelde oude brongegevens en prijs. **Niet beschikbaar**
+wist de oude pakprijs en inhoud; de werkelijk geziene artikelidentiteit mag
+blijven staan. Onveilige oude JSON-concepten waarin niet-waargenomen of
+niet-beschikbare regels toch verborgen prijzen hebben, worden geweigerd bij
+herstel. Ongeldige of dubbel gebruikte SKU's, numerieke velden en tijdzones
+worden als nog te controleren gemarkeerd; alleen voldoende ingevulde
+geselecteerde waarnemingen kunnen naar de bestaande originele negenkoloms
+CSV/TSV-broncontrole. Een onvolledig of verlopen winkelmandje blijft
+**prijsverschil onbekend** tot beide echte bronsets afzonderlijk zijn beoordeeld.
+
+## Vrijwillig tijdelijk hervatten na pagina verversen
+
+Het telefoonformulier heeft nu drie expliciete acties: **Schakel tijdelijk
+bewaren in dit tabblad in**, **Hervat tijdelijk concept in dit tabblad** en
+**Wis tijdelijke tabopslag**. Standaard staat automatisch bewaren **uit**.
+Pas na inschakelen schrijft de browser de huidige originele conceptgegevens
+naar **sessionStorage** van dit tabblad, zonder HTTP, cookies, sync of server.
+Als je na het verversen terugkomt, kies je zelf *Hervat*; er wordt niets
+automatisch als retailerbron geopend of als prijs goedgekeurd. Een hersteld
+concept moet nog de bestaande originele broncontrole doorlopen.
+
+De aparte tijdelijke opslag is gebonden aan exact dezelfde week, fysieke
+Planner-vraag en winkelkeuze als het bestaande, streng gevalideerde JSON-
+concept. Concepten ouder dan twaalf uur of met afwijkende tijd-/bestands-
+integriteit worden geweigerd; verlopen of corrupte exemplaren worden bij
+een herstelpoging verwijderd. Bij bewust stoppen wordt de laatste invoer nog
+eenmaal in dit tabblad bewaard, en via *Wis* wordt hij bewust gewist. Begin
+je een nieuw opnameformulier, dan wordt de automatische opslag uitgezet om
+een vorige week niet stilzwijgend te overschrijven.
+
+Dit is een **privé gemaksfunctie**, geen duurzame of versleutelde externe
+back-up. De browser kan sessieopslag wissen; op gedeelde apparaten kunnen
+andere personen met toegang tot hetzelfde tabblad de inhoud zien. Download
+voor bewaardoeleinden expliciet een **eigen JSON-concept**. Een prijs blijft
+onbekend totdat een werkelijk waargenomen bronbestand afzonderlijk lokaal is
+gecontroleerd en de match is geaccepteerd; supermarktbronrechten zijn niet
+automatisch aanwezig.
+
+## Privéconcept van telefoon naar telefoon overdragen
+
+Naast het bestaande downloaden van een JSON-bestand kun je nu bewust
+**Deel mijn eigen privéconcept als JSON via telefoon** kiezen. Alleen wanneer
+het besturingssysteem lokaal bestandsdelen ondersteunt verschijnt het eigen
+JSON-bestand in de OS-deeldialoog; anders downloadt Supa het op je toestel.
+De ontvanger van jouw bewuste share kan bronidentiteiten en mogelijke bedragen
+lezen: deel dit privéconcept uitsluitend met je eigen vertrouwde apparaat.
+Deelacties bij de bron-CSV blijven afzonderlijk; de twee bestandsformaten
+zijn niet onderling uitwisselbaar.
+
+**Kopieer mijn eigen privéconcept als JSON** toont een selecteerbare lokale
+tekst, ook zonder klembordrechten. Op het andere apparaat kun je die met
+**Plak een eerder gekopieerd privéconcept** handmatig herstellen, of het
+gedownloade bestand met het bestaande JSON-bestandsveld openen. Beide
+herstelroutes gebruiken dezelfde bestaande strikte 256 kB UTF-8-invoer,
+exact-week-fingerprint, winkel-/regeltelling, veldinspectie en expliciete
+vervangingsbevestiging. Ongeldige of tussentijds verouderde invoer kan geen
+oude mobiele formuliergegevens overschrijven; herstel is nooit een
+prijsbevestiging of winkelautorisatie.
+
+**Snelle refresh:** bij ingeschakelde tabopslag bewaart Supa ook bij het verbergen of verlaten van de pagina direct een lokale versie. Sommige mobiele browsers sluiten zonder event; download voor duurzaam behoud zelf je privé-JSON. Een andere Planner-week overschrijft de vorige sessie niet.
+
+## Zelf afgelezen schapprijs direct als eurobedrag invullen
+
+Bij elk werkelijk zelf waargenomen beschikbaar winkelproduct kun je nu
+optioneel **Of: lees het echte prijskaartje af in euro (€)** kiezen. Typ de
+oorspronkelijke prijs exact, bijvoorbeeld **1,99**, **€ 1,99** of **1.99**,
+en druk afzonderlijk op **Zet mijn afgelezen europrijs exact om naar centen**.
+De mobiele app vult daarmee precies **199** in het bestaande veld
+**Originele hele-verpakkingprijs in eurocenten** in. Conversie verloopt via
+hele getallen, zonder binaire floating-point afronding. Ongeldige getallen,
+duizendtalscheiding, meer of minder dan twee decimalen, negatieve of
+ongepast hoge bedragen worden niet omgezet. Een werkelijk geobserveerde
+nulprijs is alleen expliciet nul; niets wordt vanuit productnaam of
+boodschappenlijst geschat. Zolang je eurotekst nog niet apart hebt
+bevestigd, blijft de oorspronkelijke centprijs leeg. Het tijdelijke
+eurotypveld wordt niet als prijsbron opgeslagen of gedeeld.
+
+Dezelfde invoercontrole wijst verdachte spreadsheet-formules in originele
+SKU/productnaam, onzichtbare opmaak en niet-exacte zesdecimalenverpakking
+af vóór het lokale CSV/TSV-exportbestand wordt aangemaakt. Echte
+productidentiteit wordt niet stilzwijgend herschreven. Bij afwijzing blijft
+het huidige formulier bewerkbaar en meldt Supa welk fysiek veld moet
+worden gecorrigeerd. De bestaande bronimport en persoonlijke matchreview
+blijven daarnaast ongewijzigd verplicht; deze invoergemakken geven
+geen retailerrechten of publieke besparingsclaim.
+
+## Bronmoment en beide winkels vóór de daadwerkelijke vergelijking
+
+Het mobiele opnameformulier meldt per winkel nu meteen of het **zelf
+ingevulde** originele bronmoment syntactisch correct is, niet meer dan vijf
+minuten in de toekomst ligt en hoogstens zeven dagen oud is. Een ouder of
+ongeldig moment houdt de betreffende bronregel onvolledig; de bestaande
+canonieke importer bevestigt afzonderlijk of de hele opname werkelijk kan
+worden geaccepteerd. Het oorspronkelijke ISO-tekstveld wordt niet automatisch
+ingevuld of verplaatst naar de huidige tijd.
+
+Zodra de gebruiker twee originele bronmomenten invoert, geeft het formulier
+een afzonderlijke waarschuwing als deze meer dan **24 uur** uiteenliggen.
+De melding noemt de oudere PLUS- of DekaMarkt-waarneming die opnieuw nodig
+is voordat een volledig zelfde-weekmandje kan worden vergeleken. Onbekende
+producten, oude bedragen of lege winkelobservaties worden niet tot nul,
+actuele schapprijs of besparing gepromoveerd. Deze tijdcontrole geldt alleen
+voor de door de gebruiker ingevoerde tijden en is geen bewijs van
+bronrechten, onafhankelijke fysieke winkelobservaties of een echte korting.
+
+## Indicatieve eenheidsprijs uit eigen originele schapwaarneming
+
+Als je voor een PLUS- of DekaMarkt-artikel de originele productcode,
+productnaam, werkelijke verpakkingseenheid en -hoeveelheid, multipack,
+prijscenten en een nog bruikbaar bronmoment volledig hebt ingevuld, toont
+het mobiele formulier nu direct de **indicatieve prijs per kilogram, liter
+of stuk**. De berekening gebruikt de al bestaande Supa
+`privatePackUnitRate` en diens exacte BigInt-centafronding; er is geen
+tweede prijsengine of automatisch matchvoorstel toegevoegd. Onvolledige,
+onmogelijke, verlopen of nog niet werkelijk ingevoerde bedragen krijgen
+geen indicatieve eenheidsprijs.
+
+Bij beide volledig ingevulde winkelbladen volgt een melding om de bestaande
+persoonlijke SKU-/pak-/weekmand-review te openen. Losse eenheidsprijzen
+zijn geen hele-pakmandbedragen en er verschijnt in dit opnameformulier
+geen ongefundeerde winkelwinnaar. Een verschil en eventuele besparing
+vereisen nog steeds dezelfde fysieke vraag bij twee winkels, werkelijk
+rechtmatig vastgelegde bronprijzen en de canonieke persoonlijke
+match-/versheidscontrole.
+
+## Ontbrekende winkelproducten mobiel aanvullen vanuit dezelfde broncontrole
+
+De PLUS/Deka-bronpreview bevat nu ook een werkende knop
+**Controleer mijn echte winkelopname in Supa** bij de apart getoonde ontbrekende
+winkelregels. Die gebruikt opnieuw de oorspronkelijke negenkoloms-importer,
+in plaats van de eerder alleen als concept bruikbare mobiele invoer dood te
+laten lopen. Zowel de volledige Planner-opname als de los gekozen nieuwe
+winkelproducten hergebruiken dezelfde broncontrole en vereisen afzonderlijk
+bewuste acceptatie van SKU, pakinhoud en prijzen. Een concept in de open
+preview wordt niet bij elke toetsaanslag verborgen; na een expliciete
+nieuwe indiening wordt de oude bronpreview vervangen. Als tijdens het
+asynchroon openen van een eigen bronbestand de originele formulierinvoer
+wijzigt, meldt het formulier dat het oudere resultaat niet meer bij de
+huidige broninvoer hoort. Ook bronprijzen in die preview blijven
+onbevestigd, en een ontbrekende of oude tweede winkel blijft onbekend.
+
+## Geen schijnsucces bij geweigerde bronvoorinzage
+
+Het mobiele opnameformulier ontvangt voortaan een expliciet succes- of
+afwijsresultaat van de bestaande canonieke CSV-voorinzage. Als een bronbestand
+ongeldig is, verouderd raakt of na het starten door een nieuwe broninvoer
+wordt ingehaald, toont het formulier geen vals bericht dat de invoer
+bruikbaar klaarstaat. De precieze fout uit de bestaande import staat in
+het normale bronpaneel. Eerder geaccepteerde brondata en handmatige
+productreviews blijven behouden; er worden geen prijzen stil bevestigd.
+
+## Eén fysieke winkel-SKU voor meerdere Planner-regels
+
+Wanneer dezelfde daadwerkelijk geobserveerde winkelverpakking voor twee
+receptingrediënten in het weekmenu in aanmerking komt, mag je dezelfde
+SKU nooit twee keer als afzonderlijk bronproduct opvoeren. Kies bij de
+latere Planner-regel de status **Zelfde winkelartikel al bij andere regel
+ingevoerd** en selecteer handmatig de al opgenomen SKU uit dezelfde
+supermarkt. Er wordt dan **geen tweede bronproduct, verpakking of prijs**
+gemaakt: het canonieke negenkoloms CSV bevat het originele product precies
+eenmaal. De verwijzing blijft als bewerkbaar, lokaal privéconcept bewaard,
+maar is geen door het systeem gekozen productmatch.
+
+Een verwijzing kan alleen naar een daadwerkelijk bij dezelfde winkel
+ingevoerd en voldoende compleet beschikbaar bronartikel wijzen. Als het
+originele artikel ontbreekt, onvolledig is of wordt gewist, signaleert de
+formuliervoorinzage de verwijzing als onopgelost; er wordt geen onbekende
+prijs gereconstrueerd. De bestaande fysieke productmatching bepaalt
+vervolgens of datzelfde originele pak werkelijk bij één of meer gevraagde
+ingrediënten past. Ook een handmatig gekozen verwijzing omzeilt nooit de
+aparte menselijke review, huidige bronmomenten of bronrechten.
+
+## Optionele lokale verpakkingsbarcode in de mobiele bronopname
+
+Binnen een originele winkelproductregel kun je desgewenst **Scan originele
+verpakkingsbarcode op dit apparaat** kiezen. Hiervoor hergebruikt Supa de
+bestaande lokale camera-/EAN-/UPC-scanner zonder remote afbeeldingsherkenning,
+prijsopvraag of automatische netwerkrequest. Alleen na afzonderlijke
+bevestiging door de gebruiker verschijnt de afgelezen code in het
+SKU-conceptveld. Een barcode is niet automatisch de artikelcode van PLUS of
+DekaMarkt; echte pakinhoud, naam, beschikbaarheid, prijs en het
+waarnemingsmoment moeten nog steeds persoonlijk worden ingevuld. De
+bestaande bronimport, controle op unieke SKU en menselijke matching blijven
+vereist. Handmatige code-invoer blijft mogelijk zonder camera.

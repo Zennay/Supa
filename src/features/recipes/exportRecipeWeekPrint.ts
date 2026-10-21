@@ -1,5 +1,5 @@
 import type { SavedRecipe } from './recipeLibrary.ts'
-import { formatOwnRecipeChecklist, ownRecipeShoppingChecklist, type OwnRecipeChecklist } from './recipeShoppingChecklist.ts'
+import { formatOwnRecipeChecklist, ownRecipeShoppingChecklist, readableRecipeShoppingAmount, type OwnRecipeChecklist } from './recipeShoppingChecklist.ts'
 
 export type RecipeWeekAssignment = {
   day: string
@@ -63,9 +63,7 @@ export function exportRecipeWeekPrint(
         line.unit === null))
       throw new Error('Een recept bevat ongecontroleerde ingrediënten. Controleer deze eerst.')
     const items = ingredients.lines.map(line => {
-      const amount = Number(line.amount!.toFixed(3)).toLocaleString('nl-NL', {
-        useGrouping: false, maximumFractionDigits: 3,
-      })
+      const amount = readableRecipeShoppingAmount(line.amount!)
       return '<li>' + escape(amount + ' ' +
         (line.unit === 'piece' ? 'stuks' : line.unit) + ' ' + line.label) + '</li>'
     }).join('')

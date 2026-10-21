@@ -29,6 +29,9 @@ jobs:
       # The pinned Playwright Noble image supplies matching Chromium and OS libraries;
       # keep the browser proof unchanged while avoiding host Ubuntu 26.04 incompatibility.
       - name: Render and exercise recipe UI
+        # GitHub's container default is /bin/sh (dash); pipefail requires Bash.
+        # Keep the existing browser gate, checks and failure propagation intact.
+        shell: bash
         run: |
           set -euo pipefail
           npm start > /tmp/supa-recipe-server.log 2>&1 &

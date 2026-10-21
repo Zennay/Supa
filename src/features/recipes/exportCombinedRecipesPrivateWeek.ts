@@ -11,6 +11,9 @@ import type { SavedRecipe } from './recipeLibrary.ts'
  */
 export function exportCombinedRecipesPrivateWeek(
   recipes: readonly SavedRecipe[], portionsById: Readonly<Record<string, number>> = {},
+  // Only an explicitly selected, distinct cooking-day arrangement may
+  // replace the neutral private "Eigen recept N" labels.
+  cookingDays?: readonly string[],
 ): string {
   if (!Array.isArray(recipes) || !recipes.length || recipes.length > 14 ||
       new Set(recipes.map(recipe => recipe.id)).size !== recipes.length) {
@@ -44,7 +47,12 @@ export function exportCombinedRecipesPrivateWeek(
     // selected physical week demand; never invent retailer data.
     return { ...recipeForBasket, servings: portions, ingredients }
   })
-  const days = converted.map((_, index) => 'Eigen recept ' + (index + 1))
+  if (cookingDays && (!Array.isArray(cookingDays) ||
+      cookingDays.length !== converted.length ||
+      new Set(cookingDays).size !== converted.length)) {
+    throw new Error('De gekozen kookdagen zijn onvolledig of dubbel. Controleer de weekindeling.')
+  }
+  const days = cookingDays ?? converted.map((_, index) => 'Eigen recept ' + (index + 1))
   return exportPrivatePlannerWeek(
     converted.map((recipe, index) => ({ day: days[index], recipeId: recipe.id })),
     converted, days,

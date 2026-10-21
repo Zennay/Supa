@@ -1,9 +1,12 @@
 import { aggregatePlanIngredients } from '../../domain/basket.ts'
+import { sumDecimalAmounts } from '../../domain/decimalPackArithmetic.ts'
 import { makeBlankPlannerCaptureCsv, type CaptureStore } from '../comparison/plannerPriceCaptureSheet.ts'
-import { makePlannerCaptureGuide } from '../comparison/plannerPriceCaptureGuide.ts'
+import { makePlannerCaptureGuide, readablePlannerDemandAmount } from '../comparison/plannerPriceCaptureGuide.ts'
 import { exportCombinedRecipesPrivateWeek } from './exportCombinedRecipesPrivateWeek.ts'
 import { combinedImportedRecipeGroceries, type GroceryContribution } from './combinedImportedRecipeGroceries.ts'
 import type { SavedRecipe } from './recipeLibrary.ts'
+
+export type CaptureRecipeOrigin = GroceryContribution & { cookingDay: string | null }
 
 type CanonicalWeek = {
   plan: { day: string; recipeId: string }[]
@@ -20,8 +23,13 @@ export function combinedRecipesCaptureKit(
   recipes: readonly SavedRecipe[],
   portionsById: Readonly<Record<string, number>>,
   stores: readonly CaptureStore[],
-): { csv: string; guide: string; storeLabel: string; rows: { csvRow: number; store: CaptureStore; id: string; label: string; amount: number; unit: string; sources: GroceryContribution[] }[] } {
-  const week = JSON.parse(exportCombinedRecipesPrivateWeek(recipes, portionsById)) as CanonicalWeek
+  cookingDays?: readonly string[],
+  delimiter: ',' | ';' | '\t' = ';',
+): { csv: string; guide: string; storeLabel: string; rows: { csvRow: number; store: CaptureStore; id: string; label: string; amount: number; unit: string; sources: CaptureRecipeOrigin[] }[] } {
+  const week = JSON.parse(exportCombinedRecipesPrivateWeek(recipes, portionsById, cookingDays)) as CanonicalWeek
+  const cookingDayByRecipe = cookingDays
+    ? new Map(week.plan.map(meal => [meal.recipeId, meal.day]))
+    : new Map<string, string>()
   const needs = aggregatePlanIngredients(week.plan, week.recipes, week.activeDays)
   if (needs.length < 1 || needs.length > 200 ||
       needs.some(item => item.amount === null || !Number.isFinite(item.amount) ||
@@ -43,6 +51,23 @@ export function combinedRecipesCaptureKit(
         combined.contributorsByLine[line.key] ?? [],
       )
   }
+  // The two-store worksheet must not silently present a plausible recipe
+  // origin that belongs to another physical demand or a different sum. The
+  // original, scaled recipe lines are the only permitted provenance here:
+  // no seller SKU, price, observation or source permission is synthesized.
+  for (const need of needs) {
+    const origins = sourcesByNeedId.get(need.id)
+    if (!origins?.length || origins.some(origin =>
+      origin.unit !== need.unit || typeof origin.amount !== 'number' ||
+      !Number.isFinite(origin.amount) || origin.amount <= 0)) {
+      throw new Error('De herkomst van een fysiek ingrediënt ontbreekt of is gewijzigd. Controleer de recepten opnieuw.')
+    }
+    const total = sumDecimalAmounts(origins.map(origin => origin.amount!))
+    if (total === null || total !== need.amount) {
+      throw new Error('De receptenbundel en de totale fysieke winkelvraag komen niet meer overeen.')
+    }
+  }
+
   // The downloadable TXT guide must remain usable when the person filling
   // in a lawful offline CSV is not looking at the React preview. List each
   // canonical demand just once, refer to its exact CSV row(s), and clearly
@@ -54,11 +79,17 @@ export function combinedRecipesCaptureKit(
     const csvRows = stores.map((_, storeIndex) =>
       2 + storeIndex * needs.length + index).join(' / ')
     const lines = sources.slice(0, 4).map(source =>
-      '  - ' + short(source.recipeTitle, 60) + ': ' +
+      '  - ' + short(source.recipeTitle, 60) +
+      (cookingDayByRecipe.has(source.recipeId)
+        ? ' [' + short(cookingDayByRecipe.get(source.recipeId)!, 40) + ']' : '') +
+      ' · ' + short(source.ingredientLabel, 80) + ': ' +
       (source.amount === null ? 'hoeveelheid controleren'
-        : source.amount + ' ' + (source.unit === 'piece' ? 'stuks' : source.unit)) +
+        : readablePlannerDemandAmount(source.amount) + ' ' +
+          (source.unit === 'piece' ? 'stuks' : source.unit)) +
       ' · oorspronkelijk: ' + short(source.original, 90))
     return 'CSV-rij(en) ' + csvRows + ' · ' + short(need.label, 90) +
+      ' · totaal nodig: ' + readablePlannerDemandAmount(need.amount) + ' ' +
+      (need.unit === 'piece' ? 'stuks' : short(need.unit, 20)) +
       ' · ' + sources.length + ' oorspronkelijke ingrediëntregels\n' +
       (lines.length ? lines.join('\n') : '  - Herkomst niet gekoppeld; controleer in Recepten.') +
       (sources.length > 4
@@ -67,9 +98,11 @@ export function combinedRecipesCaptureKit(
   }).join('\n')
   // Both formats MUST receive the same canonical demand and store order.
   return {
-    csv: makeBlankPlannerCaptureCsv(needs, stores, ';'),
+    csv: makeBlankPlannerCaptureCsv(needs, stores, delimiter),
     guide: 'SUPA · eigen receptenbundel · ' + recipes.length + ' recepten\n' +
-      'LET OP: de lege bron-CSV bevat standaard beschikbaar=false. Zet dit alleen op true ' +
+      'Bestandsformaat: ' + (delimiter === '\t' ? 'TSV met tabs' :
+        delimiter === ';' ? 'Nederlandse CSV met puntkomma' : 'CSV met komma') + '\n' +
+      'LET OP: de lege bron-CSV/TSV bevat standaard beschikbaar=false. Zet dit alleen op true ' +
       'als het originele winkelproduct werkelijk beschikbaar is én je de verpakking, prijs en ' +
       'het echte observatiemoment hebt opgenomen. Een leeg product is NOOIT een gratis product.\n\n' +
       makePlannerCaptureGuide(needs, stores) +
@@ -82,7 +115,9 @@ export function combinedRecipesCaptureKit(
     rows: stores.flatMap((store, storeIndex) => needs.map((need, ingredientIndex) => ({
       csvRow: storeIndex * needs.length + ingredientIndex + 2,
       store, id: need.id, label: need.label, amount: need.amount!, unit: need.unit,
-      sources: sourcesByNeedId.get(need.id) ?? [],
+      sources: (sourcesByNeedId.get(need.id) ?? []).map(source => ({
+        ...source, cookingDay: cookingDayByRecipe.get(source.recipeId) ?? null,
+      })),
     }))),
   }
 }

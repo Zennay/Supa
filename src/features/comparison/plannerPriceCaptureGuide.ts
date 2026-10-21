@@ -1,4 +1,5 @@
 import { makeBlankPlannerCaptureCsv, type CaptureStore, type PlannerCaptureNeed } from './plannerPriceCaptureSheet.ts'
+import { captureWorksheetText } from './captureWorksheetText.ts'
 
 export type PlannerCaptureGuideNeed = PlannerCaptureNeed & Readonly<{
   amount: number | null
@@ -36,8 +37,7 @@ export function makePlannerCaptureGuide(
 ): string {
   // Reuse the same structural/size limits as the real blank CSV export.
   makeBlankPlannerCaptureCsv(needs, selectedStores)
-  const clean = (value: string) =>
-    value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim().slice(0, 180)
+  const clean = (value: string) => captureWorksheetText(value, 180)
   return [
     'SUPA · eigen prijsvastlegging voor jouw geselecteerde weekmenu',
     'Dit is GEEN winkelcatalogus, prijsopname, retailerrecht of besparingsbewijs.',

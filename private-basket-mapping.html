@@ -121,6 +121,16 @@ Productnamen en prijzen komen uitsluitend uit jouw eigen bestanden.</p>
 <p>Geen CSV klaar? Vul zelf producten in die je <strong>daadwerkelijk</strong> bij PLUS en/of DekaMarkt hebt waargenomen. Een tweede echte winkelopname kan later aan je eerste worden toegevoegd zonder die eerste opnieuw te verzinnen of in te voeren.
 Dit is een lokale invoerhulp, geen scraper. Laat onbekende prijzen leeg en bevestig alleen werkelijk gecontroleerde beschikbaarheid.
 Tijdstippen en artikel-ID's worden niet automatisch bedacht of ingevuld.</p>
+<aside id="manual-demand-context" class="ingredient" hidden aria-label="Mijn fysieke weekbehoefte tijdens handmatige winkelopname">
+<h3>Mijn gekozen weekboodschappen als geheugensteun</h3>
+<p>Na jouw expliciete Planner-import verschijnt hier de oorspronkelijke fysieke vraag.
+Deze ingrediënten zijn <strong>geen</strong> waargenomen winkelartikelen, productmatches, prijzen of voorraad.
+Vul rechts of hieronder uitsluitend werkelijk gecontroleerde winkelproducten in.</p>
+<label for="manual-demand-query">Zoek ingrediënt in mijn gekozen mandje</label>
+<input id="manual-demand-query" type="search" maxlength="120" autocomplete="off" placeholder="Bijvoorbeeld rijst of paprika">
+<p id="manual-demand-count" class="muted" role="status" aria-live="polite"></p>
+<ol id="manual-demand-items" style="max-height:270px;overflow:auto;padding-left:24px"></ol>
+</aside>
 <label for="manual-store-mode">Van welke winkel(s) heb je werkelijk producten waargenomen?</label>
 <select id="manual-store-mode"><option value="both">PLUS en DekaMarkt</option><option value="PLUS">Alleen PLUS</option><option value="DekaMarkt">Alleen DekaMarkt</option></select>
 <small>Met één winkel kun je al een eigen mand en budget maken. De andere winkel blijft volledig onbekend, zonder fictieve opname.</small>
