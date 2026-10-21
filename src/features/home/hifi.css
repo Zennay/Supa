@@ -354,3 +354,10 @@ body { background: #e9eeec; }
     outline-color: Highlight;
   }
 }
+
+/* Distinguish owned, reviewed products from historic Figma catalogue examples. */
+.hifi-products-heading { flex-wrap: wrap; gap: 8px; }
+.hifi-products .hifi-go-to-own { min-height: 44px; padding: 8px 11px;
+  border: 1px solid #346b54; border-radius: 12px; color: #164734;
+  background: #e1f1e6; font: inherit; font-weight: 700; cursor: pointer; }
+.hifi-products .hifi-go-to-own:focus-visible { outline: 3px solid #346b54; outline-offset: 2px; }

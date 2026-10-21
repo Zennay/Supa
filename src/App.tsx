@@ -710,7 +710,8 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             {planRepairMessage && <p role="alert">{planRepairMessage}</p>}
           </section>
         )}
-        {tab === 'products' && <Suspense fallback={<p role="status">Eigen bronproducten openen…</p>}>
+        {tab === 'products' && <div id="supa-real-source-catalog" tabIndex={-1}>
+          <Suspense fallback={<p role="status">Eigen bronproducten openen…</p>}>
           <PrivateReviewedProductCatalog reviewed={livePrivateReviewed} budget={budget}
             captureNeeds={productCaptureNeeds}
             onAddMissingToOwnList={(shop, ingredients) => {
@@ -823,7 +824,8 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               if (store) setPreferredOwnStore(store)
               navigate('list')
             }} />
-        </Suspense>}
+          </Suspense>
+        </div>}
         {tab === 'home' && <Suspense fallback={<p role="status">Mijn winkelvergelijking laden…</p>}>
           <PrivateComparisonJourney
             reviewed={livePrivateReviewed}
@@ -905,6 +907,11 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               <p>Deze ontwerpen zijn geen actuele winkelprijzen of geautoriseerde aanbiedingen.
                 Alleen jouw hierboven persoonlijk bevestigde bronregels tellen mee.</p>
               <HiFiHome view="products" onNavigate={navigate} activeDays={activeDays}
+                onOpenOwnSources={() => {
+                  const source = document.getElementById('supa-real-source-catalog')
+                  source?.focus({ preventScroll: true })
+                  source?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                }}
                 addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />
             </details>
           : <section className="supa-product-archive supa-product-archive--visible"
@@ -915,6 +922,11 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
                 aan Lijst toevoegen. Voor actuele prijzen gebruik je de bronimport hierboven.
                 Alle getoonde voorbeeldprijzen en aanbiedingen zijn demo, geen live data.</p>
               <HiFiHome view="products" onNavigate={navigate} activeDays={activeDays}
+                onOpenOwnSources={() => {
+                  const source = document.getElementById('supa-real-source-catalog')
+                  source?.focus({ preventScroll: true })
+                  source?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                }}
                 addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />
             </section>)}
         {!isHiFiView && <nav className="hifi-utilities" aria-label="Vergelijken en meten"><button onClick={() => navigate('basket')}>Mand</button><button onClick={() => navigate('observe')}>Meten</button></nav>}
