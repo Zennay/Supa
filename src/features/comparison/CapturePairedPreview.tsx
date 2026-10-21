@@ -128,20 +128,44 @@ export function CapturePairedPreview({
       try { a.click() } finally { a.remove() }
     } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
   }
+  function spreadsheet(onlyOpen: boolean) {
+    return privateTwoStoreReviewCsv({
+      plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh,
+      plusFresh, dekaFresh, onlyOpen,
+    })
+  }
+  function spreadsheetFilename(onlyOpen: boolean) {
+    return onlyOpen ? 'supa-PLUS-Deka-openstaande-bronvoorstellen-prive.csv' :
+      'supa-PLUS-Deka-volledige-bronvoorstellen-prive.csv'
+  }
   function downloadSpreadsheet(onlyOpen: boolean) {
     try {
       setExportMessage('')
-      const csv = privateTwoStoreReviewCsv({
-        plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh,
-        plusFresh, dekaFresh, onlyOpen,
-      })
-      downloadLocal(csv, 'text/csv;charset=utf-8',
-        onlyOpen ? 'supa-PLUS-Deka-openstaande-bronvoorstellen-prive.csv' :
-          'supa-PLUS-Deka-volledige-bronvoorstellen-prive.csv')
+      downloadLocal(spreadsheet(onlyOpen), 'text/csv;charset=utf-8',
+        spreadsheetFilename(onlyOpen))
       setExportMessage('Excel-geschikt lokaal bronoverzicht bewaard. Alle SKU’s, pakbedragen en eenheidsprijzen zijn uitsluitend onbevestigde voorstellen; deze CSV kan niet als bronprijsimport worden gebruikt.')
     } catch (cause) {
       setExportMessage(cause instanceof Error ? cause.message :
         'Kan het eigen winkelbronoverzicht niet bewaren.')
+    }
+  }
+  async function shareSpreadsheet(onlyOpen: boolean) {
+    try {
+      setExportMessage('')
+      const file = new File([spreadsheet(onlyOpen)], spreadsheetFilename(onlyOpen),
+        { type: 'text/csv;charset=utf-8' })
+      // OS share sheet is only opened after a click; no Supa network request.
+      if (!navigator.share || !navigator.canShare?.({ files: [file] })) {
+        downloadLocal(await file.text(), file.type, file.name)
+        setExportMessage('Bestanden delen via dit toestel niet beschikbaar. De privécontrole-CSV is lokaal gedownload om zelf te versturen.')
+        return
+      }
+      await navigator.share({ files: [file], title: 'Supa · mijn eigen winkelbroncontrole' })
+      setExportMessage('De lokale CSV is via de deelactie van je toestel aangeboden. Er zijn geen winkelprijzen bevestigd.')
+    } catch (cause) {
+      setExportMessage(cause instanceof Error && cause.name === 'AbortError'
+        ? 'Delen geannuleerd; je eigen winkelbronnen zijn niet veranderd.' :
+          cause instanceof Error ? cause.message : 'Kan eigen broncontrole niet delen.')
     }
   }
   function downloadMissingReview() {
@@ -306,6 +330,14 @@ export function CapturePairedPreview({
       <button type="button" className="ghost-button" disabled={missing === 0}
         onClick={() => downloadSpreadsheet(true)}>
         Download {missing} openstaande of opnieuw op te nemen regels in Excel-CSV
+      </button>
+      <button type="button" className="ghost-button"
+        onClick={() => void shareSpreadsheet(false)}>
+        Deel volledige Excel-CSV via mijn telefoon
+      </button>
+      <button type="button" className="ghost-button" disabled={missing === 0}
+        onClick={() => void shareSpreadsheet(true)}>
+        Deel alleen {missing} openstaande CSV-regels via mijn telefoon
       </button>
       <button type="button" className="ghost-button" onClick={downloadReview}>
         Download privécontrole van beide bronvoorstellen (TXT)
