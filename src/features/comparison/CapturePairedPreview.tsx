@@ -4,6 +4,7 @@ import { observedInstant } from '../../domain/offlineReviewedImport.ts'
 import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
 import type { PreviewMatchLine } from './CaptureMatchingPreview.tsx'
 import { privateTwoStorePreviewChecklist } from './privateTwoStorePreviewChecklist.ts'
+import { privateTwoStorePreviewPrintHtml } from './privateTwoStorePreviewPrintHtml.ts'
 
 function labelQuantity(line: PreviewMatchLine): string {
   return readablePlannerDemandAmount(line.amount) + ' ' + line.unit
@@ -90,21 +91,35 @@ export function CapturePairedPreview({
       plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh,
     })
   }
+  function downloadLocal(content: string, mime: string, filename: string) {
+    // Download from in-memory private text only; nothing is uploaded or fetched.
+    const uri = URL.createObjectURL(new Blob([content], { type: mime }))
+    try {
+      const a = document.createElement('a')
+      a.href = uri
+      a.download = filename
+      document.body.append(a)
+      try { a.click() } finally { a.remove() }
+    } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
+  }
   function downloadReview() {
     try {
       setExportMessage('')
-      const note = reviewText()
-      const uri = URL.createObjectURL(new Blob([note], { type: 'text/plain;charset=utf-8' }))
-      try {
-        const a = document.createElement('a')
-        a.href = uri
-        a.download = 'supa-PLUS-Deka-bronmatch-voorcontrole-prive.txt'
-        document.body.append(a)
-        try { a.click() } finally { a.remove() }
-      } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
+      downloadLocal(reviewText(), 'text/plain;charset=utf-8',
+        'supa-PLUS-Deka-bronmatch-voorcontrole-prive.txt')
       setExportMessage('Voorcontrole lokaal gedownload, zonder bevestigde prijsverschillen.')
     } catch (cause) {
       setExportMessage(cause instanceof Error ? cause.message : 'Kan het privécontroleblad niet bewaren.')
+    }
+  }
+  function downloadPrintableReview() {
+    try {
+      setExportMessage('')
+      downloadLocal(privateTwoStorePreviewPrintHtml(reviewText()), 'text/html;charset=utf-8',
+        'supa-PLUS-Deka-broncontrole-afdruk-prive.html')
+      setExportMessage('Afdrukbaar privécontroleblad lokaal bewaard. Open het HTML-bestand om te printen; de conceptprijzen zijn niet bevestigd.')
+    } catch (cause) {
+      setExportMessage(cause instanceof Error ? cause.message : 'Kan het offline printblad niet bewaren.')
     }
   }
   async function copyReview() {
@@ -190,6 +205,9 @@ export function CapturePairedPreview({
     <div className="offline-price-workbench__matching-actions">
       <button type="button" className="ghost-button" onClick={downloadReview}>
         Download privécontrole van beide bronvoorstellen (TXT)
+      </button>
+      <button type="button" className="ghost-button" onClick={downloadPrintableReview}>
+        Bewaar offline printblad van beide originele bronvoorstellen (HTML)
       </button>
       <button type="button" className="ghost-button" onClick={() => void copyReview()}>
         Kopieer broncontrole voor onderweg
