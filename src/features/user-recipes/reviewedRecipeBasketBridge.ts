@@ -65,6 +65,12 @@ export function prepareUnpricedPrivateRecipe(
         reasons.push('fractional_piece_requires_review')
         break
       }
+      const sourceReviewReason =
+        (ingredient as typeof ingredient & { sourceReviewReason?: unknown }).sourceReviewReason
+      if (typeof sourceReviewReason === 'string' && sourceReviewReason.length > 0) {
+        reasons.push('outstanding_measurement_review')
+        break
+      }
       if (!ingredient ||
         typeof ingredient.query !== 'string' ||
         !ingredient.query.trim() ||
