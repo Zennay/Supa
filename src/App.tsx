@@ -654,52 +654,59 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             {planRepairMessage && <p role="alert">{planRepairMessage}</p>}
           </section>
         )}
-        {tab === 'products' && <Suspense fallback={<p role="status">Eigen bronproducten openen…</p>}>
-          <PrivateReviewedProductCatalog reviewed={livePrivateReviewed} budget={budget}
-            captureProgress={privateCaptureProgress?.planKey === privatePlanKey
-              ? privateCaptureProgress : null}
-            onReviewIngredient={(store, ingredientId) => {
-              setPrivateReviewFocus(previous => ({
-                planKey: privatePlanKey, store, ingredientId,
-                serial: (previous?.serial ?? 0) + 1,
-              }))
-              navigate('basket')
-            }}
-            checked={privateShoppingTicks}
-            onToggleChecked={(shop, selected) => {
-              // No checkout progress can be created from expired or replaced
-              // source products. Existing local checkmarks remain untouched.
-              const current = freshReviewedBaskets(livePrivateReviewed, privatePlanKey, Date.now())
-              const capture = current?.stores[shop]
-              if (!capture || !capture.basket.lines.includes(selected)) return
-              const key = privatePhysicalShoppingTick(privatePlanKey, shop, capture.basket.store.id, selected)
-              setPrivateShoppingTicks(before => ({ ...before, [key]: !before[key] }))
-            }}
-            onOpenComparison={openOwnPriceImport}
-            onChooseRouteLine={intent => {
-              const serial = mixedRouteOpenSignal + 1
-              setMixedCostIntent(null)
-              setPrivateRouteChoice({ ...intent, serial })
-              setMixedRouteOpenSignal(serial)
-              navigate('list')
-            }}
-            onOpenMixedRoute={() => { setMixedCostIntent(null); setPrivateRouteChoice(null); setMixedRouteOpenSignal(value => value + 1); navigate('list') }}
-            onOpenList={(store) => {
-              if (store) setPreferredOwnStore(store)
-              navigate('list')
-            }} />
-        </Suspense>}
+        {tab === 'products' && <HiFiHome view="products" onNavigate={navigate}
+          activeDays={activeDays} addedProducts={designProductIds}
+          onToggleProduct={toggleDesignProduct}
+          onOpenOwnSources={() => document.getElementById('supa-real-source-catalog')?.scrollIntoView({
+            behavior: 'smooth', block: 'start',
+          })} />}
         {(tab === 'home' || tab === 'recipes') && <HiFiHome view={tab}
           onNavigate={navigate} activeDays={activeDays}
           addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />}
-        {tab === 'products' && <details className="supa-product-archive">
-          <summary>Oude ontwerpvoorbeelden en historische bronkaarten tonen (geen actuele prijzen)</summary>
-          <p>Alleen de persoonlijk bevestigde bronartikelen hierboven tellen mee in
-            de prijsvergelijking, budgetten en winkelroute. Deze voorbeelden zijn
-            geen supermarktvoorraad of actuele aanbiedingen.</p>
-          <HiFiHome view="products" onNavigate={navigate} activeDays={activeDays}
-            addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />
-        </details>}
+        {tab === 'products' && <section id="supa-real-source-catalog"
+          className="supa-product-real-source" aria-label="Mijn echte gecontroleerde winkelbronproducten">
+          <p className="supa-product-real-source__intro">
+            Echte winkelbronartikelen staan apart van de Figma-demokaarten hierboven.
+            Alleen eigen, gecontroleerde en voldoende verse brondata mogen meetellen in
+            het weekmandje of een prijsverschil; onbekende prijzen blijven onbekend.
+          </p>
+          <Suspense fallback={<p role="status">Eigen bronproducten openen…</p>}>
+            <PrivateReviewedProductCatalog reviewed={livePrivateReviewed} budget={budget}
+              captureProgress={privateCaptureProgress?.planKey === privatePlanKey
+                ? privateCaptureProgress : null}
+              onReviewIngredient={(store, ingredientId) => {
+                setPrivateReviewFocus(previous => ({
+                  planKey: privatePlanKey, store, ingredientId,
+                  serial: (previous?.serial ?? 0) + 1,
+                }))
+                navigate('basket')
+              }}
+              checked={privateShoppingTicks}
+              onToggleChecked={(shop, selected) => {
+                const current = freshReviewedBaskets(livePrivateReviewed, privatePlanKey, Date.now())
+                const capture = current?.stores[shop]
+                if (!capture || !capture.basket.lines.includes(selected)) return
+                const key = privatePhysicalShoppingTick(privatePlanKey, shop, capture.basket.store.id, selected)
+                setPrivateShoppingTicks(before => ({ ...before, [key]: !before[key] }))
+              }}
+              onOpenComparison={openOwnPriceImport}
+              onChooseRouteLine={intent => {
+                const serial = mixedRouteOpenSignal + 1
+                setMixedCostIntent(null)
+                setPrivateRouteChoice({ ...intent, serial })
+                setMixedRouteOpenSignal(serial)
+                navigate('list')
+              }}
+              onOpenMixedRoute={() => {
+                setMixedCostIntent(null); setPrivateRouteChoice(null)
+                setMixedRouteOpenSignal(value => value + 1); navigate('list')
+              }}
+              onOpenList={store => {
+                if (store) setPreferredOwnStore(store)
+                navigate('list')
+              }} />
+          </Suspense>
+        </section>}
         {!isHiFiView && <nav className="hifi-utilities" aria-label="Vergelijken en meten"><button onClick={() => navigate('basket')}>Mand</button><button onClick={() => navigate('observe')}>Meten</button></nav>}
 
         {productSelectionWarning && (tab === 'list' || tab === 'products') && (
