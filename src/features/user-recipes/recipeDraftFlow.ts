@@ -40,11 +40,18 @@ export function previewLocalRecipePortions(
     : null
   const sourceNotReviewed = source.source === 'url' &&
     (!sourceAssessment || sourceAssessment.accepted === false)
+  // Import provenance warnings remain review blockers through portion scaling.
+  // Invalid warning containers also fail closed instead of appearing reviewed.
+  const hasPendingWarnings = (warnings: unknown): boolean =>
+    !Array.isArray(warnings) ||
+    warnings.some(warning => typeof warning !== 'string' || warning.trim().length > 0)
   return {
     draft: scaled.draft,
     portionWarnings: scaled.warnings,
     sourceAssessment,
     needsReview: sourceNotReviewed ||
+      hasPendingWarnings(source.warnings) ||
+      hasPendingWarnings(scaled.draft.warnings) ||
       scaled.status === 'needs_review' ||
       !canConfirmUserRecipeDraft(scaled.draft),
     fetchAuthorized: false,
