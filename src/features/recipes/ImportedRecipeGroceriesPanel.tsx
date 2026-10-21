@@ -58,6 +58,7 @@ export function ImportedRecipeGroceriesPanel({
   const [startDay, setStartDay] = useState(m2InitialPlan[0].day)
   const [captureTarget, setCaptureTarget] = useState<'both' | 'PLUS' | 'DekaMarkt'>('both')
   const [showCookingMode, setShowCookingMode] = useState(false)
+  const [cookingModeOpened, setCookingModeOpened] = useState(false)
   const [copyableCaptureGuide, setCopyableCaptureGuide] = useState<{ identity: string; target: string; text: string } | null>(null)
   const [capturePreview, setCapturePreview] = useState<{
     key: string; rows: { csvRow: number; store: string; id: string;
@@ -965,15 +966,24 @@ export function ImportedRecipeGroceriesPanel({
           <button type="button" className="ghost-button"
             disabled={!plannerReadyForSelection || !plannerAssignments.length || !plannerDaysDistinct}
             aria-expanded={showCookingMode}
-            onClick={() => setShowCookingMode(current => !current)}>
+            onClick={() => {
+              setCookingModeOpened(true)
+              setShowCookingMode(current => !current)
+            }}>
             {showCookingMode ? 'Sluit kookmodus' : 'Start kookmodus voor deze week'}
           </button>
         </div>
-        {showCookingMode && plannerReadyForSelection && plannerDaysDistinct &&
-          <Suspense fallback={<p role="status">Kookmodus openen…</p>}>
-            <RecipeWeekCookingMode key={plannerExportKey} assignments={plannerAssignments}
-              recipes={selected} days={plannerDays} />
-          </Suspense>}
+        {cookingModeOpened && plannerReadyForSelection && plannerDaysDistinct && (
+          // Keep this exact week component mounted when temporarily collapsed.
+          // Its ticks remain volatile and are intentionally discarded on a
+          // genuinely different week, page unload or unmount. No persistence.
+          <div hidden={!showCookingMode} aria-hidden={!showCookingMode}>
+            <Suspense fallback={<p role="status">Kookmodus openen…</p>}>
+              <RecipeWeekCookingMode key={plannerExportKey} assignments={plannerAssignments}
+                recipes={selected} days={plannerDays} />
+            </Suspense>
+          </div>
+        )}
       </section>
       <section className="recipe-collection-groceries__week"
         aria-label="Mijn receptenkeuze privé bewaren of herstellen">
