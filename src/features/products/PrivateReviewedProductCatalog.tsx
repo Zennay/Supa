@@ -423,6 +423,7 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, captureNeeds
     {currentProgress && !fullPairReady && <Suspense fallback={<p role="status">
       Bevestigde losse bronartikelen laden…</p>}>
       <PrivatePartialProductCards progress={currentProgress} reviewed={currentReviewed}
+        incomingSearch={incomingSearch}
         now={nowMs} onOpenComparison={onOpenComparison}
         onReviewIngredient={onReviewIngredient} />
     </Suspense>}

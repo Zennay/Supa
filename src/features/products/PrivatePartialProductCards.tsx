@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { privatePackUnitRate, formatPrivateUnitRate } from '../comparison/privateUnitPrice.ts'
 import type {
   OwnStore, PrivateCaptureProgress, PrivateReviewedBaskets,
@@ -21,9 +21,10 @@ type Unit = 'all' | 'kg' | 'liter' | 'stuk'
  * by promoting a partial source into a complete grocery price.
  */
 export function PrivatePartialProductCards({
-  progress, reviewed, now, onReviewIngredient, onOpenComparison,
+  progress, reviewed, now, onReviewIngredient, onOpenComparison, incomingSearch,
 }: {
   progress: PrivateCaptureProgress
+  incomingSearch?: { serial: number; text: string }
   reviewed: PrivateReviewedBaskets | null
   now: number
   onReviewIngredient: (store: OwnStore, ingredientId: string) => void
@@ -31,6 +32,13 @@ export function PrivatePartialProductCards({
 }) {
   const [store, setStore] = useState<'both' | OwnStore>('both')
   const [query, setQuery] = useState('')
+  useEffect(() => {
+    if (!incomingSearch?.serial) return
+    setQuery(incomingSearch.text.slice(0, 120))
+    setStore('both')
+    setUnit('all')
+    setSort('source')
+  }, [incomingSearch?.serial, incomingSearch?.text])
   const [unit, setUnit] = useState<Unit>('all')
   const [sort, setSort] = useState<Sort>('source')
   const [message, setMessage] = useState('')
