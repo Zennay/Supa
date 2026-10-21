@@ -4,6 +4,7 @@ import type {
   OwnStore, PrivateCaptureProgress, PrivateReviewedBaskets,
 } from '../comparison/privateReviewedBasketBridge.ts'
 import { productSearchText } from './productSearchText.ts'
+import { readablePlannerDemandAmount } from '../comparison/plannerPriceCaptureGuide.ts'
 import { downloadPrivateKnownLinePriceCsv } from './privateKnownLinePriceCsv.ts'
 import { downloadPrivateKnownLinePricePrint } from './privateKnownLinePricePrint.ts'
 import {
@@ -161,6 +162,12 @@ export function PrivatePartialProductCards({
           {comparison && difference !== undefined && <div
             className="private-reviewed-products__card-difference" role="note">
             <strong>Dezelfde fysieke hoeveelheid bij twee winkels</strong>
+            <p>Oorspronkelijke vraag: PLUS{' '}
+              {readablePlannerDemandAmount(comparison.plusRequiredAmount)}{' '}
+              {comparison.plusRequiredUnit} = DekaMarkt{' '}
+              {readablePlannerDemandAmount(comparison.dekaRequiredAmount)}{' '}
+              {comparison.dekaRequiredUnit}. Alleen exact dezelfde fysieke behoefte
+              wordt met hele verpakkingen vergeleken.</p>
             <p><b>PLUS:</b> {comparison.plusProduct.productName} · SKU {comparison.plusProduct.productId}<br />
               {comparison.plusProduct.packCount} × {comparison.plusProduct.packAmount}
               {' '}{comparison.plusProduct.packUnit} per verpakking ·

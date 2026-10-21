@@ -153,6 +153,10 @@ export type PrivateKnownPricePair = {
   ingredientLabel: string
   requiredAmount: number
   requiredUnit: string
+  plusRequiredAmount: number
+  plusRequiredUnit: string
+  dekaRequiredAmount: number
+  dekaRequiredUnit: string
   plusCents: number
   dekaCents: number
   plusPacks: number
@@ -186,6 +190,10 @@ export function privateKnownPricePairs(
       ingredientLabel: pair.one.ingredientLabel,
       requiredAmount: pair.one.requiredAmount,
       requiredUnit: pair.one.requiredUnit,
+      plusRequiredAmount: pair.one.requiredAmount,
+      plusRequiredUnit: pair.one.requiredUnit,
+      dekaRequiredAmount: pair.other.requiredAmount,
+      dekaRequiredUnit: pair.other.requiredUnit,
       plusCents: pair.one.lineTotalCents,
       dekaCents: pair.other.lineTotalCents,
       plusPacks: pair.one.packagesNeeded,
@@ -233,8 +241,16 @@ export function privateKnownPricePairs(
       result.set(line.ingredientId, {
         ingredientId: line.ingredientId,
         ingredientLabel: line.ingredientLabel,
-        requiredAmount: line.requiredAmount,
-        requiredUnit: line.requiredUnit,
+        requiredAmount: original.requirement.amount!,
+        requiredUnit: original.requirement.unit,
+        plusRequiredAmount: completeStore === 'PLUS'
+          ? original.requirement.amount! : line.requiredAmount,
+        plusRequiredUnit: completeStore === 'PLUS'
+          ? original.requirement.unit : line.requiredUnit,
+        dekaRequiredAmount: completeStore === 'DekaMarkt'
+          ? original.requirement.amount! : line.requiredAmount,
+        dekaRequiredUnit: completeStore === 'DekaMarkt'
+          ? original.requirement.unit : line.requiredUnit,
         plusCents, dekaCents,
         plusPacks: completeStore === 'PLUS' ? original.packs : line.packagesNeeded,
         dekaPacks: completeStore === 'DekaMarkt' ? original.packs : line.packagesNeeded,

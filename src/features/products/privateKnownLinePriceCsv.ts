@@ -11,7 +11,9 @@ const headers = [
   'DekaMarkt_pakinhoud', 'DekaMarkt_pakeenheid', 'DekaMarkt_stuks_per_pak',
   'DekaMarkt_pakprijs_cent', 'DekaMarkt_eenheidsprijs', 'DekaMarkt_hele_verpakkingen',
   'DekaMarkt_regelprijs_cent', 'regelverschil_cent', 'goedkoper_bij',
-  'vergelijkbare_eenheid', 'eenheidsverschil_cent', 'eenheidsprijs_lager_bij', 'geldigheid',
+  'vergelijkbare_eenheid', 'eenheidsverschil_cent', 'eenheidsprijs_lager_bij',
+  'PLUS_originele_vraag', 'PLUS_vraageenheid', 'DekaMarkt_originele_vraag',
+  'DekaMarkt_vraageenheid', 'geldigheid',
 ]
 
 /** Private, non-importable, per-ingredient export. A missing basket never
@@ -47,6 +49,8 @@ export function privateKnownLinePriceCsv(
         pair.difference > 0 ? 'PLUS' : 'DekaMarkt',
       pair.unitGap?.unit ?? '', pair.unitGap ? String(pair.unitGap.roundedDifferenceCents) : '',
       pair.unitGap?.cheaper ?? (pair.unitGap ? 'gelijk' : 'onbekend'),
+      String(pair.plusRequiredAmount), pair.plusRequiredUnit,
+      String(pair.dekaRequiredAmount), pair.dekaRequiredUnit,
       'Eigen oorspronkelijk gecontroleerde bronregels; binnen 24 uur; eenheidsprijzen zijn indicatief; geen compleet winkelmandje, kassagarantie of onafhankelijke besparingsclaim.',
     ]
   })

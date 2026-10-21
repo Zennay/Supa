@@ -1,5 +1,6 @@
 import type { PrivateCaptureProgress, PrivateReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
 import { privateKnownPricePairs, privateProgressProductRows, formatKnownUnitGap } from './privateProgressProductRows.ts'
+import { readablePlannerDemandAmount } from '../comparison/plannerPriceCaptureGuide.ts'
 
 const money = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 const esc = (value: string): string => value.replace(/&/gu, '&amp;')
@@ -24,8 +25,10 @@ export function privateKnownLinePricePrintHtml(
       money.format(Math.abs(pair.difference) / 100) + ' lager bij ' +
       (pair.difference > 0 ? 'PLUS' : 'DekaMarkt')
     return '<tr><th scope="row">' + esc(original.ingredientLabel) +
-      '<small>' + esc(String(original.requiredAmount)) + ' ' +
-      esc(original.requiredUnit) + ' nodig</small></th>' +
+      '<small>PLUS ' + esc(readablePlannerDemandAmount(pair.plusRequiredAmount)) +
+      ' ' + esc(pair.plusRequiredUnit) + ' = DekaMarkt ' +
+      esc(readablePlannerDemandAmount(pair.dekaRequiredAmount)) + ' ' +
+      esc(pair.dekaRequiredUnit) + ' nodig (zelfde fysieke hoeveelheid)</small></th>' +
       '<td><b>' + esc(pair.plusProduct.productName) + '</b>' +
       '<small>SKU ' + esc(pair.plusProduct.productId) + ' · pak ' +
       esc(String(pair.plusProduct.packCount)) + ' × ' +
