@@ -778,6 +778,29 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   const largest = changed.length ? [...changed].sort((a, b) =>
     Math.abs(b.plus.lineTotalCents - b.deka.lineTotalCents) -
     Math.abs(a.plus.lineTotalCents - a.deka.lineTotalCents))[0] : null
+  // The complete baskets, never a search/filter result, determine the financial
+  // explanation. Use integer cents throughout; gross wins from both shops must
+  // reconcile to the exact whole-pack total difference shown above.
+  const fullPriceDrivers = plus.basket.lines.flatMap(line => {
+    const alternate = dekaById.get(line.id)
+    return line.status === 'matched' && alternate
+      ? [{ id: line.id, label: line.ingredientLabel,
+        plusCents: line.lineTotalCents, dekaCents: alternate.lineTotalCents }]
+      : []
+  })
+  const grossPlusCents = fullPriceDrivers.reduce((sum, line) => sum +
+    BigInt(Math.max(0, line.dekaCents - line.plusCents)), 0n)
+  const grossDekaCents = fullPriceDrivers.reduce((sum, line) => sum +
+    BigInt(Math.max(0, line.plusCents - line.dekaCents)), 0n)
+  const cheaperAtPlus = fullPriceDrivers.filter(line => line.plusCents < line.dekaCents).length
+  const cheaperAtDeka = fullPriceDrivers.filter(line => line.dekaCents < line.plusCents).length
+  const samePrice = fullPriceDrivers.length - cheaperAtPlus - cheaperAtDeka
+  const visibleDriverIds = new Set(advantaged.map(row => row.plus.id))
+  const topDrivers = [...fullPriceDrivers].filter(line =>
+    visibleDriverIds.has(line.id) && line.plusCents !== line.dekaCents)
+    .sort((a, b) => Math.abs(b.plusCents - b.dekaCents) -
+      Math.abs(a.plusCents - a.dekaCents)).slice(0, 5)
+  const driverAnchor = (id: string) => 'private-reviewed-price-row-' + encodeURIComponent(id)
   const mix = createMixedStoreShoppingPlan(plus.basket, deka.basket)
   const splitTrip = !!mix && mix.lines.some(line => line.store === 'PLUS') &&
     mix.lines.some(line => line.store === 'DekaMarkt')
@@ -842,6 +865,32 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         of een berekening van werkelijk afgerekende producten.</small>
     </div>}
     <strong role="status">{leader}</strong>
+    <section className="private-reviewed-products__difference-focus"
+      aria-label="Waar komt het volledige winkelprijsverschil vandaan?">
+      <h4>Welk mandje heeft welke goedkopere artikelen?</h4>
+      <p><strong>PLUS</strong> heeft {cheaperAtPlus} lagere hele-pakregelprijzen
+        ({exactEuro.formatCents(grossPlusCents)} opgeteld).</p>
+      <p><strong>DekaMarkt</strong> heeft {cheaperAtDeka} lagere hele-pakregelprijzen
+        ({exactEuro.formatCents(grossDekaCents)} opgeteld).</p>
+      <p>{samePrice} ingrediënten hebben een gelijk volledig regelbedrag.</p>
+      <p>Het saldo van de twee winkelvoordelen is {' '}
+        <strong>{exactEuro.formatCents(grossPlusCents >= grossDekaCents
+          ? grossPlusCents - grossDekaCents : grossDekaCents - grossPlusCents)}</strong>.
+        {' '}Dat is het prijsverschil tussen de twee volledige mandjes hierboven.</p>
+      <small>Dit zijn originele door jou gecontroleerde hele-verpakkingsprijzen,
+        geen korting op de kassabon en geen onafhankelijke besparingsclaim.
+        Zoek-, soort- en winkelfilters veranderen deze volledige optelling niet.</small>
+      {topDrivers.length > 0 && <div>
+        <h5>Grootste verschillen in je huidige selectie</h5>
+        <ol>{topDrivers.map(line => <li key={line.id}>
+          <button type="button" onClick={() => document.getElementById(
+            driverAnchor(line.id))?.scrollIntoView({ block: 'center', behavior: 'smooth' })}>
+            {line.label}: {exactEuro.formatCents(BigInt(Math.abs(line.plusCents - line.dekaCents)))}
+            {' '}goedkoper bij {line.plusCents < line.dekaCents ? 'PLUS' : 'DekaMarkt'}
+          </button>
+        </li>)}</ol>
+      </div>}
+    </section>
     <details className="private-reviewed-products__single-shop-panel">
       <summary>Ik ga naar één winkel · aparte lijst en printbare bron</summary>
       <div className="private-reviewed-products__source-coverage">
@@ -958,7 +1007,8 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       bij je zoek-, eenheids- en sorteerselectie. Alle mandtotalen hierboven blijven
       gebaseerd op het volledige weekmenu, niet alleen de gefilterde producten.</p>
     <div className="private-reviewed-products__paired-rows">
-      {advantaged.map(({ plus: first, deka: second }) => <article key={first.id}>
+      {advantaged.map(({ plus: first, deka: second }) => <article
+        key={first.id} id={driverAnchor(first.id)}>
         <h4>{first.ingredientLabel} · {first.requirement.amount} {first.requirement.unit}</h4>
         <div className="private-reviewed-products__paired-options">
           {product(first, 'PLUS')}{product(second, 'DekaMarkt')}
