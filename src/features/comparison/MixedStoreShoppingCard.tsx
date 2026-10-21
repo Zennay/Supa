@@ -263,6 +263,36 @@ export function MixedStoreShoppingCard({
     }
   }
 
+  async function sharePersonalRoute() {
+    if (block || !eligibleNow()) {
+      setMessage('Controleer eerst je actuele eigen bronprijzen en de extra bezoekkosten.')
+      return
+    }
+    const text = printable
+    if (new TextEncoder().encode(text).length > 128000) {
+      setShowText(true)
+      setMessage('Deze route is te groot voor mobiel delen. Kopieer de getoonde tekst lokaal.')
+      return
+    }
+    try {
+      if (typeof navigator.share === 'function') {
+        await navigator.share({ title: 'Supa · mijn persoonlijke winkelroute', text })
+        setMessage('Je eigen route is gedeeld via de door jou gekozen app; geen kassagarantie.')
+        return
+      }
+      if (navigator.clipboard?.writeText) {
+        if (!eligibleNow()) throw Error('Je originele prijsopnames zijn verlopen.')
+        await navigator.clipboard.writeText(text)
+        setMessage('De gekozen privéroute is gekopieerd, inclusief ongeprijsde eigen regels.')
+        return
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return
+    }
+    setShowText(true)
+    setMessage('Delen is niet beschikbaar; selecteer hieronder zelf de privéroute.')
+  }
+
   const copyFingerprint = JSON.stringify([privatePlanKey, printable, captured, mode, onlyOpen])
   const currentCopyFingerprint = useRef(copyFingerprint)
   currentCopyFingerprint.current = copyFingerprint
@@ -453,6 +483,10 @@ export function MixedStoreShoppingCard({
         ? 'boodschap hoort' : 'boodschappen horen'} bij een winkel buiten jouw gekozen route.</strong>
       {' '}Supa voegt die winkel niet stilzwijgend als stop toe. Kies zelf een andere
       winkelroute of pas de winkelgroep aan in je persoonlijke Lijst.
+      <button type="button" className="ghost-button" onClick={() =>
+        document.getElementById('supa-manual-shopping-notes')?.scrollIntoView({
+          behavior: 'smooth', block: 'start',
+        })}>Open mijn persoonlijke winkelgroepen</button>
     </p>}
     {validManualNotes.length > 0 && <p role="status" className="mixed-store-route__budget">
       Daarnaast staan {validManualNotes.length} eigen ongeprijsde boodschappen op deze route,
@@ -588,6 +622,10 @@ export function MixedStoreShoppingCard({
         Toon kopieerbare route + extra boodschappen
       </button>}
       <button type="button" className="ghost-button" onClick={download}>Download gekozen weergave (TXT)</button>
+      <button type="button" className="ghost-button"
+        onClick={() => { void sharePersonalRoute() }}>
+        Deel gekozen privéroute (mobiel)
+      </button>
       {privatePlanKey && <button type="button" className="ghost-button"
         onClick={() => { void downloadRouteWithExtras() }}>
         Download gekozen winkelroute + bewaarde ongeprijsde extras (TXT)
