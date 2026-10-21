@@ -79,6 +79,18 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
   const [favorites, setFavorites] = useState<string[]>(initialFavorites.ids)
   const [favoritesRaw, setFavoritesRaw] = useState(initialFavorites.raw)
   const [favoritesWritable, setFavoritesWritable] = useState(initialFavorites.writable)
+  useEffect(() => {
+    const syncFavorites = (event: StorageEvent) => {
+      if (event.key !== null && event.key !== discoveryFavoritesKey) return
+      const snapshot = readDiscoveryFavorites()
+      setFavorites(snapshot.ids)
+      setFavoritesRaw(snapshot.raw)
+      setFavoritesWritable(snapshot.writable)
+      if (!snapshot.writable) setMessage('Favorieten zijn elders gewijzigd met gegevens die deze versie niet kan opslaan; de bestaande opslag blijft behouden.')
+    }
+    window.addEventListener('storage', syncFavorites)
+    return () => window.removeEventListener('storage', syncFavorites)
+  }, [])
   const [filterOpen, setFilterOpen] = useState(false)
   const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [selectedRecipe, setSelectedRecipe] = useState<typeof designRecipes[number] | null>(null)
