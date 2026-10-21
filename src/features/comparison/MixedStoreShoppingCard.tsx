@@ -272,18 +272,20 @@ export function MixedStoreShoppingCard({
       throw Error('Controleer eerst alle originele bronartikelen en eventuele extra bezoekkosten.')
     const { readSavedExtrasForPlan } = await import('./ownExtraGroceriesStorage.ts')
     const saved = readSavedExtrasForPlan(privatePlanKey)
-    if (!saved.available || !saved.items.length)
-      throw Error('Bewaar eerst de eigen extra boodschappen voor deze exacte Planner-week.')
+    if (!saved.available)
+      throw Error('De bewaarde extra boodschappen zijn niet leesbaar. Controleer je privégegevens in de Lijst.')
+    if (!saved.items.length && !validManualNotes.length)
+      throw Error('Voeg eerst eigen ongeprijsde boodschappen toe in de Lijst.')
     const visible = onlyOpen ? saved.items.filter(item => !item.done) : saved.items
     const clean = (value: string) => value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim()
-    const complete = [printable, '',
+    const complete = saved.items.length ? [printable, '',
       'EIGEN EXTRA BOODSCHAPPEN (' + saved.items.length + ' apart bewaard)',
       'Geen gekoppelde winkel, bronprijs, pakprijs of bijdrage aan bovenstaand prijsverschil.',
       ...visible.map(item => (item.done ? '☑ ' : '☐ ') + clean(item.name) +
         ' · ' + item.quantity + ' ' + (item.unit === 'piece' ? 'stuks' : item.unit) +
         ' · prijs onbekend'),
       'Bovenstaande bedragen omvatten uitsluitend het geprijsde Planner-weekmandje.',
-    ].join('\n')
+    ].join('\n') : printable
     if (new TextEncoder().encode(complete).length > 128000 || !eligibleNow())
       throw Error('Bron of privélijst is gewijzigd of verlopen.')
     return complete
@@ -309,7 +311,7 @@ export function MixedStoreShoppingCard({
       if (original !== currentCopyFingerprint.current || !eligibleNow())
         throw Error('De bron of gekozen route is gewijzigd. Open de complete lijst opnieuw.')
       setCombinedCopy({ fingerprint: original, text })
-      setMessage('Je kunt de volledige gekozen route plus ongeprijsde extras hieronder selecteren en kopiëren.')
+      setMessage('Je kunt jouw gekozen route met eigen ongeprijsde boodschappen hieronder selecteren en kopiëren.')
     } catch (error) {
       setCombinedCopy(null)
       setMessage(error instanceof Error ? error.message : 'Kopieerbare volledige route niet beschikbaar.')
