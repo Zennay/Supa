@@ -54,11 +54,22 @@ export function prepareUnpricedPrivateRecipe(
         reasons.push('metric_amount_exceeds_import_contract')
         break
       }
-      // A portion of an indivisible shopping item cannot be assumed to be
-      // a purchasable whole item without a separate explicit review contract.
-      // Grams and millilitres may still contain legitimate metric decimals.
-      if (ingredient.unit === 'piece' && !Number.isInteger(ingredient.amount)) {
+      if (!['g', 'ml', 'piece'].includes(ingredient.unit ?? '')) {
+        reasons.push('invalid_metric_unit')
+        break
+      }
+      // A fraction of an indivisible item cannot be assumed purchasable
+      // without a separate explicit review contract. Keep the original
+      // issue-specific reason while preserving the parent branch's safe-integer
+      // check, metric-unit allowlist, and outstanding measurement review gate.
+      if (ingredient.unit === 'piece' && !Number.isSafeInteger(ingredient.amount)) {
         reasons.push('fractional_piece_requires_human_review')
+        break
+      }
+      const sourceReviewReason =
+        (ingredient as typeof ingredient & { sourceReviewReason?: unknown }).sourceReviewReason
+      if (typeof sourceReviewReason === 'string' && sourceReviewReason.length > 0) {
+        reasons.push('outstanding_measurement_review')
         break
       }
       if (!ingredient ||

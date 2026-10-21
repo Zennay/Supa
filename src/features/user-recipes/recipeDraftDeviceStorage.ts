@@ -57,6 +57,24 @@ function storageKey(id: string): string | null {
   return typeof id === 'string' && DRAFT_ID.test(id) ? STORAGE_PREFIX + id : null
 }
 
+// Keep only a non-content high-watermark after deleting a draft. It prevents a
+// stale tab's old numeric revision from matching a different draft recreated
+// under the same UUID (the ABA problem); recipe content is still removed.
+function revisionKey(id: string): string | null {
+  return typeof id === 'string' && DRAFT_ID.test(id)
+    ? STORAGE_PREFIX + 'revision:' + id : null
+}
+
+function readRevisionCounter(storage: RecipeDraftStorage, id: string): number | null {
+  const key = revisionKey(id)
+  if (!key) return null
+  const raw = storage.getItem(key)
+  if (raw === null) return 0
+  if (!/^(0|[1-9][0-9]*)$/.test(raw)) return null
+  const revision = Number(raw)
+  return Number.isSafeInteger(revision) && revision >= 0 ? revision : null
+}
+
 function plainRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
@@ -149,7 +167,8 @@ export function saveRecipeDeviceDraft(
   expectedRevision: number | null,
 ): DraftStorageWrite {
   const key = storageKey(id)
-  if (!key || (expectedRevision !== null &&
+  const counterKey = revisionKey(id)
+  if (!key || !counterKey || (expectedRevision !== null &&
     (!Number.isSafeInteger(expectedRevision) || expectedRevision < 1))) return { status: 'invalid' }
   const draft = safeDraft(input)
   if (!draft) return { status: 'invalid' }
@@ -159,7 +178,12 @@ export function saveRecipeDeviceDraft(
       (previous.status === 'found' && previous.record.revision !== expectedRevision)) {
     return { status: 'conflict' }
   }
-  const revision = previous.status === 'found' ? previous.record.revision + 1 : 1
+  let highWatermark: number | null
+  try { highWatermark = readRevisionCounter(storage, id) }
+  catch { return { status: 'unavailable' } }
+  if (highWatermark === null) return { status: 'protected' }
+  const previousRevision = previous.status === 'found' ? previous.record.revision : 0
+  const revision = Math.max(highWatermark, previousRevision) + 1
   if (!Number.isSafeInteger(revision)) return { status: 'protected' }
 
   const record: DeviceDraftRecord = {
@@ -175,7 +199,17 @@ export function saveRecipeDeviceDraft(
   if (lastCheck.status !== previous.status ||
       (lastCheck.status === 'found' && previous.status === 'found' &&
         lastCheck.record.revision !== previous.record.revision)) return { status: 'conflict' }
-  try { storage.setItem(key, serialized) } catch { return { status: 'unavailable' } }
+  let lastCounter: number | null
+  try { lastCounter = readRevisionCounter(storage, id) }
+  catch { return { status: 'unavailable' } }
+  if (lastCounter === null) return { status: 'protected' }
+  if (lastCounter !== highWatermark) return { status: 'conflict' }
+  // Persist the high-watermark first. If content writing fails, skipping a
+  // revision is safe; reusing an old revision after deletion is not.
+  try {
+    storage.setItem(counterKey, String(revision))
+    storage.setItem(key, serialized)
+  } catch { return { status: 'unavailable' } }
   return { status: 'saved', record }
 }
 
@@ -185,12 +219,22 @@ export function deleteRecipeDeviceDraft(
   expectedRevision: number,
 ): DraftStorageWrite {
   const key = storageKey(id)
-  if (!key || !Number.isSafeInteger(expectedRevision) || expectedRevision < 1) return { status: 'invalid' }
+  const counterKey = revisionKey(id)
+  if (!key || !counterKey || !Number.isSafeInteger(expectedRevision) || expectedRevision < 1) return { status: 'invalid' }
   const current = readRecipeDeviceDraft(storage, id)
   if (current.status === 'protected' || current.status === 'unavailable') return { status: current.status }
   if (current.status !== 'found' || current.record.revision !== expectedRevision) {
     return { status: 'conflict' }
   }
-  try { storage.removeItem(key) } catch { return { status: 'unavailable' } }
+  let highWatermark: number | null
+  try { highWatermark = readRevisionCounter(storage, id) }
+  catch { return { status: 'unavailable' } }
+  if (highWatermark === null) return { status: 'protected' }
+  // Leave a numeric tombstone, not recipe content, so old tabs cannot match a
+  // new draft incarnation after this record is removed.
+  try {
+    storage.setItem(counterKey, String(Math.max(highWatermark, current.record.revision)))
+    storage.removeItem(key)
+  } catch { return { status: 'unavailable' } }
   return { status: 'deleted' }
 }
