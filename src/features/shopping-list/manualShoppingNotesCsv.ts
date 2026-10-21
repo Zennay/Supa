@@ -69,3 +69,27 @@ export function importUnpricedShoppingCsv(source: string): Row[] {
     return { store, label, done: columns[3] === 'ja' }
   })
 }
+
+/** Excel/Calc clipboard copies cells as TSV, not as a .csv file. Only accept
+ * Supa's exact unpriced four-column contract; never infer price columns. */
+export function importUnpricedShoppingPaste(source: string): Row[] {
+  if (!source.replace(/^\ufeff/u, '').startsWith('supa-eigen-ongeprijsd-v1\t')) {
+    return importUnpricedShoppingCsv(source)
+  }
+  if (new TextEncoder().encode(source).length > 32768) throw Error('Tabel groter dan 32 kB.')
+  const lines = source.replace(/^\ufeff/u, '').replace(/\r\n/gu, '\n').split('\n')
+  if (lines.at(-1) === '') lines.pop()
+  if (!lines.length || lines[0] !== header.replace(/;/gu, '\t'))
+    throw Error('Plak vier kolommen uit het eigen ongeprijsde Supa-invulblad.')
+  if (lines.length < 2 || lines.length > 101) throw Error('Plak 1–100 eigen boodschappen.')
+  const originalRows = lines.slice(1).map(line => {
+    if (line.includes('\r')) throw Error('Tabel bevat ongeldige regeleinden.')
+    const cells = line.split('\t')
+    if (cells.length !== 4 || cells[0] !== 'eigen') throw Error('Tabel bevat extra of ontbrekende kolommen.')
+    return cells
+  })
+  // Reuse exactly the same admitted schema, duplicate checking and length limits.
+  const csv = '\ufeff' + header + '\r\n' +
+    originalRows.map(cells => cells.map(quote).join(';')).join('\r\n') + '\r\n'
+  return importUnpricedShoppingCsv(csv)
+}

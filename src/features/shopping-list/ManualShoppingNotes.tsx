@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type Dispatch, type SetStateAction } from 'react'
 import './manualShoppingNotes.css'
-import { exportUnpricedShoppingCsv, importUnpricedShoppingCsv } from './manualShoppingNotesCsv.ts'
+import { exportUnpricedShoppingCsv, importUnpricedShoppingCsv, importUnpricedShoppingPaste } from './manualShoppingNotesCsv.ts'
 import { mergePrivateNotes, normalizePrivateNotes, serializePrivateNotes, PRIVATE_NOTES_BACKUP_MAX_BYTES } from './manualShoppingNotesBackup.ts'
 
 export type UnpricedShoppingNote = { id: string; label: string; store: 'Algemeen' | 'PLUS' | 'DekaMarkt'; done: boolean }
@@ -226,8 +226,8 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
     } catch { setMessage('Kon de ongeprijsde CSV niet bewaren.') }
   }
-  function prepareOwnCsvPreview(source: string) {
-    const incoming = importUnpricedShoppingCsv(source)
+  function prepareOwnCsvPreview(source: string, pasted = false) {
+    const incoming = pasted ? importUnpricedShoppingPaste(source) : importUnpricedShoppingCsv(source)
     const draft = incoming.map(item => (item.done ? '☑ ' : '☐ ') +
       '[' + item.store + '] ' + item.label).join('\n')
     if (draft.length > 15000) throw Error('Te veel tekst voor de voorinzage.')
@@ -237,7 +237,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
   }
   function preparePastedOwnCsv() {
     ++bulkFileSerial.current
-    try { prepareOwnCsvPreview(ownCsvPaste) }
+    try { prepareOwnCsvPreview(ownCsvPaste, true) }
     catch (error) { setMessage(error instanceof Error ? error.message : 'Geplakte CSV geweigerd.') }
   }
   async function readOwnCsv(file?: File) {
@@ -743,8 +743,8 @@ export function ManualShoppingNotes({ notes, setNotes }: {
           }} />
         </label>
         <details>
-          <summary>Of plak eigen Supa-CSV uit je spreadsheet</summary>
-          <p>Uitsluitend het eigen ongeprijsde Supa-formaat, geen winkelprijs-CSV.
+          <summary>Of plak vier kolommen uit Excel/Calc</summary>
+          <p>Plak rechtstreeks de vier kolommen van het eigen Supa-invulblad (ook met tabs), of de volledige Supa-CSV. Geen winkelprijsbestanden.
             Na voorbereiden verschijnt de lijst hierboven; bevestig daarna zelf de voorinzage.</p>
           <label>Privé-CSV-tekst
             <textarea rows={4} maxLength={32768} value={ownCsvPaste}
@@ -752,7 +752,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
               placeholder="supa-eigen-ongeprijsd-v1;winkel;artikel;afgevinkt" />
           </label>
           <button type="button" disabled={!ownCsvPaste.trim()} onClick={preparePastedOwnCsv}>
-            Zet mijn CSV klaar voor controle
+            Zet mijn spreadsheet klaar voor controle
           </button>
         </details>
         <button type="submit" disabled={!bulkDraft.trim() || notes.length >= 100}>
