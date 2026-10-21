@@ -2266,15 +2266,20 @@ export function OfflineReviewedWorkbench({
     return [store, plannerCaptureNeeds.filter(need => ids.has(need.id))]
   })) as Record<(typeof stores)[number], typeof plannerCaptureNeeds>
 
-  async function downloadMissingPriceCapture(store: (typeof stores)[number], kind: 'csv' | 'guide') {
-    // Freshness is checked again at click time; a sleeping tab must not
-    // quietly present expired observed prices as completed source coverage.
+  function missingCaptureNeedsNow(store: (typeof stores)[number]) {
+    // Both file download and phone clipboard use the same live source-age
+    // admission. A newly expired source needs a whole fresh capture, not a
+    // short list that misleadingly reuses old package prices or timestamps.
     const capture = imported?.captures[store]
     const nowNs = BigInt(Date.now()) * 1_000_000n
     const sourceFresh = !!capture && nowNs >= capture.observedNs - 300_000_000_000n &&
       nowNs - capture.observedNs <= 604_800_000_000_000n
-    const needs = !sourceFresh || olderPairCapture === store
+    return !sourceFresh || olderPairCapture === store
       ? plannerCaptureNeeds : missingPriceCaptureNeeds[store]
+  }
+
+  async function downloadMissingPriceCapture(store: (typeof stores)[number], kind: 'csv' | 'guide') {
+    const needs = missingCaptureNeedsNow(store)
     if (!needs.length) return
     try {
       const text = kind === 'csv'
@@ -3205,6 +3210,14 @@ export function OfflineReviewedWorkbench({
                           {store}-regelnummergids (TXT)
                         </button>
                       </div>
+                      {missingPriceCaptureNeeds[store].length > 0 &&
+                        <PortableBlankCapture purpose="missing"
+                          needs={missingPriceCaptureNeeds[store]}
+                          needsAtClick={() => missingCaptureNeedsNow(store)}
+                          stores={[store]}
+                          captureKey={captureWeek + ':missing:' + store + ':' +
+                            (imported?.captures[store]?.observedAt ?? 'none') + ':' +
+                            Math.floor(clockMs / 60000)} />}
                     </div>)}
                   </div>
                   <div className="offline-price-workbench__actions">
