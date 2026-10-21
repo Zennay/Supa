@@ -37,7 +37,7 @@ import { createPrivateBasketComparisonCsv } from '../../privateBasketComparisonC
 import { UnpricedPlannerChecklist } from './UnpricedPlannerChecklist.tsx'
 import { PrivateCapturePastePreview } from './PrivateCapturePastePreview.tsx'
 import { PortableBlankCapture } from './PortableBlankCapture.tsx'
-import { CaptureMatchingPreview } from './CaptureMatchingPreview.tsx'
+import { CaptureMatchingPreview, type PreviewMatchLine } from './CaptureMatchingPreview.tsx'
 import { recentOwnCaptureInstant, type PrivateReviewedBaskets, type PrivateCaptureProgress, type PrivateReviewFocus } from './privateReviewedBasketBridge.ts'
 import './offlineReviewedWorkbench.css'
 const dateTime = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
@@ -74,10 +74,7 @@ type CapturePreviewStore = {
   appendableNewProducts?: number
   matching?: {
     proposed: number; unresolved: number; total: number
-    lines: { id: string; label: string; status: 'matched' | 'unresolved'
-      amount: number | null; unit: string
-      product: string | null; originalSku: string | null
-      packs: number | null; reasons: string[] }[]
+    lines: PreviewMatchLine[]
   }
   observedAt: string; observedNs?: bigint; unavailableProducts: number
   previewProducts: {
@@ -524,6 +521,12 @@ export function OfflineReviewedWorkbench({
             product: line.status === 'matched' ? line.productName : null,
             originalSku: line.status === 'matched' ? line.productId : null,
             packs: line.status === 'matched' ? line.packs : null,
+            packAmount: line.status === 'matched' ? line.pack.amount : null,
+            packUnit: line.status === 'matched' ? line.pack.unit : null,
+            packCount: line.status === 'matched' ? line.pack.count : null,
+            pricePerPackCents: line.status === 'matched' ? line.pricePerPackCents : null,
+            lineTotalCents: line.status === 'matched' ? line.lineTotalCents : null,
+            unitPrice: line.status === 'matched' ? privateUnitPrice(line) : null,
             reasons: line.reasons,
           })),
         }
