@@ -47,6 +47,10 @@ export function ManualShoppingNotes({ notes, setNotes }: {
   } | null>(null)
   const [lastDuplicateBatch, setLastDuplicateBatch] = useState<
     { note: UnpricedShoppingNote; index: number }[] | null>(null)
+  const [pendingGeneralDuplicates, setPendingGeneralDuplicates] = useState<
+    UnpricedShoppingNote[] | null>(null)
+  const [lastGeneralDuplicates, setLastGeneralDuplicates] = useState<
+    { note: UnpricedShoppingNote; index: number }[] | null>(null)
   const [pendingCleared, setPendingCleared] = useState<UnpricedShoppingNote[] | null>(null)
   const [pendingNextRound, setPendingNextRound] = useState<UnpricedShoppingNote[] | null>(null)
   const [lastNextRound, setLastNextRound] = useState<UnpricedShoppingNote[] | null>(null)
@@ -683,6 +687,64 @@ export function ManualShoppingNotes({ notes, setNotes }: {
     setLastDuplicateBatch(null)
     setMessage('De eerdere dubbele eigen boodschappen zijn met hun originele winkel en vinkjes hersteld.')
   }
+  const retailerOpenKeys = new Set(notes.filter(note =>
+    note.store !== 'Algemeen' && !note.done).map(note =>
+    note.label.normalize('NFC').toLocaleLowerCase('nl-NL')))
+  const redundantGeneralNotes = notes.filter(note => note.store === 'Algemeen' &&
+    !note.done && retailerOpenKeys.has(note.label.normalize('NFC').toLocaleLowerCase('nl-NL')))
+  function confirmGeneralDuplicates() {
+    const selected = pendingGeneralDuplicates
+    if (!selected?.length) return
+    const keys = new Set(notes.filter(note => note.store !== 'Algemeen' && !note.done)
+      .map(note => note.label.normalize('NFC').toLocaleLowerCase('nl-NL')))
+    const valid = selected.every(note => notes.some(current =>
+      current.id === note.id && current.store === 'Algemeen' &&
+      current.label === note.label && !current.done) &&
+      keys.has(note.label.normalize('NFC').toLocaleLowerCase('nl-NL')))
+    if (!valid) {
+      setPendingGeneralDuplicates(null)
+      setMessage('Algemene of winkelgebonden boodschappen zijn inmiddels veranderd. Controleer opnieuw.')
+      return
+    }
+    const removed = selected.map(note => ({ note, index: notes.findIndex(item => item.id === note.id) }))
+    const ids = new Set(selected.map(note => note.id))
+    setNotes(current => {
+      const storeKeys = new Set(current.filter(item => item.store !== 'Algemeen' && !item.done)
+        .map(item => item.label.normalize('NFC').toLocaleLowerCase('nl-NL')))
+      return selected.every(note => current.some(item => item.id === note.id &&
+        item.store === 'Algemeen' && item.label === note.label && !item.done) &&
+        storeKeys.has(note.label.normalize('NFC').toLocaleLowerCase('nl-NL')))
+        ? current.filter(item => !ids.has(item.id)) : current
+    })
+    setLastGeneralDuplicates(removed)
+    setPendingGeneralDuplicates(null)
+    setMessage(selected.length + ' dubbele open algemene boodschappen opgeruimd. ' +
+      'De bestaande winkelgebonden artikelen en hun vinkjes blijven behouden.')
+  }
+  function undoGeneralDuplicates() {
+    const removed = lastGeneralDuplicates
+    if (!removed?.length) return
+    const valid = (current: UnpricedShoppingNote[]) => {
+      const ids = new Set(current.map(item => item.id))
+      const keys = new Set(current.map(item => duplicateKey(item.store, item.label)))
+      return current.length + removed.length <= 100 && removed.every(({ note }) =>
+        !ids.has(note.id) && !keys.has(duplicateKey(note.store, note.label)))
+    }
+    if (!valid(notes)) {
+      setLastGeneralDuplicates(null)
+      setMessage('Herstel geweigerd omdat de lijst nu conflicterende algemene boodschappen bevat.')
+      return
+    }
+    setNotes(current => {
+      if (!valid(current)) return current
+      const restored = [...current]
+      for (const entry of [...removed].sort((a, b) => a.index - b.index))
+        restored.splice(Math.min(entry.index, restored.length), 0, entry.note)
+      return restored
+    })
+    setLastGeneralDuplicates(null)
+    setMessage('Algemene boodschappen met hun oorspronkelijke vinkjes en ID’s hersteld.')
+  }
   const selected = notes.filter(note => filterStore === 'Alle winkels' ||
     note.store === filterStore || note.store === 'Algemeen')
   // Search only the shopper's own notes. Never infer a retailer identity.
@@ -1168,6 +1230,38 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       {duplicateOpenLabels.length > 8 && <small>En {duplicateOpenLabels.length - 8} andere; bekijk
         alle winkels met je eigen zoekfilter.</small>}
     </section>}
+    {redundantGeneralNotes.length > 0 && <section className="manual-shopping-notes__double-buy"
+      aria-label="Algemene boodschappen die ook op winkellijsten staan">
+      <strong>{redundantGeneralNotes.length} open algemene boodschappen staan ook op een winkellijst</strong>
+      <p>Dezelfde eigen omschrijving staat bij Algemeen én PLUS of DekaMarkt.
+        Dit is alleen een mogelijke dubbele herinnering, geen automatische productmatching
+        of prijsvergelijking. Je kunt de algemene regels na controle in één keer verwijderen;
+        de echte winkellijst blijft bestaan.</p>
+      <button type="button" onClick={() =>
+        setPendingGeneralDuplicates(redundantGeneralNotes.map(item => ({ ...item })))}>
+        Bekijk {redundantGeneralNotes.length} dubbele algemene regels…
+      </button>
+      {pendingGeneralDuplicates && <div role="group" aria-label="Dubbele algemene regels bevestigen">
+        <p>{pendingGeneralDuplicates.length} nog open algemene regels worden verwijderd;
+          dezelfde eigen namen blijven op PLUS of DekaMarkt staan. Geen winkelprijzen,
+          SKU's, bronbestanden of bestaande vinkjes worden aangepast.</p>
+        <ul>{pendingGeneralDuplicates.slice(0, 12).map(item =>
+          <li key={item.id}>{item.label}</li>)}</ul>
+        {pendingGeneralDuplicates.length > 12 &&
+          <small>En {pendingGeneralDuplicates.length - 12} andere.</small>}
+        <button type="button" onClick={confirmGeneralDuplicates}>
+          Ja, verwijder alleen de dubbele algemene regels
+        </button>
+        <button type="button" onClick={() => setPendingGeneralDuplicates(null)}>
+          Annuleer
+        </button>
+      </div>}
+    </section>}
+    {lastGeneralDuplicates && <p className="manual-shopping-notes__undo-duplicates">
+      <button type="button" onClick={undoGeneralDuplicates}>
+        Herstel {lastGeneralDuplicates.length} eerder verwijderde algemene boodschappen
+      </button>
+    </p>}
     {lastDuplicateBatch && <p className="manual-shopping-notes__undo-duplicates">
       <button type="button" onClick={undoDuplicateBatch}>
         Herstel {lastDuplicateBatch.length} eerder verwijderde dubbele eigen boodschappen
