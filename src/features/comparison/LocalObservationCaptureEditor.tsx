@@ -62,6 +62,8 @@ export function LocalObservationCaptureEditor({
   const [tabError, setTabError] = useState('')
   const [search, setSearch] = useState('')
   const [onlyOpen, setOnlyOpen] = useState(false)
+  const [draftPaste, setDraftPaste] = useState('')
+  const [draftCopy, setDraftCopy] = useState('')
   const [portable, setPortable] = useState<{ store: CaptureStore; text: string } | null>(null)
   const changed = snapshot.fingerprint !== currentFingerprint
   const missingByStore = new Map(snapshot.stores.map(store =>
@@ -123,7 +125,7 @@ export function LocalObservationCaptureEditor({
       ++latestRestore.current
       setRows(stored.rows)
       setMoments(stored.moments)
-      setPortable(null)
+      setPortable(null); setDraftCopy(''); setDraftPaste('')
       invalidatePreviewOnce()
       setStatus('Eerdere invoer uit dit tabblad hervat. Alle winkelproducten en prijzen moeten nog door broncontrole.')
       setTabError('')
@@ -171,12 +173,14 @@ export function LocalObservationCaptureEditor({
     })
     setStatus('')
     setPortable(null)
+    setDraftCopy('')
     invalidatePreviewOnce()
   }
   function moment(store: CaptureStore, value: string) {
     ++changes.current
     setMoments(old => ({ ...old, [store]: value }))
     setPortable(null)
+    setDraftCopy('')
     setStatus('')
     invalidatePreviewOnce()
   }
@@ -186,23 +190,56 @@ export function LocalObservationCaptureEditor({
     ++changes.current
     ++latestRestore.current
     setSnapshot({ fingerprint: currentFingerprint, needs: [...needs], stores: [...stores] })
-    setRows({}); setMoments({}); setStatus(''); setSearch(''); setOnlyOpen(false); setPortable(null)
+    setRows({}); setMoments({}); setStatus(''); setSearch(''); setOnlyOpen(false); setPortable(null); setDraftPaste(''); setDraftCopy('')
     // A new physical week must not quietly overwrite the previous tab copy.
     setTabAutosave(false)
     invalidatePreviewOnce()
   }
-  function backupDraft() {
+  async function backupDraft(method: 'download' | 'share' | 'copy') {
     try {
+      setStatus('')
       const text = exportLocalCaptureDraft(snapshot.fingerprint, { rows, moments })
-      const url = URL.createObjectURL(new Blob([text], { type: 'application/json;charset=utf-8' }))
+      if (method === 'copy') {
+        setDraftCopy(text)
+        if (!navigator.clipboard?.writeText) {
+          setStatus('Klembord niet beschikbaar. Selecteer de privé-JSON hieronder.')
+          return
+        }
+        try {
+          await navigator.clipboard.writeText(text)
+          setStatus('Alleen je eigen privéconcept gekopieerd. Plak uitsluitend op een vertrouwd apparaat.')
+        } catch {
+          setStatus('Klembordtoegang ontbreekt. Selecteer je privé-JSON hieronder.')
+        }
+        return
+      }
+      const file = new File([text],
+        'supa-mijn-onvolledige-winkelinvoer-niet-gecontroleerd.json',
+        { type: 'application/json;charset=utf-8' })
+      if (method === 'share' && navigator.share &&
+          navigator.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file],
+            title: 'Supa · mijn eigen privéwinkelinvoer (geen prijsbewijs)' })
+          setStatus('Je eigen JSON-concept bewust via het toestel gedeeld. Dit is geen winkelprijsbewijs.')
+        } catch (cause) {
+          setStatus(cause instanceof Error && cause.name === 'AbortError'
+            ? 'Delen geannuleerd. Je invoer blijft in dit formulier staan.'
+            : 'Delen niet gelukt. Download desgewenst je eigen JSON-concept.')
+        }
+        return
+      }
+      const url = URL.createObjectURL(file)
       try {
         const link = document.createElement('a')
         link.href = url
-        link.download = 'supa-mijn-onvolledige-winkelinvoer-niet-gecontroleerd.json'
+        link.download = file.name
         document.body.append(link)
         try { link.click() } finally { link.remove() }
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
-      setStatus('Je onvolledige privéconcept is lokaal bewaard als JSON. Dit is geen negenkoloms bron-CSV of geaccepteerde winkelprijs.')
+      setStatus(method === 'share'
+        ? 'Mobiel bestandsdelen niet beschikbaar. Privé-JSON lokaal gedownload.'
+        : 'Je privéconcept lokaal opgeslagen als JSON; geen geaccepteerde winkelbron.')
     } catch (cause) {
       setStatus(cause instanceof Error ? cause.message : 'Kan het privéconcept niet bewaren.')
     }
@@ -233,7 +270,7 @@ export function LocalObservationCaptureEditor({
       }
       ++changes.current
       setRows(restored.rows); setMoments(restored.moments)
-      setPortable(null)
+      setPortable(null); setDraftCopy(''); setDraftPaste('')
       setStatus('Privéconcept op dit toestel hersteld. Alle SKU’s, bronmomenten en prijzen moeten nog via de gewone broncontrole.')
       invalidatePreviewOnce()
     } catch (cause) {
@@ -540,8 +577,16 @@ export function LocalObservationCaptureEditor({
         download ook een eigen JSON-bestand voor bewaren buiten deze sessie.</p>}
     </section>
     <div className="offline-price-workbench__actions">
-      <button type="button" className="ghost-button" onClick={backupDraft}>
+      <button type="button" className="ghost-button" onClick={() => { void backupDraft('download') }}>
         Bewaar ook onvolledige invoer als privéconcept (JSON)
+      </button>
+      <button type="button" className="ghost-button"
+        onClick={() => { void backupDraft('share') }}>
+        Deel mijn eigen privéconcept als JSON via telefoon
+      </button>
+      <button type="button" className="ghost-button"
+        onClick={() => { void backupDraft('copy') }}>
+        Kopieer mijn eigen privéconcept als JSON
       </button>
       <label>Herstel eerder bewaard privéconcept voor precies dit weekmenu
         <input type="file" accept=".json,application/json"
@@ -551,6 +596,23 @@ export function LocalObservationCaptureEditor({
             if (file) void restoreDraft(file)
           }} />
       </label>
+      <details>
+        <summary>Plak een eerder gekopieerd privéconcept (JSON) voor precies dit weekmenu</summary>
+        <p>Plak uitsluitend je eigen <code>supa-private-capture-editor-draft-v1</code>
+          JSON. Dit is een bewerkbaar concept, geen originele winkelbron of geaccepteerde
+          prijs. Bestaande invoer wordt alleen na controle en jouw bevestiging vervangen.</p>
+        <textarea rows={5} spellCheck={false} maxLength={256000}
+          value={draftPaste} onChange={event => setDraftPaste(event.currentTarget.value)}
+          placeholder="Plak je eigen privéconcept-JSON (geen winkel-CSV)"
+          style={{ display: 'block', width: '100%', boxSizing: 'border-box' }} />
+        <button type="button" disabled={!draftPaste.trim() || changed}
+          onClick={() => { void restoreDraft(new File([draftPaste],
+            'supa-eigen-priveconcept.json', { type: 'application/json' })) }}>
+          Controleer en herstel mijn geplakte privéconcept
+        </button>
+        <button type="button" className="ghost-button"
+          onClick={() => setDraftPaste('')}>Wis geplakte concepttekst</button>
+      </details>
       <button type="button" className="ghost-button"
         onClick={() => { void act('download') }}>Bewaar ingevulde originele winkelopname op dit toestel</button>
       <button type="button" className="ghost-button"
@@ -560,6 +622,13 @@ export function LocalObservationCaptureEditor({
       <button type="button" className="ghost-button"
         onClick={reset}>Start nieuw leeg opnameformulier</button>
     </div>
+    {!changed && draftCopy && <label>Eigen privé-JSON om handmatig te kopiëren (geen winkelprijsbewijs)
+      <textarea readOnly rows={5} spellCheck={false} value={draftCopy}
+        onFocus={event => event.currentTarget.select()}
+        style={{ display: 'block', width: '100%', boxSizing: 'border-box' }} />
+      <button type="button" className="ghost-button"
+        onClick={() => setDraftCopy('')}>Verberg mijn gekopieerde privé-JSON</button>
+    </label>}
     {status && <p role="status" aria-live="polite">{status}</p>}
     <small>Dit JSON-concept is alleen je eigen lokale back-up voor dit exacte
       weekmenu; geen retailerbron, bronrecht of winkelbewijs. Je brongegevens

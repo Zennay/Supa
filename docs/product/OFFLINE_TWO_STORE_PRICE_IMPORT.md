@@ -1312,3 +1312,24 @@ voor bewaardoeleinden expliciet een **eigen JSON-concept**. Een prijs blijft
 onbekend totdat een werkelijk waargenomen bronbestand afzonderlijk lokaal is
 gecontroleerd en de match is geaccepteerd; supermarktbronrechten zijn niet
 automatisch aanwezig.
+
+## Privéconcept van telefoon naar telefoon overdragen
+
+Naast het bestaande downloaden van een JSON-bestand kun je nu bewust
+**Deel mijn eigen privéconcept als JSON via telefoon** kiezen. Alleen wanneer
+het besturingssysteem lokaal bestandsdelen ondersteunt verschijnt het eigen
+JSON-bestand in de OS-deeldialoog; anders downloadt Supa het op je toestel.
+De ontvanger van jouw bewuste share kan bronidentiteiten en mogelijke bedragen
+lezen: deel dit privéconcept uitsluitend met je eigen vertrouwde apparaat.
+Deelacties bij de bron-CSV blijven afzonderlijk; de twee bestandsformaten
+zijn niet onderling uitwisselbaar.
+
+**Kopieer mijn eigen privéconcept als JSON** toont een selecteerbare lokale
+tekst, ook zonder klembordrechten. Op het andere apparaat kun je die met
+**Plak een eerder gekopieerd privéconcept** handmatig herstellen, of het
+gedownloade bestand met het bestaande JSON-bestandsveld openen. Beide
+herstelroutes gebruiken dezelfde bestaande strikte 256 kB UTF-8-invoer,
+exact-week-fingerprint, winkel-/regeltelling, veldinspectie en expliciete
+vervangingsbevestiging. Ongeldige of tussentijds verouderde invoer kan geen
+oude mobiele formuliergegevens overschrijven; herstel is nooit een
+prijsbevestiging of winkelautorisatie.
