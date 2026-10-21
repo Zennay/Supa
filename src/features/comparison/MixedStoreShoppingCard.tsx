@@ -643,7 +643,8 @@ export function MixedStoreShoppingCard({
         })}
       </div>
     </details>
-    <MixedStoreUnitBreakdown plus={plus} deka={deka} route={plan} />
+    <MixedStoreUnitBreakdown plus={plus} deka={deka} route={plan}
+      captured={captured} eligibleNow={eligibleNow} />
     {canEditSecondStop && <div className="offline-price-workbench__actions">
       <label>Extra kosten van de tweede stop (€)
         <input type="text" inputMode="decimal" value={extraVisitCost} maxLength={9}
