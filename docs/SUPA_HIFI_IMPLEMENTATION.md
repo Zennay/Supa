@@ -50,6 +50,6 @@ The M2 Firefox workflow enters Planner from the new Home before replaying all ex
 ## Product discovery search follow-up (2026-10-21)
 
 - Product search uses the existing accent-insensitive normalizer and matches the displayed product name, retailer, package/unit, demo price text and product ID. Historical price-free source identities also match their retailer, package, capture timestamp, source URL and source ID.
-- Multi-term search now treats each word as a separate constraint across the available metadata, so a combined query such as a product + retailer + package can match across fields; visible result counts announce updates to assistive technology.
+- Multi-term search treats each word as a separate constraint across metadata and search-normalizes Dutch decimal commas plus number/unit spacing (for example, `1,5 l` and `1.5L`); captured source values remain untouched. Visible result counts announce updates to assistive technology.
 - Switching between historical identities and Figma examples preserves the typed search query but clears source-specific filters, so a favorites-only selection from one catalog cannot silently make the other catalog appear empty.
 - This is discovery-only behavior: it does not add current retailer prices, change source rights, or feed demo values into the private reviewed-basket calculator.
