@@ -1,6 +1,9 @@
 import { FigmaImage } from './components/FigmaImage'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { PlannerView } from './features/planner/PlannerView'
+const PlannerView = lazy(async () => {
+  const module = await import('./features/planner/PlannerView')
+  return { default: module.PlannerView }
+})
 import { WeekShareManualCopy } from './features/planner/WeekShareManualCopy'
 import { PlannerPortableWeek } from './features/planner/PlannerPortableWeek.tsx'
 import { currentWeekSharePreview, formatShareableWeek } from './features/planner/weekPlanShare'
@@ -34,7 +37,10 @@ import type { PrivateExtraVisitCostIntent } from './features/comparison/privateE
 import type { PrivateSourceFileHandoff } from './features/comparison/privateSourceFileHandoff.ts'
 import { parsePrivateExtraVisitCostCents } from './features/comparison/privateExtraVisitCost.ts'
 import { freshReviewedBaskets, type PrivateReviewedBaskets, type PrivateCaptureProgress, type PrivateReviewFocus, type OwnStore, type PrivateRouteChoice } from './features/comparison/privateReviewedBasketBridge.ts'
-import { ObservationView } from './features/observation/ObservationView'
+const ObservationView = lazy(async () => {
+  const module = await import('./features/observation/ObservationView')
+  return { default: module.ObservationView }
+})
 import { IdentityAvatar } from './components/IdentityAvatar.tsx'
 import { HiFiHome, HiFiDemoList } from './features/home/HiFiHome'
 import { readRecipeLibrary } from './features/recipes/recipeLibrary'
@@ -707,7 +713,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               : 'Je weekbudget en maaltijdkeuzes zijn tijdelijk en niet opgeslagen omdat browseropslag niet beschikbaar is.'}
           </p>
         )}
-        {tab === 'planner' && (
+        {tab === 'planner' && <Suspense fallback={<section className="screen" role="status" aria-live="polite">Planner wordt geladen…</section>}>
           <PlannerView
             budget={budget}
             activeDays={activeDays}
@@ -774,7 +780,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             onRecipeChange={changeRecipe}
             onReset={resetPlan}
           />
-        )}
+        </Suspense>}
         {tab === 'planner' && <PlannerPortableWeek
           preferences={preferences}
           days={m2InitialPlan.map(meal => meal.day)}
@@ -960,7 +966,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             </Suspense>
           </section>
         )}
-        {tab === 'observe' && <ObservationView />}
+        {tab === 'observe' && <Suspense fallback={<section className="screen" role="status" aria-live="polite">Meten wordt geladen…</section>}><ObservationView /></Suspense>}
       </div>
 
       <nav className="bottom-nav hifi-nav" aria-label="Hoofdnavigatie">
