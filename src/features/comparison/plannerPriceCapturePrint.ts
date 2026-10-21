@@ -21,7 +21,8 @@ export function makePrintablePlannerCaptureHtml(
   makeBlankPlannerCaptureCsv(needs, selectedStores)
   if (originalRecipeLines && (
     originalRecipeLines.length !== needs.length ||
-    originalRecipeLines.some(names => !Array.isArray(names) || names.some(name => typeof name !== 'string'))
+    originalRecipeLines.some(lines => !Array.isArray(lines) ||
+      lines.length > 1_000 || lines.some(line => typeof line !== 'string' || line.length > 2_000))
   )) throw new Error('De recept-herkomst komt niet overeen met de fysieke CSV-rijen.')
   const sections = selectedStores.map((store, storeIndex) => {
     const rows = needs.map((need, index) => {

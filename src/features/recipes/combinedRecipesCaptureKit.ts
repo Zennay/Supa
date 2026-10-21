@@ -54,7 +54,8 @@ export function combinedRecipesCaptureKit(
     const csvRows = stores.map((_, storeIndex) =>
       2 + storeIndex * needs.length + index).join(' / ')
     const lines = sources.slice(0, 4).map(source =>
-      '  - ' + short(source.recipeTitle, 60) + ': ' +
+      '  - ' + short(source.recipeTitle, 60) + ' · ' +
+      short(source.ingredientLabel, 80) + ': ' +
       (source.amount === null ? 'hoeveelheid controleren'
         : readablePlannerDemandAmount(source.amount) + ' ' +
           (source.unit === 'piece' ? 'stuks' : source.unit)) +

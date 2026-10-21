@@ -677,8 +677,8 @@ export function ImportedRecipeGroceriesPanel({
       // amounts and recipe provenance. Only the first store is needed for the
       // per-ingredient legend; the printer repeats it for the second store.
       const recipeLines = kit.rows.filter(row => row.store === stores[0]).map(row =>
-        row.sources.map(source => source.recipeTitle + ' · ' +
-          readablePlannerDemandAmount(source.amount) + ' ' +
+        row.sources.map(source => source.recipeTitle + ' · ' + source.ingredientLabel +
+          ' · ' + readablePlannerDemandAmount(source.amount) + ' ' +
           (source.unit === 'piece' ? 'stuks' : source.unit ?? 'eenheid controleren')))
       const html = makePrintablePlannerCaptureHtml(needs, stores, recipeLines)
       requireLatestOwnedRecipes()
