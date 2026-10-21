@@ -251,7 +251,9 @@ export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: 
   // ingredient checklist and never participates in the price comparator.
   const selectedHistorical = historicalRetailerProducts.filter(item => ids.includes(item.id))
   const selectedExamples = designProducts.filter(item => ids.includes(item.id))
-  if (!selectedHistorical.length && !selectedExamples.length) return null
+  const recognizedIds = new Set([...selectedHistorical.map(item => item.id), ...selectedExamples.map(item => item.id)])
+  const selectedUnknown = ids.filter(id => !recognizedIds.has(id))
+  if (!selectedHistorical.length && !selectedExamples.length && !selectedUnknown.length) return null
 
   return <section className="hifi-demo-list" aria-label="Zelf gekozen producten">
     <h3>Jouw gekozen producten</h3>
@@ -270,6 +272,15 @@ export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: 
           aria-label={`Verwijder uit lijst: ${item.name} bij ${item.store}`}>Verwijder</button>
       </div>)}
     </div>}
+    {selectedUnknown.length > 0 && <div className="hifi-picked-demo" aria-label="Oude productselecties die niet meer in de catalogus staan">
+      <h4>Oude productselecties</h4>
+      <p className="disclaimer">Deze product-ID's horen niet bij de huidige catalogus. Ze blijven bewaard totdat je ze verwijdert; er wordt geen prijs of productmatch afgeleid.</p>
+      {selectedUnknown.map(id => <div className="hifi-demo-list-row" key={id}>
+        <div className="hifi-picked-source-logo" aria-hidden="true">?</div>
+        <div className="hifi-picked-details"><strong>Product niet beschikbaar</strong><span>Oude product-ID: {id} · prijs onbekend</span></div>
+        <button type="button" className="ghost-button" onClick={() => onRemove(id)} aria-label={`Verwijder oude productselectie: ${id}`}>Verwijder</button>
+      </div>)}
+    </div>}
     {selectedExamples.length > 0 && <div className="hifi-picked-demo" aria-label="Figma demoproducten">
       <h4>Figma-voorbeelden</h4>
       <p className="disclaimer">Demolijst · geen actuele prijzen. Niet meegenomen in de mandvergelijking.</p>
@@ -284,7 +295,8 @@ export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: 
       <textarea readOnly rows={Math.min(ids.length + 2, 12)}
         onFocus={event => event.currentTarget.select()}
         value={[...selectedHistorical.map(item => `☐ ${item.name} · ${item.store} · ${item.pack} · prijs onbekend (historisch)`),
-          ...selectedExamples.map(item => `☐ ${item.name} · Figma-demo, geen actuele prijs`)].join('\n')}
+          ...selectedExamples.map(item => `☐ ${item.name} · Figma-demo, geen actuele prijs`),
+          ...selectedUnknown.map(id => `☐ Product niet beschikbaar · oude product-ID ${id} · prijs onbekend`)].join('\n')}
         aria-label="Kopieerbare gekozen producten, zonder winkelprijzen" />
     </label>
   </section>
