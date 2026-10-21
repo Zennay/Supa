@@ -210,6 +210,12 @@ export function CapturePairedPreview({
       {' '}Er is geen volledig vergelijkbaar prijsverschil zolang het bronpaar te ver uiteenligt.</p>}
     {!sourceFresh && <p role="status">Minstens één bronmoment is ouder dan zeven
       dagen of ongeldig. Vermeld deze getallen niet als actuele prijzen.</p>}
+    {missing > 0 && <p>
+      <a href="#supa-two-store-capture-followup">
+        Ga naar de lege PLUS-/Deka-invulbladen om deze {missing} openstaande
+        of opnieuw te observeren Planner-regels aan te vullen
+      </a>. Er worden geen oude SKU's, bedragen of bronmomenten voor je ingevuld.
+    </p>}
     <div className="offline-price-workbench__matching-controls">
       <label>Zoek origineel ingrediënt of bronproduct
         <input type="search" value={query} maxLength={120}

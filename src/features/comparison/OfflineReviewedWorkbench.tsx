@@ -2721,8 +2721,9 @@ export function OfflineReviewedWorkbench({
                   {' '}niet geobserveerde regels bij de andere winkel;
                   geen tweede winkelprijs.</p>
               )}
-              <div className="offline-price-workbench__capture-followup">
-                <strong>Vul alleen de nog ontbrekende winkelproducten aan</strong>
+              <div id="supa-two-store-capture-followup" tabIndex={-1}
+                className="offline-price-workbench__capture-followup">
+                <strong>Vul ontbrekende of verlopen winkelproducten aan</strong>
                 <p>Per winkel kun je een kort leeg CSV-opnameblad plus de bijhorende
                   ingrediëntenrijgids downloaden. Er wordt geen winkelprijs,
                   productcode of bronmoment voor je ingevuld. Bij een verlopen
