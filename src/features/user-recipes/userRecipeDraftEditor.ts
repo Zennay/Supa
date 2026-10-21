@@ -65,10 +65,19 @@ function sourceReviewReasonOf(ingredient: EditorIngredient): string | null {
     return typeof ingredient.sourceReviewReason === 'string' && ingredient.sourceReviewReason.length > 0
       ? ingredient.sourceReviewReason : null
   }
-  return typeof ingredient.reviewReason === 'string' &&
-    ingredient.reviewReason.length > 0 &&
-    !EDITOR_VALIDATION_REASONS.has(ingredient.reviewReason)
-    ? ingredient.reviewReason : null
+  const legacyReason = ingredient.reviewReason
+  if (typeof legacyReason !== 'string' || legacyReason.length === 0) return null
+  for (const validation of EDITOR_VALIDATION_REASONS) {
+    if (legacyReason.startsWith(validation + ' ')) {
+      return legacyReason.slice(validation.length).trim() || null
+    }
+  }
+  return EDITOR_VALIDATION_REASONS.has(legacyReason) ? null : legacyReason
+}
+
+function isMeasurementReviewReason(reason: string): boolean {
+  const normalized = reason.normalize('NFC').toLocaleLowerCase('nl-NL')
+  return /(?:convers|omreken|eenheid|hoeveelheid|massa|schepjes|gram|milliliter|unit conversion|measurement conversion)/u.test(normalized)
 }
 
 function validAmount(value: number | null): value is number {
@@ -137,7 +146,9 @@ export function updateEditorIngredient(
       validAmount(next.amount) &&
       (next.unit === 'g' || next.unit === 'ml' || next.unit === 'piece') &&
       (next.unit !== 'piece' || Number.isSafeInteger(next.amount))
-    const sourceReviewReason = correctedMeasurementIsValid ? null : previousSourceReview
+    const canResolveSourceReview = correctedMeasurementIsValid &&
+      previousSourceReview !== null && isMeasurementReviewReason(previousSourceReview)
+    const sourceReviewReason = canResolveSourceReview ? null : previousSourceReview
     next.sourceReviewReason = sourceReviewReason
     next.reviewReason = validation
     return next
