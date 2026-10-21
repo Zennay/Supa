@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
+import { observedInstant } from '../../domain/offlineReviewedImport.ts'
 import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import { privateKnownPricePairs, privateProgressProductRows, formatKnownUnitGap, type PrivateKnownProduct, type PrivateKnownUnitGap } from '../products/privateProgressProductRows.ts'
 import { euro } from '../../lib/money.ts'
@@ -83,11 +84,35 @@ export function PrivateComparisonJourney({
   const comparison = paired
     ? compareFullBaskets({ baseline: plus.basket, candidate: deka.basket }) : null
   const ready = paired && comparison?.claimable === true
-  // Use the exact same canonical outcome as Planner's source progress view.
-  // A two-shop "covered" UI state alone cannot make an unsafe basket claimable.
+  // Both individual captures can still be valid for private review while
+  // their original collection instants are too far apart for a comparison.
+  // Use the canonical nanosecond parser, not rounded Date arithmetic.
+  const progressForCurrentPlan = !reviewed || progress?.planKey === reviewed.planKey
+    ? progress : null
+  const originalSourceAt = (store: OwnStore): string | null => {
+    const full = valid?.stores[store]
+    if (full) return full.observedAt
+    const own = progressForCurrentPlan?.stores[store]
+    return own?.fresh && recentOwnCaptureInstant(own.observedAt, nowMs)
+      ? own.observedAt : null
+  }
+  const plusOriginalAt = originalSourceAt('PLUS')
+  const dekaOriginalAt = originalSourceAt('DekaMarkt')
+  const plusInstant = plusOriginalAt ? observedInstant(plusOriginalAt) : null
+  const dekaInstant = dekaOriginalAt ? observedInstant(dekaOriginalAt) : null
+  const originalSourceGapNs = plusInstant && dekaInstant
+    ? plusInstant.ns >= dekaInstant.ns
+      ? plusInstant.ns - dekaInstant.ns
+      : dekaInstant.ns - plusInstant.ns
+    : null
+  const captureMomentsDiffer = originalSourceGapNs !== null &&
+    originalSourceGapNs > 86_400_000_000_000n
+  // Reuse Planner's existing actionable status and source review rather than
+  // building a second freshness/matching authority on Home.
   const comparisonStatus = ready ? 'comparable'
-    : plus && deka ? (paired ? 'not-comparable' : 'different-moments')
-      : 'missing'
+    : captureMomentsDiffer ? 'different-moments'
+      : plus && deka ? (paired ? 'not-comparable' : 'different-moments')
+        : 'missing'
   const cheaper = ready
     ? plus!.basket.totalCents === deka!.basket.totalCents ? null
       : plus!.basket.totalCents < deka!.basket.totalCents ? 'PLUS' : 'DekaMarkt'
@@ -571,6 +596,19 @@ export function PrivateComparisonJourney({
         onFocus={event => event.currentTarget.select()} />}
     </section>}
 
+    {!ready && captureMomentsDiffer && <section
+      className="private-comparison-journey__source-window"
+      role="status" aria-label="Originele winkelmomenten niet vergelijkbaar">
+      <strong>De twee winkelopnames liggen meer dan 24 uur uit elkaar</strong>
+      <p>Er zijn individuele, actuele originele winkelmomenten, maar die zijn
+        niet gelijktijdig genoeg voor een eerlijk prijsverschil van hetzelfde mandje.
+        Bestaande bevestigde productregels blijven afzonderlijk zichtbaar;
+        het twee-winkelprijsverschil blijft onbekend.</p>
+      <small>PLUS: {plusOriginalAt} · DekaMarkt: {dekaOriginalAt}</small>
+      <button type="button" onClick={onOpenImport}>
+        Vernieuw de oorspronkelijke bron van één winkel
+      </button>
+    </section>}
     {captureNeeds.length > 0 && <section
       className="private-comparison-journey__coverage"
       aria-label="Hetzelfde fysieke mandje bij PLUS en DekaMarkt">

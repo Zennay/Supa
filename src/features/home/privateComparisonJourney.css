@@ -144,3 +144,11 @@
 .private-comparison-journey__coverage>strong{display:block;font-size:1.08rem}
 .private-comparison-journey__coverage>p{max-width:70ch;line-height:1.5}
 .private-comparison-journey__coverage>button{min-height:44px}
+
+/* Genuine one-sided prices may remain useful even when the original store
+ * visits fall outside the strict paired comparison window. */
+.private-comparison-journey__source-window{display:grid;gap:.5rem;margin-block:1rem;padding:1rem;border:1px solid #c8ad69;border-radius:14px;background:#fffaf0}
+.private-comparison-journey__source-window>strong{font-size:1.06rem}
+.private-comparison-journey__source-window>p{margin:0;max-width:70ch;line-height:1.5}
+.private-comparison-journey__source-window>small{overflow-wrap:anywhere}
+.private-comparison-journey__source-window>button{justify-self:start;min-height:44px}
