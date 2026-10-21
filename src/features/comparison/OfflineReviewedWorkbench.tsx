@@ -398,6 +398,7 @@ export function OfflineReviewedWorkbench({
   const [captureSheetStore, setCaptureSheetStore] = useState<'both' | CaptureStore>('both')
   const [capturePreviewShown, setCapturePreviewShown] = useState<Record<CaptureStore, number>>({ PLUS: 20, DekaMarkt: 20 })
   const [capturePreviewSearch, setCapturePreviewSearch] = useState<Record<CaptureStore, string>>({ PLUS: '', DekaMarkt: '' })
+  const [capturePreviewSort, setCapturePreviewSort] = useState<Record<CaptureStore, 'source' | 'name' | 'sku' | 'price' | 'unknown'>>({ PLUS: 'source', DekaMarkt: 'source' })
   const [capturePreview, setCapturePreview] = useState<{
     files: File[]; week: string
     stores: CapturePreviewStore[]
@@ -457,6 +458,7 @@ export function OfflineReviewedWorkbench({
     setCapturePreview(null)
     setCapturePreviewShown({ PLUS: 20, DekaMarkt: 20 })
     setCapturePreviewSearch({ PLUS: '', DekaMarkt: '' })
+    setCapturePreviewSort({ PLUS: 'source', DekaMarkt: 'source' })
     setBusy(true)
     try {
       if (files.length > 2) throw Error('Kies maximaal twee eigen CSV-bestanden.')
@@ -2482,12 +2484,25 @@ export function OfflineReviewedWorkbench({
               {currentPreview.stores.map(store => {
                 const query = capturePreviewSearch[store.retailer]
                   .normalize('NFC').trim().toLocaleLowerCase('nl-NL')
-                const visibleProducts = store.previewProducts.filter(product => {
+                const filteredProducts = store.previewProducts.filter(product => {
                   if (!query) return true
                   const searchable = [product.name, product.id, product.packAmount, product.packUnit]
                     .map(value => String(value ?? '')).join(' ')
                     .normalize('NFC').toLocaleLowerCase('nl-NL')
                   return searchable.includes(query)
+                })
+                const sort = capturePreviewSort[store.retailer]
+                const visibleProducts = [...filteredProducts].sort((a, b) => {
+                  if (sort === 'source') return 0
+                  if (sort === 'name') return a.name.localeCompare(b.name, 'nl-NL')
+                  if (sort === 'sku') return a.id.localeCompare(b.id, 'nl-NL')
+                  const aPriced = a.available && a.priceCents !== null
+                  const bPriced = b.available && b.priceCents !== null
+                  if (sort === 'unknown')
+                    return Number(aPriced) - Number(bPriced) || a.name.localeCompare(b.name, 'nl-NL')
+                  return (aPriced ? a.priceCents! : Number.MAX_SAFE_INTEGER) -
+                    (bPriced ? b.priceCents! : Number.MAX_SAFE_INTEGER) ||
+                    a.name.localeCompare(b.name, 'nl-NL')
                 })
                 const shownProducts = visibleProducts.slice(0, capturePreviewShown[store.retailer])
                 return (
@@ -2507,6 +2522,20 @@ export function OfflineReviewedWorkbench({
                         }))
                         setCapturePreviewShown(current => ({ ...current, [store.retailer]: 20 }))
                       }} />
+                  </label>
+                  <label>Sorteer originele bronartikelen
+                    <select value={capturePreviewSort[store.retailer]}
+                      onChange={event => {
+                        const value = event.currentTarget.value as 'source' | 'name' | 'sku' | 'price' | 'unknown'
+                        setCapturePreviewSort(current => ({ ...current, [store.retailer]: value }))
+                        setCapturePreviewShown(current => ({ ...current, [store.retailer]: 20 }))
+                      }}>
+                      <option value="source">Oorspronkelijke volgorde</option>
+                      <option value="name">Productnaam A–Z</option>
+                      <option value="sku">Broncode A–Z</option>
+                      <option value="price">Laagste pakprijs eerst</option>
+                      <option value="unknown">Onbekende pakprijs eerst</option>
+                    </select>
                   </label>
                   <p role="status">{visibleProducts.length} van {store.previewProducts.length} originele artikelen gevonden.
                     {' '}Zoeken verandert bronprijzen of productmatches niet.</p>
