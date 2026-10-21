@@ -20,6 +20,7 @@ type RecipeMicrodata = {
 type HtmlFrame = {
   tag: string
   scope: RecipeMicrodata | null
+  childScope: RecipeMicrodata | null
   props: string[]
   value: string | null
   text: string
@@ -162,25 +163,30 @@ function extractRecipeMicrodata(raw: string): Record<string, unknown>[] {
 
     if (blockElements.has(tag)) appendText(' ')
     const attrs = parseHtmlAttributes(match[2] ?? '')
-    const parentScope = stack.length ? stack[stack.length - 1].scope : null
+    const parentScope = stack.length ? stack[stack.length - 1].childScope : null
     const isRecipe = attrs.has('itemscope') && recipeType(attrs.get('itemtype') ?? '')
     let scope = parentScope
     if (isRecipe) {
       if (recipes.length >= 15)
-        throw new Error('Deze HTML bevat meer dan 15 schema.org-recepten.')
+        throw new Error('Deze HTML bevat meer than 15 schema.org-recepten.')
       scope = {
         name: null, recipeIngredient: [], recipeInstructions: [],
         recipeYield: null, totalTime: null, prepTime: null, cookTime: null,
       }
       recipes.push(scope)
     }
+    // Descendants of a nested non-Recipe item scope (for example author/Person)
+    // belong to that item, not to the enclosing Recipe. Its own itemprop value
+    // can still belong to the parent, e.g. recipeInstructions/HowToStep.
+    const propertyScope = attrs.has('itemscope') && !isRecipe ? parentScope : scope
+    const childScope = attrs.has('itemscope') && !isRecipe ? null : scope
     const props = (attrs.get('itemprop') ?? '')
       .split(/\s+/u).filter(Boolean).map(value => value.toLowerCase())
     const value = attrs.has('content') ? attrs.get('content')! :
       attrs.has('datetime') ? attrs.get('datetime')! :
       attrs.has('value') ? attrs.get('value')! : null
     const frame: HtmlFrame = {
-      tag, scope, props, value, text: '',
+      tag, scope: propertyScope, childScope, props, value, text: '',
     }
     if (voidElements.has(tag) || /\/\s*>$/u.test(tokenText)) finish(frame)
     else stack.push(frame)
