@@ -168,7 +168,7 @@ function extractRecipeMicrodata(raw: string): Record<string, unknown>[] {
     let scope = parentScope
     if (isRecipe) {
       if (recipes.length >= 15)
-        throw new Error('Deze HTML bevat meer than 15 schema.org-recepten.')
+        throw new Error('Deze HTML bevat meer dan 15 schema.org-recepten.')
       scope = {
         name: null, recipeIngredient: [], recipeInstructions: [],
         recipeYield: null, totalTime: null, prepTime: null, cookTime: null,
