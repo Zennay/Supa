@@ -13,8 +13,13 @@ const COLUMNS = [
 
 function cell(value: string | number): string {
   const input = String(value)
-  // Protect spreadsheet importers from formula-like product/ingredient names.
-  const text = /^[\s\u200b-\u200f\u2060\ufeff]*[=+\-@]/u.test(input) ? "'" + input : input
+  // Normalize only for detection; preserve the user's original label in the CSV.
+  // NFKC catches full-width formula markers, and leading Unicode format controls
+  // cannot hide one. Numeric values (including negative deltas) stay numeric.
+  const probe = typeof value === 'string'
+    ? input.normalize('NFKC').replace(/^[\s\p{Cf}\u00ad]*/u, '')
+    : ''
+  const text = typeof value === 'string' && /^[=+\-@]/u.test(probe) ? "'" + input : input
   return '"' + text.replace(/"/g, '""') + '"'
 }
 
