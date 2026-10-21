@@ -25,6 +25,12 @@ type HtmlFrame = {
   text: string
 }
 
+const blockElements = new Set([
+  'address', 'article', 'blockquote', 'br', 'dd', 'div', 'dl', 'dt',
+  'figcaption', 'figure', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5',
+  'h6', 'header', 'hr', 'li', 'main', 'nav', 'ol', 'p', 'pre', 'section',
+  'table', 'tr', 'ul',
+])
 const voidElements = new Set([
   'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link',
   'meta', 'param', 'source', 'track', 'wbr',
@@ -147,12 +153,14 @@ function extractRecipeMicrodata(raw: string): Record<string, unknown>[] {
       continue
     }
     if (/^<\//u.test(tokenText)) {
+      if (blockElements.has(tag)) appendText(' ')
       const index = stack.map(frame => frame.tag).lastIndexOf(tag)
       if (index < 0) continue
       while (stack.length > index) finish(stack.pop()!)
       continue
     }
 
+    if (blockElements.has(tag)) appendText(' ')
     const attrs = parseHtmlAttributes(match[2] ?? '')
     const parentScope = stack.length ? stack[stack.length - 1].scope : null
     const isRecipe = attrs.has('itemscope') && recipeType(attrs.get('itemtype') ?? '')
