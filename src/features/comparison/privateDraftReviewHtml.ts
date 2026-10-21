@@ -7,6 +7,13 @@ export type PrivateDraftReviewLine = {
   deka: { code: string; product: string; packs: number; packCents: number; totalCents: number; unitRate: string | null }
 }
 
+export type PrivateDraftUnpairedLine = {
+  ingredient: string
+  demand: string
+  plusStatus: string
+  dekaStatus: string
+}
+
 const escapeHtml = (input: string): string => input
   .replace(/&/gu, '&amp;').replace(/</gu, '&lt;').replace(/>/gu, '&gt;')
   .replace(/"/gu, '&quot;').replace(/'/gu, '&#39;')
@@ -20,9 +27,13 @@ export function privateDraftReviewHtml(
   lines: readonly PrivateDraftReviewLine[],
   capturedAt: { PLUS: string; DekaMarkt: string },
   totalPhysicalNeeds: number,
+  unpaired: readonly PrivateDraftUnpairedLine[],
 ): string {
   if (!lines.length || lines.length > 1000 ||
-      !Number.isSafeInteger(totalPhysicalNeeds) || totalPhysicalNeeds < lines.length ||
+      !Number.isSafeInteger(totalPhysicalNeeds) ||
+      lines.length + unpaired.length !== totalPhysicalNeeds ||
+      unpaired.some(line => !line.ingredient.trim() || !line.demand.trim() ||
+        !line.plusStatus.trim() || !line.dekaStatus.trim()) ||
       lines.some(line => !line.ingredient.trim() || !line.demand.trim() ||
         [line.plus, line.deka].some(item => !item.code.trim() || !item.product.trim() ||
           !Number.isSafeInteger(item.packs) || item.packs <= 0 ||
@@ -51,6 +62,17 @@ export function privateDraftReviewHtml(
       ' Controleer of het écht hetzelfde product is; geen winkeladvies.</p></section>'
   }).join('')
 
+  const missing = unpaired.length
+    ? '<section><h2>Nog niet als twee volledige prijsregels berekenbaar</h2>' +
+      '<p>Geen verschil of winkelwinnaar op deze regels. Expliciet niet beschikbaar ' +
+      'is iets anders dan een onbekende of onvolledige eigen waarneming.</p>' +
+      '<ul>' + unpaired.map(line =>
+        '<li><strong>' + escapeHtml(line.ingredient) + '</strong> · ' +
+        escapeHtml(line.demand) + '<br>PLUS: ' + escapeHtml(line.plusStatus) +
+        ' · DekaMarkt: ' + escapeHtml(line.dekaStatus) + '</li>').join('') +
+      '</ul></section>'
+    : ''
+
   const html = '<!doctype html><html lang="nl"><head><meta charset="utf-8">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1">' +
     '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; base-uri \'none\'; form-action \'none\'">' +
@@ -70,7 +92,7 @@ export function privateDraftReviewHtml(
     ' fysieke Planner-behoeften met twee voorlopige pakberekeningen.</p>' +
     '<p>Ontbrekende of ongeschikte producten blijven onbekend. Geen volledig mandtotaal, ' +
     'geen bevestigde SKU-equivalentie, geen actuele retailerrechten en geen bewezen besparing. ' +
-    'Vervolg in de echte Supa bron-/productreview.</p></header>' + sections +
+    'Vervolg in de echte Supa bron-/productreview.</p></header>' + sections + missing +
     '<footer><small>Offlinerapport zonder scripts of externe bronnen. Originele winkelcodes ' +
     'zijn alleen door jezelf ingevoerd en niet onafhankelijk geverifieerd.</small></footer></body></html>'
   if (new TextEncoder().encode(html).byteLength > 512000) {
