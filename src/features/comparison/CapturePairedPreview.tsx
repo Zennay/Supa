@@ -81,11 +81,15 @@ export function CapturePairedPreview({
   const norm = (value: string) => value.normalize('NFKD')
     .replace(/\p{M}/gu, '').toLocaleLowerCase('nl-NL')
   const filter = norm(query.trim())
+  // A field reviewer first needs to find the physical items that still
+  // prevent a complete two-store match. Sorting only changes presentation;
+  // original source row order and identifiers remain intact in exports.
   const visible = rows.filter(row => (!openOnly || row.open) &&
     (!filter || norm([
       row.label, row.left?.product ?? '', row.left?.originalSku ?? '',
       row.right?.product ?? '', row.right?.originalSku ?? '',
     ].join(' ')).includes(filter)))
+    .sort((a, b) => Number(b.open) - Number(a.open))
   const missing = rows.filter(row => row.open).length
   const plusMoment = observedInstant(plusObservedAt)
   const dekaMoment = observedInstant(dekaObservedAt)
@@ -119,6 +123,19 @@ export function CapturePairedPreview({
       setExportMessage('Alleen ontbrekende of incomplete bronvoorstellen lokaal bewaard. Nog geen winkelprijzen bevestigd.')
     } catch (cause) {
       setExportMessage(cause instanceof Error ? cause.message : 'Kan de ontbrekende bronregels niet bewaren.')
+    }
+  }
+  function downloadMissingPrintableReview() {
+    try {
+      setExportMessage('')
+      const note = privateTwoStoreMissingChecklist({
+        plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh, describeReason,
+      })
+      downloadLocal(privateTwoStorePreviewPrintHtml(note), 'text/html;charset=utf-8',
+        'supa-PLUS-Deka-ontbrekende-bronmatches-afdruk-prive.html')
+      setExportMessage('Alleen de openstaande PLUS/Deka-broncontroles offline bewaard als afdrukblad. Geen prijzen bevestigd.')
+    } catch (cause) {
+      setExportMessage(cause instanceof Error ? cause.message : 'Kan het ontbrekende-bronblad niet afdrukbaar bewaren.')
     }
   }
   function downloadReview() {
@@ -202,7 +219,7 @@ export function CapturePairedPreview({
         {' '}Alleen ontbrekende/twijfelachtige regels ({missing})</label>
     </div>
     <p role="status">{Math.min(limit, visible.length)} van {visible.length} regels zichtbaar.
-      Filters wijzigen geen originele bron of productreview.</p>
+      Openstaande regels staan bovenaan; filters en volgorde wijzigen geen originele bron of productreview.</p>
     <div className="offline-price-workbench__breakdown-scroll">
       <table>
         <caption>Privé bronvoorinzage: dezelfde fysieke Planner-vraag, twee winkels.
@@ -252,6 +269,10 @@ export function CapturePairedPreview({
       <button type="button" className="ghost-button" onClick={downloadMissingReview}
         disabled={missing === 0}>
         Download alleen {missing} incomplete twee-winkelmatches (TXT)
+      </button>
+      <button type="button" className="ghost-button"
+        onClick={downloadMissingPrintableReview} disabled={missing === 0}>
+        Bewaar alleen {missing} openstaande bronmatches als offline afdrukblad (HTML)
       </button>
       <button type="button" className="ghost-button" onClick={() => void carryReview('all', 'copy')}>
         Kopieer broncontrole voor onderweg
