@@ -212,7 +212,7 @@ function searchableSourceText(value: string): string {
 function sourceOptions(products: OfflineStoreProduct[],
   unit: BasketTraceLine['requirement']['unit'], text: string, keepId: string,
   ingredient: string, requestedAmount: number | null, sort: SourceSort,
-  cheaperThanCents: number | null = null) {
+  cheaperThanCents: number | null = null, limit = 40) {
   const query = searchableSourceText(text)
   const matchesQuery = (product: import('../../domain/basket.ts').StoreProduct) =>
     !query || searchableSourceText(product.name).includes(query) ||
@@ -240,7 +240,7 @@ function sourceOptions(products: OfflineStoreProduct[],
     return left === null && right === null ? 0 :
       left === null ? 1 : right === null ? -1 : left - right
   })
-  const shown = ranked.slice(0, 40)
+  const shown = ranked.slice(0, Math.min(1000, Math.max(40, limit)))
   const current = available.find(p => p.id === keepId)
   if (current && !shown.some(p => p.id === keepId)) shown.unshift(current)
 
@@ -393,6 +393,7 @@ export function OfflineReviewedWorkbench({
     PLUS: {}, DekaMarkt: {},
   })
   const [skuFilter, setSkuFilter] = useState<Record<string, string>>({})
+  const [sourceResultLimit, setSourceResultLimit] = useState<Record<string, number>>({})
   const [sourceSort, setSourceSort] = useState<Record<string, SourceSort>>({})
   const [onlyCheaper, setOnlyCheaper] = useState<Record<string, boolean>>({})
   const [doneTripItems, setDoneTripItems] = useState<Record<string, boolean>>({})
@@ -3481,7 +3482,7 @@ export function OfflineReviewedWorkbench({
                           line.ingredientLabel, line.requirement.amount,
                           sourceSort[searchKey] ?? 'relevance',
                           onlyCheaper[searchKey] && line.status === 'matched'
-                            ? line.lineTotalCents : null)
+                            ? line.lineTotalCents : null, sourceResultLimit[searchKey] ?? 40)
                         return (
                         <article key={line.id} id={reviewRowId(store, line.id)} tabIndex={-1}
                           className="offline-price-workbench__line">
@@ -3503,8 +3504,10 @@ export function OfflineReviewedWorkbench({
                                   <span>Zoek op originele productnaam of artikelcode; ook zonder accent.</span>
                                   <input type="search" value={skuFilter[searchKey] ?? ''}
                                     maxLength={120} placeholder="Zoek product of artikelcode"
-                                    onChange={event => setSkuFilter(current =>
-                                      ({ ...current, [searchKey]: event.currentTarget.value }))} />
+                                    onChange={event => {
+                                      setSkuFilter(current => ({ ...current, [searchKey]: event.currentTarget.value }))
+                                      setSourceResultLimit(previous => ({ ...previous, [searchKey]: 40 }))
+                                    }} />
                                   <small>{choices.total} prijsklare en {choices.unpricedTotal} niet-prijsklare bronartikelen in deze zoekopdracht.</small>
                                 </label>
                                 {choices.availableCount > 0 && (
@@ -3547,9 +3550,24 @@ export function OfflineReviewedWorkbench({
                                         </option>
                                       ))}
                                     </select>
-                                    <small>Maximaal 40 originele artikelen, gerangschikt volgens jouw huidige keuze.
-                                      Het oorspronkelijke bronartikel blijft in de keuzelijst, ook wanneer een andere
-                                      sortering of zoekterm het verbergt. Controleer zelf de SKU, inhoud en prijs.</small>
+                                    <small>Bekijk tot {choices.total} passende bronartikelen, eerst 40.
+                                      Het gekozen bronartikel blijft beschikbaar; controleer zelf SKU, inhoud en prijs.</small>
+                                    {(sourceResultLimit[searchKey] ?? 40) < choices.total && (
+                                      <div className="offline-price-workbench__matching-actions">
+                                        <button type="button" className="ghost-button"
+                                          onClick={() => setSourceResultLimit(previous => ({
+                                            ...previous, [searchKey]: Math.min(1000, (previous[searchKey] ?? 40) + 40),
+                                          }))}>
+                                          Toon volgende {Math.min(40, choices.total - (sourceResultLimit[searchKey] ?? 40))} bronartikelen
+                                        </button>
+                                        <button type="button" className="ghost-button"
+                                          onClick={() => setSourceResultLimit(previous => ({
+                                            ...previous, [searchKey]: Math.min(1000, choices.total),
+                                          }))}>
+                                          Toon alle {choices.total} passende originele artikelen
+                                        </button>
+                                      </div>
+                                    )}
                                     {choices.shown.length > 0 && <details className="offline-price-workbench__candidate-preview">
                                       <summary>Bekijk de eerste bronartikelen met benodigde hele verpakkingen</summary>
                                       <p>Dit zijn ongetoetste alternatieven uit je eigen bron.
