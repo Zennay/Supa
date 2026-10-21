@@ -26,6 +26,9 @@ export type EditorRecipeDraft = {
 
 const MAX_TEXT = 180
 const MAX_INGREDIENTS = 100
+// The normalized importer accepts at most one million g, ml or pieces.
+// The editor must never confirm a value its source parser would reject.
+const MAX_CANONICAL_METRIC_AMOUNT = 1_000_000
 let ingredientSequence = 0
 function newClientIngredientId(): string {
   ingredientSequence += 1
@@ -36,6 +39,7 @@ const EDITOR_VALIDATION_REASONS = new Set([
   'Vul een ingrediëntnaam in.',
   'Vul een geldige hoeveelheid in.',
   'Vul een geldige hoeveelheid in (maximaal 1.000.000).',
+  'Vul een geldige hoeveelheid in (maximaal 1.000.000 g, ml of stuks).',
   'Kies gram, milliliter of stuks.',
   'Een deel van een stuk: kies een heel aantal stuks.',
   'Vul een hoeveelheid in.',
@@ -55,22 +59,30 @@ function editorValidationReason(
 }
 
 function sourceReviewReasonOf(ingredient: EditorIngredient): string | null {
-  if (typeof ingredient.sourceReviewReason === 'string' && ingredient.sourceReviewReason.length > 0) {
-    return ingredient.sourceReviewReason
+  // An explicit null means a previously reviewed source warning was cleared.
+  // Only older drafts without this field need the legacy reviewReason fallback.
+  if (Object.hasOwn(ingredient, 'sourceReviewReason')) {
+    return typeof ingredient.sourceReviewReason === 'string' && ingredient.sourceReviewReason.length > 0
+      ? ingredient.sourceReviewReason : null
   }
-  return typeof ingredient.reviewReason === 'string' &&
-    ingredient.reviewReason.length > 0 &&
-    !EDITOR_VALIDATION_REASONS.has(ingredient.reviewReason)
-    ? ingredient.reviewReason : null
+  const legacyReason = ingredient.reviewReason
+  if (typeof legacyReason !== 'string' || legacyReason.length === 0) return null
+  for (const validation of EDITOR_VALIDATION_REASONS) {
+    if (legacyReason.startsWith(validation + ' ')) {
+      return legacyReason.slice(validation.length).trim() || null
+    }
+  }
+  return EDITOR_VALIDATION_REASONS.has(legacyReason) ? null : legacyReason
 }
 
-function combinedReviewReason(validation: string | null, source: string | null): string | null {
-  if (validation && source) return validation + ' ' + source
-  return validation ?? source
+function isMeasurementReviewReason(reason: string): boolean {
+  const normalized = reason.normalize('NFC').toLocaleLowerCase('nl-NL')
+  return /(?:convers|omreken|eenheid|hoeveelheid|massa|schepjes|gram|milliliter|unit conversion|measurement conversion)/u.test(normalized)
 }
 
 function validAmount(value: number | null): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 1_000_000 &&
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 &&
+    value <= MAX_CANONICAL_METRIC_AMOUNT &&
     Math.abs(value * 1000 - Math.round(value * 1000)) <= 1e-7
 }
 
@@ -92,7 +104,7 @@ export function prepareImportedRecipeForEditor(
     next.sourceReviewReason = sourceReviewReason
     // Imported data is a proposal, not permission to bypass the editor's
     // canonical quantity limits, whole-piece rule, or source review hold.
-    next.reviewReason = combinedReviewReason(editorValidationReason(next), sourceReviewReason)
+    next.reviewReason = editorValidationReason(next)
     return next
   })
   return { ...draft, ingredients }
@@ -101,7 +113,7 @@ export function prepareImportedRecipeForEditor(
 export function parseMetricEditorAmount(value: string): number | null {
   if (!/^(?:\d{1,9})(?:[.,]\d{1,3})?$/.test(value.trim())) return null
   const amount = Number(value.trim().replace(',', '.'))
-  return Number.isFinite(amount) && amount > 0 && amount <= 1_000_000 ? amount : null
+  return Number.isFinite(amount) && amount > 0 && amount <= MAX_CANONICAL_METRIC_AMOUNT ? amount : null
 }
 
 /**
@@ -134,11 +146,28 @@ export function updateEditorIngredient(
       validAmount(next.amount) &&
       (next.unit === 'g' || next.unit === 'ml' || next.unit === 'piece') &&
       (next.unit !== 'piece' || Number.isSafeInteger(next.amount))
-    const sourceReviewReason = correctedMeasurementIsValid ? null : previousSourceReview
+    const canResolveSourceReview = correctedMeasurementIsValid &&
+      previousSourceReview !== null && isMeasurementReviewReason(previousSourceReview)
+    const sourceReviewReason = canResolveSourceReview ? null : previousSourceReview
     next.sourceReviewReason = sourceReviewReason
-    next.reviewReason = combinedReviewReason(validation, sourceReviewReason)
+    next.reviewReason = validation
     return next
   })
+  // Only retire the exact parser-generated warning for THIS ingredient after
+  // a real, valid measurement correction. Source-wide and unrelated warnings
+  // remain pending; label-only edits never erase import provenance.
+  const previous = draft.ingredients[index]
+  const reviewed = ingredients[index]
+  const correctedMeasurement =
+    (Object.hasOwn(patch, 'amount') && patch.amount !== previous.amount) ||
+    (Object.hasOwn(patch, 'unit') && patch.unit !== previous.unit)
+  const previousSourceReview = sourceReviewReasonOf(previous)
+  const reviewedSourceReview = sourceReviewReasonOf(reviewed)
+  if (correctedMeasurement && previousSourceReview && !reviewedSourceReview) {
+    const resolvedWarning = `Ingrediënt ${index + 1}: ${previousSourceReview}`
+    return { ...draft, ingredients,
+      warnings: draft.warnings.filter(warning => warning !== resolvedWarning) }
+  }
   return { ...draft, ingredients }
 }
 
