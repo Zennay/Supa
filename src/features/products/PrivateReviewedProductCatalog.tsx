@@ -5,7 +5,7 @@ import { privatePackUnitRate, privateUnitPrice } from '../comparison/privateUnit
 import { PrivateReviewedTwoStoreTable } from './PrivateReviewedTwoStoreTable.tsx'
 import { ownStoreWeekComparison } from '../planner/ownStoreBudgetComparison.ts'
 import { currentPrivateRouteChoice } from '../comparison/privateRouteChoice.ts'
-import { productSearchText } from './productSearchText.ts'
+import { productFieldsMatchTerms, productSearchTerms } from './productSearchText.ts'
 import { privatePriceAgeNotice } from '../comparison/privatePriceAgeNotice.ts'
 import { privatePhysicalShoppingTick } from '../shopping-list/privatePhysicalShoppingTick.ts'
 import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
@@ -132,7 +132,7 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, captureNeeds
       (ownMinusOther < 0 ? ' goedkoper dan bij ' : ' duurder dan bij ') +
       against + ' voor exact dezelfde fysieke ingrediëntvraag' + scope + '.'
   }
-  const search = productSearchText(query.trim())
+  const search = productSearchTerms(query)
   const rate = (line: Matched) => privatePackUnitRate({
     amount: line.pack.amount, unit: line.pack.unit, count: line.pack.count,
     priceCents: line.pricePerPackCents,
@@ -146,8 +146,10 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, captureNeeds
     (store === 'all' || row.shop === store) &&
     (!onlyUnbought || !isChecked(row.shop, row.line)) &&
     (unitFilter === 'all' || rate(row.line)?.unit === unitFilter) &&
-    (!search || [row.line.productName, row.line.productId, row.line.ingredientLabel]
-      .some(value => productSearchText(value).includes(search))))
+    productFieldsMatchTerms([row.shop, row.line.productName, row.line.productId,
+      row.line.ingredientLabel, row.line.pack.amount, row.line.pack.unit,
+      row.line.pack.amount + ' ' + row.line.pack.unit,
+      row.line.pack.count], search))
   // Price/kg cannot meaningfully be compared to price/litre/piece. Keep
   // incompatible units in distinct stable groups; prices are advisory only,
   // while weekly whole-pack costs remain the authoritative budget calculation.
@@ -581,7 +583,7 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, captureNeeds
       </button>
     </>}
     {store === 'all' && <PrivateReviewedTwoStoreTable reviewed={reviewed ?? emptyReviewed}
-      search={search} unitFilter={unitFilter} order={order} budget={budget}
+      search={query} unitFilter={unitFilter} order={order} budget={budget}
       onOpenComparison={onOpenComparison} onReviewIngredient={onReviewIngredient}
       onOpenList={onOpenList}
       onOpenMixedRoute={onOpenMixedRoute} onChooseRouteLine={onChooseRouteLine}

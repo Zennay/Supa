@@ -8,7 +8,7 @@ import type { BasketTraceLine, OneStoreBasket } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import { privatePackUnitRate, privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import { readablePlannerDemandAmount } from '../comparison/plannerPriceCaptureGuide.ts'
-import { productSearchText } from './productSearchText.ts'
+import { productFieldsMatchTerms, productSearchTerms } from './productSearchText.ts'
 import { currentPrivateRouteChoice } from '../comparison/privateRouteChoice.ts'
 import { createMixedStoreShoppingPlan } from '../comparison/mixedStoreShoppingPlan.ts'
 import { validCustomWeekBudgetEuros } from '../planner/customWeekBudget.ts'
@@ -45,6 +45,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   checked: Readonly<Record<string, boolean>>
   onlyUnbought?: boolean
 }) {
+  const searchTerms = productSearchTerms(search)
   const reviewedRef = useRef(reviewed)
   reviewedRef.current = reviewed
   const [receiptMessage, setReceiptMessage] = useState('')
@@ -506,9 +507,11 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
           checked[privatePhysicalShoppingTick(reviewed.planKey, 'PLUS', plus.basket.store.id, first)] &&
           checked[privatePhysicalShoppingTick(reviewed.planKey, 'DekaMarkt', deka.basket.store.id, second)])
         return false
-      if (search && ![first.ingredientLabel, first.productName, first.productId,
-        second.productName, second.productId].some(value =>
-          productSearchText(value).includes(search))) return false
+      if (!productFieldsMatchTerms(['PLUS', 'DekaMarkt', first.ingredientLabel,
+        first.productName, first.productId, second.productName, second.productId,
+        first.pack.amount + ' ' + first.pack.unit,
+        second.pack.amount + ' ' + second.pack.unit],
+        searchTerms)) return false
       if (unitFilter === 'all') return true
       const a = privatePackUnitRate({ amount: first.pack.amount, unit: first.pack.unit,
         count: first.pack.count, priceCents: first.pricePerPackCents })
@@ -901,9 +904,11 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         checked[privatePhysicalShoppingTick(reviewed.planKey, 'DekaMarkt', deka.basket.store.id, alternate)])
       return []
     if (unitFilter !== 'all' && family(line, alternate) !== unitFilter) return []
-    if (search && ![line.ingredientLabel, line.productId, line.productName,
-      alternate.productId, alternate.productName].some(value =>
-        productSearchText(value).includes(search))) return []
+    if (!productFieldsMatchTerms(['PLUS', 'DekaMarkt', line.ingredientLabel,
+      line.productId, line.productName, alternate.productId, alternate.productName,
+      line.pack.amount + ' ' + line.pack.unit,
+      alternate.pack.amount + ' ' + alternate.pack.unit],
+      searchTerms)) return []
     return [{ plus: line, deka: alternate }]
   })
   const advantaged = rows.filter(({ plus: first, deka: second }) =>

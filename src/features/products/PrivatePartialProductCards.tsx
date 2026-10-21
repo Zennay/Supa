@@ -3,7 +3,7 @@ import { privatePackUnitRate, formatPrivateUnitRate } from '../comparison/privat
 import type {
   OwnStore, PrivateCaptureProgress, PrivateReviewedBaskets,
 } from '../comparison/privateReviewedBasketBridge.ts'
-import { productSearchText } from './productSearchText.ts'
+import { productFieldsMatchTerms, productSearchTerms } from './productSearchText.ts'
 import { readablePlannerDemandAmount } from '../comparison/plannerPriceCaptureGuide.ts'
 import { downloadPrivateKnownLinePriceCsv } from './privateKnownLinePriceCsv.ts'
 import { downloadPrivateKnownLinePricePrint } from './privateKnownLinePricePrint.ts'
@@ -57,11 +57,13 @@ export function PrivatePartialProductCards({
     amount: row.line.packAmount, unit: row.line.packUnit,
     count: row.line.packCount, priceCents: row.line.pricePerPackCents,
   })
-  const search = productSearchText(query.trim())
+  const search = productSearchTerms(query)
   const filtered = rows.filter(row => (store === 'both' || row.store === store) &&
     (unit === 'all' || rate(row)?.unit === unit) &&
-    (!search || [row.line.productName, row.line.productId, row.line.ingredientLabel]
-      .some(value => productSearchText(value).includes(search))))
+    productFieldsMatchTerms([row.store, row.line.productName, row.line.productId,
+      row.line.ingredientLabel, row.line.packAmount, row.line.packUnit,
+      row.line.packAmount + ' ' + row.line.packUnit,
+      row.line.packCount], search))
   const ordered = sort === 'source' ? filtered : [...filtered].sort((a, b) => {
     if (sort === 'lineTotal') return a.line.lineTotalCents - b.line.lineTotalCents
     if (sort === 'priceGap') return (
