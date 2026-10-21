@@ -85,6 +85,10 @@ export function UserRecipeDraftEditor({
                   }} />
                 <label htmlFor={'recipe-ingredient-unit-' + index}>Eenheid</label>
                 <select id={'recipe-ingredient-unit-' + index} value={ingredient.unit ?? ''}
+                  aria-describedby={[
+                    ingredient.reviewReason ? 'recipe-ingredient-warning-' + index : '',
+                    ingredient.sourceReviewReason ? 'recipe-ingredient-source-warning-' + index : '',
+                  ].filter(Boolean).join(' ') || undefined}
                   onChange={(event) => onChange(updateEditorIngredient(draft, index, { unit: event.target.value as EditorUnit }))}>
                   <option value="">Kies eenheid</option>
                   <option value="g">gram (g)</option>
