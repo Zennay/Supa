@@ -1,4 +1,5 @@
 import { aggregatePlanIngredients } from '../../domain/basket.ts'
+import { sumDecimalAmounts } from '../../domain/decimalPackArithmetic.ts'
 import { makeBlankPlannerCaptureCsv, type CaptureStore } from '../comparison/plannerPriceCaptureSheet.ts'
 import { makePlannerCaptureGuide, readablePlannerDemandAmount } from '../comparison/plannerPriceCaptureGuide.ts'
 import { exportCombinedRecipesPrivateWeek } from './exportCombinedRecipesPrivateWeek.ts'
@@ -43,6 +44,23 @@ export function combinedRecipesCaptureKit(
         combined.contributorsByLine[line.key] ?? [],
       )
   }
+  // The two-store worksheet must not silently present a plausible recipe
+  // origin that belongs to another physical demand or a different sum. The
+  // original, scaled recipe lines are the only permitted provenance here:
+  // no seller SKU, price, observation or source permission is synthesized.
+  for (const need of needs) {
+    const origins = sourcesByNeedId.get(need.id)
+    if (!origins?.length || origins.some(origin =>
+      origin.unit !== need.unit || typeof origin.amount !== 'number' ||
+      !Number.isFinite(origin.amount) || origin.amount <= 0)) {
+      throw new Error('De herkomst van een fysiek ingrediënt ontbreekt of is gewijzigd. Controleer de recepten opnieuw.')
+    }
+    const total = sumDecimalAmounts(origins.map(origin => origin.amount!))
+    if (total === null || total !== need.amount) {
+      throw new Error('De receptenbundel en de totale fysieke winkelvraag komen niet meer overeen.')
+    }
+  }
+
   // The downloadable TXT guide must remain usable when the person filling
   // in a lawful offline CSV is not looking at the React preview. List each
   // canonical demand just once, refer to its exact CSV row(s), and clearly
