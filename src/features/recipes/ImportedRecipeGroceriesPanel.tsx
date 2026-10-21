@@ -59,6 +59,8 @@ export function ImportedRecipeGroceriesPanel({
   const [reuseFirst, setReuseFirst] = useState(false)
   const [startDay, setStartDay] = useState(m2InitialPlan[0].day)
   const [captureTarget, setCaptureTarget] = useState<'both' | 'PLUS' | 'DekaMarkt'>('both')
+  const [captureRowQuery, setCaptureRowQuery] = useState('')
+  const [captureRowStore, setCaptureRowStore] = useState<'all' | 'PLUS' | 'DekaMarkt'>('all')
   const [captureDelimiter, setCaptureDelimiter] = useState<',' | ';' | '\t'>(';')
   const [showCookingMode, setShowCookingMode] = useState(false)
   const [cookingModeOpened, setCookingModeOpened] = useState(false)
@@ -196,6 +198,15 @@ export function ImportedRecipeGroceriesPanel({
   const captureKey = JSON.stringify([progressIdentity, captureTarget, captureDelimiter, privateCookingDays ?? null])
   const latestCaptureKey = useRef(captureKey)
   latestCaptureKey.current = captureKey
+  const visibleCaptureRows = capturePreview?.key === captureKey
+    ? capturePreview.rows.filter(row =>
+      (captureRowStore === 'all' || row.store === captureRowStore) &&
+      (!captureRowQuery.trim() || searchableIngredient([
+        row.label, row.id,
+        ...row.sources.flatMap(source =>
+          [source.recipeTitle, source.ingredientLabel, source.original]),
+      ].join(' ')).includes(searchableIngredient(captureRowQuery.trim()))))
+    : []
   const outstanding = list?.lines.filter(line => line.needsReview).length ?? 0
   const checkedCount = list?.lines.filter(line => !line.needsReview && checked[line.key]).length ?? 0
   const visible = list?.lines.filter(line => !pendingOnly || line.needsReview || !checked[line.key]) ?? []
@@ -1206,12 +1217,31 @@ export function ImportedRecipeGroceriesPanel({
             Een benodigde hoeveelheid is <strong>geen</strong> gemeten winkelverpakking.
             De originele SKU, bronmomenten, echte pakprijzen en productmatches
             blijven onbekend tot je die zelf in de bestaande import controleert.</p>
+          <div className="recipe-collection-groceries__capture-filters">
+            <label>Zoek ingrediënt, recept of originele receptregel
+              <input type="search" value={captureRowQuery}
+                onChange={event => setCaptureRowQuery(event.currentTarget.value)}
+                placeholder="Bijvoorbeeld rijst of dinsdag" />
+            </label>
+            <label>Toon fysieke opname voor
+              <select value={captureRowStore}
+                onChange={event => setCaptureRowStore(event.currentTarget.value as typeof captureRowStore)}>
+                <option value="all">Beide winkels</option>
+                <option value="PLUS">PLUS</option>
+                <option value="DekaMarkt">DekaMarkt</option>
+              </select>
+            </label>
+          </div>
+          <p role="status">{visibleCaptureRows.length} van {capturePreview.rows.length} rijen zichtbaar.
+            Dit filter verandert nooit het volledige offline opnamebestand of de CSV-rijnummers.</p>
+          {visibleCaptureRows.length === 0 && <p>Geen overeenkomende opname-rijen.
+            Wis de zoekterm of toon beide winkels om de oorspronkelijke vraag te zien.</p>}
           <div className="recipe-collection-groceries__capture-scroll">
             <table>
               <thead><tr><th scope="col">CSV-rij</th><th scope="col">Winkel</th>
                 <th scope="col">Originele fysieke vraag</th><th scope="col">Herkomst receptregels</th>
                 <th scope="col">Bronproduct en prijs</th></tr></thead>
-              <tbody>{capturePreview.rows.map(row => <tr key={JSON.stringify([row.csvRow, row.id])}>
+              <tbody>{visibleCaptureRows.map(row => <tr key={JSON.stringify([row.csvRow, row.id])}>
                 <td>{row.csvRow}</td><td>{row.store}</td>
                 <td>{readablePlannerDemandAmount(row.amount)} {row.unit === 'piece' ? 'stuks' : row.unit} {row.label}</td>
                 <td>{row.sources.length > 0
