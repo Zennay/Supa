@@ -16,6 +16,7 @@ type Input = {
   plusFresh: boolean
   dekaFresh: boolean
   onlyOpen?: boolean
+  focusStore?: 'all' | 'PLUS' | 'DekaMarkt'
   delimiter?: ',' | ';' | '\t'
 }
 const header = [
@@ -70,7 +71,7 @@ function storeColumns(line: PreviewMatchLine | undefined, observedAt: string, fr
 /** Original candidate money only after canonical arithmetic; never deltas or totals. */
 export function privateTwoStoreReviewCsv(input: Input): string {
   const { plus, deka, plusObservedAt, dekaObservedAt, within24h,
-    sourceFresh, plusFresh, dekaFresh, onlyOpen = false,
+    sourceFresh, plusFresh, dekaFresh, onlyOpen = false, focusStore = 'all',
     delimiter = ';' } = input
   if (!Array.isArray(plus) || !Array.isArray(deka) ||
       plus.length > 200 || deka.length > 200 || !plusObservedAt || !dekaObservedAt) {
@@ -101,10 +102,12 @@ export function privateTwoStoreReviewCsv(input: Input): string {
     const right = dekaRows.get(id)
     const equal = !!left && !!right && left.label === right.label &&
       samePrivatePhysicalDemand(left, right)
-    const complete = equal && completePreviewProposal(left ?? null) &&
-      completePreviewProposal(right ?? null)
-    const open = !complete || !within24h || !sourceFresh
-    if (onlyOpen && !open) continue
+    const plusOpen = !equal || !plusUsable || !completePreviewProposal(left ?? null)
+    const dekaOpen = !equal || !dekaUsable || !completePreviewProposal(right ?? null)
+    const complete = !plusOpen && !dekaOpen
+    const open = plusOpen || dekaOpen
+    if (onlyOpen && !(focusStore === 'PLUS' ? plusOpen :
+      focusStore === 'DekaMarkt' ? dekaOpen : open)) continue
     const reason = !equal ? 'Corrigeer de oorspronkelijke fysieke Planner-vraag' :
       !plusFresh && !dekaFresh ? 'Neem beide winkelbronnen opnieuw op' :
       !plusFresh ? 'Neem PLUS opnieuw op; bron verouderd of ongeldig' :

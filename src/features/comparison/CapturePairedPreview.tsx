@@ -154,12 +154,14 @@ export function CapturePairedPreview({
   function spreadsheet(onlyOpen: boolean) {
     return privateTwoStoreReviewCsv({
       plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh,
-      plusFresh, dekaFresh, onlyOpen, delimiter,
+      plusFresh, dekaFresh, onlyOpen, delimiter, focusStore: storeFilter,
     })
   }
   function spreadsheetFilename(onlyOpen: boolean) {
-    const name = onlyOpen ? 'supa-PLUS-Deka-openstaande-bronvoorstellen-prive' :
-      'supa-PLUS-Deka-volledige-bronvoorstellen-prive'
+    const name = onlyOpen
+      ? 'supa-' + (storeFilter === 'all' ? 'PLUS-Deka' : storeFilter) +
+        '-openstaande-bronvoorstellen-prive'
+      : 'supa-PLUS-Deka-volledige-bronvoorstellen-prive'
     return name + (delimiter === '\t' ? '.tsv' : '.csv')
   }
   function downloadSpreadsheet(onlyOpen: boolean) {
@@ -379,7 +381,9 @@ export function CapturePairedPreview({
       </button>
       <button type="button" className="ghost-button" disabled={missing === 0}
         onClick={() => downloadSpreadsheet(true)}>
-        Download {missing} openstaande of opnieuw op te nemen regels in Excel-CSV
+        Download openstaande {storeFilter === 'all' ? missing :
+          storeFilter === 'PLUS' ? plusOpen : dekaOpen} regels van
+        {' '}{storeFilter === 'all' ? 'beide winkels' : storeFilter} in Excel-CSV
       </button>
       <button type="button" className="ghost-button"
         onClick={() => void shareSpreadsheet(false)}>
@@ -387,7 +391,7 @@ export function CapturePairedPreview({
       </button>
       <button type="button" className="ghost-button" disabled={missing === 0}
         onClick={() => void shareSpreadsheet(true)}>
-        Deel alleen {missing} openstaande CSV-regels via mijn telefoon
+        Deel openstaande {storeFilter === 'all' ? 'twee-winkel' : storeFilter + '-'}CSV via mijn telefoon
       </button>
       <button type="button" className="ghost-button" onClick={downloadReview}>
         Download privécontrole van beide bronvoorstellen (TXT)
