@@ -1,4 +1,5 @@
 import { observedInstant } from '../../domain/offlineReviewedImport.ts'
+import { samePhysicalDemand } from '../../domain/basketComparison.ts'
 import { privatePackUnitRate, formatPrivateUnitRate } from '../comparison/privateUnitPrice.ts'
 import type { BasketTraceLine } from '../../domain/basket.ts'
 import { confirmedPartialBasket } from '../planner/confirmedPartialBasket.ts'
@@ -66,9 +67,11 @@ export function privateProgressPricePairs(
   return rows.filter(row => row.store === 'PLUS').flatMap(row => {
     const one = row.line
     const other = dekaRows.get(one.ingredientId)
-    if (!other || one.requiredAmount !== other.requiredAmount ||
-        one.requiredUnit !== other.requiredUnit ||
-        one.ingredientLabel !== other.ingredientLabel) return []
+    if (!other || one.ingredientLabel !== other.ingredientLabel ||
+        !samePhysicalDemand(
+          { amount: one.requiredAmount, unit: one.requiredUnit },
+          { amount: other.requiredAmount, unit: other.requiredUnit },
+        )) return []
     const difference = other.lineTotalCents - one.lineTotalCents
     return Number.isSafeInteger(difference) ? [{ one, other, difference }] : []
   })
@@ -215,8 +218,8 @@ export function privateKnownPricePairs(
       const original = completeLines.get(line.ingredientId)
       if (!original || original.status !== 'matched' ||
           original.ingredientLabel !== line.ingredientLabel ||
-          original.requirement.amount !== line.requiredAmount ||
-          original.requirement.unit !== line.requiredUnit) continue
+          !samePhysicalDemand(original.requirement,
+            { amount: line.requiredAmount, unit: line.requiredUnit })) continue
       const plusCents = completeStore === 'PLUS'
         ? original.lineTotalCents : line.lineTotalCents
       const dekaCents = completeStore === 'DekaMarkt'
