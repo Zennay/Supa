@@ -11,7 +11,15 @@ import { samePrivatePhysicalDemand } from './samePrivatePhysicalDemand.ts'
 function labelQuantity(line: PreviewMatchLine): string {
   return readablePlannerDemandAmount(line.amount) + ' ' + line.unit
 }
-function localOffer(line: PreviewMatchLine | null, describeReason: (value: string) => string) {
+function localOffer(line: PreviewMatchLine | null,
+  describeReason: (value: string) => string, usable: boolean) {
+  if (!usable) return <span>
+    <strong>Opname opnieuw nodig. Actuele prijs onbekend.</strong>
+    {line?.product && <small style={{ display: 'block' }}>Historisch bronproduct: {line.product}</small>}
+    {line?.originalSku && <small style={{ display: 'block' }}>Oorspronkelijke SKU {line.originalSku}</small>}
+    <small>Verlopen of oudste winkelbron buiten het 24-uursvenster.
+      De oude bedragen worden niet als prijsvoorstel getoond.</small>
+  </span>
   if (!completePreviewProposal(line)) {
     return <span>Geen complete betrouwbare productmatch. Prijs onbekend.
       {line?.reasons?.length ? <small style={{ display: 'block' }}>
@@ -101,6 +109,8 @@ export function CapturePairedPreview({
   const dekaMoment = observedInstant(dekaObservedAt)
   const olderStore = plusMoment && dekaMoment
     ? plusMoment.ns <= dekaMoment.ns ? 'PLUS' : 'DekaMarkt' : null
+  const plusUsable = plusFresh && (within24h || olderStore !== 'PLUS')
+  const dekaUsable = dekaFresh && (within24h || olderStore !== 'DekaMarkt')
 
   function reviewText() {
     return privateTwoStorePreviewChecklist({
@@ -275,7 +285,7 @@ export function CapturePairedPreview({
                 : 'Vraag ongelijk of ontbrekend — controleren'}
             </small></th>
             {row.sameDemand
-              ? <><td>{localOffer(row.left, describeReason)}</td><td>{localOffer(row.right, describeReason)}</td></>
+              ? <><td>{localOffer(row.left, describeReason, plusUsable)}</td><td>{localOffer(row.right, describeReason, dekaUsable)}</td></>
               : <td colSpan={2}>De originele fysieke vraag is niet eenduidig
                 voor beide winkels. PLUS: {row.left ? labelQuantity(row.left) : 'ontbreekt'}.
                 {' '}DekaMarkt: {row.right ? labelQuantity(row.right) : 'ontbreekt'}.

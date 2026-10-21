@@ -43,8 +43,10 @@ function storeColumns(line: PreviewMatchLine | undefined, observedAt: string, fr
   }
   return [observedAt, line.originalSku, line.product,
     readablePlannerDemandAmount(line.packAmount), line.packUnit,
-    String(line.packCount), String(line.pricePerPackCents), String(line.packs),
-    String(line.lineTotalCents), line.unitPrice ?? '', fresh ? 'Onbevestigd bronvoorstel' : 'Oude/onbruikbare bron; niet actueel']
+    String(line.packCount), fresh ? String(line.pricePerPackCents) : '',
+    String(line.packs), fresh ? String(line.lineTotalCents) : '',
+    fresh ? line.unitPrice ?? '' : '',
+    fresh ? 'Onbevestigd bronvoorstel' : 'Oude/onbruikbare bron; prijs opnieuw opnemen']
 }
 
 /** Original candidate money only after canonical arithmetic; never deltas or totals. */
@@ -68,6 +70,12 @@ export function privateTwoStoreReviewCsv(input: Input): string {
   }
   const plusRows = new Map(plus.map(line => [line.id, line]))
   const dekaRows = new Map(deka.map(line => [line.id, line]))
+  const plusInstant = observedInstant(plusObservedAt)
+  const dekaInstant = observedInstant(dekaObservedAt)
+  const older = plusInstant && dekaInstant
+    ? plusInstant.ns <= dekaInstant.ns ? 'PLUS' : 'DekaMarkt' : null
+  const plusUsable = plusFresh && (within24h || older !== 'PLUS')
+  const dekaUsable = dekaFresh && (within24h || older !== 'DekaMarkt')
   const body: string[][] = []
   for (const id of ids) {
     const left = plusRows.get(id)
@@ -78,10 +86,6 @@ export function privateTwoStoreReviewCsv(input: Input): string {
       completePreviewProposal(right ?? null)
     const open = !complete || !within24h || !sourceFresh
     if (onlyOpen && !open) continue
-    const plusInstant = observedInstant(plusObservedAt)
-    const dekaInstant = observedInstant(dekaObservedAt)
-    const older = plusInstant && dekaInstant
-      ? plusInstant.ns <= dekaInstant.ns ? 'PLUS' : 'DekaMarkt' : null
     const reason = !equal ? 'Corrigeer de oorspronkelijke fysieke Planner-vraag' :
       !plusFresh && !dekaFresh ? 'Neem beide winkelbronnen opnieuw op' :
       !plusFresh ? 'Neem PLUS opnieuw op; bron verouderd of ongeldig' :
@@ -94,8 +98,8 @@ export function privateTwoStoreReviewCsv(input: Input): string {
     body.push([
       open ? 'Openstaand' : 'Alleen voorstel', id, left?.label ?? right?.label ?? '',
       quantity(left), quantity(right), equal ? 'ja' : 'nee',
-      ...storeColumns(left, plusObservedAt, plusFresh),
-      ...storeColumns(right, dekaObservedAt, dekaFresh), reason,
+      ...storeColumns(left, plusObservedAt, plusUsable),
+      ...storeColumns(right, dekaObservedAt, dekaUsable), reason,
     ])
   }
   if (onlyOpen && body.length === 0) throw Error('Er zijn geen openstaande winkelregels.')
