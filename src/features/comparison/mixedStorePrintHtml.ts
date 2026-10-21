@@ -24,17 +24,24 @@ export function printMixedStoreRouteHtml(input: {
   strategy: 'auto' | 'mixed' | 'single'
   extras?: readonly OwnExtraGrocery[]
   manualNotes?: readonly UnpricedShoppingNote[]
+  /** Print one shop without changing the fully validated basket. */
+  stop?: MixedStore
 }): string {
   exportMixedStoreRouteCsv(input)
-  const { route, captured, checked } = input
+  const { route, captured, checked, stop } = input
+  if (stop && !route.lines.some(line => line.store === stop))
+    throw Error('Deze winkel is geen onderdeel van de gecontroleerde route.')
   if (input.extras && (input.extras.length > 100 || !input.extras.every(item =>
       typeof item.name === 'string' && item.name.length > 0 && item.name.length <= 120 &&
       Number.isFinite(item.quantity) && item.quantity > 0 && item.quantity <= 100000 &&
       ['piece', 'g', 'ml'].includes(item.unit) && typeof item.done === 'boolean')))
     throw Error('Eigen ongeprijsde boodschappen zijn niet geldig.')
-  const manual = input.manualNotes?.length
+  const allManual = input.manualNotes?.length
     ? normalizePrivateNotes({ schema: 'supa-private-unpriced-notes-v1',
         notes: [...input.manualNotes] }) : []
+  const manual = stop
+    ? allManual.filter(note => note.store === stop || note.store === 'Algemeen')
+    : allManual
   const both = route.lines.some(line => line.store === 'PLUS') &&
     route.lines.some(line => line.store === 'DekaMarkt')
   const totalWithCost = !both ? BigInt(route.totalCents) : input.extraVisitCostCents === null
@@ -63,7 +70,7 @@ export function printMixedStoreRouteHtml(input: {
           '</small><br><b>' + clean(exactEuro.formatCents(line.lineTotalCents)) +
           '</b></div></li>').join('')) + '</ul></section>'
   }
-  const extrasSection = input.extras?.length ?
+  const extrasSection = !stop && input.extras?.length ?
     '<section><h2>Eigen extra boodschappen · winkel en prijs onbekend</h2>' +
     '<p><strong>Niet meegerekend</strong> in de berekende winkelbedragen. ' +
     'Het volledige totaal inclusief deze extra aankopen is onbekend.</p><ul>' +
@@ -91,11 +98,24 @@ export function printMixedStoreRouteHtml(input: {
             (note.done ? '&#9745;' : '&#9744;') +
             '</span><div><strong>' + clean(note.label) +
             '</strong><br><small>Zelf toegevoegd · prijs, SKU en bronmoment onbekend' +
-            (note.store !== 'Algemeen' && !visitedStores.has(note.store)
-              ? ' · BUITEN gekozen winkelroute' : ' · persoonlijke lijst') +
+            (note.store === 'Algemeen' && stop
+              ? ' · NIET aan deze winkel toegewezen'
+              : note.store !== 'Algemeen' && !visitedStores.has(note.store)
+                ? ' · BUITEN gekozen winkelroute' : ' · persoonlijke lijst') +
             '</small></div></li>').join('') + '</ul>'
       }).join('') + '</section>' : ''
-  const summary = '<div class="totals"><p>PLUS hele mand <b>' +
+  const stopLines = stop ? route.lines.filter(line => line.store === stop) : []
+  const stopRemaining = stopLines.filter(line => !checked.has(line.key))
+    .reduce((sum, line) => sum + BigInt(line.lineTotalCents), 0n)
+  // A single shop is not a complete basket or a source of savings claims.
+  const summary = stop
+    ? '<div class="totals"><p>Gecontroleerde pakken bij ' + clean(stop) + '<b>' +
+      clean(exactEuro.formatCents(route.totals[stop])) +
+      '</b></p><p>Nog niet afgevinkte pakken <b>' +
+      clean(exactEuro.formatCents(stopRemaining)) +
+      '</b></p></div><p>Alleen deze winkelstop, niet het volledige mandje. ' +
+      'Extra bezoekkosten en eigen ongeprijsde boodschappen zijn niet meegerekend.</p>'
+    : '<div class="totals"><p>PLUS hele mand <b>' +
     clean(exactEuro.formatCents(route.plusWholeCents)) + '</b></p>' +
     '<p>DekaMarkt hele mand <b>' + clean(exactEuro.formatCents(route.dekaWholeCents)) +
     '</b></p><p>Gekozen producten <b>' +
@@ -112,7 +132,8 @@ export function printMixedStoreRouteHtml(input: {
     '<meta name="referrer" content="no-referrer">' +
     '<meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; ' +
     'style-src &#39;unsafe-inline&#39;; base-uri &#39;none&#39;; form-action &#39;none&#39;">' +
-    '<title>SUPA · mijn privé boodschappenroute</title><style>' +
+    '<title>SUPA · mijn privé ' + (stop ? clean(stop) + ' winkelstop' : 'boodschappenroute') +
+    '</title><style>' +
     'body{font:16px/1.5 system-ui,sans-serif;color:#193626;max-width:850px;' +
     'margin:1.5rem auto;padding:0 1rem}h1,h2{margin-bottom:.35rem}' +
     'header{border-bottom:2px solid #9ab59e}.warning{background:#f4f7f2;' +
@@ -127,14 +148,16 @@ export function printMixedStoreRouteHtml(input: {
     '@media(max-width:650px){.totals{grid-template-columns:1fr}}' +
     '@media print{body{max-width:none;margin:0;font-size:11pt}' +
     'header,section{break-inside:avoid}.warning{border:1px solid #777}}' +
-    '</style></head><body><header><h1>SUPA · mijn eigen boodschappenroute</h1>' +
+    '</style></head><body><header><h1>SUPA · mijn eigen ' +
+    (stop ? clean(stop) + '-winkelstop' : 'boodschappenroute') + '</h1>' +
     '<p class="warning"><strong>Privé rekenhulp.</strong> Geen onafhankelijke ' +
     'retailerprijzen, bronrechten, kassa- of besparingsgarantie. ' +
     'Je hebt deze originele bronproducten persoonlijk gecontroleerd. ' +
     'Dit bestand bevat geen scripts of internetbronnen.</p></header>' +
     '<div class="meta">' + paragraphs.map(item =>
       '<p>' + clean(item) + '</p>').join('') + '</div>' + summary +
-    storeSection('PLUS') + storeSection('DekaMarkt') + extrasSection + manualSection +
+    (stop ? storeSection(stop) : storeSection('PLUS') + storeSection('DekaMarkt')) +
+    extrasSection + manualSection +
     '<footer><p>Handmatige winkelkeuzes en afvinkingen zijn uitsluitend voor ' +
     'je eigen boodschappen. Verouderde prijsopnames kunnen andere actuele ' +
     'winkelprijzen hebben. Print via je browser.</p></footer></body></html>'

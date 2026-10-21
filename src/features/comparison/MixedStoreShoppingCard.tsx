@@ -489,12 +489,14 @@ export function MixedStoreShoppingCard({
     }
   }
 
-  async function downloadPrintHtml(includeExtras = false) {
+  async function downloadPrintHtml(includeExtras = false, stop?: MixedStore) {
     if (block || !eligibleNow()) {
       setMessage('Controleer je huidige originele winkelprijzen en extra bezoekkosten voordat je een afdruk bewaart.')
       return
     }
     try {
+      if (stop && (!plan.lines.some(line => line.store === stop) || includeExtras))
+        throw Error('Deze winkelstop is niet beschikbaar in de gekozen route.')
       let extras: import('./ownExtraGroceriesStorage.ts').Item[] | undefined
       if (includeExtras) {
         if (!privatePlanKey) throw Error('Geen huidig Planner-weekmandje beschikbaar.')
@@ -511,19 +513,22 @@ export function MixedStoreShoppingCard({
         plus, deka, route: plan, captured,
         checked: new Set(plan.lines.filter(line => done(line.key)).map(line => line.key)),
         extraVisitCostCents: appliedCostCents, strategy: mode,
-        extras, manualNotes: validManualNotes,
+        extras, manualNotes: validManualNotes, stop,
       })
       if (!eligibleNow()) throw Error('Deze opnames zijn inmiddels verlopen.')
       const url = URL.createObjectURL(new Blob([page], { type: 'text/html;charset=utf-8' }))
       try {
         const link = document.createElement('a')
         link.href = url
-        link.download = includeExtras
-          ? 'supa-mijn-winkelroute-en-ongeprijsde-extras.html'
-          : 'supa-mijn-winkelroute-prive.html'
+        link.download = stop
+          ? 'supa-mijn-' + stop.toLowerCase() + '-winkelstop-prive.html'
+          : includeExtras
+            ? 'supa-mijn-winkelroute-en-ongeprijsde-extras.html'
+            : 'supa-mijn-winkelroute-prive.html'
         document.body.appendChild(link)
         try { link.click() } finally { link.remove() }
-        setMessage('Afdrukbaar privéoverzicht opgeslagen. Open het HTML-bestand lokaal en kies Afdrukken in je browser.')
+        setMessage((stop ? stop + '-winkelstop' : 'Volledige route') +
+          ' offline opgeslagen. Open het HTML-bestand lokaal en kies Afdrukken in je browser.')
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Deze route kan nu niet veilig worden afgedrukt.')
@@ -736,6 +741,10 @@ export function MixedStoreShoppingCard({
           <button type="button" className="ghost-button" disabled={!all.length}
             onClick={() => { void shareStoreStop(store) }}>
             Deel of kopieer alleen mijn {store}-winkelstop
+          </button>
+          <button type="button" className="ghost-button" disabled={!all.length}
+            onClick={() => { void downloadPrintHtml(false, store) }}>
+            Bewaar / print alleen mijn {store}-winkelstop (HTML)
           </button>
           <p><strong>{perStoreProgress[store].done} van {perStoreProgress[store].count}</strong>
             {' '}ingrediënten afgevinkt. Nog op de lijst bij deze winkel:{' '}
