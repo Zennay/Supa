@@ -1425,3 +1425,24 @@ wordt ingehaald, toont het formulier geen vals bericht dat de invoer
 bruikbaar klaarstaat. De precieze fout uit de bestaande import staat in
 het normale bronpaneel. Eerder geaccepteerde brondata en handmatige
 productreviews blijven behouden; er worden geen prijzen stil bevestigd.
+
+## Eén fysieke winkel-SKU voor meerdere Planner-regels
+
+Wanneer dezelfde daadwerkelijk geobserveerde winkelverpakking voor twee
+receptingrediënten in het weekmenu in aanmerking komt, mag je dezelfde
+SKU nooit twee keer als afzonderlijk bronproduct opvoeren. Kies bij de
+latere Planner-regel de status **Zelfde winkelartikel al bij andere regel
+ingevoerd** en selecteer handmatig de al opgenomen SKU uit dezelfde
+supermarkt. Er wordt dan **geen tweede bronproduct, verpakking of prijs**
+gemaakt: het canonieke negenkoloms CSV bevat het originele product precies
+eenmaal. De verwijzing blijft als bewerkbaar, lokaal privéconcept bewaard,
+maar is geen door het systeem gekozen productmatch.
+
+Een verwijzing kan alleen naar een daadwerkelijk bij dezelfde winkel
+ingevoerd en voldoende compleet beschikbaar bronartikel wijzen. Als het
+originele artikel ontbreekt, onvolledig is of wordt gewist, signaleert de
+formuliervoorinzage de verwijzing als onopgelost; er wordt geen onbekende
+prijs gereconstrueerd. De bestaande fysieke productmatching bepaalt
+vervolgens of datzelfde originele pak werkelijk bij één of meer gevraagde
+ingrediënten past. Ook een handmatig gekozen verwijzing omzeilt nooit de
+aparte menselijke review, huidige bronmomenten of bronrechten.

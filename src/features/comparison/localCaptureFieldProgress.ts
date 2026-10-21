@@ -68,6 +68,23 @@ export function incompleteCaptureFields(
     const missing: string[] = []
     if (!row || row.state === 'unseen') {
       missing.push('nog niet zelf waargenomen')
+    } else if (row.state === 'reuse') {
+      // Explicit reference only. Never create another retailer source row or
+      // assume the matching engine will accept a physical demand.
+      if (!row.sku.trim()) {
+        missing.push('kies eerst een bestaand werkelijk ingevoerd winkelartikel')
+      } else {
+        const original = Object.entries(rows).filter(([key, source]) =>
+          key.startsWith(store + ':') && key !== store + ':' + index &&
+          source.state === 'available' && source.sku.trim() === row.sku.trim())
+        if (original.length !== 1) {
+          missing.push('gekozen origineel artikel is niet meer uniek beschikbaar')
+        } else if (incompleteCaptureFields(store, [need], {
+          [store + ':0']: original[0][1],
+        }, observedAt).length > 0) {
+          missing.push('vul eerst alle originele bronvelden van het hergebruikte artikel in')
+        }
+      }
     } else {
       const time = captureTimeReadiness(observedAt)
       if (!time.ok) missing.push(time.reason)

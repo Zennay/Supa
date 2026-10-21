@@ -2,7 +2,7 @@
  * Never a retailer source, accepted price, permission or product match.
  */
 export type LocalCaptureEntry = {
-  state: 'unseen' | 'available' | 'unavailable'
+  state: 'unseen' | 'available' | 'unavailable' | 'reuse'
   sku: string; name: string; amount: string; unit: string
   count: string; cents: string
 }
@@ -11,7 +11,7 @@ export type LocalCaptureDraft = {
   moments: Record<string, string>
 }
 const stores = ['PLUS', 'DekaMarkt'] as const
-const states = ['unseen', 'available', 'unavailable'] as const
+const states = ['unseen', 'available', 'unavailable', 'reuse'] as const
 const maxBytes = 256000
 const fieldLengths = { sku: 100, name: 160, amount: 64, unit: 8,
   count: 12, cents: 16 } as const
@@ -83,6 +83,11 @@ export function restoreLocalCaptureDraft(raw: string, fingerprint: string,
     if (value.state === 'unavailable' &&
         ['amount', 'count', 'cents'].some(field => !!(value[field] as string).trim())) {
       return reject('niet-beschikbaar product bewaart een oude pakprijs.')
+    }
+    if (value.state === 'reuse' &&
+        ['name', 'amount', 'unit', 'count', 'cents'].some(
+          field => !!(value[field] as string).trim())) {
+      return reject('verwijzing naar eerder bronartikel bevat verborgen product- of prijsvelden.')
     }
     rows[key] = {
       state: value.state as LocalCaptureEntry['state'],

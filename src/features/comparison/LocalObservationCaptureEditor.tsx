@@ -10,7 +10,7 @@ import { shopLabelEuroCents } from './shopLabelEuroCents.ts'
 import { privatePackUnitRate, formatPrivateUnitRate } from './privateUnitPrice.ts'
 
 type Row = {
-  state: 'unseen' | 'available' | 'unavailable'
+  state: 'unseen' | 'available' | 'unavailable' | 'reuse'
   sku: string; name: string; amount: string; unit: string
   count: string; cents: string
 }
@@ -180,11 +180,18 @@ export function LocalObservationCaptureEditor({
       oldEntry.state !== 'unseen'
     const droppingPrice = field === 'state' && value === 'unavailable' &&
       !!(oldEntry.amount || oldEntry.count || oldEntry.cents)
+    const enteringReuse = field === 'state' && value === 'reuse' &&
+      oldEntry.state !== 'reuse'
+    const leavingReuse = field === 'state' && oldEntry.state === 'reuse' &&
+      value !== 'reuse'
     if (discardingObservation && !window.confirm(
       'Niet waargenomen kiezen wist de oude SKU, productnaam, verpakking en prijs uit deze conceptregel. Eerst lokaal bewaren?'
     )) return
     if (droppingPrice && !window.confirm(
       'Niet-beschikbaar kiezen wist de eerdere pakinhoud en prijs uit deze lokale conceptregel. Toch wijzigen?'
+    )) return
+    if (enteringReuse && oldEntry.state !== 'unseen' && !window.confirm(
+      'Verwijzen naar een ander origineel artikel wist de eigen oude SKU, verpakking en prijs van deze regel. Eerst lokaal bewaren?'
     )) return
     ++changes.current
     if (field === 'cents' || field === 'state') {
@@ -195,8 +202,9 @@ export function LocalObservationCaptureEditor({
     setRows(old => {
       const key = rowKey(store, index)
       const next = { ...(old[key] ?? empty()), [field]: value }
-      return { ...old, [key]: discardingObservation ? empty() : droppingPrice
-        ? { ...next, amount: '', count: '', cents: '' } : next }
+      return { ...old, [key]: discardingObservation ? empty()
+        : enteringReuse || leavingReuse ? { ...empty(), state: value as Row['state'] }
+        : droppingPrice ? { ...next, amount: '', count: '', cents: '' } : next }
     })
     setStatus('')
     setPortable(null)
@@ -377,7 +385,7 @@ export function LocalObservationCaptureEditor({
     for (const store of snapshot.stores) {
       const selected = snapshot.needs.map((need, index) =>
         ({ need, row: row(store, index), index: index + 2 }))
-        .filter(entry => entry.row.state !== 'unseen')
+        .filter(entry => entry.row.state === 'available' || entry.row.state === 'unavailable')
       if (!selected.length) continue
       const observedAt = moments[store]?.trim() ?? ''
       // Refuse a malformed selected observation before producing a nominally
@@ -548,9 +556,11 @@ export function LocalObservationCaptureEditor({
         </div>
       })()}
       <p role="status">{snapshot.needs.filter((_, index) =>
-        row(store, index).state !== 'unseen').length} van {snapshot.needs.length}
-        {' '}fysieke Planner-regels hebben een door jou opgegeven bronproduct;
-        de overige blijven onbekend. Dit is nog geen geaccepteerde productmatch.</p>
+        ['available', 'unavailable'].includes(row(store, index).state)).length}
+        {' '}originele {store}-bronregels ingevoerd;
+        {' '}{snapshot.needs.filter((_, index) => row(store, index).state === 'reuse').length}
+        {' '}extra Planner-regels verwijzen alleen naar een eerder ingevulde SKU.
+        Een verwijzing maakt geen tweede bronproduct of geaccepteerde productmatch.</p>
       <label>Werkelijk bronmoment, inclusief tijdzone (geen automatische datum)
         <input type="text" value={moments[store] ?? ''} maxLength={40}
           placeholder="2026-10-21T16:30:00+02:00"
@@ -570,6 +580,10 @@ export function LocalObservationCaptureEditor({
           .toLocaleLowerCase('nl-NL').includes(search.trim().normalize('NFKD')
             .toLocaleLowerCase('nl-NL'))).map(({ need, index }) => {
         const value = row(store, index)
+        const reusable = snapshot.needs.map((origin, sourceIndex) => ({
+          sourceIndex, origin, source: row(store, sourceIndex),
+        })).filter(item => item.sourceIndex !== index &&
+          item.source.state === 'available' && !!item.source.sku.trim())
         const physical = readablePlannerDemandAmount(need.amount)
         // Reuse the production BigInt pack-rate calculator, never a float
         // or an inferred ingredient->retailer match. Only a complete,
@@ -585,7 +599,9 @@ export function LocalObservationCaptureEditor({
             {physical === 'hoeveelheid nog controleren'
               ? physical : physical + ' ' + need.unit}
             {' '}· {value.state === 'unseen' ? 'niet waargenomen' :
-              value.state === 'available' ? 'bronproduct beschikbaar' : 'bronproduct niet beschikbaar'}
+              value.state === 'available' ? 'bronproduct beschikbaar' :
+              value.state === 'reuse' ? 'verwijst naar eerder opgenomen artikel' :
+              'bronproduct niet beschikbaar'}
           </summary>
           {missingByStore.get(store)?.find(item => item.index === index)?.missing &&
             <p role="status"><small>Voor deze originele regel nog nodig:{' '}
@@ -597,9 +613,28 @@ export function LocalObservationCaptureEditor({
               <option value="unseen">Niet waargenomen (geen bronprijs)</option>
               <option value="available">Eigen bronproduct gezien, beschikbaar</option>
               <option value="unavailable">Eigen bronproduct gezien, niet beschikbaar</option>
+              <option value="reuse">Zelfde winkelartikel al bij andere regel ingevoerd</option>
             </select>
           </label>
-          {value.state !== 'unseen' && <div className="offline-price-workbench__input">
+          {value.state === 'reuse' && <div className="offline-price-workbench__input">
+            <label>Kies een al werkelijk ingevulde {store}-SKU (geen tweede bronprijs)
+              <select value={value.sku}
+                onChange={event => edit(store, index, 'sku', event.currentTarget.value)}>
+                <option value="">Selecteer de eerdere originele bronregel</option>
+                {reusable.map(({ sourceIndex, origin, source }) =>
+                  <option key={sourceIndex} value={source.sku}>
+                    Regel {sourceIndex + 2} · {origin.label} · {source.name || source.sku}
+                    {' '}({source.sku})
+                  </option>)}
+              </select>
+            </label>
+            <small>Deze verwijzing maakt geen nieuwe SKU, verpakking of prijs;
+              de bestaande matcher controleert straks onafhankelijk of hetzelfde
+              product de werkelijke Planner-vraag dekt. Wordt de originele
+              bronregel gewist of onvolledig, dan wordt deze verwijzing onbruikbaar.</small>
+          </div>}
+          {value.state !== 'unseen' && value.state !== 'reuse' &&
+            <div className="offline-price-workbench__input">
             <label>Originele winkelartikelcode (SKU)
               <input type="text" value={value.sku} maxLength={100}
                 onChange={event => edit(store, index, 'sku', event.currentTarget.value)} />
