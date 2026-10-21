@@ -2705,6 +2705,14 @@ export function OfflineReviewedWorkbench({
                       (currentPreview.retainedOther?.observedAt ?? '')}
                     plus={previewPlusLines} deka={previewDekaLines}
                     within24h={previewPair24h} sourceFresh={previewPairFresh}
+                    plusFresh={freshPreviewInstant(
+                      currentPreview.stores.find(store => store.retailer === 'PLUS')?.observedNs ??
+                      (currentPreview.retainedOther?.retailer === 'PLUS'
+                        ? currentPreview.retainedOther.observedNs : undefined))}
+                    dekaFresh={freshPreviewInstant(
+                      currentPreview.stores.find(store => store.retailer === 'DekaMarkt')?.observedNs ??
+                      (currentPreview.retainedOther?.retailer === 'DekaMarkt'
+                        ? currentPreview.retainedOther.observedNs : undefined))}
                     plusObservedAt={previewPlusAt} dekaObservedAt={previewDekaAt}
                     retainedStore={currentPreview.retainedOther?.retailer}
                     describeReason={humanMatchReason} />

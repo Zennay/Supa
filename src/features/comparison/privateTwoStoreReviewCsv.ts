@@ -4,6 +4,7 @@ import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
 import type { PreviewMatchLine } from './CaptureMatchingPreview.tsx'
 import { completePreviewProposal } from './privateTwoStorePreviewChecklist.ts'
 import { samePrivatePhysicalDemand } from './samePrivatePhysicalDemand.ts'
+import { observedInstant } from '../../domain/offlineReviewedImport.ts'
 
 type Input = {
   plus: readonly PreviewMatchLine[]
@@ -12,6 +13,8 @@ type Input = {
   dekaObservedAt: string
   within24h: boolean
   sourceFresh: boolean
+  plusFresh: boolean
+  dekaFresh: boolean
   onlyOpen?: boolean
 }
 const header = [
@@ -31,7 +34,7 @@ const header = [
 function quantity(line: PreviewMatchLine | undefined): string {
   return line ? readablePlannerDemandAmount(line.amount) + ' ' + line.unit : ''
 }
-function storeColumns(line: PreviewMatchLine | undefined, observedAt: string): string[] {
+function storeColumns(line: PreviewMatchLine | undefined, observedAt: string, fresh: boolean): string[] {
   if (!line) return [observedAt, ...Array<string>(9).fill(''), 'Ontbrekende bronmatch']
   if (!completePreviewProposal(line)) {
     return [observedAt, ...Array<string>(9).fill(''),
@@ -41,12 +44,13 @@ function storeColumns(line: PreviewMatchLine | undefined, observedAt: string): s
   return [observedAt, line.originalSku, line.product,
     readablePlannerDemandAmount(line.packAmount), line.packUnit,
     String(line.packCount), String(line.pricePerPackCents), String(line.packs),
-    String(line.lineTotalCents), line.unitPrice ?? '', 'Onbevestigd bronvoorstel']
+    String(line.lineTotalCents), line.unitPrice ?? '', fresh ? 'Onbevestigd bronvoorstel' : 'Oude/onbruikbare bron; niet actueel']
 }
 
 /** Original candidate money only after canonical arithmetic; never deltas or totals. */
 export function privateTwoStoreReviewCsv(input: Input): string {
-  const { plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh, onlyOpen = false } = input
+  const { plus, deka, plusObservedAt, dekaObservedAt, within24h,
+    sourceFresh, plusFresh, dekaFresh, onlyOpen = false } = input
   if (!Array.isArray(plus) || !Array.isArray(deka) ||
       plus.length > 200 || deka.length > 200 || !plusObservedAt || !dekaObservedAt) {
     throw Error('Geen geldig paar originele winkelopnames voor het overzicht.')
@@ -74,16 +78,24 @@ export function privateTwoStoreReviewCsv(input: Input): string {
       completePreviewProposal(right ?? null)
     const open = !complete || !within24h || !sourceFresh
     if (onlyOpen && !open) continue
+    const plusInstant = observedInstant(plusObservedAt)
+    const dekaInstant = observedInstant(dekaObservedAt)
+    const older = plusInstant && dekaInstant
+      ? plusInstant.ns <= dekaInstant.ns ? 'PLUS' : 'DekaMarkt' : null
     const reason = !equal ? 'Corrigeer de oorspronkelijke fysieke Planner-vraag' :
+      !plusFresh && !dekaFresh ? 'Neem beide winkelbronnen opnieuw op' :
+      !plusFresh ? 'Neem PLUS opnieuw op; bron verouderd of ongeldig' :
+      !dekaFresh ? 'Neem DekaMarkt opnieuw op; bron verouderd of ongeldig' :
+      !within24h ? older
+        ? 'Neem de oudste winkel (' + older + ') opnieuw op; meer dan 24 uur verschil'
+        : 'Controleer beide bronmomenten: meer dan 24 uur uiteen' :
       !complete ? 'Controleer beide originele artikelen, verpakking en pakprijs' :
-      !sourceFresh ? 'Minstens één bron verouderd of ongeldig: nieuwe opname vereist' :
-      !within24h ? 'Opnames meer dan 24 uur uiteen: oudste opnieuw opnemen' :
       'Na eigen controle kan de reguliere bronimport worden bevestigd'
     body.push([
       open ? 'Openstaand' : 'Alleen voorstel', id, left?.label ?? right?.label ?? '',
       quantity(left), quantity(right), equal ? 'ja' : 'nee',
-      ...storeColumns(left, plusObservedAt),
-      ...storeColumns(right, dekaObservedAt), reason,
+      ...storeColumns(left, plusObservedAt, plusFresh),
+      ...storeColumns(right, dekaObservedAt, dekaFresh), reason,
     ])
   }
   if (onlyOpen && body.length === 0) throw Error('Er zijn geen openstaande winkelregels.')

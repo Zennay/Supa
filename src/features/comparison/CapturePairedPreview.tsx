@@ -42,12 +42,15 @@ function localOffer(line: PreviewMatchLine | null, describeReason: (value: strin
  * is not a whole-basket financial comparison or a right to publish prices.
  */
 export function CapturePairedPreview({
-  plus, deka, within24h, sourceFresh, retainedStore, plusObservedAt, dekaObservedAt, describeReason,
+  plus, deka, within24h, sourceFresh, plusFresh, dekaFresh, retainedStore,
+  plusObservedAt, dekaObservedAt, describeReason,
 }: {
   plus: readonly PreviewMatchLine[]
   deka: readonly PreviewMatchLine[]
   within24h: boolean
   sourceFresh: boolean
+  plusFresh: boolean
+  dekaFresh: boolean
   retainedStore?: 'PLUS' | 'DekaMarkt'
   plusObservedAt: string
   dekaObservedAt: string
@@ -119,7 +122,8 @@ export function CapturePairedPreview({
     try {
       setExportMessage('')
       const csv = privateTwoStoreReviewCsv({
-        plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh, onlyOpen,
+        plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh,
+        plusFresh, dekaFresh, onlyOpen,
       })
       downloadLocal(csv, 'text/csv;charset=utf-8',
         onlyOpen ? 'supa-PLUS-Deka-openstaande-bronvoorstellen-prive.csv' :
@@ -224,8 +228,10 @@ export function CapturePairedPreview({
       {olderStore ? ' Vernieuw de bron van ' + olderStore + ' met een werkelijke nieuwe opname.' :
         ' Controleer beide oorspronkelijke bronmomenten.'}
       {' '}Er is geen volledig vergelijkbaar prijsverschil zolang het bronpaar te ver uiteenligt.</p>}
-    {!sourceFresh && <p role="status">Minstens één bronmoment is ouder dan zeven
-      dagen of ongeldig. Vermeld deze getallen niet als actuele prijzen.</p>}
+    {!sourceFresh && <p role="status">Een of beide bronmomenten zijn ouder dan zeven
+      dagen of ongeldig: {!plusFresh && !dekaFresh ? 'neem beide winkels opnieuw op.' :
+        !plusFresh ? 'neem PLUS opnieuw op.' : 'neem DekaMarkt opnieuw op.'}
+      {' '}Vermeld de conceptprijzen niet als actuele prijzen.</p>}
     {missing > 0 && <p>
       <a href="#supa-two-store-capture-followup">
         Ga naar de lege PLUS-/Deka-invulbladen om deze {missing} openstaande
