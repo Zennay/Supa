@@ -2734,7 +2734,8 @@ export function OfflineReviewedWorkbench({
                   prijzen nooit kunstmatig het oudere bronmoment om de import te laten passen.
                   Supa controleert vóór vervangen welke oorspronkelijke SKU’s verdwijnen.</p>
                 {stores.map(store => {
-                  const missing = missingPreviewCaptureNeeds(store).length
+                  const missingNeeds = missingPreviewCaptureNeeds(store)
+                  const missing = missingNeeds.length
                   const source = currentPreview.stores.find(item => item.retailer === store)
                   const other = currentPreview.stores.find(item => item.retailer !== store)
                   const retained = currentPreview.retainedOther
@@ -2765,6 +2766,16 @@ export function OfflineReviewedWorkbench({
                       onClick={() => { void downloadPreviewMissingCapture(store, 'guide') }}>
                       {store} rijgids (TXT)
                     </button>
+                    {missing > 0 && <details>
+                      <summary>{store}: vul ontbrekende bronregels mobiel in zonder download</summary>
+                      <PortableBlankCapture purpose="missing"
+                        needs={missingNeeds}
+                        needsAtClick={() => missingPreviewCaptureNeeds(store)}
+                        stores={[store]} delimiter={captureDelimiter}
+                        captureKey={captureWeek + ':preview-missing:' + store + ':' +
+                          captureDelimiter + ':' + importRevision.current + ':' +
+                          Math.floor(clockMs / 60000)} />
+                    </details>}
                   </div>
                 })}
               </div>
