@@ -356,6 +356,18 @@ export function LocalTwoStorePriceEditor({
     currentDraftPackMath(rows[key('PLUS', need.id)] ?? emptyDraft(need.unit), need) &&
     currentDraftPackMath(rows[key('DekaMarkt', need.id)] ?? emptyDraft(need.unit), need),
   ).map(need => need.id))
+  // Rank only calculations for identical physical Planner demand. These
+  // shopper-typed candidate SKUs have not passed the actual source matcher or
+  // human product-equivalence review, so the result is never a basket winner.
+  const provisionalDifferences = sameTimePair ? activeNeeds.flatMap((need, index) => {
+    const plus = currentDraftPackMath(rows[key('PLUS', need.id)] ?? emptyDraft(need.unit), need)
+    const deka = currentDraftPackMath(rows[key('DekaMarkt', need.id)] ?? emptyDraft(need.unit), need)
+    if (!plus || !deka) return []
+    const differenceCents = deka.lineTotalCents - plus.lineTotalCents
+    if (!Number.isSafeInteger(differenceCents)) return []
+    return [{ need, index, plus, deka, differenceCents }]
+  }).sort((a, b) => Math.abs(b.differenceCents) - Math.abs(a.differenceCents) ||
+    a.index - b.index) : []
   const nextIncompletePairIndex = activeNeeds.findIndex(need =>
     !readyPairedDraftIds.has(need.id) || recaptureStores.size > 0)
   const openCaptureTasks = selectedStores.flatMap(store => activeNeeds.flatMap(need => {
@@ -1360,6 +1372,39 @@ export function LocalTwoStorePriceEditor({
               <small>Alle conceptregels zijn ingevuld, maar kijk eerst de echte
                 opnamemomenten na; anders zijn de winkelprijzen niet vergelijkbaar.</small>}
           </div>
+          {provisionalDifferences.length > 0 && <section
+            className="offline-manual-editor__review-priority"
+            aria-label="Nog te controleren bronproducten met het grootste voorlopige prijsverschil">
+            <h5>Welke bronproducten eerst controleren?</h5>
+            <p>Deze lijst sorteert uitsluitend rekenverschillen uit jouw eigen,
+              nog niet bevestigde PLUS/Deka-concepten. Beide hoeveelheden zijn exact
+              dezelfde Planner-behoefte, maar de producten kunnen verschillend zijn.
+              Dit is geen goedkoper-winkeladvies, mandtotaal of besparing.</p>
+            <ol>{provisionalDifferences.slice(0, 5).map(item => <li key={item.need.id}>
+              <strong>{item.need.label}</strong>
+              <span>PLUS: {item.plus.packagesNeeded} pak(ken) ·
+                {' '}{exactEuro.formatCents(item.plus.lineTotalCents)}<br />
+                DekaMarkt: {item.deka.packagesNeeded} pak(ken) ·
+                {' '}{exactEuro.formatCents(item.deka.lineTotalCents)}</span>
+              <span>{item.differenceCents === 0 ? 'Zelfde voorlopige regelprijs' :
+                exactEuro.formatCents(Math.abs(item.differenceCents)) +
+                ' voorlopig rekenverschil; productidentiteit nog controleren'}</span>
+              <div className="offline-manual-editor__review-actions">
+                {stores.map(store => <button type="button" className="ghost-button"
+                  key={store} onClick={() => {
+                    setOnlyOpenRows(false)
+                    window.requestAnimationFrame(() => {
+                      const field = document.getElementById('own-price-' + store + '-' + item.index)
+                      field?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                      field?.querySelector('input')?.focus({ preventScroll: true })
+                    })
+                  }}>Controleer {store}-code en verpakking</button>)}
+              </div>
+            </li>)}</ol>
+            {provisionalDifferences.length > 5 && <small>
+              Nog {provisionalDifferences.length - 5} andere rekenbare conceptregels
+              staan hieronder in de volledige twee-winkelmatrix.</small>}
+          </section>}
           {activeNeeds.map((need, index) => <div key={need.id}
             className="offline-manual-editor__pair-row">
             <strong>{need.label} <small>· {need.amount ?? '?'} {need.unit}</small></strong>

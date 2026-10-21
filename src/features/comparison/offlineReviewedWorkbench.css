@@ -453,3 +453,16 @@ border-radius:10px;padding:.65rem;scroll-margin-top:1.25rem}
 .offline-price-workbench__store-progress-actions { display:flex; gap:.55rem; flex-wrap:wrap; }
 .offline-price-workbench__store-progress-actions button { min-height:44px; flex:1; }
 @media(max-width:650px) { .offline-price-workbench__store-progress { grid-template-columns:minmax(0,1fr); } }
+
+/* Read-only prioritized review of personally entered, unverified store drafts. */
+.offline-manual-editor__review-priority { border:1px solid #a8c9ae; border-radius:12px;
+  background:#f8fcf7; padding:1rem; display:grid; gap:.6rem; }
+.offline-manual-editor__review-priority h5,.offline-manual-editor__review-priority p {
+  margin:0; }
+.offline-manual-editor__review-priority ol { display:grid; gap:.5rem; padding-left:1.4rem;
+  margin:0; }
+.offline-manual-editor__review-priority li { padding:.55rem; border-bottom:1px solid #d1ddd1;
+  overflow-wrap:anywhere; }
+.offline-manual-editor__review-priority li > span { display:block; margin:.2rem 0; }
+.offline-manual-editor__review-actions { display:flex; flex-wrap:wrap; gap:.45rem; }
+.offline-manual-editor__review-actions button { min-height:44px; white-space:normal; }
