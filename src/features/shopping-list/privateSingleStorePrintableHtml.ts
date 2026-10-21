@@ -2,6 +2,7 @@ import { euro as exactEuro } from '../../lib/money.ts'
 import type { OneStoreBasket } from '../../domain/basket.ts'
 import { privateSingleStoreShoppingCsv } from './privateSourceShoppingCsv.ts'
 import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
+import { readablePlannerDemandAmount } from '../comparison/plannerPriceCaptureGuide.ts'
 import type { OwnExtraGrocery } from '../comparison/ownExtraGroceriesCsv.ts'
 import type { UnpricedShoppingNote } from './ManualShoppingNotes.tsx'
 import { normalizePrivateNotes } from './manualShoppingNotesBackup.ts'
@@ -31,7 +32,9 @@ export function privateSingleStorePrintableHtml({ basket, observedAt, done, extr
       '</span><div><strong>' + esc(line.ingredientLabel) + '</strong>' +
       '<p>' + esc(line.packs) + ' × ' + esc(line.productName) +
       ' <small>SKU ' + esc(line.productId) + '</small></p>' +
-      '<small>Verpakking: ' + esc(line.pack.count) + ' × ' + esc(line.pack.amount) +
+      '<small>Benodigd: ' + esc(readablePlannerDemandAmount(line.requirement.amount)) +
+      ' ' + esc(line.requirement.unit) + '<br>Verpakking: ' + esc(line.pack.count) +
+      ' × ' + esc(readablePlannerDemandAmount(line.pack.amount)) +
       ' ' + esc(line.pack.unit) + ' · ' +
       esc(exactEuro.formatCents(line.pricePerPackCents)) + ' per pak · ' +
       esc(privateUnitPrice(line) ?? 'eenheidsprijs onbekend') + '</small></div>' +

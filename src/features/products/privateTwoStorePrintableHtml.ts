@@ -1,5 +1,6 @@
 import type { OwnStoreWeekComparison } from '../planner/ownStoreBudgetComparison.ts'
 import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
+import { readablePlannerDemandAmount } from '../comparison/plannerPriceCaptureGuide.ts'
 import { privatePhysicalShoppingTick } from '../shopping-list/privatePhysicalShoppingTick.ts'
 
 type Comparable = Extract<OwnStoreWeekComparison, { status: 'comparable' }>
@@ -30,7 +31,7 @@ export function privateTwoStorePrintableHtml(
       '</span><br><strong>' + esc(line.productName) + '</strong><br>' +
     '<small>SKU ' + esc(line.productId) + '</small><br>' +
     esc(String(line.packs)) + ' hele pak(ken) · ' +
-    esc(String(line.pack.count)) + ' × ' + esc(String(line.pack.amount)) +
+    esc(String(line.pack.count)) + ' × ' + esc(readablePlannerDemandAmount(line.pack.amount)) +
     ' ' + esc(line.pack.unit) + ' per pak<br>' +
     euro(line.pricePerPackCents) + ' per pak · ' +
     esc(privateUnitPrice(line) ?? 'Eenheidsprijs onbekend') +
@@ -38,8 +39,11 @@ export function privateTwoStorePrintableHtml(
   }
   const lines = comparison.lines.map(line =>
     '<tr><th scope="row">' + esc(line.ingredientLabel) +
-    '<small>' + esc(String(line.plus.requirement.amount)) + ' ' +
-    esc(line.plus.requirement.unit) + ' nodig</small></th><td>' +
+    '<small>Benodigd: PLUS ' +
+    esc(readablePlannerDemandAmount(line.plus.requirement.amount)) + ' ' +
+    esc(line.plus.requirement.unit) + ' = DekaMarkt ' +
+    esc(readablePlannerDemandAmount(line.deka.requirement.amount)) + ' ' +
+    esc(line.deka.requirement.unit) + '</small></th><td>' +
     entry('PLUS', line.plus) + '</td><td>' + entry('DekaMarkt', line.deka) +
     '</td><td>' + (line.deltaCents === 0 ? 'Gelijk' :
       euro(Math.abs(line.deltaCents)) + ' lager bij ' +

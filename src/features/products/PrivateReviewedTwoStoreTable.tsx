@@ -7,6 +7,7 @@ import { observedInstant } from '../../domain/offlineReviewedImport.ts'
 import type { BasketTraceLine, OneStoreBasket } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import { privatePackUnitRate, privateUnitPrice } from '../comparison/privateUnitPrice.ts'
+import { readablePlannerDemandAmount } from '../comparison/plannerPriceCaptureGuide.ts'
 import { productSearchText } from './productSearchText.ts'
 import { currentPrivateRouteChoice } from '../comparison/privateRouteChoice.ts'
 import { createMixedStoreShoppingPlan } from '../comparison/mixedStoreShoppingPlan.ts'
@@ -835,7 +836,10 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
           {' '}Geen totale besparing, winkelwinnaar of kassagarantie.</p>
         <div className="private-reviewed-products__paired-rows">
           {partialShown.map(({ plus: first, deka: second }) => <article key={first.id}>
-            <h4>{first.ingredientLabel} · {first.requirement.amount} {first.requirement.unit}</h4>
+            <h4>{first.ingredientLabel} · benodigd: PLUS {' '}
+          {readablePlannerDemandAmount(first.requirement.amount)} {first.requirement.unit}
+          {' '}= DekaMarkt {' '}
+          {readablePlannerDemandAmount(second.requirement.amount)} {second.requirement.unit}</h4>
             <div className="private-reviewed-products__paired-options">
               {([['PLUS', first], ['DekaMarkt', second]] as const).map(([shop, line]) =>
                 <div className="private-reviewed-products__paired-option" key={shop}>
@@ -1189,7 +1193,10 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
     <div className="private-reviewed-products__paired-rows">
       {advantaged.map(({ plus: first, deka: second }) => <article
         key={first.id} id={driverAnchor(first.id)} tabIndex={-1}>
-        <h4>{first.ingredientLabel} · {first.requirement.amount} {first.requirement.unit}</h4>
+        <h4>{first.ingredientLabel} · benodigd: PLUS {' '}
+          {readablePlannerDemandAmount(first.requirement.amount)} {first.requirement.unit}
+          {' '}= DekaMarkt {' '}
+          {readablePlannerDemandAmount(second.requirement.amount)} {second.requirement.unit}</h4>
         <div className="private-reviewed-products__paired-options">
           {product(first, 'PLUS')}{product(second, 'DekaMarkt')}
         </div>
