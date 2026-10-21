@@ -282,6 +282,8 @@ export function LocalTwoStorePriceEditor({
 }: Props) {
   const [open, setOpen] = useState(false)
   const [onlyOpenRows, setOnlyOpenRows] = useState(false)
+  const [pairSearch, setPairSearch] = useState('')
+  const [pairView, setPairView] = useState<'all' | 'attention' | 'paired'>('all')
   const [preparedOpenCaptureCopy, setPreparedOpenCaptureCopy] = useState<{ identity: string; text: string } | null>(null)
   const [pricePreviewNow, setPricePreviewNow] = useState(() => Date.now())
   const [sourceSelection, setSourceSelection] = useState<'both' | OfflineRetailer>('both')
@@ -360,14 +362,67 @@ export function LocalTwoStorePriceEditor({
     return []
   })
   const activeNeeds = needs.filter(item => item.label.trim() && item.query.trim())
+  // Two distinct draft product definitions must not claim the same original
+  // store SKU. The canonical source generator already refuses this conflict;
+  // surface it BEFORE it can imply a plausible two-store difference.
+  const conflictingCodes = selectedStores.flatMap(store => {
+    const byCode = new Map<string, { signature: string; index: number; label: string }[]>()
+    activeNeeds.forEach((need, index) => {
+      const row = rows[key(store, need.id)] ?? emptyDraft(need.unit)
+      if (!isEnteredOwnCapture(row)) return
+      const code = row.sourceId ?? ''
+      const signature = JSON.stringify([
+        row.name, row.packAmount ? amountOrNull(row.packAmount.trim()) : null,
+        row.packUnit, Number(row.packCount), row.available,
+        row.available ? eurosToCents(row.priceEuros.trim()) : null,
+      ])
+      const group = byCode.get(code) ?? []
+      group.push({ signature, index, label: need.label })
+      byCode.set(code, group)
+    })
+    return [...byCode].flatMap(([sourceId, group]) => {
+      if (group.length < 2 || group.every(item =>
+        item.signature === group[0].signature)) return []
+      return [{ store, sourceId, indices: group.map(item => item.index),
+        labels: group.map(item => item.label) }]
+    })
+  })
+  const conflictingNeedIndices = new Set(conflictingCodes.flatMap(item => item.indices))
   // Count the SAME physical ingredient needs with two complete provisional
   // price entries. No partial total or store winner may be inferred from this.
-  const readyPairedDraftIds = new Set(activeNeeds.filter(need =>
+  const readyPairedDraftIds = new Set(activeNeeds.filter((need, index) =>
+    !conflictingNeedIndices.has(index) &&
     currentDraftPackMath(rows[key('PLUS', need.id)] ?? emptyDraft(need.unit), need) &&
     currentDraftPackMath(rows[key('DekaMarkt', need.id)] ?? emptyDraft(need.unit), need),
   ).map(need => need.id))
+  // Rank only calculations for identical physical Planner demand. These
+  // shopper-typed candidate SKUs have not passed the actual source matcher or
+  // human product-equivalence review, so the result is never a basket winner.
+  const provisionalDifferences = sameTimePair ? activeNeeds.flatMap((need, index) => {
+    if (conflictingNeedIndices.has(index)) return []
+    const plus = currentDraftPackMath(rows[key('PLUS', need.id)] ?? emptyDraft(need.unit), need)
+    const deka = currentDraftPackMath(rows[key('DekaMarkt', need.id)] ?? emptyDraft(need.unit), need)
+    if (!plus || !deka) return []
+    const differenceCents = deka.lineTotalCents - plus.lineTotalCents
+    if (!Number.isSafeInteger(differenceCents)) return []
+    return [{ need, index, plus, deka, differenceCents }]
+  }).sort((a, b) => Math.abs(b.differenceCents) - Math.abs(a.differenceCents) ||
+    a.index - b.index) : []
   const nextIncompletePairIndex = activeNeeds.findIndex(need =>
     !readyPairedDraftIds.has(need.id) || recaptureStores.size > 0)
+  const visiblePairRows = activeNeeds.flatMap((need, index) => {
+    const query = pairSearch.trim().toLocaleLowerCase('nl')
+    const sourceWords = stores.flatMap(store => {
+      const row = rows[key(store, need.id)]
+      return row ? [row.sourceId ?? '', row.name] : []
+    })
+    if (query && ![need.label, need.query, ...sourceWords].some(value =>
+      value.toLocaleLowerCase('nl').includes(query))) return []
+    const paired = readyPairedDraftIds.has(need.id)
+    if (pairView === 'paired' && !paired) return []
+    if (pairView === 'attention' && paired && sameTimePair) return []
+    return [{ need, index }]
+  })
   const openCaptureTasks = selectedStores.flatMap(store => activeNeeds.flatMap(need => {
     const row = rows[key(store, need.id)] ?? emptyDraft(need.unit)
     const status = ownCaptureStatus(row, need)
@@ -396,6 +451,11 @@ export function LocalTwoStorePriceEditor({
   // Avoid importing a draft into a different plan if it changed during File.text().
   const currentPlanFingerprint = useRef(selectedPlanFingerprint)
   currentPlanFingerprint.current = selectedPlanFingerprint
+  // A lazy HTML exporter must never download a snapshot after the shopper
+  // switched weeks, edited a draft SKU or changed a store capture time.
+  const draftReviewIdentity = JSON.stringify([selectedPlanFingerprint, sourceSelection, capturedAt, rows])
+  const currentDraftReviewIdentity = useRef(draftReviewIdentity)
+  currentDraftReviewIdentity.current = draftReviewIdentity
   // A camera stream belongs only to the selected physical Planner week.
   useEffect(() => setScanTarget(null), [selectedPlanFingerprint])
   const [preparedFor, setPreparedFor] = useState('')
@@ -839,6 +899,94 @@ export function LocalTwoStorePriceEditor({
     setCapturedAt(prev => ({ ...prev, [store]: value }))
     setOutput(''); setError(''); setPreparedFor(''); onEdit()
   }
+  async function downloadProvisionalReview() {
+    const identity = draftReviewIdentity
+    try {
+      // Revalidate at the instant of the action, even if this tab stayed open
+      // long enough for a previously plausible pair to become stale.
+      const instants = stores.map(store => {
+        const original = timestampWithOffset(capturedAt[store])
+        return original === null ? Number.NaN : Date.parse(original)
+      })
+      const now = Date.now()
+      const pairEligibleNow = sourceSelection === 'both' &&
+        instants.every(time => Number.isFinite(time) &&
+          now - time >= -300000 && now - time <= 604800000) &&
+        Math.abs(instants[0] - instants[1]) <= 86400000
+      if (!selectedStores.some(store => activeNeeds.some(need =>
+        isEnteredOwnCapture(rows[key(store, need.id)] ?? emptyDraft(need.unit))))) {
+        throw Error('Vul eerst een eigen werkelijk gecontroleerd product of voorraadstatus in; leeg winkelblad is al beschikbaar.')
+      }
+      // Missing / aged store moments can still produce an OFFLINE personal
+      // collection report, but never an inter-store numeric difference.
+      const comparableDrafts = pairEligibleNow ? provisionalDifferences : []
+      const records = comparableDrafts.map(item => {
+        const plus = rows[key('PLUS', item.need.id)]!
+        const deka = rows[key('DekaMarkt', item.need.id)]!
+        return {
+          ingredient: item.need.label,
+          demand: String(item.need.amount) + ' ' + item.need.unit,
+          plus: { code: plus.sourceId ?? '', product: plus.name,
+            packs: item.plus.packagesNeeded, packCents: item.plus.pricePerPackCents,
+            totalCents: item.plus.lineTotalCents, unitRate: item.plus.unitRate },
+          deka: { code: deka.sourceId ?? '', product: deka.name,
+            packs: item.deka.packagesNeeded, packCents: item.deka.pricePerPackCents,
+            totalCents: item.deka.lineTotalCents, unitRate: item.deka.unitRate },
+        }
+      })
+      const alreadyPaired = new Set(comparableDrafts.map(item => item.need.id))
+      const unpaired = activeNeeds.flatMap((need, index) => {
+        if (alreadyPaired.has(need.id)) return []
+        const conflicted = (store: OfflineRetailer) => conflictingCodes.some(conflict =>
+          conflict.store === store && conflict.indices.includes(index))
+        const status = (store: OfflineRetailer) => !selectedStores.includes(store)
+          ? 'Geen huidige bron geselecteerd; prijs onbekend'
+          : conflicted(store)
+            ? 'Oorspronkelijke productcode conflicteert met andere winkelregel'
+            : captureStatusNames[ownCaptureStatus(
+              rows[key(store, need.id)] ?? emptyDraft(need.unit), need)]
+        const priced = (store: OfflineRetailer) => {
+          if (!selectedStores.includes(store) || conflicted(store)) return undefined
+          const row = rows[key(store, need.id)] ?? emptyDraft(need.unit)
+          const math = currentDraftPackMath(row, need)
+          if (!math) return undefined
+          return { code: row.sourceId ?? '', product: row.name,
+            packs: math.packagesNeeded, packCents: math.pricePerPackCents,
+            totalCents: math.lineTotalCents, unitRate: math.unitRate }
+        }
+        return [{
+          ingredient: need.label, demand: String(need.amount ?? 'onbekend') + ' ' + need.unit,
+          plusStatus: status('PLUS'), dekaStatus: status('DekaMarkt'),
+          plus: priced('PLUS'), deka: priced('DekaMarkt'),
+        }]
+      })
+      const { privateDraftReviewHtml } = await import('./privateDraftReviewHtml.ts')
+      if (identity !== currentDraftReviewIdentity.current ||
+          (pairEligibleNow && instants.some(time =>
+            Date.now() - time > 604800000))) {
+        throw Error('Je winkel- of Planner-invoer is ondertussen gewijzigd of verouderd. Open het overzicht opnieuw.')
+      }
+      const reportCapturedAt = {
+        PLUS: selectedStores.includes('PLUS') ? capturedAt.PLUS : '',
+        DekaMarkt: selectedStores.includes('DekaMarkt') ? capturedAt.DekaMarkt : '',
+      }
+      const html = privateDraftReviewHtml(
+        records, reportCapturedAt, activeNeeds.length, unpaired, pairEligibleNow)
+      const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-twee-winkels-prive-conceptcontrole.html'
+        document.body.append(link); link.click(); link.remove()
+        setDraftStatus(records.length + ' voorlopige prijsregels en ' +
+          unpaired.length + ' nog niet vergelijkbare Planner-regels lokaal afgedrukt. ' +
+          'De status is persoonlijk en niet onafhankelijk geverifieerd; geen volledig mandtotaal.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+    } catch (cause) {
+      setDraftStatus(cause instanceof Error ? cause.message : 'Privé-controleblad niet opgeslagen.')
+    }
+  }
+
   function createSourceFile() {
     setError(''); setOutput('')
     try {
@@ -1242,6 +1390,16 @@ export function LocalTwoStorePriceEditor({
           <button type="button" className="ghost-button" onClick={downloadMissingCaptureList}>
             Download open winkelwaarnemingen (TXT)
           </button>
+          <button type="button" className="ghost-button"
+            disabled={!selectedStores.some(store => activeNeeds.some(need =>
+              isEnteredOwnCapture(rows[key(store, need.id)] ?? emptyDraft(need.unit))))}
+            onClick={() => void downloadProvisionalReview()}>
+            Download mijn privéprijs- en winkelstatus (offline HTML)
+          </button>
+          <small>Ook voor een gedeeltelijk ingevulde winkel: toont alleen eigen
+            bronconcepten, de overige onbekende regels en eventuele oude bronmomenten.
+            Een twee-winkelprijsverschil verschijnt uitsluitend bij voorlopig
+            passende originele tijden en twee rekenbare, niet-conflicterende producten.</small>
           <button type="button" className="ghost-button" onClick={downloadUnfinishedDraft}>
             Download onvoltooid invulconcept (JSON)
           </button>
@@ -1316,6 +1474,29 @@ export function LocalTwoStorePriceEditor({
         </select>
       </label>
       <p className="disclaimer">Voer alleen winkels in die je werkelijk hebt waargenomen. De andere winkel blijft onbekend; je kunt zijn aparte bronopname later toevoegen.</p>
+      {conflictingCodes.length > 0 && <section className="offline-manual-editor__source-conflicts"
+        role="alert" aria-label="Tegenstrijdige originele winkelcodes">
+        <strong>{conflictingCodes.length} tegenstrijdige winkelcode(s) gevonden</strong>
+        <p>Dezelfde code is bij dezelfde winkel met verschillende productnamen,
+          verpakkingen, prijzen of voorraad ingevoerd. Deze regels krijgen
+          geen voorlopig twee-winkelprijsverschil en kunnen niet samen als
+          één echte broncode worden geïmporteerd. Corrigeer aan de hand van de
+          originele winkelwaarneming, niet door codes te verzinnen.</p>
+        <ul>{conflictingCodes.map(conflict => <li key={key(conflict.store, conflict.sourceId)}>
+          <strong>{conflict.store}: {conflict.sourceId}</strong>
+          <div className="offline-manual-editor__review-actions">
+            {conflict.indices.map((index, position) => <button type="button"
+              key={index} className="ghost-button" onClick={() => {
+                setOnlyOpenRows(false)
+                window.requestAnimationFrame(() => {
+                  const field = document.getElementById('own-price-' + conflict.store + '-' + index)
+                  field?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                  field?.querySelector('input')?.focus({ preventScroll: true })
+                })
+              }}>Controleer {conflict.labels[position]}</button>)}
+          </div>
+        </li>)}</ul>
+      </section>}
       {sourceSelection === 'both' && activeNeeds.length > 0 && (
         <section className="offline-manual-editor__pair-matrix" aria-label="PLUS en DekaMarkt per ingrediënt">
           <h4>Hetzelfde weekmandje · voortgang per winkel</h4>
@@ -1379,7 +1560,72 @@ export function LocalTwoStorePriceEditor({
               <small>Alle conceptregels zijn ingevuld, maar kijk eerst de echte
                 opnamemomenten na; anders zijn de winkelprijzen niet vergelijkbaar.</small>}
           </div>
-          {activeNeeds.map((need, index) => <div key={need.id}
+          {provisionalDifferences.length > 0 && <section
+            className="offline-manual-editor__review-priority"
+            aria-label="Nog te controleren bronproducten met het grootste voorlopige prijsverschil">
+            <h5>Welke bronproducten eerst controleren?</h5>
+            <p>Deze lijst sorteert uitsluitend rekenverschillen uit jouw eigen,
+              nog niet bevestigde PLUS/Deka-concepten. Beide hoeveelheden zijn exact
+              dezelfde Planner-behoefte, maar de producten kunnen verschillend zijn.
+              Dit is geen goedkoper-winkeladvies, mandtotaal of besparing.</p>
+            <ol>{provisionalDifferences.slice(0, 5).map(item => <li key={item.need.id}>
+              <strong>{item.need.label}</strong>
+              <span>PLUS: {item.plus.packagesNeeded} pak(ken) ·
+                {' '}{exactEuro.formatCents(item.plus.lineTotalCents)}<br />
+                DekaMarkt: {item.deka.packagesNeeded} pak(ken) ·
+                {' '}{exactEuro.formatCents(item.deka.lineTotalCents)}</span>
+              <span>{item.differenceCents === 0 ? 'Zelfde voorlopige regelprijs' :
+                exactEuro.formatCents(Math.abs(item.differenceCents)) +
+                ' voorlopig rekenverschil; productidentiteit nog controleren'}</span>
+              <div className="offline-manual-editor__review-actions">
+                {stores.map(store => <button type="button" className="ghost-button"
+                  key={store} onClick={() => {
+                    setOnlyOpenRows(false)
+                    window.requestAnimationFrame(() => {
+                      const field = document.getElementById('own-price-' + store + '-' + item.index)
+                      field?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                      field?.querySelector('input')?.focus({ preventScroll: true })
+                    })
+                  }}>Controleer {store}-code en verpakking</button>)}
+              </div>
+            </li>)}</ol>
+            {provisionalDifferences.length > 5 && <small>
+              Nog {provisionalDifferences.length - 5} andere rekenbare conceptregels
+              staan hieronder in de volledige twee-winkelmatrix.</small>}
+            <button type="button" className="ghost-button"
+              onClick={() => void downloadProvisionalReview()}>
+              Download alle eigen prijs- en winkelstatusregels (offline HTML)
+            </button>
+            <small>Scriptvrij lokaal werkblad met jouw oorspronkelijke productcodes,
+              bronmomenten, hele pakken, eenheidsprijzen en rekenverschillen.
+              Geen mandtotaal, bevestigd vergelijkbaar product of besparingsclaim.
+              Bij gewijzigde of verouderde invoer wordt downloaden geweigerd.</small>
+          </section>}
+          <div className="offline-manual-editor__pair-filters" aria-label="Zoek en filter winkelproducten">
+            <label>Zoek op ingrediënt of eigen broncode/productnaam
+              <input type="search" value={pairSearch}
+                placeholder="Bijv. rijst of productcode"
+                onChange={event => setPairSearch(event.currentTarget.value)} />
+            </label>
+            <label>Welke regels wil je bekijken?
+              <select value={pairView} onChange={event =>
+                setPairView(event.currentTarget.value as 'all' | 'attention' | 'paired')}>
+                <option value="all">Alle Planner-producten</option>
+                <option value="attention">Open of opnieuw te controleren</option>
+                <option value="paired">Twee rekenbare prijsconcepten</option>
+              </select>
+            </label>
+            <small role="status">{visiblePairRows.length} van {activeNeeds.length} fysieke
+              behoeften zichtbaar. Filters veranderen je oorspronkelijke Planner,
+              bronbestanden en het lokale controleblad niet.</small>
+          </div>
+          {visiblePairRows.length === 0 && <p role="status">
+            Geen winkelregels bij deze zoekopdracht of selectie.
+            <button type="button" className="ghost-button" onClick={() => {
+              setPairSearch(''); setPairView('all')
+            }}>Toon alle winkelregels</button>
+          </p>}
+          {visiblePairRows.map(({ need, index }) => <div key={need.id}
             className="offline-manual-editor__pair-row">
             <strong>{need.label} <small>· {need.amount ?? '?'} {need.unit}</small></strong>
             <div className="offline-manual-editor__pair-stores">
@@ -1399,6 +1645,29 @@ export function LocalTwoStorePriceEditor({
                 </button>
               })}
             </div>
+            {(!sameTimePair || !readyPairedDraftIds.has(need.id)) && (() => {
+              const available = stores.flatMap(store => {
+                const math = currentDraftPackMath(
+                  rows[key(store, need.id)] ?? emptyDraft(need.unit), need)
+                return math ? [{ store, math }] : []
+              })
+              if (!available.length) return null
+              return <div className="offline-manual-editor__pair-unpaired" role="note">
+                <strong>Alleen persoonlijke pakberekening — niet vergelijkbaar</strong>
+                {available.map(({ store, math }) => <span key={store}>
+                  {store}: {math.packagesNeeded} hele pak(ken) ·
+                  {' '}{exactEuro.formatCents(math.lineTotalCents)} ·
+                  {' '}{math.unitRate ?? 'eenheidsprijs onbekend'}
+                </span>)}
+                {available.length < 2 && <small>De prijs van de andere winkel is
+                  onbekend of niet fysiek geschikt; nooit als nul tellen.</small>}
+                {!sameTimePair && <small>De oorspronkelijke twee winkelmomenten
+                  zijn nog niet als actueel en onderling vergelijkbaar beoordeeld.
+                  Geen prijsverschil of goedkoopste winkel uit deze gegevens.</small>}
+                <small>Eigen concept, niet goedgekeurd. Controleer eerst de
+                  originele codes, verpakkingen en menselijke bronreview.</small>
+              </div>
+            })()}
             {sameTimePair && (() => {
               const plus = currentDraftPackMath(
                 rows[key('PLUS', need.id)] ?? emptyDraft(need.unit), need)
