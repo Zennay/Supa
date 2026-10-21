@@ -76,8 +76,34 @@ document.addEventListener('supa:private-planner-demand', event => {
   })) : []
   manualDemandQuery.value = ''
   showManualDemand()
+  // The existing basket module has already applied this event before this
+  // guide listener runs. Capture only the physical identity, never SKU choices.
+  manualDemandSnapshot = valid ? physicalDemandSnapshot() : null
 })
 manualDemandQuery.addEventListener('input', showManualDemand)
+
+/** Keep the reference accurate after a real demand edit, but NEVER throw
+ * away legitimate admitted store observations merely because the user
+ * searches this guide or picks another original shop SKU. */
+let manualDemandSnapshot = null
+const physicalDemandSnapshot = () => JSON.stringify([
+  document.querySelector('#meal-count')?.value ?? '',
+  Array.from(document.querySelector('#lines')?.children ?? [], row => [
+    row.dataset.id ?? '', row.querySelector('.label')?.value ?? '',
+    row.querySelector('.amount')?.value ?? '', row.querySelector('.unit')?.value ?? '',
+  ]),
+])
+function clearStaleManualDemand() {
+  if (manualDemandSnapshot === null ||
+      physicalDemandSnapshot() === manualDemandSnapshot) return
+  manualDemandSnapshot = null
+  manualDemand = []
+  showManualDemand()
+}
+document.addEventListener('supa:private-basket-invalidated', clearStaleManualDemand)
+document.querySelector('#lines').addEventListener('input', clearStaleManualDemand)
+document.querySelector('#meal-count').addEventListener('input', clearStaleManualDemand)
+document.querySelector('#meal-count').addEventListener('change', clearStaleManualDemand)
 
 const make = (tag, text) => {
   const element = tag === 'div' ? document.createElement('div') :
