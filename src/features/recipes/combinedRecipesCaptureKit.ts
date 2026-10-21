@@ -24,6 +24,7 @@ export function combinedRecipesCaptureKit(
   portionsById: Readonly<Record<string, number>>,
   stores: readonly CaptureStore[],
   cookingDays?: readonly string[],
+  delimiter: ',' | ';' | '\t' = ';',
 ): { csv: string; guide: string; storeLabel: string; rows: { csvRow: number; store: CaptureStore; id: string; label: string; amount: number; unit: string; sources: CaptureRecipeOrigin[] }[] } {
   const week = JSON.parse(exportCombinedRecipesPrivateWeek(recipes, portionsById, cookingDays)) as CanonicalWeek
   const cookingDayByRecipe = cookingDays
@@ -97,7 +98,7 @@ export function combinedRecipesCaptureKit(
   }).join('\n')
   // Both formats MUST receive the same canonical demand and store order.
   return {
-    csv: makeBlankPlannerCaptureCsv(needs, stores, ';'),
+    csv: makeBlankPlannerCaptureCsv(needs, stores, delimiter),
     guide: 'SUPA · eigen receptenbundel · ' + recipes.length + ' recepten\n' +
       'LET OP: de lege bron-CSV bevat standaard beschikbaar=false. Zet dit alleen op true ' +
       'als het originele winkelproduct werkelijk beschikbaar is én je de verpakking, prijs en ' +

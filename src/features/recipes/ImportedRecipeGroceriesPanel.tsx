@@ -59,6 +59,7 @@ export function ImportedRecipeGroceriesPanel({
   const [reuseFirst, setReuseFirst] = useState(false)
   const [startDay, setStartDay] = useState(m2InitialPlan[0].day)
   const [captureTarget, setCaptureTarget] = useState<'both' | 'PLUS' | 'DekaMarkt'>('both')
+  const [captureDelimiter, setCaptureDelimiter] = useState<',' | ';' | '\t'>(';')
   const [showCookingMode, setShowCookingMode] = useState(false)
   const [cookingModeOpened, setCookingModeOpened] = useState(false)
   const [copyableCaptureGuide, setCopyableCaptureGuide] = useState<{ identity: string; target: string; text: string } | null>(null)
@@ -191,7 +192,7 @@ export function ImportedRecipeGroceriesPanel({
   })
   const latestProgressIdentity = useRef(progressIdentity)
   latestProgressIdentity.current = progressIdentity
-  const captureKey = JSON.stringify([progressIdentity, captureTarget, privateCookingDays ?? null])
+  const captureKey = JSON.stringify([progressIdentity, captureTarget, captureDelimiter, privateCookingDays ?? null])
   const latestCaptureKey = useRef(captureKey)
   latestCaptureKey.current = captureKey
   const outstanding = list?.lines.filter(line => line.needsReview).length ?? 0
@@ -635,7 +636,7 @@ export function ImportedRecipeGroceriesPanel({
         throw new Error('De receptenbundel of winkelkeuze veranderde. Bekijk de nieuwe rijen.')
       const stores = target === 'both' ? ['PLUS', 'DekaMarkt'] as const
         : [target as 'PLUS' | 'DekaMarkt']
-      const kit = combinedRecipesCaptureKit(selected, portionsById, stores, privateCookingDays)
+      const kit = combinedRecipesCaptureKit(selected, portionsById, stores, privateCookingDays, captureDelimiter)
       if (latestCaptureKey.current !== key)
         throw new Error('De fysieke boodschappen veranderden. Bekijk het actuele winkelblad opnieuw.')
       setCapturePreview({ key, rows: kit.rows })
@@ -661,7 +662,7 @@ export function ImportedRecipeGroceriesPanel({
         throw new Error('De fysieke receptenbundel veranderde tijdens voorbereiden. Probeer opnieuw.')
       const shops = target === 'both' ? ['PLUS', 'DekaMarkt'] as const
         : [target as 'PLUS' | 'DekaMarkt']
-      const content = combinedRecipesCaptureKit(selected, portionsById, shops, privateCookingDays).guide
+      const content = combinedRecipesCaptureKit(selected, portionsById, shops, privateCookingDays, captureDelimiter).guide
       if (latestCaptureKey.current !== key)
         throw new Error('De fysieke ingrediënten veranderden; kopieer de nieuwe gids.')
       if (navigator.clipboard?.writeText) {
@@ -695,7 +696,7 @@ export function ImportedRecipeGroceriesPanel({
       if (latestCaptureKey.current !== key)
         throw new Error('De receptenbundel is gewijzigd. Maak de winkelopname opnieuw.')
       const stores = captureTarget === 'both' ? ['PLUS', 'DekaMarkt'] as const : [captureTarget]
-      const kit = combinedRecipesCaptureKit(selected, portionsById, stores, privateCookingDays)
+      const kit = combinedRecipesCaptureKit(selected, portionsById, stores, privateCookingDays, captureDelimiter)
       if (latestCaptureKey.current !== key)
         throw new Error('De fysieke ingrediënten zijn veranderd. Maak het opnameblad opnieuw.')
       // One stable filename stem pairs the blank CSV with its exact row guide.
@@ -705,11 +706,12 @@ export function ImportedRecipeGroceriesPanel({
       requireLatestOwnedRecipes()
       if (latestCaptureKey.current !== key)
         throw new Error('De winkelkeuze is gewijzigd. Maak het actuele bronblad opnieuw.')
-      savePrivateFile(stem + (kind === 'csv' ? '-lege-winkelopname.csv' : '-opnamegids.txt'),
+      const isTsv = captureDelimiter === '\t'
+      savePrivateFile(stem + (kind === 'csv' ? '-lege-winkelopname.' + (isTsv ? 'tsv' : 'csv') : '-opnamegids.txt'),
         kind === 'csv' ? kit.csv : kit.guide,
-        kind === 'csv' ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8')
+        kind === 'csv' ? (isTsv ? 'text/tab-separated-values;charset=utf-8' : 'text/csv;charset=utf-8') : 'text/plain;charset=utf-8')
       setFeedback(kind === 'csv'
-        ? 'Leeg importeerbaar winkelblad opgeslagen, zonder bronartikelen, tijd of prijzen. Download de bijbehorende rijgids.'
+        ? 'Leeg importeerbaar CSV/TSV-winkelblad opgeslagen, zonder bronartikelen, tijd of prijzen. Download de bijbehorende rijgids.'
         : 'De bijbehorende rijgids is opgeslagen. Vul alleen werkelijk toegestane en gecontroleerde bronproducten in.')
     } catch (cause) {
       setFeedback(cause instanceof Error ? cause.message : 'Het lege winkelopnameblad is niet beschikbaar.')
@@ -730,7 +732,7 @@ export function ImportedRecipeGroceriesPanel({
       if (latestCaptureKey.current !== key)
         throw new Error('De gekozen recepten of winkels zijn veranderd. Maak het formulier opnieuw.')
       const stores = captureTarget === 'both' ? ['PLUS', 'DekaMarkt'] as const : [captureTarget]
-      const kit = combinedRecipesCaptureKit(selected, portionsById, stores, privateCookingDays)
+      const kit = combinedRecipesCaptureKit(selected, portionsById, stores, privateCookingDays, captureDelimiter)
       // This canonical capture kit already fixes source demand, CSV row order,
       // store grouping and the physical limits. Use its first store's rows as
       // needs: the existing print engine reproduces those exact row numbers.
@@ -1117,6 +1119,14 @@ export function ImportedRecipeGroceriesPanel({
             <option value="DekaMarkt">Alleen DekaMarkt</option>
           </select>
         </label>
+        <label>Spreadsheetformaat voor jouw eigen bronopname
+          <select value={captureDelimiter}
+            onChange={event => setCaptureDelimiter(event.currentTarget.value as typeof captureDelimiter)}>
+            <option value=";">Nederlandse Excel CSV (puntkomma)</option>
+            <option value=",">CSV (komma)</option>
+            <option value={'\t'}>TSV (tab)</option>
+          </select>
+        </label>
         <div className="recipe-backup-panel__actions">
           <button type="button" disabled={!privateTransfer.ready}
             onClick={openInPrivateMatcher}>
@@ -1128,7 +1138,7 @@ export function ImportedRecipeGroceriesPanel({
           </button>
           <button type="button" disabled={!privateTransfer.ready}
             onClick={() => void downloadCaptureKit('csv')}>
-            Download leeg winkelinvulblad (CSV)
+            Download leeg winkelinvulblad (CSV/TSV)
           </button>
           <button type="button" disabled={!privateTransfer.ready}
             onClick={() => void downloadPrintableCaptureKit()}>
@@ -1145,7 +1155,7 @@ export function ImportedRecipeGroceriesPanel({
         </div>
         {capturePreview?.key === captureKey && <details open
           className="recipe-collection-groceries__capture-preview">
-          <summary>Dezelfde {capturePreview.rows.length} fysieke rijen als in het lege CSV-bronblad</summary>
+          <summary>Dezelfde {capturePreview.rows.length} fysieke rijen als in het lege CSV/TSV-bronblad</summary>
           <p>Alleen jouw exacte gekozen ingrediënten en hoeveelheden worden weergegeven.
             Een benodigde hoeveelheid is <strong>geen</strong> gemeten winkelverpakking.
             De originele SKU, bronmomenten, echte pakprijzen en productmatches
