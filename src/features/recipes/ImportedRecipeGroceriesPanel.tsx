@@ -1100,13 +1100,15 @@ export function ImportedRecipeGroceriesPanel({
       <section className="recipe-collection-groceries__capture" aria-label="Eigen fysieke receptenboodschappen in PLUS en DekaMarkt opnemen">
         <h4>Zelf echte winkelprijzen opnemen voor dit receptenmandje</h4>
         <p>Gebruik exact dezelfde gecontroleerde ingrediënten als in je privéwinkelmandje.
-          Download een leeg negenkoloms winkelblad én de bijbehorende rijgids. Vul uitsluitend
-          je werkelijk en rechtmatig verkregen PLUS/DekaMarkt-SKU’s, verpakkingen,
-          opnametijden en pakprijzen in. Importeer de ingevulde bron-CSV via de
-          bestaande privéwinkelvergelijker en bevestig iedere productmatch zelf.
-          De lege CSV staat veilig standaard op beschikbaar=false: wijzig dit uitsluitend
-          in true voor een daadwerkelijk beschikbaar en volledig opgenomen winkelproduct.
-          Zonder twee volledige actuele opnames blijft een prijsverschil onbekend.</p>
+          Open je mandje rechtstreeks in de bestaande privévergelijker, bevestig daar eerst
+          je oorspronkelijke fysieke behoefte en vul daarna zelf je echt waargenomen winkelproducten
+          in. Je kunt er de oorspronkelijke ingrediënten en hoeveelheden naast de handmatige
+          prijsinvoer blijven doorzoeken. Een tweede route is het lege negenkoloms CSV-blad met
+          bijbehorende opnamegids downloaden, zelf invullen en in de privévergelijker importeren.
+          Koppel vervolgens uitsluitend de werkelijk en rechtmatig gecontroleerde
+          PLUS/DekaMarkt-SKU’s, verpakkingen, opnametijden en pakprijzen. De lege CSV staat
+          standaard op beschikbaar=false; bevestig true alleen bij een echt beschikbaar artikel.
+          Zonder twee volledig vergelijkbare actuele winkelmandjes blijft een prijsverschil onbekend.</p>
         <label>Winkel(s) voor de lege opname
           <select value={captureTarget}
             onChange={event => setCaptureTarget(event.currentTarget.value as typeof captureTarget)}>
