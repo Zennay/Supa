@@ -12,6 +12,7 @@ import { printMixedStoreRouteHtml } from './mixedStorePrintHtml.ts'
 import { validCustomWeekBudgetEuros } from '../planner/customWeekBudget.ts'
 import { parsePrivateExtraVisitCostCents, type PrivateExtraVisitCostIntent } from './privateExtraVisitCost.ts'
 import type { PrivateRouteChoice } from './privateReviewedBasketBridge.ts'
+import type { UnpricedShoppingNote } from '../shopping-list/ManualShoppingNotes.tsx'
 const stores: MixedStore[] = ['PLUS', 'DekaMarkt']
 
 /** Renders only a reviewed, timely, same-demand comparison. Never loads
@@ -20,7 +21,7 @@ const stores: MixedStore[] = ['PLUS', 'DekaMarkt']
  */
 export function MixedStoreShoppingCard({
   mixed, single, plus, deka, captured, eligibleNow, weekBudget,
-  plannerPlan, plannerRecipes, plannerActiveDays, privatePlanKey, isSingleCheckedOnRoute, routeChoice, routeCostIntent,
+  plannerPlan, plannerRecipes, plannerActiveDays, privatePlanKey, isSingleCheckedOnRoute, routeChoice, routeCostIntent, manualNotes = [], onToggleManualNote,
 }: {
   mixed: MixedStoreShoppingPlan
   single: MixedStoreShoppingPlan
@@ -36,6 +37,8 @@ export function MixedStoreShoppingCard({
   isSingleCheckedOnRoute?: (line: MixedStoreLine) => boolean
   routeChoice?: PrivateRouteChoice | null
   routeCostIntent?: PrivateExtraVisitCostIntent | null
+  manualNotes?: readonly UnpricedShoppingNote[]
+  onToggleManualNote?: (note: UnpricedShoppingNote) => void
 }) {
   const [checked, setChecked] = useState<Record<string, boolean>>({})
   const [onlyOpen, setOnlyOpen] = useState(false)
@@ -147,7 +150,21 @@ export function MixedStoreShoppingCard({
   }>
   const remainingProductCents = stores.reduce(
     (sum, store) => sum + perStoreProgress[store].remainingCents, 0n)
-  const printable = formatMixedStoreShoppingPlan(plan, captured, progress, appliedCostCents, onlyOpen)
+  const validManualNotes = manualNotes.filter(note => note &&
+    ['Algemeen', 'PLUS', 'DekaMarkt'].includes(note.store) &&
+    typeof note.label === 'string' && note.label.length > 0 &&
+    note.label.length <= 140 && typeof note.done === 'boolean')
+  const visibleManualNotes = onlyOpen ? validManualNotes.filter(note => !note.done) : validManualNotes
+  const personalText = [
+    'PERSOONLIJKE BOODSCHAPPEN — GEEN SKU, BRONMOMENT OF PRIJS',
+    ...visibleManualNotes.map(note => (note.done ? '☑ ' : '☐ ') +
+      '[' + note.store + '] ' +
+      note.label.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim() +
+      ' · prijs onbekend'),
+    'Deze eigen regels tellen niet mee voor productkosten, winkelwinnaar of besparing.',
+  ].join('\n')
+  const printable = formatMixedStoreShoppingPlan(plan, captured, progress, appliedCostCents, onlyOpen) +
+    (visibleManualNotes.length ? '\n\n' + personalText : '')
   const block = costInvalid && !chooseSingle
 
   function importSingleStoreChecks() {
@@ -434,9 +451,9 @@ export function MixedStoreShoppingCard({
         ? 'PLUS én DekaMarkt'
         : plan.lines[0]?.store ?? 'Geen winkel'} ·
         {' '}{exactEuro.formatCents(plan.totalCents)} aan winkelproducten.</p>
-      {weekBudgetCents !== null && extraCount > 0 && <p role="status"
+      {weekBudgetCents !== null && (extraCount > 0 || validManualNotes.length > 0) && <p role="status"
         className="mixed-store-route__budget">
-        Je hebt ook {extraCount} eigen extra boodschappen zonder bronprijs. De werkelijke totale
+        Je hebt ook {extraCount} extra boodschappen en {validManualNotes.length} eigen lijstregels zonder bronprijs. De werkelijke totale
         weekuitgaven en resterende budgetruimte zijn daarom <strong>onbekend</strong>.
         Vergelijk het weekbudget hieronder uitsluitend met de bekende geprijsde Planner-producten.
       </p>}
@@ -623,6 +640,25 @@ export function MixedStoreShoppingCard({
         </section>
       })}
     </div>
+    {validManualNotes.length > 0 && <section className="mixed-store-route__manual"
+      aria-label="Eigen ongeprijsde boodschappen in mijn winkelroute">
+      <h4>Eigen boodschappen · nog zonder prijs</h4>
+      <p>Alleen jouw persoonlijke lijst: {validManualNotes.filter(note => !note.done).length}
+        {' '}van {validManualNotes.length} open. Vinkjes worden ook zichtbaar in je gewone Lijst;
+        ze beïnvloeden geen SKU-keuze, eurobedrag of winkelwinnaar.</p>
+      {(['PLUS', 'DekaMarkt', 'Algemeen'] as const).map(name => {
+        const rows = visibleManualNotes.filter(note => note.store === name)
+        return rows.length ? <div key={name}>
+          <strong>{name === 'Algemeen' ? 'Algemeen · wijs zelf een winkel toe' : name}</strong>
+          <ul>{rows.map(note => <li key={note.id}><label>
+            <input type="checkbox" checked={note.done} disabled={!onToggleManualNote}
+              onChange={() => onToggleManualNote?.(note)} />
+            {note.label} <small>· prijs onbekend · geen bron-SKU</small>
+          </label></li>)}</ul>
+        </div> : null
+      })}
+      {visibleManualNotes.length === 0 && <p>Alle persoonlijke lijstregels zijn afgevinkt.</p>}
+    </section>}
     {privatePlanKey && <PrivateRouteExtraGroceries
       identity={privatePlanKey} onlyOpen={onlyOpen} onCount={setExtraCount} />}
     {combinedCopy?.fingerprint === copyFingerprint && <label>

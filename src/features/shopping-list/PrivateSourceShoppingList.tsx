@@ -521,6 +521,7 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
               plannerPlan={plan} plannerRecipes={recipes} plannerActiveDays={activeDays}
               privatePlanKey={reviewed.planKey}
               isSingleCheckedOnRoute={isSingleCheckedOnRoute}
+              manualNotes={manualNotes} onToggleManualNote={onToggleManualNote}
               routeChoice={routeChoice?.planKey === reviewed.planKey ? routeChoice : null}
               routeCostIntent={routeCostIntent?.planKey === reviewed.planKey &&
                 routeCostIntent.observedAt.PLUS === plus.observedAt &&
