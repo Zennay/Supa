@@ -453,3 +453,34 @@ border-radius:10px;padding:.65rem;scroll-margin-top:1.25rem}
 .offline-price-workbench__store-progress-actions { display:flex; gap:.55rem; flex-wrap:wrap; }
 .offline-price-workbench__store-progress-actions button { min-height:44px; flex:1; }
 @media(max-width:650px) { .offline-price-workbench__store-progress { grid-template-columns:minmax(0,1fr); } }
+
+/* Optional local spreadsheet paste; preserve readable fields on small phones. */
+.offline-price-workbench__capture-paste {
+  margin-block: 1rem;
+  padding: .75rem;
+  border: 1px solid var(--color-border, #cad3ce);
+  border-radius: .75rem;
+}
+.offline-price-workbench__capture-paste label {
+  display: block;
+  margin-block: .75rem;
+}
+.offline-price-workbench__capture-paste textarea {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-height: 6.5rem;
+  margin-top: .35rem;
+  box-sizing: border-box;
+  font: inherit;
+  overflow-wrap: anywhere;
+}
+.offline-price-workbench__capture-paste-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+}
+.offline-price-workbench__capture-paste-actions button {
+  max-width: 100%;
+  white-space: normal;
+}

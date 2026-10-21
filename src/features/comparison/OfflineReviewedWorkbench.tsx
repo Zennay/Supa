@@ -35,6 +35,7 @@ import { importPrivateBasketSession } from './importPrivateBasketSession.ts'
 import { currentTripKey, loadTripProgress, saveTripProgress } from '../../privateShoppingProgress.ts'
 import { createPrivateBasketComparisonCsv } from '../../privateBasketComparisonCsv.ts'
 import { UnpricedPlannerChecklist } from './UnpricedPlannerChecklist.tsx'
+import { PrivateCapturePastePreview } from './PrivateCapturePastePreview.tsx'
 import { recentOwnCaptureInstant, type PrivateReviewedBaskets, type PrivateCaptureProgress, type PrivateReviewFocus } from './privateReviewedBasketBridge.ts'
 import './offlineReviewedWorkbench.css'
 const dateTime = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
@@ -2545,6 +2546,16 @@ export function OfflineReviewedWorkbench({
             <small>Controleert lokaal de oorspronkelijke bronvelden en timestamps.
               Een gedeeltelijk ingevulde regel wordt nooit stilzwijgend weggegooid.</small>
           </label>
+          <PrivateCapturePastePreview disabled={busy || plannerCaptureNeeds.length === 0}
+            onPreview={sources => {
+              // File identity is used only to reuse the already-reviewed CSV
+              // preview route; source identity and facts come from its parser.
+              const files = sources.map((raw, index) => new File(
+                [raw], 'supa-eigen-bron-' + (index + 1) + '.csv',
+                { type: 'text/csv;charset=utf-8' },
+              ))
+              void previewFilledCsv(files)
+            }} />
           {currentPreview && (
             <div className="offline-price-workbench__capture-preview" role="region" aria-label="Controle van ingevuld bronblad">
               <strong>Bronblad leesbaar, nog geen productmatch goedgekeurd</strong>
