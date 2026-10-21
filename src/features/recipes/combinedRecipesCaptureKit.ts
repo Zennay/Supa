@@ -1,6 +1,6 @@
 import { aggregatePlanIngredients } from '../../domain/basket.ts'
 import { makeBlankPlannerCaptureCsv, type CaptureStore } from '../comparison/plannerPriceCaptureSheet.ts'
-import { makePlannerCaptureGuide } from '../comparison/plannerPriceCaptureGuide.ts'
+import { makePlannerCaptureGuide, readablePlannerDemandAmount } from '../comparison/plannerPriceCaptureGuide.ts'
 import { exportCombinedRecipesPrivateWeek } from './exportCombinedRecipesPrivateWeek.ts'
 import { combinedImportedRecipeGroceries, type GroceryContribution } from './combinedImportedRecipeGroceries.ts'
 import type { SavedRecipe } from './recipeLibrary.ts'
@@ -56,9 +56,12 @@ export function combinedRecipesCaptureKit(
     const lines = sources.slice(0, 4).map(source =>
       '  - ' + short(source.recipeTitle, 60) + ': ' +
       (source.amount === null ? 'hoeveelheid controleren'
-        : source.amount + ' ' + (source.unit === 'piece' ? 'stuks' : source.unit)) +
+        : readablePlannerDemandAmount(source.amount) + ' ' +
+          (source.unit === 'piece' ? 'stuks' : source.unit)) +
       ' · oorspronkelijk: ' + short(source.original, 90))
     return 'CSV-rij(en) ' + csvRows + ' · ' + short(need.label, 90) +
+      ' · totaal nodig: ' + readablePlannerDemandAmount(need.amount) + ' ' +
+      (need.unit === 'piece' ? 'stuks' : short(need.unit, 20)) +
       ' · ' + sources.length + ' oorspronkelijke ingrediëntregels\n' +
       (lines.length ? lines.join('\n') : '  - Herkomst niet gekoppeld; controleer in Recepten.') +
       (sources.length > 4

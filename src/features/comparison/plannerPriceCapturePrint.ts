@@ -16,12 +16,12 @@ export function makePrintablePlannerCaptureHtml(
   selectedStores: readonly CaptureStore[],
   // Optional private recipe provenance, aligned with the same canonical needs
   // order as the CSV. Never derived from retailer product names or prices.
-  originalRecipeNames?: readonly (readonly string[])[],
+  originalRecipeLines?: readonly (readonly string[])[],
 ): string {
   makeBlankPlannerCaptureCsv(needs, selectedStores)
-  if (originalRecipeNames && (
-    originalRecipeNames.length !== needs.length ||
-    originalRecipeNames.some(names => !Array.isArray(names) || names.some(name => typeof name !== 'string'))
+  if (originalRecipeLines && (
+    originalRecipeLines.length !== needs.length ||
+    originalRecipeLines.some(names => !Array.isArray(names) || names.some(name => typeof name !== 'string'))
   )) throw new Error('De recept-herkomst komt niet overeen met de fysieke CSV-rijen.')
   const sections = selectedStores.map((store, storeIndex) => {
     const rows = needs.map((need, index) => {
@@ -29,10 +29,10 @@ export function makePrintablePlannerCaptureHtml(
       const amount = readablePlannerDemandAmount(need.amount)
       const physical = amount === 'hoeveelheid nog controleren'
         ? 'Hoeveelheid nog controleren' : amount + ' ' + need.unit
-      const recipeNames = originalRecipeNames?.[index] ?? []
-      const uniqueRecipes = [...new Set(recipeNames.map(name => name.trim()).filter(Boolean))]
+      const recipeLines = originalRecipeLines?.[index] ?? []
+      const uniqueRecipes = [...new Set(recipeLines.map(line => line.trim()).filter(Boolean))]
       const origins = uniqueRecipes.length
-        ? '<small class="origin">Uit eigen recept(en): ' +
+        ? '<small class="origin">Uit oorspronkelijke receptregels: ' +
           uniqueRecipes.slice(0, 4).map(htmlText).join(', ') +
           (uniqueRecipes.length > 4 ? ' (+' + (uniqueRecipes.length - 4) + ' meer)' : '') +
           '</small>'

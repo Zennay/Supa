@@ -676,9 +676,11 @@ export function ImportedRecipeGroceriesPanel({
       // The printable capture form and the CSV use the same row IDs, physical
       // amounts and recipe provenance. Only the first store is needed for the
       // per-ingredient legend; the printer repeats it for the second store.
-      const recipeNames = kit.rows.filter(row => row.store === stores[0]).map(row =>
-        row.sources.map(source => source.recipeTitle))
-      const html = makePrintablePlannerCaptureHtml(needs, stores, recipeNames)
+      const recipeLines = kit.rows.filter(row => row.store === stores[0]).map(row =>
+        row.sources.map(source => source.recipeTitle + ' · ' +
+          readablePlannerDemandAmount(source.amount) + ' ' +
+          (source.unit === 'piece' ? 'stuks' : source.unit ?? 'eenheid controleren')))
+      const html = makePrintablePlannerCaptureHtml(needs, stores, recipeLines)
       requireLatestOwnedRecipes()
       if (latestCaptureKey.current !== key)
         throw new Error('De fysieke weekvraag of winkelkeuze is veranderd.')
