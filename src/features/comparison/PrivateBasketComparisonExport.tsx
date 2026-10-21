@@ -39,7 +39,10 @@ function cell(value: string | number): string {
 
 function lineFields(line: BasketTraceLine): (string | number)[] {
   if (line.status !== 'matched') return [
-    'niet gekoppeld', '', '', '', '', '', '', '', '',
+    // All ten store fields, including the last line-total cents cell, must
+    // remain present. Otherwise a partial two-store export shifts the next
+    // shop's columns and can present source values under the wrong headers.
+    'niet gekoppeld', '', '', '', '', '', '', '', '', '',
   ]
   return [
     line.reasons.includes('explicit local user selection; not an automatic or verified retailer match')
