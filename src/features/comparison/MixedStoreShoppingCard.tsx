@@ -434,6 +434,12 @@ export function MixedStoreShoppingCard({
       <div><strong>DekaMarkt volledig</strong><p>{exactEuro.formatCents(mixed.dekaWholeCents)}</p></div>
       <div><strong>Mijn gekozen route</strong><p>{exactEuro.formatCents(plan.totalCents)}</p></div>
     </div>
+    {validManualNotes.length > 0 && <p role="status" className="mixed-store-route__budget">
+      Daarnaast staan {validManualNotes.length} eigen ongeprijsde boodschappen op deze route,
+      waarvan {validManualNotes.filter(note => !note.done).length} open.
+      <strong> De daadwerkelijke uitgaven zijn onbekend.</strong> Bovenstaande eurobedragen
+      zijn alleen de gecontroleerde Planner-producten, nooit deze extra regels.
+    </p>}
     <p role="status">Een route met de goedkoopste artikelen kan vóór extra bezoekkosten
       maximaal <strong>{exactEuro.formatCents(mixed.additionalDifferenceCents)}</strong>
       {' '}lager uitkomen dan het goedkoopste complete mandje bij één winkel.
@@ -652,6 +658,16 @@ export function MixedStoreShoppingCard({
         const rows = visibleManualNotes.filter(note => note.store === name)
         return rows.length ? <div key={name}>
           <strong>{name === 'Algemeen' ? 'Algemeen · wijs zelf een winkel toe' : name}</strong>
+          {onToggleManualNote && <button type="button" className="ghost-button" onClick={() => {
+            const allDone = rows.every(note => note.done)
+            if (!allDone && !window.confirm('Deze ' + rows.length + ' eigen ongeprijsde ' +
+              name + '-artikelen afvinken? Dit bevestigt geen prijs of betaling.')) return
+            rows.filter(note => note.done === allDone).forEach(note => onToggleManualNote(note))
+            setMessage(allDone ? name + ': eigen vinkjes heropend.' :
+              name + ': eigen ongeprijsde boodschappen afgevinkt.')
+          }}>{rows.every(note => note.done)
+            ? 'Heropen eigen ' + name + '-artikelen'
+            : 'Vink zichtbare eigen ' + name + '-artikelen af'}</button>}
           <ul>{rows.map(note => <li key={note.id}><label>
             <input type="checkbox" checked={note.done} disabled={!onToggleManualNote}
               onChange={() => onToggleManualNote?.(note)} />
