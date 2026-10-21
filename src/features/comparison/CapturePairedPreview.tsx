@@ -5,6 +5,7 @@ import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
 import type { PreviewMatchLine } from './CaptureMatchingPreview.tsx'
 import { completePreviewProposal, privateTwoStoreMissingChecklist, privateTwoStorePreviewChecklist } from './privateTwoStorePreviewChecklist.ts'
 import { privateTwoStorePreviewPrintHtml } from './privateTwoStorePreviewPrintHtml.ts'
+import { samePrivatePhysicalDemand } from './samePrivatePhysicalDemand.ts'
 
 function labelQuantity(line: PreviewMatchLine): string {
   return readablePlannerDemandAmount(line.amount) + ' ' + line.unit
@@ -63,8 +64,8 @@ export function CapturePairedPreview({
       right: PreviewMatchLine | null; sameDemand: boolean; open: boolean
     }> = plus.map(left => {
       const right = byDeka.get(left.id) ?? null
-      const sameDemand = !!right && left.amount === right.amount &&
-        left.unit === right.unit && left.label === right.label
+      const sameDemand = !!right && left.label === right.label &&
+        samePrivatePhysicalDemand(left, right)
       return { id: left.id, label: left.label, left, right, sameDemand,
         open: !sameDemand || !completePreviewProposal(left) ||
           !completePreviewProposal(right) }
@@ -220,8 +221,11 @@ export function CapturePairedPreview({
         <tbody>{visible.slice(0, limit).map(row =>
           <tr key={row.id}>
             <th scope="row">{row.label}<small style={{ display: 'block' }}>
-              {row.sameDemand && row.left ? labelQuantity(row.left) :
-                'Vraag ongelijk of ontbrekend — controleren'}
+              {row.sameDemand && row.left
+                ? labelQuantity(row.left) + (row.right &&
+                    (row.left.unit !== row.right.unit || row.left.amount !== row.right.amount)
+                    ? ' = ' + labelQuantity(row.right) + ' · fysiek gelijk' : '')
+                : 'Vraag ongelijk of ontbrekend — controleren'}
             </small></th>
             {row.sameDemand
               ? <><td>{localOffer(row.left, describeReason)}</td><td>{localOffer(row.right, describeReason)}</td></>

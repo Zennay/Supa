@@ -1,6 +1,7 @@
 import { euro } from '../../lib/money.ts'
 import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
 import type { PreviewMatchLine } from './CaptureMatchingPreview.tsx'
+import { samePrivatePhysicalDemand } from './samePrivatePhysicalDemand.ts'
 
 const clean = (value: unknown) => String(value ?? '')
   .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ')
@@ -69,9 +70,8 @@ export function privateTwoStorePreviewChecklist({
     '',
   ]
   const append = (left: PreviewMatchLine | null, right: PreviewMatchLine | null, index: number) => {
-    const demandEqual = !!left && !!right &&
-      left.amount === right.amount && left.unit === right.unit &&
-      left.label === right.label
+    const demandEqual = !!left && !!right && left.label === right.label &&
+      samePrivatePhysicalDemand(left, right)
     output.push(String(index + 1) + '. ' + clean(left?.label ?? right?.label))
     if (!demandEqual) {
       output.push('  Planner-vraag ongelijk of niet aanwezig in beide bronnen: controleren.')
@@ -82,8 +82,10 @@ export function privateTwoStorePreviewChecklist({
       output.push('  PLUS: geen bruikbare prijs | DekaMarkt: geen bruikbare prijs', '')
       return
     }
-    output.push('  Zelfde fysieke vraag: ' + readablePlannerDemandAmount(left!.amount) +
-      ' ' + clean(left!.unit))
+    output.push('  Zelfde fysieke vraag: PLUS ' +
+      readablePlannerDemandAmount(left!.amount) + ' ' + clean(left!.unit) +
+      ' = DekaMarkt ' + readablePlannerDemandAmount(right!.amount) +
+      ' ' + clean(right!.unit))
     output.push('  PLUS: ' + offer(left, describeReason))
     output.push('  DekaMarkt: ' + offer(right, describeReason), '')
   }
@@ -117,8 +119,8 @@ export function privateTwoStoreMissingChecklist(
   const incomplete = new Set([...plusById.keys(), ...dekaById.keys()].filter(id => {
     const left = plusById.get(id) ?? null
     const right = dekaById.get(id) ?? null
-    return !left || !right || left.amount !== right.amount ||
-      left.unit !== right.unit || left.label !== right.label ||
+    return !left || !right || left.label !== right.label ||
+      !samePrivatePhysicalDemand(left, right) ||
       !completePreviewProposal(left) || !completePreviewProposal(right)
   }))
   if (incomplete.size === 0) {
