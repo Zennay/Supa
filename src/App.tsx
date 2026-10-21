@@ -821,7 +821,46 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         </Suspense>}
         {(tab === 'home' || tab === 'recipes') && <HiFiHome view={tab}
           onNavigate={navigate} activeDays={activeDays}
-          addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />}
+          addedProducts={designProductIds} onToggleProduct={toggleDesignProduct}
+          onAddRecipeGroceries={labels => {
+            // Only transient private, unpriced notes. The parent never transfers
+            // original recipe source warnings into price evidence or SKUs.
+            if (!Array.isArray(labels) || labels.length < 1 || labels.length > 100 ||
+                labels.some(label => typeof label !== 'string' || !label.trim() ||
+                  label.length > 140 || label !== label.trim() ||
+                  /[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/u.test(label))) {
+              return 'De gekozen receptboodschappen zijn gewijzigd of ongeldig; open de actuele receptenlijst.'
+            }
+            const identity = (label: string) => label.normalize('NFC').toLocaleLowerCase('nl-NL')
+            const known = new Set(manualShoppingNotes.filter(note => note.store === 'Algemeen')
+              .map(note => identity(note.label)))
+            const additions = labels.filter(label => {
+              const key = identity(label)
+              if (known.has(key)) return false
+              known.add(key)
+              return true
+            })
+            if (manualShoppingNotes.length + additions.length > 100) {
+              return 'Je persoonlijke Lijst kan maximaal 100 eigen artikelen bevatten. Ruim eerst eerdere boodschappen op.'
+            }
+            setManualShoppingNotes(current => {
+              const latest = new Set(current.filter(note => note.store === 'Algemeen')
+                .map(note => identity(note.label)))
+              const next = additions.filter(label => {
+                const key = identity(label)
+                if (latest.has(key)) return false
+                latest.add(key)
+                return true
+              })
+              if (current.length + next.length > 100) return current
+              return [...current, ...next.map(label => ({
+                id: 'own-recipe-note-' + crypto.randomUUID(),
+                label, store: 'Algemeen' as const, done: false,
+              }))]
+            })
+            navigate('list')
+            return null
+          }} />}
         {tab === 'products' && (hasOwnProductCapture
           ? <details className="supa-product-archive">
               <summary>Oude Figma-voorbeelden bekijken · prijzen zijn demo</summary>

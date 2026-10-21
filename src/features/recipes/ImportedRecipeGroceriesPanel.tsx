@@ -5,7 +5,7 @@ import { scaleOwnRecipe } from './scaleOwnRecipe.ts'
 import type { UserRecipeDraft } from '../../domain/userRecipeImport.ts'
 import { m2InitialPlan } from '../../data/m2Fixture.ts'
 import { combinedImportedRecipeGroceries, type GroceryContribution } from './combinedImportedRecipeGroceries.ts'
-import { formatOwnRecipeChecklist } from './recipeShoppingChecklist.ts'
+import { formatOwnRecipeChecklist, personalRecipeShoppingNoteLabels } from './recipeShoppingChecklist.ts'
 import { exportOwnRecipeChecklistCsv } from './recipeShoppingCsv.ts'
 import { exportCombinedRecipesPrivateWeek } from './exportCombinedRecipesPrivateWeek.ts'
 import { exportUnpricedProgress, importUnpricedProgress, unpricedProgressMaxBytes, unpricedProgressStorageKey } from '../comparison/unpricedPlannerProgress.ts'
@@ -39,11 +39,12 @@ function savePrivateFile(filename: string, content: string, mime: string) {
  * No automatic store matching, no phantom unit rates, no financial claim.
  */
 export function ImportedRecipeGroceriesPanel({
-  recipes, recentIds, onEdit, onSavePortionVariants,
+  recipes, recentIds, onEdit, onSavePortionVariants, onAddToOwnList,
 }: {
   recipes: readonly SavedRecipe[]
   recentIds: readonly string[]
   onEdit: (recipe: SavedRecipe) => void
+  onAddToOwnList?: (labels: readonly string[]) => string | null
   onSavePortionVariants: (changes: readonly {
     recipeId: string; sourceSnapshot: string; portions: number; draftSnapshot: string
   }[]) => SavedRecipe[]
@@ -482,6 +483,27 @@ export function ImportedRecipeGroceriesPanel({
       setFeedback(cause instanceof Error ? cause.message : 'Vinkjes opslaan is niet gelukt.')
     }
   }
+  function addRemainingToOwnList() {
+    if (!onAddToOwnList || !list?.canCopy) return
+    try {
+      // Confirm that none of the selected originals were replaced in another tab.
+      // No new shopping item may inherit the previous recipe's stale quantity.
+      requireLatestOwnedRecipes()
+      const pending = list.lines.filter(line => line.needsReview || checked[line.key] !== true)
+      const labels = personalRecipeShoppingNoteLabels(pending)
+      if (!window.confirm('Voeg ' + labels.length +
+        ' nog openstaande receptboodschappen toe aan je gewone ongeprijsde Lijst? ' +
+        'Bestaande lijstregels en vinkjes blijven bewaard. Controlepunten krijgen geen verzonnen hoeveelheid ' +
+        'en er worden geen winkelprijzen of artikelcodes gekoppeld.')) return
+      requireLatestOwnedRecipes()
+      const error = onAddToOwnList(labels)
+      if (error) setFeedback(error)
+    } catch (cause) {
+      setFeedback(cause instanceof Error ? cause.message :
+        'De ongeprijsde receptenboodschappen konden niet worden overgenomen.')
+    }
+  }
+
   async function copyGroceries() {
     setFeedback('')
     setManualCopy(null)
@@ -1060,6 +1082,10 @@ export function ImportedRecipeGroceriesPanel({
           Deze code is geen retailerrecht, prijswaarneming of onderzoeksbewijs.</small>
       </section>
       <div className="recipe-backup-panel__actions">
+        {onAddToOwnList && <button type="button" disabled={!list.canCopy}
+          onClick={addRemainingToOwnList}>
+          Zet mijn openstaande receptboodschappen rechtstreeks op Lijst
+        </button>}
         <button type="button" onClick={() => void copyGroceries()}>
           {pendingOnly ? 'Kopieer alleen openstaande boodschappen (mobiel)' : 'Kopieer volledige lijst (mobiel)'}
         </button>

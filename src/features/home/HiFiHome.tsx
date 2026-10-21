@@ -42,6 +42,7 @@ type Props = {
   onNavigate: (view: HiFiTab | 'planner' | 'list' | 'basket') => void
   addedProducts: string[]
   onToggleProduct: (id: string) => void
+  onAddRecipeGroceries?: (labels: readonly string[]) => string | null
   activeDays?: readonly string[]
 }
 
@@ -50,7 +51,8 @@ export function HiFiHome(props: Props) {
     <section className="hifi-home" role="status" aria-live="polite">
       <p>Je recepten worden geopend…</p>
     </section>
-  }><RecipeLibrary onBack={() => props.onNavigate('home')} /></Suspense>
+  }><RecipeLibrary onBack={() => props.onNavigate('home')}
+    onAddRecipeGroceries={props.onAddRecipeGroceries} /></Suspense>
   return <HiFiDiscovery {...props} />
 }
 

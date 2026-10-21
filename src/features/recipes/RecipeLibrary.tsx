@@ -76,7 +76,10 @@ function initialFavorites(): RecipeFavorites {
   catch { return { ids: [], raw: null, error: 'Favorieten kunnen niet worden geopend in deze browser.' } }
 }
 
-export function RecipeLibrary({ onBack }: { onBack: () => void }) {
+export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
+  onBack: () => void
+  onAddRecipeGroceries?: (labels: readonly string[]) => string | null
+}) {
   const [library, setLibrary] = useState(initialLibrary)
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<'all' | 'own' | 'favorites'>('all')
@@ -1112,6 +1115,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       <summary>Maak één boodschappenlijst van mijn eigen recepten</summary>
       <ImportedRecipeGroceriesPanel recipes={library.recipes}
         recentIds={lastImportedIds} onEdit={recipe => openSavedRecipeEditor(recipe)}
+        onAddToOwnList={onAddRecipeGroceries}
         onSavePortionVariants={saveBatchPortionVariants} />
     </details>}
     <section className="recipe-backup-panel" aria-label="Eigen recepten meenemen naar een ander apparaat">

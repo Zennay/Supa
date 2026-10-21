@@ -111,3 +111,35 @@ export function ownRecipeShoppingChecklist(recipe: SavedRecipe, portions: number
   const partial: OwnRecipeChecklist = { title: recipe.title, portions, lines, canCopy: lines.length > 0, copyText: '' }
   return { ...partial, copyText: formatOwnRecipeChecklist(partial, {}) }
 }
+
+
+/** Transfer already-combined personal demand into the existing unpriced List.
+ * Unreviewed source quantities remain explicit questions, never guessed grams,
+ * article codes, stock or a price. This is NOT a retailer import format. */
+export function personalRecipeShoppingNoteLabels(
+  lines: readonly OwnRecipeChecklistLine[],
+): string[] {
+  if (!Array.isArray(lines) || lines.length < 1 || lines.length > 100)
+    throw new Error('Kies 1–100 nog openstaande eigen boodschappen.')
+  const clean = (value: string) => value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ')
+    .replace(/\s+/gu, ' ').trim()
+  return lines.map(line => {
+    if (typeof line.original !== 'string' || typeof line.label !== 'string')
+      throw new Error('Een oorspronkelijk receptingrediënt ontbreekt.')
+    const raw = line.needsReview
+      ? 'Controleer hoeveelheid: ' + clean(line.original)
+      : (() => {
+          if (typeof line.amount !== 'number' || !Number.isFinite(line.amount) ||
+              line.amount <= 0 || line.amount > 1_000_000 ||
+              !['g', 'ml', 'piece'].includes(line.unit ?? '') ||
+              (line.unit === 'piece' && !Number.isSafeInteger(line.amount)))
+            throw new Error('De fysieke hoeveelheid is veranderd; controleer het recept opnieuw.')
+          return compactAmount(line.amount) +
+            (line.unit === 'piece' ? ' stuks ' : ' ' + line.unit + ' ') + clean(line.label)
+        })()
+    const label = clean(raw)
+    if (!label || label.length > 140 || !/[\p{L}\p{N}]/u.test(label))
+      throw new Error('Een receptomschrijving is te lang of ongeldig voor je eigen Lijst (maximaal 140 tekens).')
+    return label
+  })
+}
