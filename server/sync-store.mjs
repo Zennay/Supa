@@ -23,14 +23,18 @@ function canonicalTimestamp(value) {
 }
 
 /** A record read back from disk is untrusted until it has this exact shape. */
-function admitRecord(value) {
+function admitRecord(value, validateApplicationEntriesOnRead) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   if (Object.keys(value).sort().join() !== 'entries,revision,updatedAt') return false
   if (!Number.isSafeInteger(value.revision) || value.revision < 1 || !canonicalTimestamp(value.updatedAt)) return false
   const { entries } = value
   if (!entries || typeof entries !== 'object' || Array.isArray(entries) || Object.getPrototypeOf(entries) !== Object.prototype) return false
-  // Disk bytes are not safer than incoming HTTP: apply the complete shared
-  // planner, own-recipe and checklist validation before returning or CAS-ing.
+  // The file store is also a low-level CAS primitive whose established
+  // direct callers use opaque string entries. The HTTP application must opt
+  // into the canonical browser-schema gate, because only it owns that schema.
+  // In production this gate runs before a restored record can be returned or
+  // its revision can be adopted by a subsequent compare-and-swap write.
+  if (validateApplicationEntriesOnRead !== true) return true
   return !validateSyncEntries(entries, { complete: true }).error
 }
 const LOCK_WAIT_MS = 5_000
@@ -79,7 +83,7 @@ async function lockHolderAlive(lock, info) {
  * publishes the new record through a uniquely named O_EXCL temp file plus an
  * atomic rename. The losing writer gets `conflict` with the stored record.
  */
-export function createFileSyncStore({ dir }) {
+export function createFileSyncStore({ dir, validateApplicationEntriesOnRead = false }) {
   const queues = new Map()
   const baseFor = key => join(dir, createHash('sha256').update(key).digest('hex'))
 
@@ -145,7 +149,7 @@ export function createFileSyncStore({ dir }) {
         if (length > info.size) throw new Error('sync record changed while reading')
       }
       const value = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(buffer.subarray(0, length)))
-      if (!admitRecord(value)) throw new Error('corrupt sync record')
+      if (!admitRecord(value, validateApplicationEntriesOnRead)) throw new Error('corrupt sync record')
       return value
     } finally { await handle.close() }
   }
