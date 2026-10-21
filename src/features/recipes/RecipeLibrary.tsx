@@ -4,7 +4,7 @@ import { figmaAssets as a } from '../home/figmaAssets'
 import { createManualRecipeDraft, importRecipeFromHtml, type UserRecipeDraft } from '../../domain/userRecipeImport'
 import { safeRecipeSourceUrl } from '../../domain/recipeSourceUrl'
 import { RECIPE_LIBRARY_KEY, readRecipeLibrary, saveRecipeLibrary, reviewRecipe, retainUnresolvedRecipeReview, sourceOnlyRecipeWarnings, acknowledgeRecipeSourceWarnings, type LibraryState, type SavedRecipe } from './recipeLibrary.ts'
-import { importRecipeLink } from './importRecipeLink'
+import { importRecipeLink, RecipeLinkImportUnavailableError } from './importRecipeLink'
 import { importRecipeLinksCollection } from './importRecipeLinksCollection'
 import { importPlainTextRecipe } from './importPlainTextRecipe'
 import { importPlainTextRecipeCollection } from './importPlainTextRecipeCollection'
@@ -832,7 +832,16 @@ export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
       const draft = await importRecipeLink(url, controller.signal)
       if (controller.signal.aborted) return
       adoptImportedRecipe(draft, 'Recept opgehaald. Controleer de gegevens en sla het daarna op.')
-    } catch (e) { if (!controller.signal.aborted) setError(e instanceof Error ? e.message : 'Importeren is niet gelukt.') }
+    } catch (e) {
+      if (!controller.signal.aborted) {
+        if (e instanceof RecipeLinkImportUnavailableError) {
+          setMode('paste')
+          setError('Automatische linkimport is op deze website niet beschikbaar. De openbare link blijft behouden als bronvermelding. Open de receptpagina en upload lokaal opgeslagen HTML/JSON-LD of plak de JSON-LD hieronder; Supa verwerkt die lokaal zonder scripts uit te voeren.')
+        } else {
+          setError(e instanceof Error ? e.message : 'Importeren is niet gelukt.')
+        }
+      }
+    }
     finally { if (!controller.signal.aborted) setBusy(false) }
   }
   function adoptImportedRecipe(draft: UserRecipeDraft, messageText: string) {
