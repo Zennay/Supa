@@ -466,3 +466,23 @@ border-radius:10px;padding:.65rem;scroll-margin-top:1.25rem}
 .offline-manual-editor__review-priority li > span { display:block; margin:.2rem 0; }
 .offline-manual-editor__review-actions { display:flex; flex-wrap:wrap; gap:.45rem; }
 .offline-manual-editor__review-actions button { min-height:44px; white-space:normal; }
+
+
+/* Keep user-entered source lookup fast without treating drafts as priced catalog. */
+.offline-manual-editor__pair-filters {
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:.65rem; padding:.8rem; border:1px solid #ceddce; border-radius:.8rem;
+  background:#fff; min-width:0;
+}
+.offline-manual-editor__pair-filters label { display:grid; gap:.3rem; min-width:0; }
+.offline-manual-editor__pair-filters input,
+.offline-manual-editor__pair-filters select {
+  box-sizing:border-box; padding:.55rem; min-height:44px; max-width:100%; width:100%;
+}
+.offline-manual-editor__pair-filters > small { grid-column:1/-1; color:#4e6253; }
+.offline-manual-editor__pair-unpaired {
+  grid-column:1/-1; display:grid; gap:.3rem; min-width:0;
+  border:1px solid #e1d4ad; background:#fffcf5; border-radius:.65rem;
+  padding:.65rem .8rem; overflow-wrap:anywhere; font-size:.87rem;
+}
+.offline-manual-editor__pair-unpaired small { color:#695633; line-height:1.45; }

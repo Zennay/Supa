@@ -272,6 +272,8 @@ export function LocalTwoStorePriceEditor({
 }: Props) {
   const [open, setOpen] = useState(false)
   const [onlyOpenRows, setOnlyOpenRows] = useState(false)
+  const [pairSearch, setPairSearch] = useState('')
+  const [pairView, setPairView] = useState<'all' | 'attention' | 'paired'>('all')
   const [preparedOpenCaptureCopy, setPreparedOpenCaptureCopy] = useState<{ identity: string; text: string } | null>(null)
   const [pricePreviewNow, setPricePreviewNow] = useState(() => Date.now())
   const [sourceSelection, setSourceSelection] = useState<'both' | OfflineRetailer>('both')
@@ -370,6 +372,19 @@ export function LocalTwoStorePriceEditor({
     a.index - b.index) : []
   const nextIncompletePairIndex = activeNeeds.findIndex(need =>
     !readyPairedDraftIds.has(need.id) || recaptureStores.size > 0)
+  const visiblePairRows = activeNeeds.flatMap((need, index) => {
+    const query = pairSearch.trim().toLocaleLowerCase('nl')
+    const sourceWords = stores.flatMap(store => {
+      const row = rows[key(store, need.id)]
+      return row ? [row.sourceId ?? '', row.name] : []
+    })
+    if (query && ![need.label, need.query, ...sourceWords].some(value =>
+      value.toLocaleLowerCase('nl').includes(query))) return []
+    const paired = readyPairedDraftIds.has(need.id)
+    if (pairView === 'paired' && !paired) return []
+    if (pairView === 'attention' && paired && sameTimePair) return []
+    return [{ need, index }]
+  })
   const openCaptureTasks = selectedStores.flatMap(store => activeNeeds.flatMap(need => {
     const row = rows[key(store, need.id)] ?? emptyDraft(need.unit)
     const status = ownCaptureStatus(row, need)
@@ -1476,7 +1491,31 @@ export function LocalTwoStorePriceEditor({
               Geen mandtotaal, bevestigd vergelijkbaar product of besparingsclaim.
               Bij gewijzigde of verouderde invoer wordt downloaden geweigerd.</small>
           </section>}
-          {activeNeeds.map((need, index) => <div key={need.id}
+          <div className="offline-manual-editor__pair-filters" aria-label="Zoek en filter winkelproducten">
+            <label>Zoek op ingrediënt of eigen broncode/productnaam
+              <input type="search" value={pairSearch}
+                placeholder="Bijv. rijst of productcode"
+                onChange={event => setPairSearch(event.currentTarget.value)} />
+            </label>
+            <label>Welke regels wil je bekijken?
+              <select value={pairView} onChange={event =>
+                setPairView(event.currentTarget.value as 'all' | 'attention' | 'paired')}>
+                <option value="all">Alle Planner-producten</option>
+                <option value="attention">Open of opnieuw te controleren</option>
+                <option value="paired">Twee rekenbare prijsconcepten</option>
+              </select>
+            </label>
+            <small role="status">{visiblePairRows.length} van {activeNeeds.length} fysieke
+              behoeften zichtbaar. Filters veranderen je oorspronkelijke Planner,
+              bronbestanden en het lokale controleblad niet.</small>
+          </div>
+          {visiblePairRows.length === 0 && <p role="status">
+            Geen winkelregels bij deze zoekopdracht of selectie.
+            <button type="button" className="ghost-button" onClick={() => {
+              setPairSearch(''); setPairView('all')
+            }}>Toon alle winkelregels</button>
+          </p>}
+          {visiblePairRows.map(({ need, index }) => <div key={need.id}
             className="offline-manual-editor__pair-row">
             <strong>{need.label} <small>· {need.amount ?? '?'} {need.unit}</small></strong>
             <div className="offline-manual-editor__pair-stores">
@@ -1496,6 +1535,29 @@ export function LocalTwoStorePriceEditor({
                 </button>
               })}
             </div>
+            {(!sameTimePair || !readyPairedDraftIds.has(need.id)) && (() => {
+              const available = stores.flatMap(store => {
+                const math = currentDraftPackMath(
+                  rows[key(store, need.id)] ?? emptyDraft(need.unit), need)
+                return math ? [{ store, math }] : []
+              })
+              if (!available.length) return null
+              return <div className="offline-manual-editor__pair-unpaired" role="note">
+                <strong>Alleen persoonlijke pakberekening — niet vergelijkbaar</strong>
+                {available.map(({ store, math }) => <span key={store}>
+                  {store}: {math.packagesNeeded} hele pak(ken) ·
+                  {' '}{exactEuro.formatCents(math.lineTotalCents)} ·
+                  {' '}{math.unitRate ?? 'eenheidsprijs onbekend'}
+                </span>)}
+                {available.length < 2 && <small>De prijs van de andere winkel is
+                  onbekend of niet fysiek geschikt; nooit als nul tellen.</small>}
+                {!sameTimePair && <small>De oorspronkelijke twee winkelmomenten
+                  zijn nog niet als actueel en onderling vergelijkbaar beoordeeld.
+                  Geen prijsverschil of goedkoopste winkel uit deze gegevens.</small>}
+                <small>Eigen concept, niet goedgekeurd. Controleer eerst de
+                  originele codes, verpakkingen en menselijke bronreview.</small>
+              </div>
+            })()}
             {sameTimePair && (() => {
               const plus = currentDraftPackMath(
                 rows[key('PLUS', need.id)] ?? emptyDraft(need.unit), need)
