@@ -569,6 +569,37 @@ export function LocalTwoStorePriceEditor({
 
   // Deliberate recovery from an old or conflicting local snapshot. Never
   // delete the tab version, visible editor, or other stored private records.
+  // A stale/future-week record can be the user's only copy. Provide an
+  // explicit byte-preserving local rescue before offering deletion; never
+  // parse, trust, publish or apply these bytes as source price evidence.
+  function downloadProtectedDraftCopy(kind: 'tab' | 'device') {
+    const stored = kind === 'device' ? deviceDraftRaw : savedDraftRaw
+    const storageKey = kind === 'device' ? privateDeviceDraftKey : privateDraftStorageKey
+    if (stored === null) return
+    try {
+      const storage = kind === 'device' ? window.localStorage : window.sessionStorage
+      if (storage.getItem(storageKey) !== stored) {
+        setDraftStatus('De beschermde kopie is intussen veranderd. Download de huidige versie pas na opnieuw openen.')
+        return
+      }
+      // Raw files remain private, unvalidated copies; a user may inspect or
+      // manually salvage them, never pass them directly to a price comparator.
+      if (new TextEncoder().encode(stored).length > 512000) throw Error('oversized')
+      const url = URL.createObjectURL(new Blob([stored], { type: 'application/json;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-beschermd-' + (kind === 'device' ? 'apparaat' : 'tab') + '-prijsconcept.json'
+        document.body.append(link)
+        link.click()
+        link.remove()
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setDraftStatus('Beschermde originele ' + (kind === 'device' ? 'apparaat' : 'tab') +
+        'kopie lokaal gedownload, zonder te importeren of prijzen goed te keuren.')
+    } catch {
+      setDraftStatus('Deze beschermde kopie kan niet veilig worden gedownload. Er is niets verwijderd.')
+    }
+  }
   function discardProtectedDeviceDraft() {
     if (!deviceDraftProtected || !window.confirm(
       'Wis uitsluitend de oude, beschermde prijsconceptkopie op dit apparaat? Download eerst je eigen JSON-backup als je die oude week nodig hebt. De geopende invoer blijft behouden.')) return
@@ -1179,6 +1210,11 @@ export function LocalTwoStorePriceEditor({
           actueel of goedgekeurd. Een andere Planner-week wordt nooit stilzwijgend overgenomen.
           Wis je browsergegevens pas na het downloaden van je eigen JSON-concept.</small>
         {deviceDraftStatus && <span role="status">{deviceDraftStatus}</span>}
+        {deviceDraftProtected && deviceDraftRaw !== null &&
+          <button type="button" className="ghost-button"
+            onClick={() => downloadProtectedDraftCopy('device')}>
+            Download beschermde apparaatkopie vóór verwijderen
+          </button>}
         {deviceDraftProtected && <button type="button" className="ghost-button"
           onClick={discardProtectedDeviceDraft}>
           Wis alleen oude beschermde apparaatkopie na bevestiging
@@ -1239,6 +1275,11 @@ export function LocalTwoStorePriceEditor({
         {draftOptIn && <button type="button" className="ghost-button" onClick={clearDraft}>
           Stop tabopslag en wis alleen tijdelijke tabkopie
         </button>}
+        {draftProtected && savedDraftRaw !== null &&
+          <button type="button" className="ghost-button"
+            onClick={() => downloadProtectedDraftCopy('tab')}>
+            Download beschermde tabkopie vóór verwijderen
+          </button>}
         {draftProtected && <button type="button" className="ghost-button"
           onClick={discardProtectedDraft}>
           Verwijder beschermd concept na bevestiging
