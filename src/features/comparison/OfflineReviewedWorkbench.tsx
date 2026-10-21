@@ -56,6 +56,30 @@ function isPrivateCaptureCsv(file: File, source: string): boolean {
     line === privateSourceColumns.join(separator) ||
     line === privateSourceColumns.map(column => '"' + column + '"').join(separator))
 }
+/** Reuse canonical admission for both locally supplied shop snapshots. */
+function combineTwoOwnShopCaptures(inputs: readonly string[]): string {
+  if (inputs.length !== 2) throw Error('Geef twee afzonderlijke winkelopnames.')
+  const captures: unknown[] = []
+  const shops = new Set<string>()
+  for (const source of inputs) {
+    const parsed = parseOfflinePriceSnapshots(source, Date.now())
+    const names = Object.keys(parsed.captures)
+    if (names.length !== 1) throw Error('Per blad precies één waargenomen winkel.')
+    if (shops.has(names[0])) throw Error('Dubbele winkel: kies PLUS en DekaMarkt.')
+    shops.add(names[0])
+    const original: unknown = JSON.parse(source)
+    if (!original || typeof original !== 'object' ||
+        !('captures' in original) || !Array.isArray(original.captures) ||
+        original.captures.length !== 1) throw Error('Originele opname ongeldig.')
+    captures.push(original.captures[0])
+  }
+  const combined = JSON.stringify({ schema: 'supa-offline-prices-v1', captures })
+  const accepted = parseOfflinePriceSnapshots(combined, Date.now())
+  if (!accepted.captures.PLUS || !accepted.captures.DekaMarkt)
+    throw Error('PLUS of DekaMarkt ontbreekt.')
+  return combined
+}
+
 const privateTabCheckpointKey = 'supa:private-basket-tab-checkpoint:v1'
 function exactPlanCheckpointKey(planKey: string): string {
   let hash = 2166136261
@@ -1348,11 +1372,23 @@ export function OfflineReviewedWorkbench({
           typeof module.convertOwnStoreCsv !== 'function') {
         throw new Error('De bestaande lokale CSV-converter is niet beschikbaar.')
       }
-      const normalized = (module.convertOwnStoreCsv as (input: string) => string)(raw)
+      const sheets = raw.split(/(?:\r\n|\n|\r)---(?:\r\n|\n|\r)/u)
+      if (sheets.length > 2)
+        throw Error('Gebruik één losse --- regel tussen twee winkelbladen.')
+      if (sheets.some(sheet => !sheet.trim()))
+        throw Error('Beide winkelbladen moeten productgegevens bevatten.')
+      const convert = module.convertOwnStoreCsv as (input: string) => string
+      const sources = sheets.map(sheet => convert(sheet))
       if (version !== importRevision.current) return
-      // The same guarded one-shop append, same-shop replacement preview,
-      // and explicit full-source confirmation used by manual price entry.
-      acceptManualSource(normalized)
+      if (sources.length === 2) {
+        const combined = combineTwoOwnShopCaptures(sources)
+        if (version !== importRevision.current) return
+        if (imported) stageBothStoreReplacement(combined, version)
+        else importSnapshots(combined)
+        setMessage(imported
+          ? 'Twee bladen ontvangen. Controleer en bevestig de bronvervanging.'
+          : 'Twee echte winkelbladen geladen. Controleer alle originele SKU’s, verpakkingen en prijzen.')
+      } else acceptManualSource(sources[0])
     } catch (error) {
       if (version !== importRevision.current) return
       setMessage((error instanceof Error ? error.message : 'CSV kon niet worden verwerkt.') +
@@ -1412,8 +1448,7 @@ export function OfflineReviewedWorkbench({
     setBusy(true)
     try {
       if (files.length !== 2) throw new Error('Selecteer maximaal twee originele winkelbestanden.')
-      const sources: unknown[] = []
-      const seen = new Set<string>()
+      const sources: string[] = []
       for (const file of files) {
         if (!file.size || file.size > 256000)
           throw new Error('Elk origineel winkelbestand moet gevuld zijn en maximaal 256 kB bevatten.')
@@ -1428,18 +1463,7 @@ export function OfflineReviewedWorkbench({
             throw new Error('De bestaande lokale CSV-converter is niet beschikbaar.')
           json = (module.convertOwnStoreCsv as (input: string) => string)(raw)
         }
-        const parsed = parseOfflinePriceSnapshots(json, Date.now())
-        const shops = Object.keys(parsed.captures)
-        if (shops.length !== 1)
-          throw new Error('Gebruik voor deze import twee afzonderlijke bestanden met elk precies één werkelijk waargenomen winkel.')
-        if (seen.has(shops[0]))
-          throw new Error('Beide bronbestanden zijn van dezelfde winkel. Selecteer één PLUS- en één DekaMarkt-opname.')
-        seen.add(shops[0])
-        const original: unknown = JSON.parse(json)
-        if (!original || typeof original !== 'object' || !('captures' in original) ||
-            !Array.isArray(original.captures) || original.captures.length !== 1)
-          throw new Error('Origineel winkelbestand ongeldig.')
-        sources.push(original.captures[0])
+        sources.push(json)
       }
       if (selectedForPlan !== undefined && selectedForPlan !== currentlySelectedPlan.current) {
         setMessage('Je weekmenu veranderde tijdens het lezen. Selecteer deze twee opnames opnieuw voor je huidige week.')
@@ -1447,9 +1471,7 @@ export function OfflineReviewedWorkbench({
       }
       // Preserve original SKUs, null prices and observation timestamps. The
       // canonical parser is the final authority for this composed capture.
-      const combined = JSON.stringify({ schema: 'supa-offline-prices-v1', captures: sources })
-      const admitted = parseOfflinePriceSnapshots(combined, Date.now())
-      if (version !== importRevision.current) return
+      const combined = combineTwoOwnShopCaptures(sources)
       if (version !== importRevision.current) return
       if (imported) {
         stageBothStoreReplacement(combined, version)
@@ -2674,7 +2696,7 @@ export function OfflineReviewedWorkbench({
           </label>
         )}
         <label>Of plak je eigen winkelopname(s) als CSV of JSON
-          <textarea rows={5} value={pasteDraft} maxLength={256000} spellCheck={false}
+          <textarea rows={8} value={pasteDraft} maxLength={256000} spellCheck={false}
             placeholder={'{"schema":"supa-offline-prices-v1","captures":[...]}'}
             onChange={event => {
               importRevision.current += 1
@@ -2683,6 +2705,11 @@ export function OfflineReviewedWorkbench({
               setPendingReplacement(null)
               setMessage('Concept gewijzigd. Eerder bevestigde winkeldata en vinkjes blijven actief totdat je de nieuwe bron expliciet importeert.')
             }} />
+          <small>Plak één eigen CSV-blad of twee afzonderlijke CSV-bladen met op een
+            losse regel <code>---</code> ertussen. Ieder blad heeft zijn eigen
+            negenkolomskop, originele winkel, bronmoment, SKU's en waargenomen prijzen.
+            Dubbele of ongeldige winkels worden samen geweigerd; je bestaande
+            winkelprijzen en vinkjes blijven bewaard tot expliciete bevestiging.</small>
         </label>
         <div className="offline-price-workbench__actions">
           <button type="button" disabled={busy || !pasteDraft.trim()} onClick={() => {
