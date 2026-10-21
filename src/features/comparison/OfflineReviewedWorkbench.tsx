@@ -2705,6 +2705,7 @@ export function OfflineReviewedWorkbench({
                       (currentPreview.retainedOther?.observedAt ?? '')}
                     plus={previewPlusLines} deka={previewDekaLines}
                     within24h={previewPair24h} sourceFresh={previewPairFresh}
+                    delimiter={captureDelimiter}
                     plusFresh={freshPreviewInstant(
                       currentPreview.stores.find(store => store.retailer === 'PLUS')?.observedNs ??
                       (currentPreview.retainedOther?.retailer === 'PLUS'

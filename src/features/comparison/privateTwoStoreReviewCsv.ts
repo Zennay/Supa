@@ -16,6 +16,7 @@ type Input = {
   plusFresh: boolean
   dekaFresh: boolean
   onlyOpen?: boolean
+  delimiter?: ',' | ';' | '\t'
 }
 const header = [
   'status', 'ingredient_id', 'ingredient', 'PLUS_oorspronkelijke_vraag',
@@ -52,7 +53,8 @@ function storeColumns(line: PreviewMatchLine | undefined, observedAt: string, fr
 /** Original candidate money only after canonical arithmetic; never deltas or totals. */
 export function privateTwoStoreReviewCsv(input: Input): string {
   const { plus, deka, plusObservedAt, dekaObservedAt, within24h,
-    sourceFresh, plusFresh, dekaFresh, onlyOpen = false } = input
+    sourceFresh, plusFresh, dekaFresh, onlyOpen = false,
+    delimiter = ';' } = input
   if (!Array.isArray(plus) || !Array.isArray(deka) ||
       plus.length > 200 || deka.length > 200 || !plusObservedAt || !dekaObservedAt) {
     throw Error('Geen geldig paar originele winkelopnames voor het overzicht.')
@@ -104,8 +106,8 @@ export function privateTwoStoreReviewCsv(input: Input): string {
   }
   if (onlyOpen && body.length === 0) throw Error('Er zijn geen openstaande winkelregels.')
   const output = [
-    header.join(','),
-    ...body.map(row => row.map(value => literalCsv(value)).join(',')),
+    header.join(delimiter),
+    ...body.map(row => row.map(value => literalCsv(value)).join(delimiter)),
   ].join('\r\n') + '\r\n'
   if (new TextEncoder().encode(output).length > 256000) {
     throw Error('Het eigen broncontroleoverzicht is te groot.')

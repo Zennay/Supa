@@ -51,7 +51,7 @@ function localOffer(line: PreviewMatchLine | null,
  */
 export function CapturePairedPreview({
   plus, deka, within24h, sourceFresh, plusFresh, dekaFresh, retainedStore,
-  plusObservedAt, dekaObservedAt, describeReason,
+  plusObservedAt, dekaObservedAt, describeReason, delimiter = ';',
 }: {
   plus: readonly PreviewMatchLine[]
   deka: readonly PreviewMatchLine[]
@@ -59,6 +59,7 @@ export function CapturePairedPreview({
   sourceFresh: boolean
   plusFresh: boolean
   dekaFresh: boolean
+  delimiter?: ',' | ';' | '\t'
   retainedStore?: 'PLUS' | 'DekaMarkt'
   plusObservedAt: string
   dekaObservedAt: string
@@ -131,17 +132,19 @@ export function CapturePairedPreview({
   function spreadsheet(onlyOpen: boolean) {
     return privateTwoStoreReviewCsv({
       plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh,
-      plusFresh, dekaFresh, onlyOpen,
+      plusFresh, dekaFresh, onlyOpen, delimiter,
     })
   }
   function spreadsheetFilename(onlyOpen: boolean) {
-    return onlyOpen ? 'supa-PLUS-Deka-openstaande-bronvoorstellen-prive.csv' :
-      'supa-PLUS-Deka-volledige-bronvoorstellen-prive.csv'
+    const name = onlyOpen ? 'supa-PLUS-Deka-openstaande-bronvoorstellen-prive' :
+      'supa-PLUS-Deka-volledige-bronvoorstellen-prive'
+    return name + (delimiter === '\t' ? '.tsv' : '.csv')
   }
   function downloadSpreadsheet(onlyOpen: boolean) {
     try {
       setExportMessage('')
-      downloadLocal(spreadsheet(onlyOpen), 'text/csv;charset=utf-8',
+      downloadLocal(spreadsheet(onlyOpen), delimiter === '\t'
+        ? 'text/tab-separated-values;charset=utf-8' : 'text/csv;charset=utf-8',
         spreadsheetFilename(onlyOpen))
       setExportMessage('Excel-geschikt lokaal bronoverzicht bewaard. Alle SKU’s, pakbedragen en eenheidsprijzen zijn uitsluitend onbevestigde voorstellen; deze CSV kan niet als bronprijsimport worden gebruikt.')
     } catch (cause) {
@@ -153,7 +156,8 @@ export function CapturePairedPreview({
     try {
       setExportMessage('')
       const file = new File([spreadsheet(onlyOpen)], spreadsheetFilename(onlyOpen),
-        { type: 'text/csv;charset=utf-8' })
+        { type: delimiter === '\t' ? 'text/tab-separated-values;charset=utf-8' :
+          'text/csv;charset=utf-8' })
       // OS share sheet is only opened after a click; no Supa network request.
       if (!navigator.share || !navigator.canShare?.({ files: [file] })) {
         downloadLocal(await file.text(), file.type, file.name)
@@ -323,6 +327,9 @@ export function CapturePairedPreview({
       onClick={() => setLimit(Math.min(limit + 25, visible.length))}>
       Toon volgende {Math.min(25, visible.length - limit)} regels
     </button>}
+    <p className="disclaimer">Het Excel-controleoverzicht gebruikt jouw gekozen scheidingsteken:
+      {' '}{delimiter === '\t' ? 'tab (TSV)' : delimiter === ';' ? 'puntkomma (Nederlandse Excel)' : 'komma'}.
+      De oorspronkelijke negenkoloms bronimport blijft ongewijzigd.</p>
     <div className="offline-price-workbench__matching-actions">
       <button type="button" className="ghost-button" onClick={() => downloadSpreadsheet(false)}>
         Download beide originele winkelbronvoorstellen in Excel-CSV
