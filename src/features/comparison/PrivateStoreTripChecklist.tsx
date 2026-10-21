@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { OneStoreBasket, BasketTraceLine } from '../../domain/basket.ts'
 import './privateStoreTripChecklist.css'
 
@@ -71,11 +71,51 @@ function checklistText(basket: OneStoreBasket, done: ReadonlySet<string>, observ
   ].join('\n')
 }
 
-const STORAGE_PREFIX = 'supa:private-trip:v1:'
 type SavedState = { enabled: boolean; protected: boolean; raw: string | null; done: string[] }
 
-function progressStorageKey(basket: OneStoreBasket): string {
-  return STORAGE_PREFIX + basket.store.id.toLowerCase().replace(/[^a-z0-9-]/g, '')
+// Literal, product-scoped keys keep the browser-storage boundary statically
+// auditable while preserving independent opt-in progress for the two stores.
+function readProgressStorage(basket: OneStoreBasket): string | null {
+  const store = basket.store.id.toLowerCase()
+  if (store === 'plus') {
+    const key = 'supa:private-trip:v1:plus'
+    return window.sessionStorage.getItem(key)
+  }
+  if (store === 'dekamarkt') {
+    const key = 'supa:private-trip:v1:dekamarkt'
+    return window.sessionStorage.getItem(key)
+  }
+  throw new Error('Unsupported private trip store')
+}
+
+function writeProgressStorage(basket: OneStoreBasket, value: string): void {
+  const store = basket.store.id.toLowerCase()
+  if (store === 'plus') {
+    const key = 'supa:private-trip:v1:plus'
+    window.sessionStorage.setItem(key, value)
+    return
+  }
+  if (store === 'dekamarkt') {
+    const key = 'supa:private-trip:v1:dekamarkt'
+    window.sessionStorage.setItem(key, value)
+    return
+  }
+  throw new Error('Unsupported private trip store')
+}
+
+function removeProgressStorage(basket: OneStoreBasket): void {
+  const store = basket.store.id.toLowerCase()
+  if (store === 'plus') {
+    const key = 'supa:private-trip:v1:plus'
+    window.sessionStorage.removeItem(key)
+    return
+  }
+  if (store === 'dekamarkt') {
+    const key = 'supa:private-trip:v1:dekamarkt'
+    window.sessionStorage.removeItem(key)
+    return
+  }
+  throw new Error('Unsupported private trip store')
 }
 
 /** Basket-specific identity; includes prices and selected source time, not only IDs. */
@@ -95,7 +135,7 @@ function readSavedTrip(basket: OneStoreBasket, observedAt: string): SavedState {
   const empty: SavedState = { enabled: false, protected: false, raw: null, done: [] }
   if (typeof window === 'undefined') return empty
   let raw: string | null = null
-  try { raw = window.sessionStorage.getItem(progressStorageKey(basket)) }
+  try { raw = readProgressStorage(basket) }
   catch { return { ...empty, protected: true } }
   if (raw === null) return empty
   if (raw.length > 64000) return { ...empty, raw, protected: true }
@@ -125,6 +165,8 @@ export function PrivateStoreTripChecklist({
   observedAt: string
   fresh: boolean
 }) {
+  const copyDetailsRef = useRef<HTMLDetailsElement>(null)
+  const copyTextareaRef = useRef<HTMLTextAreaElement>(null)
   const [initial] = useState(() => readSavedTrip(basket, observedAt))
   const [done, setDone] = useState<ReadonlySet<string>>(() => new Set(initial.done))
   const [saveEnabled, setSaveEnabled] = useState(initial.enabled)
@@ -136,8 +178,7 @@ export function PrivateStoreTripChecklist({
   useEffect(() => {
     if (!saveEnabled || storageProtected || typeof window === 'undefined') return
     try {
-      const key = progressStorageKey(basket)
-      const current = window.sessionStorage.getItem(key)
+      const current = readProgressStorage(basket)
       if (current !== savedRaw) {
         setStorageProtected(true)
         setMessage('Een ander of gewijzigd concept is beschermd tegen overschrijven.')
@@ -149,7 +190,7 @@ export function PrivateStoreTripChecklist({
         done: [...done],
       })
       if (new TextEncoder().encode(next).length > 64000) throw Error('oversized')
-      if (next !== current) window.sessionStorage.setItem(key, next)
+      if (next !== current) writeProgressStorage(basket, next)
       if (savedRaw !== next) setSavedRaw(next)
     } catch {
       setSaveEnabled(false)
@@ -166,9 +207,8 @@ export function PrivateStoreTripChecklist({
     }
     if (typeof window !== 'undefined') {
       try {
-        const key = progressStorageKey(basket)
-        const current = window.sessionStorage.getItem(key)
-        if (current === savedRaw) window.sessionStorage.removeItem(key)
+        const current = readProgressStorage(basket)
+        if (current === savedRaw) removeProgressStorage(basket)
         else setStorageProtected(true)
       } catch { setStorageProtected(true) }
     }
@@ -181,13 +221,12 @@ export function PrivateStoreTripChecklist({
     // Compare-and-delete protects a newer concept written by another tab.
     if (typeof window === 'undefined') return
     try {
-      const key = progressStorageKey(basket)
-      const current = window.sessionStorage.getItem(key)
+      const current = readProgressStorage(basket)
       if (current !== savedRaw) {
         setMessage('Het andere concept is inmiddels gewijzigd; er is niets overschreven of verwijderd.')
         return
       }
-      if (current !== null) window.sessionStorage.removeItem(key)
+      if (current !== null) removeProgressStorage(basket)
       setSavedRaw(null)
       setStorageProtected(false)
       setSaveEnabled(false)
@@ -233,14 +272,18 @@ export function PrivateStoreTripChecklist({
     }
   }
 
-  async function copy() {
-    try {
-      if (!navigator.clipboard?.writeText) throw new Error('clipboard')
-      await navigator.clipboard.writeText(text)
-      setMessage('Boodschappenlijst gekopieerd.')
-    } catch {
-      setMessage('Automatisch kopiëren is niet beschikbaar; gebruik de selecteerbare lijsttekst.')
-    }
+  function selectListText() {
+    if (copyDetailsRef.current) copyDetailsRef.current.open = true
+    window.requestAnimationFrame(() => {
+      const field = copyTextareaRef.current
+      if (!field) {
+        setMessage('Open de selecteerbare lijsttekst om handmatig te kopiëren.')
+        return
+      }
+      field.focus()
+      field.select()
+      setMessage('Lijsttekst geselecteerd. Gebruik Ctrl+C of het contextmenu om te kopiëren.')
+    })
   }
 
   return <section className="private-store-trip" aria-label={'Afvinklijst voor ' + basket.store.name}>
@@ -289,16 +332,16 @@ export function PrivateStoreTripChecklist({
         Download lijst
       </button>
       <button type="button" className="ghost-button" disabled={!lines.length}
-        onClick={() => { void copy() }}>Kopieer lijst</button>
+        onClick={selectListText}>Selecteer lijsttekst</button>
       <button type="button" className="ghost-button" disabled={!completed}
         onClick={() => { setDone(new Set()); setMessage('Alle vinkjes in dit scherm gewist.') }}>
         Wis vinkjes
       </button>
     </div>
     <p aria-live="polite" role="status">{message}</p>
-    <details>
+    <details ref={copyDetailsRef}>
       <summary>Toon selecteerbare lijsttekst</summary>
-      <textarea readOnly rows={Math.min(16, Math.max(5, lines.length + 5))}
+      <textarea ref={copyTextareaRef} readOnly rows={Math.min(16, Math.max(5, lines.length + 5))}
         value={text} aria-label={'Kopieerbare lijst ' + basket.store.name}
         onFocus={event => event.currentTarget.select()} />
     </details>
