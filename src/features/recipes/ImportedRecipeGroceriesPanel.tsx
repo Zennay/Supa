@@ -61,6 +61,7 @@ export function ImportedRecipeGroceriesPanel({
   const [showCookingMode, setShowCookingMode] = useState(false)
   const [cookingModeOpened, setCookingModeOpened] = useState(false)
   const [copyableCaptureGuide, setCopyableCaptureGuide] = useState<{ identity: string; target: string; text: string } | null>(null)
+  const [copyableDayGuide, setCopyableDayGuide] = useState<{ key: string; text: string } | null>(null)
   const [capturePreview, setCapturePreview] = useState<{
     key: string; rows: { csvRow: number; store: string; id: string;
       label: string; amount: number; unit: string; sources: GroceryContribution[] }[]
@@ -333,6 +334,41 @@ export function ImportedRecipeGroceriesPanel({
     } catch (cause) {
       setFeedback(cause instanceof Error ? cause.message :
         'De boodschappen per kookdag konden niet veilig worden gemaakt.')
+    }
+  }
+  async function copyDayGroceryGuide() {
+    setFeedback('')
+    setCopyableDayGuide(null)
+    const expected = plannerExportKey
+    try {
+      if (!plannerReadyForSelection || !plannerDaysDistinct ||
+          plannerAssignments.length === 0 || !result?.complete)
+        throw new Error('Controleer eerst de oorspronkelijke receptporties en kookdagen.')
+      requireLatestOwnedRecipes()
+      const { formatRecipeWeekShoppingByDay } = await import('./formatRecipeWeekShoppingByDay.ts')
+      if (expected !== latestPlannerExportKey.current)
+        throw new Error('De recepten of weekdagen zijn gewijzigd. Maak de tekst opnieuw.')
+      requireLatestOwnedRecipes()
+      const guide = formatRecipeWeekShoppingByDay(result, plannerAssignments)
+      if (expected !== latestPlannerExportKey.current)
+        throw new Error('De receptenbundel is gewijzigd. Open de nieuwe gids.')
+      if (navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(guide)
+          if (expected !== latestPlannerExportKey.current)
+            throw new Error('De recepten veranderden tijdens kopiëren. Kopieer het actuele weekmenu opnieuw.')
+          requireLatestOwnedRecipes()
+          setFeedback('De volledige ongeprijsde kookdag-boodschappengids is gekopieerd. Receptbijdragen zijn geen extra aankopen.')
+          return
+        } catch { /* Fall back to manually selectable, local-only text. */ }
+      }
+      if (expected !== latestPlannerExportKey.current)
+        throw new Error('Je kookdagen zijn gewijzigd. Maak de actuele gids opnieuw.')
+      requireLatestOwnedRecipes()
+      setCopyableDayGuide({ key: expected, text: guide })
+      setFeedback('Klembord niet beschikbaar. Selecteer hieronder je volledige ongeprijsde kookdag-gids.')
+    } catch (cause) {
+      setFeedback(cause instanceof Error ? cause.message : 'De kookdag-gids is niet beschikbaar.')
     }
   }
   async function downloadDayGroceryCsv() {
@@ -997,7 +1033,21 @@ export function ImportedRecipeGroceriesPanel({
             onClick={() => void downloadDayGroceryCsv()}>
             Download weekboodschappen met receptbijdragen (CSV)
           </button>
+          <button type="button" className="ghost-button"
+            disabled={!plannerReadyForSelection || !plannerAssignments.length || !plannerDaysDistinct}
+            onClick={() => void copyDayGroceryGuide()}>
+            Kopieer mijn weekboodschappen per kookdag (mobiel)
+          </button>
         </div>
+        {copyableDayGuide?.key === plannerExportKey && <label
+          className="recipe-collection-groceries__mobile-copy">
+          Selecteer en kopieer je volledige ongeprijsde kookdag-boodschappen
+          <textarea readOnly rows={12} value={copyableDayGuide.text}
+            onFocus={event => {
+              if (copyableDayGuide.key === latestPlannerExportKey.current)
+                event.currentTarget.select()
+            }} />
+        </label>}
         <div className="recipe-backup-panel__actions">
           <button type="button" className="ghost-button"
             disabled={!plannerReadyForSelection || !plannerAssignments.length || !plannerDaysDistinct}
