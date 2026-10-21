@@ -140,18 +140,34 @@ export function CapturePairedPreview({
       setExportMessage(cause instanceof Error ? cause.message : 'Kan het offline printblad niet bewaren.')
     }
   }
-  async function copyReview() {
+  async function carryReview(scope: 'all' | 'missing', method: 'copy' | 'share') {
     try {
       setExportMessage('')
-      const note = reviewText()
-      // Keep a selectable fallback even if clipboard permission is denied.
+      const note = scope === 'all' ? reviewText() : privateTwoStoreMissingChecklist({
+        plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh, describeReason,
+      })
+      // Always provide a local selectable fallback for denied permissions.
       setPrintable(note)
-      if (!navigator.clipboard?.writeText) throw Error(
-        'Automatisch kopiëren niet beschikbaar. Selecteer de tekst hieronder.')
-      await navigator.clipboard.writeText(note)
-      setExportMessage('Onbevestigde bronvoorcontrole gekopieerd. Geen prijzen geaccepteerd.')
+      if (method === 'copy') {
+        if (!navigator.clipboard?.writeText) {
+          throw Error('Klembord niet beschikbaar. Selecteer de tekst hieronder.')
+        }
+        await navigator.clipboard.writeText(note)
+        setExportMessage('Privébroncontrole gekopieerd. Geen prijzen geaccepteerd.')
+      } else {
+        if (!navigator.share) {
+          throw Error('Mobiel delen niet beschikbaar. Selecteer de tekst hieronder.')
+        }
+        await navigator.share({
+          title: 'Supa · privé ' + (scope === 'missing' ? 'ontbrekende winkelmatches' : 'winkelbroncontrole'),
+          text: note,
+        })
+        setExportMessage('Privécontroleblad bewust via je toestel gedeeld. Geen bron geaccepteerd.')
+      }
     } catch (cause) {
-      setExportMessage(cause instanceof Error ? cause.message : 'Gebruik de selecteerbare tekst hieronder.')
+      setExportMessage(cause instanceof Error && cause.name === 'AbortError'
+        ? 'Delen geannuleerd; de tekst blijft hieronder selecteerbaar.'
+        : cause instanceof Error ? cause.message : 'Gebruik de selecteerbare tekst hieronder.')
     }
   }
 
@@ -233,11 +249,19 @@ export function CapturePairedPreview({
         disabled={missing === 0}>
         Download alleen {missing} incomplete twee-winkelmatches (TXT)
       </button>
-      <button type="button" className="ghost-button" onClick={() => void copyReview()}>
+      <button type="button" className="ghost-button" onClick={() => void carryReview('all', 'copy')}>
         Kopieer broncontrole voor onderweg
       </button>
+      <button type="button" className="ghost-button" disabled={missing === 0}
+        onClick={() => void carryReview('missing', 'copy')}>
+        Kopieer alleen {missing} openstaande winkelmatches
+      </button>
+      <button type="button" className="ghost-button" disabled={missing === 0}
+        onClick={() => void carryReview('missing', 'share')}>
+        Deel alleen openstaande broncontroles via mijn telefoon
+      </button>
     </div>
-    {printable !== null && <label>Alle originele onzekere bronregels als selecteerbare tekst
+    {printable !== null && <label>Gekozen privébronregels als selecteerbare tekst
       <textarea readOnly rows={9} spellCheck={false} value={printable}
         onFocus={event => event.currentTarget.select()}
         style={{ display: 'block', boxSizing: 'border-box', maxWidth: '100%', width: '100%' }} />
