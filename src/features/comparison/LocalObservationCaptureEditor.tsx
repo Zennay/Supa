@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { CaptureStore } from './plannerPriceCaptureSheet.ts'
 import type { PlannerCaptureGuideNeed } from './plannerPriceCaptureGuide.ts'
 import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
+import { exportLocalCaptureDraft, restoreLocalCaptureDraft } from './localCaptureEditorBackup.ts'
 
 type Row = {
   state: 'unseen' | 'available' | 'unavailable'
@@ -44,6 +45,8 @@ export function LocalObservationCaptureEditor({
   stores, needs, needsAtClick, delimiter, context, onReview, onDraftChange,
 }: Props) {
   const currentFingerprint = fingerprintOf(stores, needs, context)
+  const currentScope = useRef(currentFingerprint)
+  currentScope.current = currentFingerprint
   const [snapshot, setSnapshot] = useState<Snapshot>(() => ({
     fingerprint: currentFingerprint, needs: [...needs], stores: [...stores],
   }))
@@ -81,6 +84,49 @@ export function LocalObservationCaptureEditor({
     setSnapshot({ fingerprint: currentFingerprint, needs: [...needs], stores: [...stores] })
     setRows({}); setMoments({}); setStatus(''); setSearch('')
     onDraftChange?.()
+  }
+  function backupDraft() {
+    try {
+      const text = exportLocalCaptureDraft(snapshot.fingerprint, { rows, moments })
+      const url = URL.createObjectURL(new Blob([text], { type: 'application/json;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-mijn-onvolledige-winkelinvoer-niet-gecontroleerd.json'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setStatus('Je onvolledige privéconcept is lokaal bewaard als JSON. Dit is geen negenkoloms bron-CSV of geaccepteerde winkelprijs.')
+    } catch (cause) {
+      setStatus(cause instanceof Error ? cause.message : 'Kan het privéconcept niet bewaren.')
+    }
+  }
+  async function restoreDraft(file: File) {
+    try {
+      if (changed) throw Error('Planner-week of winkelkeuze veranderd. Begin bewust een nieuw leeg formulier voordat je een passende back-up herstelt.')
+      if (!/\.json$/iu.test(file.name) || !file.size || file.size > 256000)
+        throw Error('Kies een JSON-conceptbestand tot 256 kB dat je eerder zelf hebt opgeslagen.')
+      const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      if (currentScope.current !== snapshot.fingerprint) {
+        throw Error('De actuele Planner-selectie is tijdens het openen gewijzigd. Bestaande invoer blijft behouden.')
+      }
+      const restored = restoreLocalCaptureDraft(raw, currentScope.current,
+        snapshot.stores, snapshot.needs.length)
+      if (Object.keys(rows).length > 0 || Object.values(moments).some(Boolean)) {
+        if (!window.confirm('Je huidige onopgeslagen winkelinvoer vervangen door deze lokale conceptback-up?')) {
+          setStatus('Huidige invoer behouden. Er is niets teruggezet.')
+          return
+        }
+      }
+      if (currentScope.current !== snapshot.fingerprint) {
+        throw Error('De Planner-selectie is tijdens je bevestiging gewijzigd. Oude invoer behouden.')
+      }
+      setRows(restored.rows); setMoments(restored.moments)
+      setStatus('Privéconcept op dit toestel hersteld. Alle SKU’s, bronmomenten en prijzen moeten nog via de gewone broncontrole.')
+      onDraftChange?.()
+    } catch (cause) {
+      setStatus(cause instanceof Error ? cause.message : 'Kon het lokale concept niet herstellen.')
+    }
   }
   function filledFiles(): File[] {
     const actual: File[] = []
@@ -264,8 +310,19 @@ export function LocalObservationCaptureEditor({
       })}
     </fieldset>)}
     <div className="offline-price-workbench__actions">
+      <button type="button" className="ghost-button" onClick={backupDraft}>
+        Bewaar ook onvolledige invoer als privéconcept (JSON)
+      </button>
+      <label>Herstel eerder bewaard privéconcept voor precies dit weekmenu
+        <input type="file" accept=".json,application/json"
+          onChange={event => {
+            const file = event.currentTarget.files?.[0]
+            event.currentTarget.value = ''
+            if (file) void restoreDraft(file)
+          }} />
+      </label>
       <button type="button" className="ghost-button"
-        onClick={() => act('download')}>Bewaar ingevulde originele winkelopname op dit toestel</button>
+        onClick={() => { void act('download') }}>Bewaar ingevulde originele winkelopname op dit toestel</button>
       <button type="button" className="ghost-button"
         onClick={() => { void act('share') }}>Deel originele winkelopname-CSV via mijn telefoon</button>
       <button type="button" disabled={!onReview || changed}
@@ -274,8 +331,9 @@ export function LocalObservationCaptureEditor({
         onClick={reset}>Start nieuw leeg opnameformulier</button>
     </div>
     {status && <p role="status" aria-live="polite">{status}</p>}
-    <small>De originele invoer blijft uitsluitend in deze open browsersessie tot je
-      zelf een bestand bewaart. De bestaande import controleert daarna elke
+    <small>Dit JSON-concept is alleen je eigen lokale back-up voor dit exacte
+      weekmenu; geen retailerbron, bronrecht of winkelbewijs. Je brongegevens
+      blijven uitsluitend in deze open browsersessie tot je zelf een bestand bewaart. De bestaande import controleert daarna elke
       SKU, prijs, tijd, pakinhoud en gebruikerstoestemming afzonderlijk.</small>
   </details>
 }
