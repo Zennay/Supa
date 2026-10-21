@@ -763,7 +763,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               navigate('basket')
             }}
             checked={privateShoppingTicks}
-            onMarkCheckedBatch={(shop, rows) => {
+            onMarkCheckedBatch={(shop, rows, checkedFlag = true) => {
               // A bulk physical tick is never a retailer-source approval.
               // Every original line must still belong to the exact currently
               // valid source and same current Planner demand at click time.
@@ -782,7 +782,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               }
               setPrivateShoppingTicks(before => {
                 const next = { ...before }
-                for (const key of keys) next[key] = true
+                for (const key of keys) next[key] = checkedFlag
                 return next
               })
               return null
