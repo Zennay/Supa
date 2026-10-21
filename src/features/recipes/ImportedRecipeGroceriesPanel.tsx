@@ -1117,6 +1117,10 @@ export function ImportedRecipeGroceriesPanel({
         </label>
         <div className="recipe-backup-panel__actions">
           <button type="button" disabled={!privateTransfer.ready}
+            onClick={openInPrivateMatcher}>
+            Open mijn mandje en voer echte winkelprijzen in
+          </button>
+          <button type="button" disabled={!privateTransfer.ready}
             onClick={() => void showCapturePreview()}>
             Bekijk exacte winkelopnameregels
           </button>
@@ -1206,10 +1210,7 @@ export function ImportedRecipeGroceriesPanel({
         </label>
         <button type="button" onClick={exportCsv}
           disabled={list.lines.length > 80}>Download gezamenlijke lijst (CSV)</button>
-        <button type="button" onClick={openInPrivateMatcher}
-          disabled={!privateTransfer.ready}>
-          Vergelijk dit mandje met mijn eigen winkelproducten
-        </button>
+
         <button type="button" onClick={exportForStores}
           disabled={!privateTransfer.ready}>
           Gebruik deze recepten in de privéwinkelvergelijker (JSON)
