@@ -319,10 +319,12 @@ export function PrivateBasketComparisonExport({
     <p className="disclaimer">Het afdrukbare overzicht werkt volledig offline, toont de twee
       winkelopnames naast elkaar en laat een winnaar of totaalverschil weg zolang prijzen
       ontbreken, verouderd zijn of de mandjes niet gelijkwaardig zijn.</p>
-    <p className="disclaimer">Per ingrediënt: benodigde hoeveelheid, gekoppeld of onbekend,
-      verpakking en hele eurocenten voor beide winkels. Bij ontbrekende of verlopen prijzen
-      staan er geen prijsverschillen in het bestand. Alle gegevens zijn afkomstig uit jouw eigen
-      lokale invoer; dit is geen officieel prijsbewijs of besparingsonderzoek.</p>
+    <p className="disclaimer">Per ingrediënt blijven de oorspronkelijke PLUS- en
+      Deka-hoeveelheden, SKU’s en verpakkingen beschikbaar. Alleen wanneer beide winkelmandjes
+      volledig, actueel en persoonlijk bevestigd zijn toont deze export hele eurocenten,
+      eenheidsprijzen of verschillen; anders staat er expliciet prijs onbekend.
+      Alle gegevens komen uit jouw eigen lokale invoer, niet uit een officiële winkelprijsbron
+      of onafhankelijk besparingsonderzoek.</p>
     {message && <p role="status" aria-live="polite">{message}</p>}
   </div>
 }
