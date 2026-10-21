@@ -247,6 +247,9 @@ export function PrivateStoreTripChecklist({
   const consistent = useMemo(() => basketConsistent(basket), [basket])
   const lines = consistent ? basket.lines : []
   const visibleDone = checkedIds ?? done
+  // Keep the freshest shared checklist ticks across lazy HTML module loading.
+  const latestDoneRef = useRef(visibleDone)
+  latestDoneRef.current = visibleDone
   const completed = lines.filter(line => visibleDone.has(line.id)).length
   const text = consistent ? checklistText(basket, visibleDone, observedAt, fresh) : ''
 
@@ -286,6 +289,38 @@ export function PrivateStoreTripChecklist({
       setMessage('Je privéboodschappenlijst is gedownload.')
     } finally {
       window.setTimeout(() => URL.revokeObjectURL(uri), 1000)
+    }
+  }
+
+  async function downloadPrintableHtml() {
+    if (!eligibleNow()) {
+      setMessage('De originele prijsopname is verlopen. Vernieuw de winkelbron in Vergelijk.')
+      return
+    }
+    try {
+      // Reuse the existing canonical one-store printable exporter, including
+      // its whole-pack and price validation; no new parallel price arithmetic.
+      const { privateSingleStorePrintableHtml } = await import(
+        '../shopping-list/privateSingleStorePrintableHtml.ts')
+      if (!eligibleNow()) throw Error('De bron is intussen verlopen. Heropen Vergelijk.')
+      const html = privateSingleStorePrintableHtml({
+        basket, observedAt, done: latestDoneRef.current,
+      })
+      if (!eligibleNow()) throw Error('De bron is intussen verlopen. Heropen Vergelijk.')
+      const uri = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = uri
+        link.download = 'supa-' + basket.store.id.toLowerCase().replace(/[^a-z0-9-]/g, '') +
+          '-privéboodschappen.html'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+        setMessage('Printbare eigen winkelmand als offline HTML opgeslagen, zonder netwerkverbinding.')
+      } finally {
+        window.setTimeout(() => URL.revokeObjectURL(uri), 1000)
+      }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Printbare privéwinkelmand kon niet worden gemaakt.')
     }
   }
 
@@ -349,6 +384,8 @@ export function PrivateStoreTripChecklist({
       <button type="button" className="ghost-button" disabled={!lines.length} onClick={download}>
         Download lijst
       </button>
+      <button type="button" className="ghost-button" disabled={!lines.length}
+        onClick={() => { void downloadPrintableHtml() }}>Bewaar printbare winkellijst (HTML)</button>
       <button type="button" className="ghost-button" disabled={!lines.length}
         onClick={selectListText}>Selecteer lijsttekst</button>
       <button type="button" className="ghost-button" disabled={!completed}
