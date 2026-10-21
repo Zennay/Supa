@@ -89,6 +89,9 @@ body { background: #e9eeec; }
 .hifi-added { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: #def5ed; color: #006642; font-weight: bold; }
 .hifi-feedback:empty { display: none; }
 .hifi-feedback, .hifi-empty { font-size: 14px; line-height: 1.4; }
+.hifi-empty-state { display: grid; justify-items: start; gap: 10px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: white; }
+.hifi-empty-state .hifi-empty { margin: 0; }
+.hifi-empty-reset { min-height: 44px; padding: 9px 14px; border: 1px solid #78967f; border-radius: 12px; background: #e8f1e7; color: #254e38; font: inherit; font-weight: 650; }
 .hifi-feedback { background: white; border-radius: 12px; padding: 12px; }
 .hifi-home .hifi-page-title { font-size: 24px; }
 .hifi-products-heading { display: flex; align-items: center; justify-content: space-between; }
