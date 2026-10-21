@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type Dispatch, type SetStateAction } from 'react'
 import './manualShoppingNotes.css'
+import { exportUnpricedShoppingCsv, importUnpricedShoppingCsv, importUnpricedShoppingPaste } from './manualShoppingNotesCsv.ts'
 import { mergePrivateNotes, normalizePrivateNotes, serializePrivateNotes, PRIVATE_NOTES_BACKUP_MAX_BYTES } from './manualShoppingNotesBackup.ts'
 
 export type UnpricedShoppingNote = { id: string; label: string; store: 'Algemeen' | 'PLUS' | 'DekaMarkt'; done: boolean }
@@ -18,6 +19,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
 }) {
   const [name, setName] = useState('')
   const [bulkDraft, setBulkDraft] = useState('')
+  const [ownCsvPaste, setOwnCsvPaste] = useState('')
   const [bulkPreview, setBulkPreview] = useState<{
     draft: string; existing: string; selectedStore: UnpricedShoppingNote['store'];
     incoming: Array<Pick<UnpricedShoppingNote, 'label' | 'store' | 'done'>>;
@@ -209,6 +211,45 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       setMessage('Je eigen TXT is lokaal ingelezen; bekijk de tekst en klik zelf op toevoegen.')
     } catch (error) {
       if (serial === bulkFileSerial.current) setMessage(error instanceof Error ? error.message : 'TXT kon niet worden gelezen.')
+    }
+  }
+  function downloadOwnCsv(template = false) {
+    try {
+      const uri = URL.createObjectURL(new Blob([exportUnpricedShoppingCsv(template
+        ? [{ label: '', store: 'Algemeen', done: false }] : notes)], { type: 'text/csv;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = uri
+        link.download = template ? 'supa-lege-ongeprijsde-boodschappen.csv' : 'supa-eigen-ongeprijsde-boodschappen.csv'
+        document.body.append(link); link.click(); link.remove()
+        setMessage(template ? 'Leeg CSV-invulblad opgeslagen: vul het veld artikel in en behoud de vier kolommen.' : 'Alle eigen boodschappen als CSV opgeslagen, zonder prijzen of SKU’s.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
+    } catch { setMessage('Kon de ongeprijsde CSV niet bewaren.') }
+  }
+  function prepareOwnCsvPreview(source: string, pasted = false) {
+    const incoming = pasted ? importUnpricedShoppingPaste(source) : importUnpricedShoppingCsv(source)
+    const draft = incoming.map(item => (item.done ? '☑ ' : '☐ ') +
+      '[' + item.store + '] ' + item.label).join('\n')
+    if (draft.length > 15000) throw Error('Te veel tekst voor de voorinzage.')
+    setBulkPreview(null)
+    setBulkDraft(draft)
+    setMessage(incoming.length + ' eigen CSV-artikelen ingelezen. Bekijk en bevestig via de bestaande ongeprijsde lijstimport.')
+  }
+  function preparePastedOwnCsv() {
+    ++bulkFileSerial.current
+    try { prepareOwnCsvPreview(ownCsvPaste, true) }
+    catch (error) { setMessage(error instanceof Error ? error.message : 'Geplakte CSV geweigerd.') }
+  }
+  async function readOwnCsv(file?: File) {
+    const serial = ++bulkFileSerial.current
+    if (!file) return
+    try {
+      if (!file.size || file.size > 32768) throw Error('Kies een Supa-CSV van maximaal 32 kB.')
+      const source = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      if (serial !== bulkFileSerial.current) return
+      prepareOwnCsvPreview(source)
+    } catch (error) {
+      if (serial === bulkFileSerial.current) setMessage(error instanceof Error ? error.message : 'CSV geweigerd.')
     }
   }
   function addBulk(event: FormEvent) {
@@ -693,6 +734,27 @@ export function ManualShoppingNotes({ notes, setNotes }: {
           <input type="file" accept=".txt,text/plain"
             onChange={event => { void readBulkText(event.currentTarget.files?.[0]); event.currentTarget.value = '' }} />
         </label>
+        <button type="button" onClick={() => downloadOwnCsv(true)}>
+          Download leeg CSV-invulblad voor eigen boodschappen
+        </button>
+        <label>Importeer eigen ongeprijsde Supa-CSV (max. 32 kB; geen retailerprijzen)
+          <input type="file" accept=".csv,text/csv" onChange={event => {
+            void readOwnCsv(event.currentTarget.files?.[0]); event.currentTarget.value = ''
+          }} />
+        </label>
+        <details>
+          <summary>Of plak vier kolommen uit Excel/Calc</summary>
+          <p>Plak rechtstreeks de vier kolommen van het eigen Supa-invulblad (ook met tabs), of de volledige Supa-CSV. Geen winkelprijsbestanden.
+            Na voorbereiden verschijnt de lijst hierboven; bevestig daarna zelf de voorinzage.</p>
+          <label>Privé-CSV-tekst
+            <textarea rows={4} maxLength={32768} value={ownCsvPaste}
+              onChange={event => setOwnCsvPaste(event.target.value)}
+              placeholder="supa-eigen-ongeprijsd-v1;winkel;artikel;afgevinkt" />
+          </label>
+          <button type="button" disabled={!ownCsvPaste.trim()} onClick={preparePastedOwnCsv}>
+            Zet mijn spreadsheet klaar voor controle
+          </button>
+        </details>
         <button type="submit" disabled={!bulkDraft.trim() || notes.length >= 100}>
           Bekijk artikelen vóór toevoegen
         </button>
@@ -900,6 +962,9 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       </button>
       <button type="button" disabled={!visible.length} onClick={downloadPrintableList}>
         Offline afdrukbare lijst (HTML)
+      </button>
+      <button type="button" disabled={!notes.length} onClick={() => downloadOwnCsv()}>
+        Eigen ongeprijsde lijst (CSV voor Excel)
       </button>
       <button type="button" disabled={!notes.length} onClick={backupDownload}>Backup hele lijst (JSON)</button>
       <label>Herstel lijst uit JSON-backup (max. 64 kB)
