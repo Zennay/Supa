@@ -40,11 +40,18 @@ export function previewLocalRecipePortions(
     : null
   const sourceNotReviewed = source.source === 'url' &&
     (!sourceAssessment || sourceAssessment.accepted === false)
+  // Import provenance warnings remain review blockers through portion scaling.
+  // Invalid warning containers also fail closed instead of appearing reviewed.
+  const hasPendingWarnings = (warnings: unknown): boolean =>
+    !Array.isArray(warnings) ||
+    warnings.some(warning => typeof warning !== 'string' || warning.trim().length > 0)
   return {
     draft: scaled.draft,
     portionWarnings: scaled.warnings,
     sourceAssessment,
     needsReview: sourceNotReviewed ||
+      hasPendingWarnings(source.warnings) ||
+      hasPendingWarnings(scaled.draft.warnings) ||
       scaled.status === 'needs_review' ||
       !canConfirmUserRecipeDraft(scaled.draft),
     fetchAuthorized: false,
@@ -63,7 +70,9 @@ export function saveLocalRecipeReviewDraft(
   expectedRevision: number | null,
   explicitDeviceStorageConsent: boolean,
 ): DraftStorageWrite | { status: 'consent_required' } {
-  if (!explicitDeviceStorageConsent) return { status: 'consent_required' }
+  // Type annotations disappear at runtime: only an explicit primitive true is consent.
+  // Reject all other values before the storage adapter can be read or written.
+  if (explicitDeviceStorageConsent !== true) return { status: 'consent_required' }
   return saveRecipeDeviceDraft(storage, id, draft, expectedRevision)
 }
 

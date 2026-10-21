@@ -9,6 +9,8 @@ export type EditorIngredient = {
   amount: number | null
   unit: EditorUnit | null
   reviewReason: string | null
+  /** Original parser/source hold, separate from temporary editor validation messages. */
+  sourceReviewReason?: string | null
 }
 export type EditorRecipeDraft = {
   source: 'manual' | 'url'
@@ -30,8 +32,45 @@ function newClientIngredientId(): string {
   return 'local-ingredient-' + ingredientSequence
 }
 
+const EDITOR_VALIDATION_REASONS = new Set([
+  'Vul een ingrediëntnaam in.',
+  'Vul een geldige hoeveelheid in.',
+  'Vul een geldige hoeveelheid in (maximaal 1.000.000).',
+  'Kies gram, milliliter of stuks.',
+  'Een deel van een stuk: kies een heel aantal stuks.',
+  'Vul een hoeveelheid in.',
+  'Vul een ingrediëntnaam en hoeveelheid in.',
+])
+
+function editorValidationReason(
+  ingredient: Pick<EditorIngredient, 'label' | 'amount' | 'unit'>,
+): string | null {
+  if (!ingredient.label.trim()) return 'Vul een ingrediëntnaam in.'
+  if (!validAmount(ingredient.amount)) return 'Vul een geldige hoeveelheid in (maximaal 1.000.000).'
+  if (!['g', 'ml', 'piece'].includes(ingredient.unit ?? '')) return 'Kies gram, milliliter of stuks.'
+  if (ingredient.unit === 'piece' && !Number.isSafeInteger(ingredient.amount)) {
+    return 'Een deel van een stuk: kies een heel aantal stuks.'
+  }
+  return null
+}
+
+function sourceReviewReasonOf(ingredient: EditorIngredient): string | null {
+  if (typeof ingredient.sourceReviewReason === 'string' && ingredient.sourceReviewReason.length > 0) {
+    return ingredient.sourceReviewReason
+  }
+  return typeof ingredient.reviewReason === 'string' &&
+    ingredient.reviewReason.length > 0 &&
+    !EDITOR_VALIDATION_REASONS.has(ingredient.reviewReason)
+    ? ingredient.reviewReason : null
+}
+
+function combinedReviewReason(validation: string | null, source: string | null): string | null {
+  if (validation && source) return validation + ' ' + source
+  return validation ?? source
+}
+
 function validAmount(value: number | null): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 1_000_000_000 &&
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 1_000_000 &&
     Math.abs(value * 1000 - Math.round(value * 1000)) <= 1e-7
 }
 
@@ -39,7 +78,7 @@ export function emptyUserRecipeDraft(): EditorRecipeDraft {
   return {
     source: 'manual', sourceUrl: null, title: '', servings: 2,
     minutes: null, steps: [], warnings: [], status: 'needs_review',
-    ingredients: [{ clientId: newClientIngredientId(), original: '', label: '', query: '', amount: null, unit: 'g', reviewReason: 'Vul een hoeveelheid in.' }],
+    ingredients: [{ clientId: newClientIngredientId(), original: '', label: '', query: '', amount: null, unit: 'g', reviewReason: 'Vul een hoeveelheid in.', sourceReviewReason: null }],
   }
 }
 
@@ -47,13 +86,20 @@ export function emptyUserRecipeDraft(): EditorRecipeDraft {
 export function prepareImportedRecipeForEditor(
   draft: Omit<EditorRecipeDraft, 'ingredients'> & { ingredients: Omit<EditorIngredient, 'clientId'>[] },
 ): EditorRecipeDraft {
-  return { ...draft, ingredients: draft.ingredients.map((ingredient) => ({ ...ingredient, clientId: newClientIngredientId() })) }
+  const ingredients = draft.ingredients.map((ingredient) => {
+    const next = { ...ingredient, clientId: newClientIngredientId() }
+    const sourceReviewReason = sourceReviewReasonOf(next)
+    next.sourceReviewReason = sourceReviewReason
+    next.reviewReason = combinedReviewReason(editorValidationReason(next), sourceReviewReason)
+    return next
+  })
+  return { ...draft, ingredients }
 }
 
 export function parseMetricEditorAmount(value: string): number | null {
   if (!/^(?:\d{1,9})(?:[.,]\d{1,3})?$/.test(value.trim())) return null
   const amount = Number(value.trim().replace(',', '.'))
-  return Number.isFinite(amount) && amount > 0 && amount <= 1_000_000_000 ? amount : null
+  return Number.isFinite(amount) && amount > 0 && amount <= 1_000_000 ? amount : null
 }
 
 /**
@@ -77,13 +123,18 @@ export function updateEditorIngredient(
     const next = { ...ingredient, ...patch }
     next.label = next.label.trimStart().slice(0, MAX_TEXT)
     next.query = next.label.toLowerCase()
-    next.reviewReason = !next.label.trim()
-      ? 'Vul een ingrediëntnaam in.'
-      : !validAmount(next.amount)
-        ? 'Vul een geldige hoeveelheid in.'
-        : !['g', 'ml', 'piece'].includes(next.unit ?? '')
-          ? 'Kies gram, milliliter of stuks.'
-          : null
+    const validation = editorValidationReason(next)
+    const measurementChanged =
+      (Object.hasOwn(patch, 'amount') && patch.amount !== ingredient.amount) ||
+      (Object.hasOwn(patch, 'unit') && patch.unit !== ingredient.unit)
+    const previousSourceReview = sourceReviewReasonOf(ingredient)
+    const correctedMeasurementIsValid = measurementChanged &&
+      validAmount(next.amount) &&
+      (next.unit === 'g' || next.unit === 'ml' || next.unit === 'piece') &&
+      (next.unit !== 'piece' || Number.isSafeInteger(next.amount))
+    const sourceReviewReason = correctedMeasurementIsValid ? null : previousSourceReview
+    next.sourceReviewReason = sourceReviewReason
+    next.reviewReason = combinedReviewReason(validation, sourceReviewReason)
     return next
   })
   return { ...draft, ingredients }
@@ -94,7 +145,7 @@ export function addEditorIngredient(draft: EditorRecipeDraft): EditorRecipeDraft
   return {
     ...draft,
     ingredients: [...draft.ingredients, {
-      clientId: newClientIngredientId(), original: '', label: '', query: '', amount: null, unit: 'g', reviewReason: 'Vul een ingrediëntnaam en hoeveelheid in.',
+      clientId: newClientIngredientId(), original: '', label: '', query: '', amount: null, unit: 'g', reviewReason: 'Vul een ingrediëntnaam en hoeveelheid in.', sourceReviewReason: null,
     }],
   }
 }
@@ -112,7 +163,8 @@ export function canConfirmUserRecipeDraft(draft: EditorRecipeDraft): boolean {
     (draft.minutes === null || (Number.isSafeInteger(draft.minutes) && draft.minutes >= 1 && draft.minutes <= 1440)) &&
     draft.ingredients.length >= 1 && draft.ingredients.length <= MAX_INGREDIENTS &&
     draft.ingredients.every((x) => x.label.trim().length > 0 && x.label.length <= MAX_TEXT &&
-      x.reviewReason === null && validAmount(x.amount) &&
-      (x.unit === 'g' || x.unit === 'ml' || x.unit === 'piece')),
+      x.reviewReason === null && x.sourceReviewReason == null && validAmount(x.amount) &&
+      (x.unit === 'g' || x.unit === 'ml' || x.unit === 'piece') &&
+      (x.unit !== 'piece' || Number.isSafeInteger(x.amount))),
   )
 }
