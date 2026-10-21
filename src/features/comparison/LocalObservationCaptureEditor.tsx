@@ -31,7 +31,7 @@ type Props = {
   needsAtClick?: () => readonly PlannerCaptureGuideNeed[]
   delimiter: ',' | ';' | '\t'
   context: string
-  onReview?: (files: File[]) => void
+  onReview?: (files: File[]) => void | Promise<void>
   onDraftChange?: () => void
 }
 /**
@@ -55,9 +55,17 @@ export function LocalObservationCaptureEditor({
   const rowKey = (store: CaptureStore, index: number) => store + ':' + index
   const row = (store: CaptureStore, index: number) => rows[rowKey(store, index)] ?? empty()
   function edit(store: CaptureStore, index: number, field: Field, value: string) {
+    const oldEntry = row(store, index)
+    const droppingPrice = field === 'state' && value === 'unavailable' &&
+      !!(oldEntry.amount || oldEntry.count || oldEntry.cents)
+    if (droppingPrice && !window.confirm(
+      'Niet-beschikbaar kiezen wist de eerdere pakinhoud en prijs uit deze lokale conceptregel. Toch wijzigen?'
+    )) return
     setRows(old => {
       const key = rowKey(store, index)
-      return { ...old, [key]: { ...(old[key] ?? empty()), [field]: value } }
+      const next = { ...(old[key] ?? empty()), [field]: value }
+      return { ...old, [key]: droppingPrice
+        ? { ...next, amount: '', count: '', cents: '' } : next }
     })
     setStatus('')
     onDraftChange?.()
@@ -134,8 +142,11 @@ export function LocalObservationCaptureEditor({
         if (!onReview) throw Error('Deze sectie kan de bron nog niet lokaal controleren.')
         // Only source files enter the existing parser. This does not accept
         // proposals, prices, permissions or product links automatically.
-        onReview(files)
-        setStatus('Eigen opname doorgestuurd naar de bestaande lokale bronvoorcontrole. Controleer daar de originele producten en bevestig eventuele overname zelf.')
+        await onReview(files)
+        setStatus('Broncontrole op dit toestel gestart. Controleer hierboven de oorspronkelijke SKU’s en bronmomenten, en bevestig eventueel overnemen altijd afzonderlijk.')
+        document.getElementById('supa-price-sheet-review')?.scrollIntoView({
+          behavior: 'smooth', block: 'start',
+        })
         return
       }
       if (method === 'share' && navigator.share &&

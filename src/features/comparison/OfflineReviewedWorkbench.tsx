@@ -2559,7 +2559,7 @@ export function OfflineReviewedWorkbench({
           <PortableBlankCapture needs={plannerCaptureNeeds}
             stores={captureSheetStore === 'both' ? stores : [captureSheetStore]}
             delimiter={captureDelimiter}
-            onReview={files => { void previewFilledCsv(files) }}
+            onReview={files => previewFilledCsv(files)}
             onDraftChange={() => {
               ++importRevision.current
               setCapturePreview(null)
@@ -3294,7 +3294,7 @@ export function OfflineReviewedWorkbench({
                       </div>
                       {missingPriceCaptureNeeds[store].length > 0 &&
                         <PortableBlankCapture purpose="missing"
-                          onReview={files => { void previewFilledCsv(files) }}
+                          onReview={files => previewFilledCsv(files)}
                           needs={missingPriceCaptureNeeds[store]}
                           needsAtClick={() => missingCaptureNeedsNow(store)}
                           stores={[store]}
