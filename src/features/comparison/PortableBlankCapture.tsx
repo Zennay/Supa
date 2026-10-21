@@ -94,6 +94,8 @@ export function PortableBlankCapture({
       <button type="button" className="ghost-button" disabled={!needs.length}
         onClick={() => void act('csv', 'show')}>Toon selecteerbare CSV</button>
       <button type="button" className="ghost-button" disabled={!needs.length}
+        onClick={() => void act('csv', 'share')}>Deel leeg CSV/TSV-invulblad op mijn telefoon</button>
+      <button type="button" className="ghost-button" disabled={!needs.length}
         onClick={() => void act('guide', 'show')}>Toon fysieke hoeveelheden en rijnummers</button>
       <button type="button" className="ghost-button" disabled={!needs.length}
         onClick={() => void act('guide', 'share')}>Deel opnamegids op mijn telefoon</button>
