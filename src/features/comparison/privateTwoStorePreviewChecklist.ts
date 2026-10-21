@@ -4,15 +4,22 @@ import type { MatchUnit } from '../../domain/matching.ts'
 import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
 import type { PreviewMatchLine } from './CaptureMatchingPreview.tsx'
 import { samePrivatePhysicalDemand } from './samePrivatePhysicalDemand.ts'
+import { observedInstant } from '../../domain/offlineReviewedImport.ts'
 
 const clean = (value: unknown) => String(value ?? '')
   .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ')
   .replace(/\s+/gu, ' ').trim().slice(0, 180)
 
-function offer(line: PreviewMatchLine | null, describeReason?: (value: string) => string): string {
+function offer(line: PreviewMatchLine | null,
+  describeReason?: (value: string) => string, usable = true): string {
+  const identity = line ? [
+    line.product?.trim() ? 'origineel bronproduct ' + clean(line.product) : '',
+    line.originalSku?.trim() ? 'originele SKU ' + clean(line.originalSku) : '',
+  ].filter(Boolean).join(' | ') : ''
+  if (!usable) return 'prijs en eenheidsprijs onbekend; bron opnieuw opnemen. ' + identity
   if (!completePreviewProposal(line)) {
-    return 'geen bruikbare voorgestelde match; prijs onbekend. ' +
-      (line?.reasons?.length && describeReason
+    return 'geen complete betrouwbare voorgestelde match; prijs onbekend. ' +
+      identity + ' | ' + (line?.reasons?.length && describeReason
         ? clean(describeReason(line.reasons[0]))
         : 'Originele code, pakinhoud en hele-pak-prijs handmatig controleren.')
   }
@@ -55,11 +62,13 @@ export function completePreviewProposal(line: PreviewMatchLine | null): line is
 
 /** Portable, user-initiated source-review notes. No comparator and no total. */
 export function privateTwoStorePreviewChecklist({
-  plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh, describeReason,
+  plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh,
+  plusFresh = sourceFresh, dekaFresh = sourceFresh, describeReason,
 }: {
   plus: readonly PreviewMatchLine[]; deka: readonly PreviewMatchLine[]
   plusObservedAt: string; dekaObservedAt: string
   within24h: boolean; sourceFresh: boolean
+  plusFresh?: boolean; dekaFresh?: boolean
   describeReason?: (value: string) => string
 }): string {
   if (!Array.isArray(plus) || !Array.isArray(deka) ||
@@ -67,6 +76,12 @@ export function privateTwoStorePreviewChecklist({
       !plusObservedAt || !dekaObservedAt) {
     throw Error('Geen geldig oorspronkelijk winkelopnamepaar om te bewaren.')
   }
+  const plusInstant = observedInstant(plusObservedAt)
+  const dekaInstant = observedInstant(dekaObservedAt)
+  const older = plusInstant && dekaInstant
+    ? plusInstant.ns <= dekaInstant.ns ? 'PLUS' : 'DekaMarkt' : null
+  const plusUsable = plusFresh && (within24h || older !== 'PLUS')
+  const dekaUsable = dekaFresh && (within24h || older !== 'DekaMarkt')
   const dekaById = new Map(deka.map(line => [line.id, line]))
   const leftIds = new Set(plus.map(line => line.id))
   const output = [
@@ -91,15 +106,16 @@ export function privateTwoStorePreviewChecklist({
         ? readablePlannerDemandAmount(left.amount) + ' ' + clean(left.unit) : 'ontbreekt'))
       output.push('  DekaMarkt oorspronkelijke vraag: ' + (right
         ? readablePlannerDemandAmount(right.amount) + ' ' + clean(right.unit) : 'ontbreekt'))
-      output.push('  PLUS: geen bruikbare prijs | DekaMarkt: geen bruikbare prijs', '')
+      output.push('  PLUS: ' + offer(left, describeReason, false))
+      output.push('  DekaMarkt: ' + offer(right, describeReason, false), '')
       return
     }
     output.push('  Zelfde fysieke vraag: PLUS ' +
       readablePlannerDemandAmount(left!.amount) + ' ' + clean(left!.unit) +
       ' = DekaMarkt ' + readablePlannerDemandAmount(right!.amount) +
       ' ' + clean(right!.unit))
-    output.push('  PLUS: ' + offer(left, describeReason))
-    output.push('  DekaMarkt: ' + offer(right, describeReason), '')
+    output.push('  PLUS: ' + offer(left, describeReason, plusUsable))
+    output.push('  DekaMarkt: ' + offer(right, describeReason, dekaUsable), '')
   }
   plus.forEach((left, index) => append(left, dekaById.get(left.id) ?? null, index))
   let position = plus.length

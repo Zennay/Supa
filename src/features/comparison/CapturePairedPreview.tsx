@@ -129,7 +129,7 @@ export function CapturePairedPreview({
 
   function reviewText() {
     return privateTwoStorePreviewChecklist({
-      plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh, describeReason,
+      plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh, plusFresh, dekaFresh, describeReason,
     })
   }
   function downloadLocal(content: string, mime: string, filename: string) {
@@ -190,7 +190,7 @@ export function CapturePairedPreview({
     try {
       setExportMessage('')
       const text = privateTwoStoreMissingChecklist({
-        plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh, describeReason,
+        plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh, plusFresh, dekaFresh, describeReason,
       })
       downloadLocal(text, 'text/plain;charset=utf-8',
         'supa-PLUS-Deka-openstaande-broncontroles-prive.txt')
@@ -203,7 +203,7 @@ export function CapturePairedPreview({
     try {
       setExportMessage('')
       const note = privateTwoStoreMissingChecklist({
-        plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh, describeReason,
+        plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh, plusFresh, dekaFresh, describeReason,
       })
       downloadLocal(privateTwoStorePreviewPrintHtml(note), 'text/html;charset=utf-8',
         'supa-PLUS-Deka-openstaande-broncontroles-afdruk-prive.html')
@@ -236,7 +236,7 @@ export function CapturePairedPreview({
     try {
       setExportMessage('')
       const note = scope === 'all' ? reviewText() : privateTwoStoreMissingChecklist({
-        plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh, describeReason,
+        plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh, plusFresh, dekaFresh, describeReason,
       })
       // Always provide a local selectable fallback for denied permissions.
       setPrintable(note)
