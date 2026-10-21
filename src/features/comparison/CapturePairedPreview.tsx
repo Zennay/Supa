@@ -9,9 +9,15 @@ import { privateTwoStorePreviewPrintHtml } from './privateTwoStorePreviewPrintHt
 function labelQuantity(line: PreviewMatchLine): string {
   return readablePlannerDemandAmount(line.amount) + ' ' + line.unit
 }
-function localOffer(line: PreviewMatchLine | null) {
+function localOffer(line: PreviewMatchLine | null, describeReason: (value: string) => string) {
   if (!completePreviewProposal(line)) {
-    return <span>Ontbrekende of niet betrouwbare productmatch. Prijs onbekend.</span>
+    return <span>Geen complete betrouwbare productmatch. Prijs onbekend.
+      {line?.reasons?.length ? <small style={{ display: 'block' }}>
+        {describeReason(line.reasons[0])}
+      </small> : <small style={{ display: 'block' }}>
+        Controleer de originele productcode, verpakking en de hele-pak-prijs.
+      </small>}
+    </span>
   }
   return <span>
     <strong>{line.product}</strong>
@@ -34,7 +40,7 @@ function localOffer(line: PreviewMatchLine | null) {
  * is not a whole-basket financial comparison or a right to publish prices.
  */
 export function CapturePairedPreview({
-  plus, deka, within24h, sourceFresh, retainedStore, plusObservedAt, dekaObservedAt,
+  plus, deka, within24h, sourceFresh, retainedStore, plusObservedAt, dekaObservedAt, describeReason,
 }: {
   plus: readonly PreviewMatchLine[]
   deka: readonly PreviewMatchLine[]
@@ -43,6 +49,7 @@ export function CapturePairedPreview({
   retainedStore?: 'PLUS' | 'DekaMarkt'
   plusObservedAt: string
   dekaObservedAt: string
+  describeReason: (value: string) => string
 }) {
   const [query, setQuery] = useState('')
   const [openOnly, setOpenOnly] = useState(false)
@@ -86,7 +93,7 @@ export function CapturePairedPreview({
 
   function reviewText() {
     return privateTwoStorePreviewChecklist({
-      plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh,
+      plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh, describeReason,
     })
   }
   function downloadLocal(content: string, mime: string, filename: string) {
@@ -104,7 +111,7 @@ export function CapturePairedPreview({
     try {
       setExportMessage('')
       const text = privateTwoStoreMissingChecklist({
-        plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh,
+        plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh, describeReason,
       })
       downloadLocal(text, 'text/plain;charset=utf-8',
         'supa-PLUS-Deka-ontbrekende-bronmatches-prive.txt')
@@ -201,7 +208,7 @@ export function CapturePairedPreview({
                 'Vraag ongelijk of ontbrekend — controleren'}
             </small></th>
             {row.sameDemand
-              ? <><td>{localOffer(row.left)}</td><td>{localOffer(row.right)}</td></>
+              ? <><td>{localOffer(row.left, describeReason)}</td><td>{localOffer(row.right, describeReason)}</td></>
               : <td colSpan={2}>De originele fysieke vraag is niet eenduidig
                 voor beide winkels. PLUS: {row.left ? labelQuantity(row.left) : 'ontbreekt'}.
                 {' '}DekaMarkt: {row.right ? labelQuantity(row.right) : 'ontbreekt'}.

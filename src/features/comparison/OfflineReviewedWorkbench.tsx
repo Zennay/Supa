@@ -2701,7 +2701,8 @@ export function OfflineReviewedWorkbench({
                     plus={previewPlusLines} deka={previewDekaLines}
                     within24h={previewPair24h} sourceFresh={previewPairFresh}
                     plusObservedAt={previewPlusAt} dekaObservedAt={previewDekaAt}
-                    retainedStore={currentPreview.retainedOther?.retailer} />
+                    retainedStore={currentPreview.retainedOther?.retailer}
+                    describeReason={humanMatchReason} />
                 )}
               {currentPreview.stores.map(store => store.matching && (
                 <CaptureMatchingPreview

@@ -6,9 +6,12 @@ const clean = (value: unknown) => String(value ?? '')
   .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ')
   .replace(/\s+/gu, ' ').trim().slice(0, 180)
 
-function offer(line: PreviewMatchLine | null): string {
+function offer(line: PreviewMatchLine | null, describeReason?: (value: string) => string): string {
   if (!completePreviewProposal(line)) {
-    return 'geen bruikbare voorgestelde match; prijs onbekend'
+    return 'geen bruikbare voorgestelde match; prijs onbekend. ' +
+      (line?.reasons?.length && describeReason
+        ? clean(describeReason(line.reasons[0]))
+        : 'Originele code, pakinhoud en hele-pak-prijs handmatig controleren.')
   }
   return [
     clean(line.product) + ' · originele SKU ' + clean(line.originalSku),
@@ -39,11 +42,12 @@ export function completePreviewProposal(line: PreviewMatchLine | null): line is
 
 /** Portable, user-initiated source-review notes. No comparator and no total. */
 export function privateTwoStorePreviewChecklist({
-  plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh,
+  plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh, describeReason,
 }: {
   plus: readonly PreviewMatchLine[]; deka: readonly PreviewMatchLine[]
   plusObservedAt: string; dekaObservedAt: string
   within24h: boolean; sourceFresh: boolean
+  describeReason?: (value: string) => string
 }): string {
   if (!Array.isArray(plus) || !Array.isArray(deka) ||
       plus.length > 200 || deka.length > 200 ||
@@ -71,13 +75,17 @@ export function privateTwoStorePreviewChecklist({
     output.push(String(index + 1) + '. ' + clean(left?.label ?? right?.label))
     if (!demandEqual) {
       output.push('  Planner-vraag ongelijk of niet aanwezig in beide bronnen: controleren.')
-      output.push('  PLUS: onbekend | DekaMarkt: onbekend', '')
+      output.push('  PLUS oorspronkelijke vraag: ' + (left
+        ? readablePlannerDemandAmount(left.amount) + ' ' + clean(left.unit) : 'ontbreekt'))
+      output.push('  DekaMarkt oorspronkelijke vraag: ' + (right
+        ? readablePlannerDemandAmount(right.amount) + ' ' + clean(right.unit) : 'ontbreekt'))
+      output.push('  PLUS: geen bruikbare prijs | DekaMarkt: geen bruikbare prijs', '')
       return
     }
     output.push('  Zelfde fysieke vraag: ' + readablePlannerDemandAmount(left!.amount) +
       ' ' + clean(left!.unit))
-    output.push('  PLUS: ' + offer(left))
-    output.push('  DekaMarkt: ' + offer(right), '')
+    output.push('  PLUS: ' + offer(left, describeReason))
+    output.push('  DekaMarkt: ' + offer(right, describeReason), '')
   }
   plus.forEach((left, index) => append(left, dekaById.get(left.id) ?? null, index))
   let position = plus.length
