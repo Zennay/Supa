@@ -58,6 +58,22 @@ export function PrivateCapturePastePreview({
       setError(cause instanceof Error ? cause.message : 'Kon het lokale concept niet bewaren.')
     }
   }
+  function confirmReplacingDrafts(target: 'first' | 'second' | 'both',
+    next: readonly string[]): boolean {
+    const replaceFirst = target === 'both' || target === 'first'
+    const replaceSecond = target === 'both' || target === 'second'
+    const oldFirst = first
+    const oldSecond = second
+    const newFirst = target === 'both' || target === 'first' ? next[0] : ''
+    const newSecond = target === 'both' ? next[1] : next[0]
+    if (!(replaceFirst && available(oldFirst) && oldFirst !== newFirst) &&
+        !(replaceSecond && available(oldSecond) && oldSecond !== newSecond)) return true
+    // Browser-native explicit consent protects unsaved source captures.
+    // Never silently discard an existing manually edited shop draft.
+    return window.confirm('Je hebt al een ingevuld winkelconcept. Het openen van dit bestand ' +
+      'vervangt de tekst in het gekozen invoerveld. Bewaar je huidige concept ' +
+      'eerst als TXT als je het wilt behouden. Toch vervangen?')
+  }
   async function readSavedDrafts(files: readonly File[], target: 'first' | 'second' | 'both') {
     if (disabled) return
     const request = ++latestRead.current
@@ -69,6 +85,11 @@ export function PrivateCapturePastePreview({
       }
       const drafts = await readLocalCaptureDraftFiles(files)
       if (request !== latestRead.current || !canRead.current) return
+      // Never overwrite an edited or unsaved original without explicit consent.
+      if (!confirmReplacingDrafts(target, drafts)) {
+        setFeedback('Bronconcept behouden. Het gekozen bestand is niet overgenomen.')
+        return
+      }
       // Stage only; do not accept any prices or infer which store supplied them.
       onDraftChange()
       if (target === 'both') { setFirst(drafts[0]); setSecond(drafts[1]) }
@@ -95,6 +116,10 @@ export function PrivateCapturePastePreview({
       if (!available(raw)) throw Error('Het klembord bevat geen ingevuld winkelblad.')
       if (raw.length > 256000 || new TextEncoder().encode(raw).length > maxBytes)
         throw Error('Het klembord bevat meer dan 256 kB. Gebruik een kleiner winkelblad.')
+      if (!confirmReplacingDrafts(target, [raw])) {
+        setFeedback('Bronconcept behouden. Het klembord is niet overgenomen.')
+        return
+      }
       onDraftChange()
       if (target === 'first') setFirst(raw)
       else setSecond(raw)
