@@ -90,7 +90,8 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
   const toggleFavorite = (id: string) => setFavorites(current => current.includes(id) ? current.filter(x => x !== id) : [...current, id])
   const switchProductSource = (source: 'history' | 'figma') => {
     setProductSource(source)
-    setQuery('')
+    // Keep the user's search intent while resetting filters that only make
+    // sense for the source being left (retailer, unit price and favorites).
     setFavoritesOnly(false)
     setUnitFilter('all')
     setStoreFilter('all')
