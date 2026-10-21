@@ -398,6 +398,11 @@ export function LocalTwoStorePriceEditor({
   // Avoid importing a draft into a different plan if it changed during File.text().
   const currentPlanFingerprint = useRef(selectedPlanFingerprint)
   currentPlanFingerprint.current = selectedPlanFingerprint
+  // A lazy HTML exporter must never download a snapshot after the shopper
+  // switched weeks, edited a draft SKU or changed a store capture time.
+  const draftReviewIdentity = JSON.stringify([selectedPlanFingerprint, sourceSelection, capturedAt, rows])
+  const currentDraftReviewIdentity = useRef(draftReviewIdentity)
+  currentDraftReviewIdentity.current = draftReviewIdentity
   // A camera stream belongs only to the selected physical Planner week.
   useEffect(() => setScanTarget(null), [selectedPlanFingerprint])
   const [preparedFor, setPreparedFor] = useState('')
@@ -835,6 +840,55 @@ export function LocalTwoStorePriceEditor({
     setCapturedAt(prev => ({ ...prev, [store]: value }))
     setOutput(''); setError(''); setPreparedFor(''); onEdit()
   }
+  async function downloadProvisionalReview() {
+    const identity = draftReviewIdentity
+    try {
+      // Revalidate at the instant of the action, even if this tab stayed open
+      // long enough for a previously plausible pair to become stale.
+      const instants = stores.map(store => {
+        const original = timestampWithOffset(capturedAt[store])
+        return original === null ? Number.NaN : Date.parse(original)
+      })
+      const now = Date.now()
+      if (sourceSelection !== 'both' || !provisionalDifferences.length ||
+          instants.some(time => !Number.isFinite(time) ||
+            now - time < -300000 || now - time > 604800000) ||
+          Math.abs(instants[0] - instants[1]) > 86400000) {
+        throw Error('Deze twee bronmomenten zijn niet vergelijkbaar. Controleer de originele tijd en prijs opnieuw.')
+      }
+      const records = provisionalDifferences.map(item => {
+        const plus = rows[key('PLUS', item.need.id)]!
+        const deka = rows[key('DekaMarkt', item.need.id)]!
+        return {
+          ingredient: item.need.label,
+          demand: String(item.need.amount) + ' ' + item.need.unit,
+          plus: { code: plus.sourceId ?? '', product: plus.name,
+            packs: item.plus.packagesNeeded, packCents: item.plus.pricePerPackCents,
+            totalCents: item.plus.lineTotalCents, unitRate: item.plus.unitRate },
+          deka: { code: deka.sourceId ?? '', product: deka.name,
+            packs: item.deka.packagesNeeded, packCents: item.deka.pricePerPackCents,
+            totalCents: item.deka.lineTotalCents, unitRate: item.deka.unitRate },
+        }
+      })
+      const { privateDraftReviewHtml } = await import('./privateDraftReviewHtml.ts')
+      if (identity !== currentDraftReviewIdentity.current ||
+          Date.now() - Math.min(...instants) > 604800000) {
+        throw Error('Je winkel- of Planner-invoer is ondertussen gewijzigd of verouderd. Open het overzicht opnieuw.')
+      }
+      const html = privateDraftReviewHtml(records, capturedAt, activeNeeds.length)
+      const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-twee-winkels-prive-conceptcontrole.html'
+        document.body.append(link); link.click(); link.remove()
+        setDraftStatus(records.length + ' voorlopige regelvergelijkingen lokaal als controleblad bewaard. Geen officieel prijsbewijs of volledig mandtotaal.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+    } catch (cause) {
+      setDraftStatus(cause instanceof Error ? cause.message : 'Privé-controleblad niet opgeslagen.')
+    }
+  }
+
   function createSourceFile() {
     setError(''); setOutput('')
     try {
@@ -1404,6 +1458,14 @@ export function LocalTwoStorePriceEditor({
             {provisionalDifferences.length > 5 && <small>
               Nog {provisionalDifferences.length - 5} andere rekenbare conceptregels
               staan hieronder in de volledige twee-winkelmatrix.</small>}
+            <button type="button" className="ghost-button"
+              onClick={() => void downloadProvisionalReview()}>
+              Download deze voorlopige twee-winkelcontrole (offline HTML)
+            </button>
+            <small>Scriptvrij lokaal werkblad met jouw oorspronkelijke productcodes,
+              bronmomenten, hele pakken, eenheidsprijzen en rekenverschillen.
+              Geen mandtotaal, bevestigd vergelijkbaar product of besparingsclaim.
+              Bij gewijzigde of verouderde invoer wordt downloaden geweigerd.</small>
           </section>}
           {activeNeeds.map((need, index) => <div key={need.id}
             className="offline-manual-editor__pair-row">
