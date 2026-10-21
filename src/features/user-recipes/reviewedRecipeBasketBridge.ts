@@ -54,6 +54,17 @@ export function prepareUnpricedPrivateRecipe(
         reasons.push('metric_amount_exceeds_import_contract')
         break
       }
+      if (!['g', 'ml', 'piece'].includes(ingredient.unit ?? '')) {
+        reasons.push('invalid_metric_unit')
+        break
+      }
+      // The editor/scaler contract rejects fractional physical pieces. Keep
+      // that gate at the basket boundary too, so stale or alternate editor
+      // branches cannot promote 1.5 eggs/onions into ready shopping demand.
+      if (ingredient.unit === 'piece' && !Number.isSafeInteger(ingredient.amount)) {
+        reasons.push('fractional_piece_requires_review')
+        break
+      }
       if (!ingredient ||
         typeof ingredient.query !== 'string' ||
         !ingredient.query.trim() ||
