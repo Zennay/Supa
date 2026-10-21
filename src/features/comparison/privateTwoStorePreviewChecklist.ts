@@ -113,8 +113,8 @@ export function privateTwoStorePreviewChecklist({
   return result
 }
 
-/** Only physical demand rows missing a complete two-store proposal. Full preflight and
- * original timestamps remain in the export. This is NOT a priced comparison.
+/** Physical demands needing match completion OR recapture due to stale/unpaired
+ * source moments. All source timestamps remain original; no prices are accepted.
  */
 export function privateTwoStoreMissingChecklist(
   input: Parameters<typeof privateTwoStorePreviewChecklist>[0],
@@ -125,7 +125,9 @@ export function privateTwoStoreMissingChecklist(
   }
   const plusById = new Map(input.plus.map(line => [line.id, line]))
   const dekaById = new Map(input.deka.map(line => [line.id, line]))
+  const mustRecapture = !input.within24h || !input.sourceFresh
   const incomplete = new Set([...plusById.keys(), ...dekaById.keys()].filter(id => {
+    if (mustRecapture) return true
     const left = plusById.get(id) ?? null
     const right = dekaById.get(id) ?? null
     return !left || !right || left.label !== right.label ||
@@ -133,7 +135,7 @@ export function privateTwoStoreMissingChecklist(
       !completePreviewProposal(left) || !completePreviewProposal(right)
   }))
   if (incomplete.size === 0) {
-    throw Error('Geen incomplete voorgestelde twee-winkelmatches.')
+    throw Error('Geen openstaande of opnieuw op te nemen winkelregels.')
   }
   return privateTwoStorePreviewChecklist({
     ...input,

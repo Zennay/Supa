@@ -67,8 +67,10 @@ export function CapturePairedPreview({
       const sameDemand = !!right && left.label === right.label &&
         samePrivatePhysicalDemand(left, right)
       return { id: left.id, label: left.label, left, right, sameDemand,
-        open: !sameDemand || !completePreviewProposal(left) ||
-          !completePreviewProposal(right) }
+        // Even perfect-looking SKU proposals cannot be used to finish the
+        // shopping trip when either source is stale or the stores are >24h apart.
+        open: !within24h || !sourceFresh || !sameDemand ||
+          !completePreviewProposal(left) || !completePreviewProposal(right) }
     })
     for (const right of deka) {
       if (!plus.some(left => left.id === right.id)) joined.push({
@@ -77,7 +79,7 @@ export function CapturePairedPreview({
       })
     }
     return joined
-  }, [plus, deka])
+  }, [plus, deka, within24h, sourceFresh])
   const norm = (value: string) => value.normalize('NFKD')
     .replace(/\p{M}/gu, '').toLocaleLowerCase('nl-NL')
   const filter = norm(query.trim())
@@ -119,8 +121,8 @@ export function CapturePairedPreview({
         plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh, describeReason,
       })
       downloadLocal(text, 'text/plain;charset=utf-8',
-        'supa-PLUS-Deka-ontbrekende-bronmatches-prive.txt')
-      setExportMessage('Alleen ontbrekende of incomplete bronvoorstellen lokaal bewaard. Nog geen winkelprijzen bevestigd.')
+        'supa-PLUS-Deka-openstaande-broncontroles-prive.txt')
+      setExportMessage('Openstaande of opnieuw op te nemen winkelbronnen lokaal bewaard. Nog geen winkelprijzen bevestigd.')
     } catch (cause) {
       setExportMessage(cause instanceof Error ? cause.message : 'Kan de ontbrekende bronregels niet bewaren.')
     }
@@ -132,8 +134,8 @@ export function CapturePairedPreview({
         plus, deka, plusObservedAt, dekaObservedAt, within24h, sourceFresh, describeReason,
       })
       downloadLocal(privateTwoStorePreviewPrintHtml(note), 'text/html;charset=utf-8',
-        'supa-PLUS-Deka-ontbrekende-bronmatches-afdruk-prive.html')
-      setExportMessage('Alleen de openstaande PLUS/Deka-broncontroles offline bewaard als afdrukblad. Geen prijzen bevestigd.')
+        'supa-PLUS-Deka-openstaande-broncontroles-afdruk-prive.html')
+      setExportMessage('Openstaande én eventueel opnieuw op te nemen winkelregels afdrukbaar bewaard. Geen prijzen bevestigd.')
     } catch (cause) {
       setExportMessage(cause instanceof Error ? cause.message : 'Kan het ontbrekende-bronblad niet afdrukbaar bewaren.')
     }
@@ -192,7 +194,7 @@ export function CapturePairedPreview({
   return <details className="offline-price-workbench__capture-pair"
     aria-label="Beide winkels naast elkaar vóór bronovername">
     <summary>Zelfde Planner-vraag bij PLUS en DekaMarkt · bekijk de bronproducten naast elkaar
-      {' '}({rows.length - missing} met twee voorstellen; {missing} nog te controleren)</summary>
+      {' '}({rows.length - missing} zonder openstaande actie; {missing} nog te controleren of opnieuw op te nemen)</summary>
     {retainedStore && <p role="status">{retainedStore}: de vergelijking gebruikt
       de reeds ingevoerde originele opname van deze winkel (ongewijzigd tijdstip).
       De nieuw ingevoerde andere winkel blijft een concept en heeft nog geen review.
@@ -216,7 +218,7 @@ export function CapturePairedPreview({
       </label>
       <label><input type="checkbox" checked={openOnly}
         onChange={event => { setOpenOnly(event.currentTarget.checked); setLimit(25) }} />
-        {' '}Alleen ontbrekende/twijfelachtige regels ({missing})</label>
+        {' '}Alleen openstaande of opnieuw op te nemen regels ({missing})</label>
     </div>
     <p role="status">{Math.min(limit, visible.length)} van {visible.length} regels zichtbaar.
       Openstaande regels staan bovenaan; filters en volgorde wijzigen geen originele bron of productreview.</p>
@@ -268,22 +270,22 @@ export function CapturePairedPreview({
       </button>
       <button type="button" className="ghost-button" onClick={downloadMissingReview}
         disabled={missing === 0}>
-        Download alleen {missing} incomplete twee-winkelmatches (TXT)
+        Download {missing} openstaande broncontroles (TXT)
       </button>
       <button type="button" className="ghost-button"
         onClick={downloadMissingPrintableReview} disabled={missing === 0}>
-        Bewaar alleen {missing} openstaande bronmatches als offline afdrukblad (HTML)
+        Bewaar {missing} openstaande broncontroles als offline afdrukblad (HTML)
       </button>
       <button type="button" className="ghost-button" onClick={() => void carryReview('all', 'copy')}>
         Kopieer broncontrole voor onderweg
       </button>
       <button type="button" className="ghost-button" disabled={missing === 0}
         onClick={() => void carryReview('missing', 'copy')}>
-        Kopieer alleen {missing} openstaande winkelmatches
+        Kopieer {missing} openstaande of te vernieuwen winkelregels
       </button>
       <button type="button" className="ghost-button" disabled={missing === 0}
         onClick={() => void carryReview('missing', 'share')}>
-        Deel alleen openstaande broncontroles via mijn telefoon
+        Deel openstaande of te vernieuwen broncontroles via mijn telefoon
       </button>
     </div>
     {printable !== null && <label>Gekozen privébronregels als selecteerbare tekst
