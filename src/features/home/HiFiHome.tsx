@@ -68,10 +68,12 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
   const [storeFilter, setStoreFilter] = useState<'all' | 'PLUS' | 'DekaMarkt'>('all')
   const dialog = useRef<HTMLDialogElement>(null)
   useEffect(() => { setQuery('') }, [view])
-  const normalizedQuery = productSearchText(query.trim())
+  // Treat each typed word as a separate constraint so users can combine a
+  // product, retailer and package term without those words sharing one field.
+  const queryTerms = productSearchText(query.trim()).split(/\s+/u).filter(Boolean)
   const includesQuery = (values: readonly (string | null | undefined)[]) =>
-    !normalizedQuery || values.some(value => typeof value === 'string' &&
-      productSearchText(value).includes(normalizedQuery))
+    queryTerms.every(term => values.some(value => typeof value === 'string' &&
+      productSearchText(value).includes(term)))
   const recipes = designRecipes.filter(recipe =>
     includesQuery([recipe.title]) && (!favoritesOnly || favorites.includes(recipe.id)))
   const matchingProducts = filterDemoProductsByUnit(designProducts.filter(product =>
@@ -148,7 +150,7 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
       </button>
     </section>}
     {view === 'products' && productSource === 'history' && <section className="hifi-section" aria-label="Historisch vastgelegde supermarktproducten">
-      <div className="hifi-section-heading"><div><h2>Producten uit brononderzoek</h2><p className="recipe-count">{historical.length} producten · PLUS en DekaMarkt</p></div></div>
+      <div className="hifi-section-heading"><div><h2>Producten uit brononderzoek</h2><p className="recipe-count" role="status" aria-live="polite">{historical.length} producten · PLUS en DekaMarkt</p></div></div>
       <p className="hifi-demo-note hifi-historical-warning">Alleen historische bronwaarnemingen van 4 oktober 2026. Niet actueel, nog niet gelicentieerd voor productie. Geen prijzen, aanbiedingen, besparingen of beschikbaarheidsclaims.</p>
       <div className="hifi-product-grid">{historical.map(item => <article className="hifi-product-card" key={item.id} data-product-source="historical"><div className="hifi-product-image"><span className="hifi-source-image" aria-hidden="true">{item.name.slice(0, 1)}</span><span className="hifi-store-logo hifi-store-text">{item.store === 'PLUS' ? 'PLUS' : 'Deka'}</span></div><div className="hifi-product-copy"><h3>{item.name}</h3><div className="hifi-product-price"><span>{item.pack}</span></div><span className="hifi-no-price">Prijs niet vrijgegeven</span><small>Bron: {item.store} · {new Date(item.capturedAt).toLocaleDateString('nl-NL')}</small></div><div className="hifi-product-actions"><button className="hifi-product-favorite" aria-label={`Favoriet: ${item.name} bij ${item.store}`} aria-pressed={favorites.includes(item.id)} onClick={() => toggleFavorite(item.id)}><FigmaImage asset={a.imgHeartButton} alt="" /></button><button type="button" className="hifi-history-add" aria-pressed={addedProducts.includes(item.id)}
   aria-label={`${addedProducts.includes(item.id) ? 'Verwijder uit lijst' : 'Voeg toe aan lijst'}: ${item.name} bij ${item.store}`}
@@ -161,7 +163,7 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
       {historical.length === 0 && <p className="hifi-empty">Geen historische productwaarnemingen gevonden.</p>}
     </section>}
     {(view === 'home' || (view === 'products' && productSource === 'figma')) && <section className="hifi-section" aria-labelledby="hifi-products-title">
-      <div className="hifi-section-heading" data-figma-node={view === 'products' ? '3064:3181' : undefined}><div><h2 id="hifi-products-title">{view === 'products' ? query.trim() || 'Populaire producten' : 'Productvoorbeelden · demo'}</h2>{view === 'products' && <p className="recipe-count">{products.length} producten</p>}</div>{view === 'home' ? <button onClick={() => changeView('products')}>Bekijk meer <FigmaImage asset={a.imgFrame7159} alt="" /></button> : <button className="hifi-product-sort" aria-pressed={sortByPrice} aria-label="Sorteer voorbeeldproducten op laagste prijs per kg of liter" onClick={() => setSortByPrice(!sortByPrice)}>Laagste prijs per kg / l <FigmaImage asset={a.productsSort} alt="" /></button>}</div>
+      <div className="hifi-section-heading" data-figma-node={view === 'products' ? '3064:3181' : undefined}><div><h2 id="hifi-products-title">{view === 'products' ? query.trim() || 'Populaire producten' : 'Productvoorbeelden · demo'}</h2>{view === 'products' && <p className="recipe-count" role="status" aria-live="polite">{products.length} producten</p>}</div>{view === 'home' ? <button onClick={() => changeView('products')}>Bekijk meer <FigmaImage asset={a.imgFrame7159} alt="" /></button> : <button className="hifi-product-sort" aria-pressed={sortByPrice} aria-label="Sorteer voorbeeldproducten op laagste prijs per kg of liter" onClick={() => setSortByPrice(!sortByPrice)}>Laagste prijs per kg / l <FigmaImage asset={a.productsSort} alt="" /></button>}</div>
       {view === 'products' && <p className="hifi-demo-note">Figma ontwerpvoorbeelden · de getoonde prijzen en aanbiedingen zijn niet actueel.</p>}
       <div className="hifi-product-grid" data-figma-node={view === 'products' ? '3064:3342' : undefined}>{products.map(product => <article className="hifi-product-card" key={product.id}>
         <div className="hifi-product-image"><FigmaImage className="hifi-product-photo" asset={product.image} alt={product.name} />{product.logo && <span className={`hifi-store-logo ${product.crop}`}><FigmaImage asset={product.logo} alt={product.store} /></span>}{product.unitPrice && <span className="hifi-unit-price">{product.unitPrice}</span>}</div>
