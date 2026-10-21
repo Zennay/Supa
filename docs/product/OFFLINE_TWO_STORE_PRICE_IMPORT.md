@@ -1379,3 +1379,23 @@ producten, oude bedragen of lege winkelobservaties worden niet tot nul,
 actuele schapprijs of besparing gepromoveerd. Deze tijdcontrole geldt alleen
 voor de door de gebruiker ingevoerde tijden en is geen bewijs van
 bronrechten, onafhankelijke fysieke winkelobservaties of een echte korting.
+
+## Indicatieve eenheidsprijs uit eigen originele schapwaarneming
+
+Als je voor een PLUS- of DekaMarkt-artikel de originele productcode,
+productnaam, werkelijke verpakkingseenheid en -hoeveelheid, multipack,
+prijscenten en een nog bruikbaar bronmoment volledig hebt ingevuld, toont
+het mobiele formulier nu direct de **indicatieve prijs per kilogram, liter
+of stuk**. De berekening gebruikt de al bestaande Supa
+`privatePackUnitRate` en diens exacte BigInt-centafronding; er is geen
+tweede prijsengine of automatisch matchvoorstel toegevoegd. Onvolledige,
+onmogelijke, verlopen of nog niet werkelijk ingevoerde bedragen krijgen
+geen indicatieve eenheidsprijs.
+
+Bij beide volledig ingevulde winkelbladen volgt een melding om de bestaande
+persoonlijke SKU-/pak-/weekmand-review te openen. Losse eenheidsprijzen
+zijn geen hele-pakmandbedragen en er verschijnt in dit opnameformulier
+geen ongefundeerde winkelwinnaar. Een verschil en eventuele besparing
+vereisen nog steeds dezelfde fysieke vraag bij twee winkels, werkelijk
+rechtmatig vastgelegde bronprijzen en de canonieke persoonlijke
+match-/versheidscontrole.

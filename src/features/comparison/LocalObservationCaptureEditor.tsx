@@ -7,6 +7,7 @@ import { incompleteCaptureFields, offlineCaptureFieldChecklist,
   captureTimeReadiness, enteredCapturePairWarning } from './localCaptureFieldProgress.ts'
 import { saveLocalCaptureTab, readLocalCaptureTab, clearLocalCaptureTab } from './localCaptureSessionDraft.ts'
 import { shopLabelEuroCents } from './shopLabelEuroCents.ts'
+import { privatePackUnitRate, formatPrivateUnitRate } from './privateUnitPrice.ts'
 
 type Row = {
   state: 'unseen' | 'available' | 'unavailable'
@@ -494,6 +495,11 @@ export function LocalObservationCaptureEditor({
     {enteredCapturePairWarning(moments.PLUS ?? '', moments.DekaMarkt ?? '') &&
       <p role="alert">{enteredCapturePairWarning(
         moments.PLUS ?? '', moments.DekaMarkt ?? '')}</p>}
+    {snapshot.stores.length === 2 &&
+      snapshot.stores.every(store => missingByStore.get(store)?.length === 0) &&
+      <p role="status">Alle originele invoervelden voor PLUS en DekaMarkt zijn
+        ingevuld. Start nu de bestaande persoonlijke bron- en productcontrole;
+        een compleet geprijsd mandje of besparing is hiermee nog niet vastgesteld.</p>}
     {snapshot.stores.map(store => <fieldset key={store}>
       <legend>{store} · originele persoonlijke bronopname</legend>
       {(() => {
@@ -549,6 +555,15 @@ export function LocalObservationCaptureEditor({
             .toLocaleLowerCase('nl-NL'))).map(({ need, index }) => {
         const value = row(store, index)
         const physical = readablePlannerDemandAmount(need.amount)
+        // Reuse the production BigInt pack-rate calculator, never a float
+        // or an inferred ingredient->retailer match. Only a complete,
+        // current, locally typed source candidate has an advisory rate.
+        const complete = !(missingByStore.get(store)?.some(item => item.index === index))
+        const rate = value.state === 'available' && complete
+          ? privatePackUnitRate({
+            amount: Number(value.amount), unit: value.unit,
+            count: Number(value.count), priceCents: Number(value.cents),
+          }) : null
         return <details key={store + ':' + index + ':' + need.id}>
           <summary>Regel {index + 2}: {need.label} · Planner-vraag{' '}
             {physical === 'hoeveelheid nog controleren'
@@ -615,6 +630,10 @@ export function LocalObservationCaptureEditor({
               <small>Je zelf getypte europrijs wordt pas een bronconcept na
                 expliciete omzetting. Bij € 1,99 komt er 199 in het centenveld.
                 De echte winkelopname en persoonlijke matchcontrole blijven vereist.</small>
+              {rate && <p role="status">Indicatieve eenheidsprijs uit alleen jouw
+                originele invoer: <strong>{formatPrivateUnitRate(rate)}</strong>.
+                {' '}Deze winkelprijs of productmatch is nog niet persoonlijk bevestigd.
+                Hele-pakregels en hetzelfde weekmandje worden apart beoordeeld.</p>}
             </>}
             <small>Dit is een handmatig bronconcept, geen bevestigde productmatch.
               Dezelfde SKU meerdere keren invoeren binnen één winkel is ongeldig.</small>
