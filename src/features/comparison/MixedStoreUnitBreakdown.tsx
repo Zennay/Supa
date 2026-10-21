@@ -11,11 +11,13 @@ type Matched = Extract<BasketTraceLine, { status: 'matched' }>
  * The per-unit amount is explanatory; the route uses whole-package totals.
  */
 export function MixedStoreUnitBreakdown({
-  plus, deka, route,
+  plus, deka, route, captured, eligibleNow,
 }: {
   plus: OneStoreBasket
   deka: OneStoreBasket
   route: MixedStoreShoppingPlan
+  captured?: { PLUS: string; DekaMarkt: string }
+  eligibleNow?: () => boolean
 }) {
   const ownMatched = (basket: OneStoreBasket) =>
     new Map(basket.lines.filter((line): line is Matched =>
@@ -25,6 +27,7 @@ export function MixedStoreUnitBreakdown({
   const [sortBy, setSortBy] = useState<'planner' | 'biggest-difference' | 'unit-difference'>('planner')
   const [onlyDifferences, setOnlyDifferences] = useState(false)
   const [search, setSearch] = useState('')
+  const [exportMessage, setExportMessage] = useState('')
   const comparisons = route.lines.flatMap((chosen, index) => {
     const p = plusLines.get(chosen.id)
     const d = dekaLines.get(chosen.id)
@@ -60,6 +63,58 @@ export function MixedStoreUnitBreakdown({
       ? [...filtered].sort((a, b) =>
           (b.unitDifference ?? -1) - (a.unitDifference ?? -1) || a.index - b.index)
       : filtered
+  function downloadVisibleComparison() {
+    if (!captured || !eligibleNow?.() || !visible.length) {
+      setExportMessage('Bronprijzen zijn verlopen, ontbreken of de selectie is leeg. Controleer eerst jouw eigen winkelopnames.')
+      return
+    }
+    const clean = (value: string) =>
+      value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim()
+    const text = [
+      'Supa · mijn persoonlijke PLUS/Deka-prijsvergelijking',
+      'PLUS originele opname: ' + clean(captured.PLUS),
+      'DekaMarkt originele opname: ' + clean(captured.DekaMarkt),
+      'Alleen persoonlijk gecontroleerde eigen bronproducten en hele verpakkingen.',
+      'Getoonde regels: ' + visible.length + ' van ' + comparisons.length,
+      'Geen live kassaprijzen, onafhankelijke besparingsclaim of retailerbronrecht.',
+      '',
+      ...visible.flatMap(({ chosen, p, d, difference }) => [
+        clean(chosen.ingredientLabel) + ' · nodig ' + chosen.amount + ' ' + clean(chosen.unit),
+        'PLUS: ' + clean(p.productName) + ' [SKU ' + clean(p.productId) + ']' +
+          ' · ' + p.packs + ' pak(ken)' +
+          ' · ' + exactEuro.formatCents(p.pricePerPackCents) + ' per pak' +
+          ' · ' + (privateUnitPrice(p) ?? 'eenheidsprijs onbekend') +
+          ' · hele weekregel ' + exactEuro.formatCents(p.lineTotalCents),
+        'DekaMarkt: ' + clean(d.productName) + ' [SKU ' + clean(d.productId) + ']' +
+          ' · ' + d.packs + ' pak(ken)' +
+          ' · ' + exactEuro.formatCents(d.pricePerPackCents) + ' per pak' +
+          ' · ' + (privateUnitPrice(d) ?? 'eenheidsprijs onbekend') +
+          ' · hele weekregel ' + exactEuro.formatCents(d.lineTotalCents),
+        'Verschil voor dezelfde benodigde hoeveelheid: ' + exactEuro.formatCents(difference) +
+          (p.lineTotalCents === d.lineTotalCents ? ' (gelijk)' :
+            ' (' + (p.lineTotalCents < d.lineTotalCents ? 'PLUS' : 'DekaMarkt') + ' lager)') +
+          '; jouw gekozen route: ' + chosen.store, '',
+      ]),
+      'De originele brongegevens zijn niet bijgewerkt of doorgestuurd.',
+    ].join('\n')
+    if (new TextEncoder().encode(text).length > 128000 || !eligibleNow()) {
+      setExportMessage('De selectie is te groot of je originele bronopnames zijn gewijzigd.')
+      return
+    }
+    try {
+      const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-eigen-twee-winkel-prijsverschillen.txt'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+        setExportMessage('Alleen jouw zichtbare prijsvergelijking is lokaal opgeslagen.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+    } catch {
+      setExportMessage('Deze lokale download is niet beschikbaar.')
+    }
+  }
   return <details className="offline-price-workbench__full-breakdown mixed-store-route__unit-breakdown">
     <summary>Vergelijk per ingrediënt de twee echte producten, eenheidsprijzen en pakbedragen</summary>
     <p>De eenheidsprijs is alleen indicatief per kilogram, liter of stuk.
@@ -94,6 +149,14 @@ export function MixedStoreUnitBreakdown({
         Zoeken en sorteren veranderen je mandje, brongegevens en winkelroute niet.
         {sortBy === 'unit-difference' && ' Alleen eenheidsprijzen met dezelfde basis (kg, liter of stuk) worden vergeleken. Onbekende of onvergelijkbare eenheden komen achteraan; je echte weekkosten blijven op hele pakken gebaseerd.'}</p>
     </div>
+    {captured && eligibleNow && <p>
+      <button type="button" disabled={!visible.length} onClick={downloadVisibleComparison}>
+        Download deze persoonlijke prijsverschillen (TXT)
+      </button>
+      <small>Inclusief originele SKU, pakbedrag, eenheidsprijs en bronmoment per winkel;
+        uitsluitend wat je hierboven hebt gefilterd.</small>
+    </p>}
+    {exportMessage && <p role="status" aria-live="polite">{exportMessage}</p>}
     <div className="mixed-store-route__unit-rows">
       {visible.map(({ chosen, p, d, difference }) => {
         const lessExpensive = p.lineTotalCents === d.lineTotalCents
