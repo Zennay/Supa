@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent, type Dispatch, type SetSta
 import './manualShoppingNotes.css'
 import { exportUnpricedShoppingCsv, importUnpricedShoppingCsv, importUnpricedShoppingPaste } from './manualShoppingNotesCsv.ts'
 import { mergePrivateNotes, normalizePrivateNotes, serializePrivateNotes, PRIVATE_NOTES_BACKUP_MAX_BYTES } from './manualShoppingNotesBackup.ts'
+import { privateNoteDuplicateKey, privateNoteLabelIdentity } from './manualShoppingNoteIdentity.ts'
 
 export type UnpricedShoppingNote = { id: string; label: string; store: 'Algemeen' | 'PLUS' | 'DekaMarkt'; done: boolean }
 type SetNotes = Dispatch<SetStateAction<UnpricedShoppingNote[]>>
@@ -10,8 +11,7 @@ const privateSessionKey = 'supa:unpriced-notes:session:v1'
 const privateDeviceKey = 'supa:unpriced-notes:device:v1'
 const safeLabel = (value: string) => value.replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/gu, ' ')
   .replace(/\s+/g, ' ').trim()
-const duplicateKey = (store: UnpricedShoppingNote['store'], label: string) =>
-  JSON.stringify([store, label.normalize('NFC').toLocaleLowerCase('nl-NL')])
+const duplicateKey = privateNoteDuplicateKey
 
 /** Private volatile notes; no product match, price or retailer-source authority. */
 export function ManualShoppingNotes({ notes, setNotes }: {
@@ -584,17 +584,17 @@ export function ManualShoppingNotes({ notes, setNotes }: {
   // Never silently merge different shopping IDs or choose a cheaper store:
   // these notes contain no trustworthy prices or product identities.
   const openDekaLabels = new Set(notes.filter(note => note.store === 'DekaMarkt' && !note.done)
-    .map(note => note.label.normalize('NFC').toLocaleLowerCase('nl-NL')))
+    .map(note => privateNoteLabelIdentity(note.label)))
   const duplicatedOpenRetailerNotes = notes.filter(note => note.store === 'PLUS' && !note.done &&
-    openDekaLabels.has(note.label.normalize('NFC').toLocaleLowerCase('nl-NL')))
+    openDekaLabels.has(privateNoteLabelIdentity(note.label)))
   const duplicateOpenLabels = Array.from(new Map(duplicatedOpenRetailerNotes.map(note =>
-    [note.label.normalize('NFC').toLocaleLowerCase('nl-NL'), note.label] as const)).values())
+    [privateNoteLabelIdentity(note.label), note.label] as const)).values())
   function proposeDuplicateChoice(label: string, keep: 'PLUS' | 'DekaMarkt') {
-    const key = label.normalize('NFC').toLocaleLowerCase('nl-NL')
+    const key = privateNoteLabelIdentity(label)
     const plus = notes.find(note => note.store === 'PLUS' && !note.done &&
-      note.label.normalize('NFC').toLocaleLowerCase('nl-NL') === key)
+      privateNoteLabelIdentity(note.label) === key)
     const deka = notes.find(note => note.store === 'DekaMarkt' && !note.done &&
-      note.label.normalize('NFC').toLocaleLowerCase('nl-NL') === key)
+      privateNoteLabelIdentity(note.label) === key)
     if (!plus || !deka) {
       setPendingDuplicateChoice(null)
       setMessage('Deze dubbele boodschap is inmiddels veranderd. Bekijk de huidige lijst opnieuw.')
@@ -629,9 +629,9 @@ export function ManualShoppingNotes({ notes, setNotes }: {
   }
   function prepareDuplicateBatch(keep: 'PLUS' | 'DekaMarkt') {
     const pairs = duplicatedOpenRetailerNotes.map(plus => {
-      const key = plus.label.normalize('NFC').toLocaleLowerCase('nl-NL')
+      const key = privateNoteLabelIdentity(plus.label)
       const deka = notes.find(note => note.store === 'DekaMarkt' && !note.done &&
-        note.label.normalize('NFC').toLocaleLowerCase('nl-NL') === key)
+        privateNoteLabelIdentity(note.label) === key)
       return deka ? { plus: { ...plus }, deka: { ...deka } } : null
     }).filter((pair): pair is { plus: UnpricedShoppingNote; deka: UnpricedShoppingNote } =>
       pair !== null)
@@ -689,18 +689,18 @@ export function ManualShoppingNotes({ notes, setNotes }: {
   }
   const retailerOpenKeys = new Set(notes.filter(note =>
     note.store !== 'Algemeen' && !note.done).map(note =>
-    note.label.normalize('NFC').toLocaleLowerCase('nl-NL')))
+    privateNoteLabelIdentity(note.label)))
   const redundantGeneralNotes = notes.filter(note => note.store === 'Algemeen' &&
-    !note.done && retailerOpenKeys.has(note.label.normalize('NFC').toLocaleLowerCase('nl-NL')))
+    !note.done && retailerOpenKeys.has(privateNoteLabelIdentity(note.label)))
   function confirmGeneralDuplicates() {
     const selected = pendingGeneralDuplicates
     if (!selected?.length) return
     const keys = new Set(notes.filter(note => note.store !== 'Algemeen' && !note.done)
-      .map(note => note.label.normalize('NFC').toLocaleLowerCase('nl-NL')))
+      .map(note => privateNoteLabelIdentity(note.label)))
     const valid = selected.every(note => notes.some(current =>
       current.id === note.id && current.store === 'Algemeen' &&
       current.label === note.label && !current.done) &&
-      keys.has(note.label.normalize('NFC').toLocaleLowerCase('nl-NL')))
+      keys.has(privateNoteLabelIdentity(note.label)))
     if (!valid) {
       setPendingGeneralDuplicates(null)
       setMessage('Algemene of winkelgebonden boodschappen zijn inmiddels veranderd. Controleer opnieuw.')
@@ -710,10 +710,10 @@ export function ManualShoppingNotes({ notes, setNotes }: {
     const ids = new Set(selected.map(note => note.id))
     setNotes(current => {
       const storeKeys = new Set(current.filter(item => item.store !== 'Algemeen' && !item.done)
-        .map(item => item.label.normalize('NFC').toLocaleLowerCase('nl-NL')))
+        .map(item => privateNoteLabelIdentity(item.label)))
       return selected.every(note => current.some(item => item.id === note.id &&
         item.store === 'Algemeen' && item.label === note.label && !item.done) &&
-        storeKeys.has(note.label.normalize('NFC').toLocaleLowerCase('nl-NL')))
+        storeKeys.has(privateNoteLabelIdentity(note.label)))
         ? current.filter(item => !ids.has(item.id)) : current
     })
     setLastGeneralDuplicates(removed)
@@ -1055,7 +1055,8 @@ export function ManualShoppingNotes({ notes, setNotes }: {
           Gewone regels gaan naar {store}; bij gekopieerde Supa-TXT met [PLUS],
           [DekaMarkt] of [Algemeen] blijven de oorspronkelijke winkels behouden.
           Eigen tekstlijstjes met kopjes PLUS:, DekaMarkt: of Algemeen: worden ook per winkel ingelezen.
-          Dubbele artikelen worden overgeslagen, zonder bestaande vinkjes of prijzen te wijzigen.</p>
+          Dubbele artikelen worden ook herkend bij compatibele of onzichtbare Unicode-varianten;
+          de oorspronkelijke omschrijving blijft zichtbaar. Bestaande vinkjes en prijzen veranderen niet.</p>
         <label>Je ongeprijsde boodschappen
           <textarea rows={5} maxLength={15000} value={bulkDraft}
             placeholder={'Vuilniszakken\nAfwasmiddel\nToiletpapier'}
