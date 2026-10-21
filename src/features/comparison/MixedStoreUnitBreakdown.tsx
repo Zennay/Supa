@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { euro as exactEuro } from '../../lib/money.ts'
 import type { BasketTraceLine, OneStoreBasket } from '../../domain/basket.ts'
-import { privateUnitPrice } from './privateUnitPrice.ts'
+import { privateUnitPrice, privatePackUnitRate } from './privateUnitPrice.ts'
 import type { MixedStoreShoppingPlan } from './mixedStoreShoppingPlan.ts'
 
 type Matched = Extract<BasketTraceLine, { status: 'matched' }>
@@ -22,16 +22,27 @@ export function MixedStoreUnitBreakdown({
       line.status === 'matched').map(line => [line.id, line]))
   const plusLines = ownMatched(plus)
   const dekaLines = ownMatched(deka)
-  const [sortBy, setSortBy] = useState<'planner' | 'biggest-difference'>('planner')
+  const [sortBy, setSortBy] = useState<'planner' | 'biggest-difference' | 'unit-difference'>('planner')
   const [onlyDifferences, setOnlyDifferences] = useState(false)
   const [search, setSearch] = useState('')
   const comparisons = route.lines.flatMap((chosen, index) => {
     const p = plusLines.get(chosen.id)
     const d = dekaLines.get(chosen.id)
-    return p && d ? [{
-      chosen, p, d, index,
+    if (!p || !d) return []
+    const plusUnit = privatePackUnitRate({
+      amount: p.pack.amount, unit: p.pack.unit, count: p.pack.count,
+      priceCents: p.pricePerPackCents,
+    })
+    const dekaUnit = privatePackUnitRate({
+      amount: d.pack.amount, unit: d.pack.unit, count: d.pack.count,
+      priceCents: d.pricePerPackCents,
+    })
+    const unitDifference = plusUnit && dekaUnit && plusUnit.unit === dekaUnit.unit
+      ? Math.abs(plusUnit.milliCentsPerUnit - dekaUnit.milliCentsPerUnit) : null
+    return [{
+      chosen, p, d, index, unitDifference,
       difference: Math.abs(p.lineTotalCents - d.lineTotalCents),
-    }] : []
+    }]
   })
   const distinct = comparisons.filter(item => item.difference > 0).length
   const query = search.normalize('NFC').trim().toLocaleLowerCase('nl-NL')
@@ -45,7 +56,10 @@ export function MixedStoreUnitBreakdown({
   })
   const visible = sortBy === 'biggest-difference'
     ? [...filtered].sort((a, b) => b.difference - a.difference || a.index - b.index)
-    : filtered
+    : sortBy === 'unit-difference'
+      ? [...filtered].sort((a, b) =>
+          (b.unitDifference ?? -1) - (a.unitDifference ?? -1) || a.index - b.index)
+      : filtered
   return <details className="offline-price-workbench__full-breakdown mixed-store-route__unit-breakdown">
     <summary>Vergelijk per ingrediënt de twee echte producten, eenheidsprijzen en pakbedragen</summary>
     <p>De eenheidsprijs is alleen indicatief per kilogram, liter of stuk.
@@ -62,9 +76,10 @@ export function MixedStoreUnitBreakdown({
       </label>
       <label>Sorteer de prijsverschillen
         <select value={sortBy} onChange={event =>
-          setSortBy(event.currentTarget.value as 'planner' | 'biggest-difference')}>
+          setSortBy(event.currentTarget.value as 'planner' | 'biggest-difference' | 'unit-difference')}>
           <option value="planner">Volgorde van mijn Planner</option>
           <option value="biggest-difference">Grootste prijsverschil eerst</option>
+          <option value="unit-difference">Grootste vergelijkbare eenheidsprijsverschil eerst</option>
         </select>
       </label>
       <label>
@@ -76,7 +91,8 @@ export function MixedStoreUnitBreakdown({
         een verschillend pakbedrag voor dezelfde benodigde hoeveelheid.
         {onlyDifferences ? ' Gelijke bedragen zijn tijdelijk verborgen.' : ''}
         {' '}Er zijn {visible.length} ingrediënten zichtbaar.
-        Zoeken en sorteren veranderen je mandje, brongegevens en winkelroute niet.</p>
+        Zoeken en sorteren veranderen je mandje, brongegevens en winkelroute niet.
+        {sortBy === 'unit-difference' && ' Alleen eenheidsprijzen met dezelfde basis (kg, liter of stuk) worden vergeleken. Onbekende of onvergelijkbare eenheden komen achteraan; je echte weekkosten blijven op hele pakken gebaseerd.'}</p>
     </div>
     <div className="mixed-store-route__unit-rows">
       {visible.map(({ chosen, p, d, difference }) => {
