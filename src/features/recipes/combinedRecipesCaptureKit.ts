@@ -6,6 +6,8 @@ import { exportCombinedRecipesPrivateWeek } from './exportCombinedRecipesPrivate
 import { combinedImportedRecipeGroceries, type GroceryContribution } from './combinedImportedRecipeGroceries.ts'
 import type { SavedRecipe } from './recipeLibrary.ts'
 
+export type CaptureRecipeOrigin = GroceryContribution & { cookingDay: string | null }
+
 type CanonicalWeek = {
   plan: { day: string; recipeId: string }[]
   activeDays: string[]
@@ -21,8 +23,12 @@ export function combinedRecipesCaptureKit(
   recipes: readonly SavedRecipe[],
   portionsById: Readonly<Record<string, number>>,
   stores: readonly CaptureStore[],
-): { csv: string; guide: string; storeLabel: string; rows: { csvRow: number; store: CaptureStore; id: string; label: string; amount: number; unit: string; sources: GroceryContribution[] }[] } {
-  const week = JSON.parse(exportCombinedRecipesPrivateWeek(recipes, portionsById)) as CanonicalWeek
+  cookingDays?: readonly string[],
+): { csv: string; guide: string; storeLabel: string; rows: { csvRow: number; store: CaptureStore; id: string; label: string; amount: number; unit: string; sources: CaptureRecipeOrigin[] }[] } {
+  const week = JSON.parse(exportCombinedRecipesPrivateWeek(recipes, portionsById, cookingDays)) as CanonicalWeek
+  const cookingDayByRecipe = cookingDays
+    ? new Map(week.plan.map(meal => [meal.recipeId, meal.day]))
+    : new Map<string, string>()
   const needs = aggregatePlanIngredients(week.plan, week.recipes, week.activeDays)
   if (needs.length < 1 || needs.length > 200 ||
       needs.some(item => item.amount === null || !Number.isFinite(item.amount) ||
@@ -72,8 +78,10 @@ export function combinedRecipesCaptureKit(
     const csvRows = stores.map((_, storeIndex) =>
       2 + storeIndex * needs.length + index).join(' / ')
     const lines = sources.slice(0, 4).map(source =>
-      '  - ' + short(source.recipeTitle, 60) + ' · ' +
-      short(source.ingredientLabel, 80) + ': ' +
+      '  - ' + short(source.recipeTitle, 60) +
+      (cookingDayByRecipe.has(source.recipeId)
+        ? ' [' + short(cookingDayByRecipe.get(source.recipeId)!, 40) + ']' : '') +
+      ' · ' + short(source.ingredientLabel, 80) + ': ' +
       (source.amount === null ? 'hoeveelheid controleren'
         : readablePlannerDemandAmount(source.amount) + ' ' +
           (source.unit === 'piece' ? 'stuks' : source.unit)) +
@@ -104,7 +112,9 @@ export function combinedRecipesCaptureKit(
     rows: stores.flatMap((store, storeIndex) => needs.map((need, ingredientIndex) => ({
       csvRow: storeIndex * needs.length + ingredientIndex + 2,
       store, id: need.id, label: need.label, amount: need.amount!, unit: need.unit,
-      sources: sourcesByNeedId.get(need.id) ?? [],
+      sources: (sourcesByNeedId.get(need.id) ?? []).map(source => ({
+        ...source, cookingDay: cookingDayByRecipe.get(source.recipeId) ?? null,
+      })),
     }))),
   }
 }

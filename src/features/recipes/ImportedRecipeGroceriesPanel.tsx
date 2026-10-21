@@ -4,7 +4,8 @@ import { toPlannerRecipe } from './plannerRecipes.ts'
 import { scaleOwnRecipe } from './scaleOwnRecipe.ts'
 import type { UserRecipeDraft } from '../../domain/userRecipeImport.ts'
 import { m2InitialPlan } from '../../data/m2Fixture.ts'
-import { combinedImportedRecipeGroceries, type GroceryContribution } from './combinedImportedRecipeGroceries.ts'
+import { combinedImportedRecipeGroceries } from './combinedImportedRecipeGroceries.ts'
+import type { CaptureRecipeOrigin } from './combinedRecipesCaptureKit.ts'
 import { formatOwnRecipeChecklist, personalRecipeShoppingNoteLabels } from './recipeShoppingChecklist.ts'
 import { exportOwnRecipeChecklistCsv } from './recipeShoppingCsv.ts'
 import { exportCombinedRecipesPrivateWeek } from './exportCombinedRecipesPrivateWeek.ts'
@@ -64,7 +65,7 @@ export function ImportedRecipeGroceriesPanel({
   const [copyableDayGuide, setCopyableDayGuide] = useState<{ key: string; text: string } | null>(null)
   const [capturePreview, setCapturePreview] = useState<{
     key: string; rows: { csvRow: number; store: string; id: string;
-      label: string; amount: number; unit: string; sources: GroceryContribution[] }[]
+      label: string; amount: number; unit: string; sources: CaptureRecipeOrigin[] }[]
   } | null>(null)
   const [dayOverrides, setDayOverrides] = useState<Record<string, string>>({})
   const [portionsById, setPortionsById] = useState<Record<string, number>>({})
@@ -190,7 +191,7 @@ export function ImportedRecipeGroceriesPanel({
   })
   const latestProgressIdentity = useRef(progressIdentity)
   latestProgressIdentity.current = progressIdentity
-  const captureKey = JSON.stringify([progressIdentity, captureTarget])
+  const captureKey = JSON.stringify([progressIdentity, captureTarget, privateCookingDays ?? null])
   const latestCaptureKey = useRef(captureKey)
   latestCaptureKey.current = captureKey
   const outstanding = list?.lines.filter(line => line.needsReview).length ?? 0
@@ -634,7 +635,7 @@ export function ImportedRecipeGroceriesPanel({
         throw new Error('De receptenbundel of winkelkeuze veranderde. Bekijk de nieuwe rijen.')
       const stores = target === 'both' ? ['PLUS', 'DekaMarkt'] as const
         : [target as 'PLUS' | 'DekaMarkt']
-      const kit = combinedRecipesCaptureKit(selected, portionsById, stores)
+      const kit = combinedRecipesCaptureKit(selected, portionsById, stores, privateCookingDays)
       if (latestCaptureKey.current !== key)
         throw new Error('De fysieke boodschappen veranderden. Bekijk het actuele winkelblad opnieuw.')
       setCapturePreview({ key, rows: kit.rows })
@@ -649,7 +650,7 @@ export function ImportedRecipeGroceriesPanel({
     if (!privateTransfer.ready) return
     setFeedback('')
     setCopyableCaptureGuide(null)
-    const identity = progressIdentity
+    const identity = captureKey
     const key = captureKey
     const target = captureTarget
     try {
@@ -660,7 +661,7 @@ export function ImportedRecipeGroceriesPanel({
         throw new Error('De fysieke receptenbundel veranderde tijdens voorbereiden. Probeer opnieuw.')
       const shops = target === 'both' ? ['PLUS', 'DekaMarkt'] as const
         : [target as 'PLUS' | 'DekaMarkt']
-      const content = combinedRecipesCaptureKit(selected, portionsById, shops).guide
+      const content = combinedRecipesCaptureKit(selected, portionsById, shops, privateCookingDays).guide
       if (latestCaptureKey.current !== key)
         throw new Error('De fysieke ingrediënten veranderden; kopieer de nieuwe gids.')
       if (navigator.clipboard?.writeText) {
@@ -686,7 +687,6 @@ export function ImportedRecipeGroceriesPanel({
   async function downloadCaptureKit(kind: 'csv' | 'guide') {
     if (!privateTransfer.ready) return
     setFeedback('')
-    const identity = progressIdentity
     const key = captureKey
     try {
       requireLatestOwnedRecipes()
@@ -695,12 +695,12 @@ export function ImportedRecipeGroceriesPanel({
       if (latestCaptureKey.current !== key)
         throw new Error('De receptenbundel is gewijzigd. Maak de winkelopname opnieuw.')
       const stores = captureTarget === 'both' ? ['PLUS', 'DekaMarkt'] as const : [captureTarget]
-      const kit = combinedRecipesCaptureKit(selected, portionsById, stores)
+      const kit = combinedRecipesCaptureKit(selected, portionsById, stores, privateCookingDays)
       if (latestCaptureKey.current !== key)
         throw new Error('De fysieke ingrediënten zijn veranderd. Maak het opnameblad opnieuw.')
       // One stable filename stem pairs the blank CSV with its exact row guide.
       // This is only a local document identifier, not source-evidence metadata.
-      const fingerprint = unpricedProgressStorageKey(identity).split(':').pop()!
+      const fingerprint = unpricedProgressStorageKey(captureKey).split(':').pop()!
       const stem = 'supa-recepten-' + fingerprint + '-' + kit.storeLabel
       requireLatestOwnedRecipes()
       if (latestCaptureKey.current !== key)
@@ -730,7 +730,7 @@ export function ImportedRecipeGroceriesPanel({
       if (latestCaptureKey.current !== key)
         throw new Error('De gekozen recepten of winkels zijn veranderd. Maak het formulier opnieuw.')
       const stores = captureTarget === 'both' ? ['PLUS', 'DekaMarkt'] as const : [captureTarget]
-      const kit = combinedRecipesCaptureKit(selected, portionsById, stores)
+      const kit = combinedRecipesCaptureKit(selected, portionsById, stores, privateCookingDays)
       // This canonical capture kit already fixes source demand, CSV row order,
       // store grouping and the physical limits. Use its first store's rows as
       // needs: the existing print engine reproduces those exact row numbers.
@@ -741,14 +741,16 @@ export function ImportedRecipeGroceriesPanel({
       // amounts and recipe provenance. Only the first store is needed for the
       // per-ingredient legend; the printer repeats it for the second store.
       const recipeLines = kit.rows.filter(row => row.store === stores[0]).map(row =>
-        row.sources.map(source => source.recipeTitle + ' · ' + source.ingredientLabel +
+        row.sources.map(source => source.recipeTitle +
+          (source.cookingDay ? ' [' + source.cookingDay + ']' : '') +
+          ' · ' + source.ingredientLabel +
           ' · ' + readablePlannerDemandAmount(source.amount) + ' ' +
           (source.unit === 'piece' ? 'stuks' : source.unit ?? 'eenheid controleren')))
       const html = makePrintablePlannerCaptureHtml(needs, stores, recipeLines)
       requireLatestOwnedRecipes()
       if (latestCaptureKey.current !== key)
         throw new Error('De fysieke weekvraag of winkelkeuze is veranderd.')
-      const fingerprint = unpricedProgressStorageKey(progressIdentity).split(':').pop()!
+      const fingerprint = unpricedProgressStorageKey(captureKey).split(':').pop()!
       savePrivateFile('supa-recepten-' + fingerprint + '-' + kit.storeLabel +
         '-printbare-lege-winkelopname.html', html, 'text/html;charset=utf-8')
       setFeedback('Printbaar offline-formulier voor precies dezelfde CSV-rijen opgeslagen. ' +
@@ -1154,7 +1156,8 @@ export function ImportedRecipeGroceriesPanel({
                   ? <details>
                       <summary>{row.sources.length} oorspronkelijke ingrediëntregel(len)</summary>
                       <ul>{row.sources.map((source, index) => <li key={source.recipeId + ':' + index}>
-                        <strong>{source.recipeTitle}</strong>: {source.amount === null
+                        <strong>{source.recipeTitle}</strong>
+                        {source.cookingDay && <> · {source.cookingDay}</>}: {source.amount === null
                           ? 'hoeveelheid controleren'
                           : readablePlannerDemandAmount(source.amount) + ' ' + (source.unit === 'piece' ? 'stuks' : source.unit)}
                         {' · '}{source.original}
@@ -1166,7 +1169,7 @@ export function ImportedRecipeGroceriesPanel({
             </table>
           </div>
         </details>}
-        {copyableCaptureGuide?.identity === progressIdentity &&
+        {copyableCaptureGuide?.identity === captureKey &&
           copyableCaptureGuide.target === captureTarget &&
           <label className="recipe-collection-groceries__mobile-copy">
             Selecteer en kopieer de volledige ongeprijsde winkelopnamegids
