@@ -19,6 +19,66 @@ const apply = document.querySelector('#manual-apply')
 const ceiling = 256000
 let acceptedCsv = null
 
+/** A visual reference only for a user-confirmed Planner handoff. No retailer
+ * SKU, price, observation time or product recommendation is inferred here. */
+const manualDemandContext = document.querySelector('#manual-demand-context')
+const manualDemandQuery = document.querySelector('#manual-demand-query')
+const manualDemandItems = document.querySelector('#manual-demand-items')
+const manualDemandCount = document.querySelector('#manual-demand-count')
+let manualDemand = []
+const readableDemand = amount => {
+  if (amount === null) return 'hoeveelheid controleren'
+  const raw = String(amount)
+  const parts = /^(\d+)(?:\.(\d+))?e([+-]?\d+)$/i.exec(raw)
+  if (!parts) return raw
+  const digits = parts[1] + (parts[2] || '')
+  const position = parts[1].length + Number(parts[3])
+  if (position <= 0) return '0.' + '0'.repeat(-position) + digits
+  if (position >= digits.length) return digits + '0'.repeat(position - digits.length)
+  return digits.slice(0, position) + '.' + digits.slice(position)
+}
+function showManualDemand() {
+  if (!manualDemand.length) {
+    manualDemandContext.hidden = true
+    manualDemandItems.replaceChildren()
+    manualDemandCount.textContent = ''
+    return
+  }
+  const search = manualDemandQuery.value.trim().normalize('NFKD')
+    .replace(/\p{M}/gu, '').toLocaleLowerCase('nl-NL')
+  const shown = manualDemand.filter(need => need.label.normalize('NFKD')
+    .replace(/\p{M}/gu, '').toLocaleLowerCase('nl-NL').includes(search))
+  const entries = shown.map(need => {
+    const li = document.createElement('li')
+    li.textContent = need.label + ': ' + readableDemand(need.amount) + ' ' +
+      (need.unit === 'piece' ? 'stuks' : need.unit)
+    return li
+  })
+  manualDemandItems.replaceChildren(...entries)
+  manualDemandCount.textContent = shown.length + ' van ' + manualDemand.length +
+    ' oorspronkelijke fysieke ingrediënten. Geen winkelartikel of prijs gekoppeld.'
+  manualDemandContext.hidden = false
+}
+document.addEventListener('supa:private-planner-demand', event => {
+  const demand = event.detail
+  const valid = demand && demand.schema === 'supa-private-basket-demand-v1' &&
+    Array.isArray(demand.ingredients) && demand.ingredients.length > 0 &&
+    demand.ingredients.length <= 200 && demand.ingredients.every(need =>
+      need && typeof need.label === 'string' && need.label.length > 0 &&
+      need.label.length <= 160 && /[\p{L}\p{N}]/u.test(need.label) &&
+      !/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(need.label) &&
+      ['g', 'kg', 'ml', 'l', 'piece'].includes(need.unit) &&
+      (need.amount === null || (typeof need.amount === 'number' &&
+        Number.isFinite(need.amount) && need.amount > 0 && need.amount <= 100000 &&
+        (need.unit !== 'piece' || Number.isSafeInteger(need.amount)))))
+  manualDemand = valid ? demand.ingredients.map(need => ({
+    label: need.label, amount: need.amount, unit: need.unit,
+  })) : []
+  manualDemandQuery.value = ''
+  showManualDemand()
+})
+manualDemandQuery.addEventListener('input', showManualDemand)
+
 const make = (tag, text) => {
   const element = tag === 'div' ? document.createElement('div') :
     tag === 'label' ? document.createElement('label') :
@@ -253,7 +313,14 @@ for (const store of stores) {
   document.querySelector('[data-add-product="' + store + '"]').addEventListener('click', () => addRow(store))
   addRow(store, false)
 }
-document.querySelector('#manual-observations').addEventListener('input', removeReview)
-document.querySelector('#manual-observations').addEventListener('change', removeReview)
+// Searching the already-confirmed *physical demand* must not revoke an
+// accepted original store capture. Only actual source form edits do that.
+for (const eventName of ['input', 'change']) {
+  document.querySelector('#manual-observations').addEventListener(eventName, event => {
+    if (event.target instanceof Element &&
+        event.target.closest('#manual-demand-context')) return
+    removeReview()
+  })
+}
 // Blank rows only, no sample IDs, generated prices, implied user observations,
 // or timestamp defaults.
