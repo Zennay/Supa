@@ -3611,12 +3611,19 @@ export function OfflineReviewedWorkbench({
                   const basket = store === 'PLUS' ? basketPair.plus : basketPair.deka
                   const capture = imported.captures[store]
                   if (!basket || !capture) return null
+                  const admittedNow = freshReviewedBaskets(reviewedBridge,
+                    reviewedBridge?.planKey ?? '', Date.now())?.stores[store]?.basket === basket
                   const purchased = basket.lines.filter(line => doneTripItems[shoppingTaskKey(store, line)]).length
                   const visible = basket.lines.filter(line =>
                     !openTripOnly || !doneTripItems[shoppingTaskKey(store, line)])
                   return (
                     <section key={store}>
                       <h4>{store} · boodschappen</h4>
+                      {!admittedNow && <p className="offline-price-workbench__missing" role="status">
+                        Prijsinformatie voor dit winkelmandje onbekend: de oorspronkelijke bron is
+                        verlopen of niet alle artikelen zijn bevestigd. De bronselectie eronder is
+                        uitsluitend historische/in te vullen invoer, geen actuele winkelprijs.
+                      </p>}
                       <p className="offline-price-workbench__trip-progress" role="status">
                         {purchased} van {basket.lines.length} afgevinkt · alleen privé op dit apparaat
                       </p>
@@ -3636,8 +3643,7 @@ export function OfflineReviewedWorkbench({
                         <p>Selecteer en kopieer deze lijst; de tekst blijft op je apparaat.</p>
                         <textarea readOnly rows={Math.min(18, basket.lines.length + 4)}
                           aria-label={`Boodschappenlijst ${store}`}
-                          value={shoppingChecklist(basket, store, doneTripItems,
-                            freshReviewedBaskets(reviewedBridge, reviewedBridge?.planKey ?? '', Date.now())?.stores[store]?.basket === basket)}
+                          value={shoppingChecklist(basket, store, doneTripItems, admittedNow)}
                           onFocus={event => event.currentTarget.select()} />
                       </details>
                       {visible.length === 0 && basket.lines.length > 0 &&
@@ -3796,8 +3802,11 @@ export function OfflineReviewedWorkbench({
                             )}
 
                             {line.status === 'matched' && <span>{line.productName} · {line.packs} × verpakking</span>}
-                            {line.status === 'matched' && <span>Eenheidsprijs: {pricePerUnit(line) ?? 'onbekend'}</span>}
-                            {line.status === 'matched' && <span>Bron-ID: {line.productId} · {line.pack.amount} {line.pack.unit} × {line.pack.count} per verpakking · {exactEuro.formatCents(line.pricePerPackCents)} per verpakking</span>}
+                            {line.status === 'matched' && <span>Eenheidsprijs: {admittedNow
+                              ? pricePerUnit(line) ?? 'onbekend' : 'onbekend · originele bron eerst controleren'}</span>}
+                            {line.status === 'matched' && <span>Bron-ID: {line.productId} · {line.pack.amount} {line.pack.unit} × {line.pack.count} per verpakking · {admittedNow
+                              ? exactEuro.formatCents(line.pricePerPackCents) + ' per verpakking'
+                              : 'prijs onbekend / nieuwe opname of bevestiging nodig'}</span>}
                             {line.reasons.length > 0 && (
                               <details className="offline-price-workbench__match-explanation">
                                 <summary>Waarom is dit {line.status === 'matched' ? 'bronartikel voorgesteld' : 'ingrediënt nog niet gekoppeld'}?</summary>
