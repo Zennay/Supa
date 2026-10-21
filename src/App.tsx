@@ -910,20 +910,20 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             <section className="screen" aria-label="Boodschappenlijst uit mijn eigen weekmenu">
               <UnpricedPlannerChecklist plan={plannedMeals} recipes={recipes} activeDays={activeDays}
                 onOpenPriceImport={openOwnPriceImport} onOpenRecipes={() => navigate('recipes')} />
-              {tab === 'list' && (designProductIds.length > 0
-                ? <section aria-label="Mijn expliciet toegevoegde producten">
-                    <h3>Mijn toegevoegde producten · apart van receptboodschappen</h3>
-                    <p className="disclaimer">Deze selectie is door jou gemaakt in Producten.
-                      Historische gegevens en Figma-voorbeelden zijn geen geverifieerde prijzen
-                      en doen niet mee in een eigen winkelmandvergelijking.</p>
-                    <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
-                    <ShoppingListView basket={basket} />
-                  </section>
-                : <details className="demo-comparison-disclosure">
-                    <summary>Toon oude voorbeeldboodschappen (geen actuele winkelprijzen)</summary>
-                    <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
-                    <ShoppingListView basket={basket} />
-                  </details>)}
+              {tab === 'list' && designProductIds.length > 0 && (
+                <section className="supa-extra-demo-products" aria-label="Extra gekozen voorbeeldproducten buiten de echte boodschappen">
+                  <p className="disclaimer">Aparte demolijst: deze voorbeelden zijn niet gekoppeld aan de fysieke Planner-behoefte,
+                    hebben geen actuele winkelprijzen en veranderen je echte mandje of besparing niet.</p>
+                  <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
+                </section>
+              )}
+              {tab === 'list' && <details className="supa-demo-basket-details">
+                <summary>Toon voorbeeldmandje uit de demo-gegevens (geen echte winkelmand)</summary>
+                <p className="disclaimer">Dit is een interactief voorbeeldmandje met historische ontwerpdata.
+                  De afvinkingen, prijzen en producten zijn geen bewijs van actuele voorraad en worden
+                  niet gebruikt in je echte winkelvergelijking.</p>
+                <ShoppingListView basket={basket} />
+              </details>}
             </section>
           </div>
         )}

@@ -549,6 +549,12 @@ h3, p { margin: 0; }
 }
 /* Keep historical/Figma pricing prototypes discoverable without presenting
    them as part of the user's verified and currently priced catalog. */
+.supa-extra-demo-products{margin:1rem auto;max-width:1060px;padding:1rem;
+  border:1px solid #dce5df;border-radius:14px;background:#f7f8f5}
+.supa-demo-basket-details{margin:1rem auto 2rem;max-width:1060px;padding:1rem;
+  border:1px solid #dce5df;border-radius:14px;background:#f7f8f5}
+.supa-demo-basket-details>summary{cursor:pointer;font-weight:700;line-height:1.5}
+.supa-demo-basket-details>p{max-width:760px;line-height:1.5;color:#4e5f53}
 .supa-product-real-source{margin:2rem auto 5rem;max-width:1060px;padding:1.5rem 1rem;
   border-top:2px solid #dce5df;scroll-margin-top:1rem}
 .supa-product-real-source__intro{max-width:760px;margin:0 auto 1.25rem;
