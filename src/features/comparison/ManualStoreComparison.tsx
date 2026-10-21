@@ -24,12 +24,20 @@ const UNIT_LABEL: Record<string, string> = {
 const tableHeader = 'ingredientId\twinkel\tproduct\tverpakking\teenheid\tmultipackAantal\tprijs'
 const legacyTableHeader = 'ingredientId\twinkel\tproduct\tverpakking\teenheid\tprijs'
 const boundTableHeader = 'ingredientId\twinkel\tbenodigdAantal\tbenodigdEenheid\tproduct\tverpakking\teenheid\tmultipackAantal\tprijs'
-function safeTableCell(value: string) {
-  // The plain TSV route must guard the same invisible-prefix and NFKC
-  // spreadsheet formula cases as the existing private CSV exports.
+// The same text rules apply to every personal export, including values that
+// start with a literal apostrophe. NFKC is inspection only: original product
+// names, exact Planner IDs and manually entered packs remain unchanged.
+const spreadsheetFormula = /^[\p{White_Space}\p{Default_Ignorable_Code_Point}\p{Mark}]*[=+@\-\u2212]/u
+function formulaLike(value: string): boolean {
+  return spreadsheetFormula.test(value.normalize('NFKC'))
+}
+function safeTableCell(value: string): string {
   const flat = value.replace(/[\t\r\n]/gu, ' ')
-  const formula = /^[\p{White_Space}\p{Cf}\p{Mn}\p{Mc}\p{Me}]*[=+@-]/u
-  return formula.test(flat.normalize('NFKC')) ? "'" + flat : flat
+  return flat.startsWith("'") || formulaLike(flat) ? "'" + flat : flat
+}
+function originalTableCell(value: string): string {
+  if (value.startsWith("''")) return value.slice(1)
+  return value.startsWith("'") && formulaLike(value.slice(1)) ? value.slice(1) : value
 }
 function tabularData(
   needs: readonly ManualNeed[], entries: ManualEntries, stores: readonly ManualRetailer[] = MANUAL_RETAILERS,
@@ -82,11 +90,16 @@ function readPastedTable(text: string, needs: readonly ManualNeed[]): {
     }
     // Older six-column Supa exports had no multi-pack observation.
     // Restore their actual product, unit and price, but NEVER infer count=1.
-    const [id, shop, product, packAmount, unit, packCount, price] = boundToDemand
+    const [encodedId, shop, encodedProduct, encodedPackAmount, unit, encodedPackCount, encodedPrice] = boundToDemand
       ? [cells[0], cells[1], cells[4], cells[5], cells[6], cells[7], cells[8]]
       : legacyWithoutPackCount
         ? [cells[0], cells[1], cells[2], cells[3], cells[4], '', cells[5]]
         : cells
+    // Decode only Supa's explicit literal-text prefix. This reversible
+    // roundtrip is never a source SKU/retailer observation approval.
+    const [id, product, packAmount, packCount, price] =
+      [encodedId, encodedProduct, encodedPackAmount, encodedPackCount, encodedPrice]
+        .map(originalTableCell)
     if (boundToDemand && (
       !expected.has(id) ||
       cells[2] !== (expected.get(id)!.amount === null ? '' : String(expected.get(id)!.amount)) ||
@@ -144,6 +157,7 @@ export function ManualStoreComparison({
   const [importText, setImportText] = useState('')
   const [importMessage, setImportMessage] = useState('')
   const [showTable, setShowTable] = useState(false)
+  const [clipboardFallback, setClipboardFallback] = useState('')
   const editRevision = useRef(0)
   const latestDemand = useRef(needs)
   latestDemand.current = needs
@@ -164,6 +178,7 @@ export function ManualStoreComparison({
       setImportMessage('De Planner is veranderd. Bewaar eerst je oude invulblad en begin daarna opnieuw.')
       return
     }
+    setClipboardFallback('')
     setEntriesDemandSignature(currentDemandSignature)
     setRecordedNeeds(needs.map(row => ({ ...row })))
     const key = manualQuoteKey(store, need.ingredientId)
@@ -277,24 +292,47 @@ export function ManualStoreComparison({
       setImportMessage('De persoonlijke boodschappenlijst kon niet worden opgeslagen; controleer de huidige invoer.')
     }
   }
+  function preparedTable(store?: ManualRetailer, onlyEntered = false): string {
+    const sourceNeeds = staleEntries ? recordedNeeds : needs
+    const includedNeeds = store && onlyEntered ? sourceNeeds.filter(need => {
+      const row = entries[manualQuoteKey(store, need.id)]
+      return !!row && (row.product.trim() !== '' || row.packAmount.trim() !== '' ||
+        row.packUnit !== '' || (row.packCount ?? '').trim() !== '' || row.price.trim() !== '')
+    }) : sourceNeeds
+    if (!includedNeeds.length) {
+      throw Error(`Nog geen ingevulde ${store ?? 'winkel'}-regels om als deelblad te bewaren.`)
+    }
+    const content = tabularData(includedNeeds, entries, store ? [store] : MANUAL_RETAILERS) + '\n'
+    if (new TextEncoder().encode(content).length > 128000) {
+      throw Error('Het huidige invulblad is te groot om lokaal te bewaren.')
+    }
+    return content
+  }
+  async function copyOwnTable(store?: ManualRetailer, onlyEntered = false) {
+    try {
+      const content = preparedTable(store, onlyEntered)
+      setClipboardFallback('')
+      if (!navigator.clipboard?.writeText) throw Error('Geen klembordrechten')
+      await navigator.clipboard.writeText(content)
+      setImportMessage((store ?? 'Beide winkels') +
+        ': persoonlijk negenkolomsinvulblad naar klembord gekopieerd. Plak het in Excel/Calc en importeer de negen persoonlijke invulkolommen later weer hier; dit zijn geen bewezen retailerprijzen.')
+    } catch (error) {
+      try {
+        // A permission failure does not lose the personal data: expose the
+        // exact same bounded TSV for manual copy in a selectable field.
+        const content = preparedTable(store, onlyEntered)
+        setClipboardFallback(content)
+        setShowTable(true)
+        setImportMessage('Automatisch kopiëren niet beschikbaar. Selecteer en kopieer het invulblad hieronder handmatig.')
+      } catch {
+        setImportMessage(error instanceof Error ? error.message : 'Geen invulblad beschikbaar.')
+      }
+    }
+  }
   function downloadTableFile(store?: ManualRetailer, onlyEntered = false) {
     if (!(staleEntries ? recordedNeeds : needs).length) return
     try {
-      const sourceNeeds = staleEntries ? recordedNeeds : needs
-      const includedNeeds = store && onlyEntered ? sourceNeeds.filter(need => {
-        const row = entries[manualQuoteKey(store, need.id)]
-        return !!row && (row.product.trim() !== '' || row.packAmount.trim() !== '' ||
-          row.packUnit !== '' || (row.packCount ?? '').trim() !== '' || row.price.trim() !== '')
-      }) : sourceNeeds
-      if (!includedNeeds.length) {
-        setImportMessage(`Nog geen ingevulde ${store ?? 'winkel'}-regels om als deelblad te bewaren.`)
-        return
-      }
-      const content = tabularData(includedNeeds, entries, store ? [store] : MANUAL_RETAILERS) + '\n'
-      if (new TextEncoder().encode(content).length > 128000) {
-        setImportMessage('Het huidige invulblad is te groot om lokaal te bewaren.')
-        return
-      }
+      const content = preparedTable(store, onlyEntered)
       const url = URL.createObjectURL(new Blob([content], {
         type: 'text/tab-separated-values;charset=utf-8',
       }))
@@ -336,6 +374,7 @@ export function ManualStoreComparison({
         return
       }
       editRevision.current += 1
+      setClipboardFallback('')
       setEntries(nextEntries)
       setEntriesDemandSignature(currentDemandSignature)
       setRecordedNeeds(needs.map(row => ({ ...row })))
@@ -364,14 +403,14 @@ export function ManualStoreComparison({
       return
     }
     try {
-      const contents = await file.text()
+      const contents = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
       if (revision !== editRevision.current || originalDemand !== latestDemand.current) {
         setImportMessage('Planner of winkelinvoer is intussen gewijzigd. Kies het bestand opnieuw; niets vervangen.')
         return
       }
       restoreTable(contents)
     } catch {
-      setImportMessage('Kon dit lokale invulblad niet lezen; bestaande invoer behouden.')
+      setImportMessage('Lokaal invulblad is ongeldig of bevat geen geldige UTF-8; bestaande invoer behouden.')
     }
   }
   const header = 'Eigen winkelprijzen vergelijken'
@@ -465,6 +504,9 @@ export function ManualStoreComparison({
             )}
           </div>
           <div className="manual-compare__actions">
+            <button className="ghost-button" type="button" onClick={() => void copyOwnTable()}>
+              Kopieer beide winkels als Excel-invulblad
+            </button>
             <button className="ghost-button" type="button" onClick={() => setShowTable(value => !value)}>
               {showTable ? 'Verberg Excel-tabel' : 'Tabel kopiëren of importeren'}
             </button>
@@ -500,6 +542,11 @@ export function ManualStoreComparison({
                 <textarea readOnly rows={7} value={tabularData(staleEntries ? recordedNeeds : needs, entries)}
                   onFocus={event => event.currentTarget.select()} />
               </label>
+              {clipboardFallback && <label>Kopieer het persoonlijke invulblad handmatig
+                <textarea readOnly rows={7} spellCheck={false} value={clipboardFallback}
+                  onFocus={event => event.currentTarget.select()} />
+                <small>Deze momentopname bevat geen onafhankelijk geverifieerde winkelbron.</small>
+              </label>}
               <label>Ingevulde tabel terugplakken
                 <textarea rows={7} value={importText}
                   onChange={event => setImportText(event.target.value)}
@@ -511,6 +558,10 @@ export function ManualStoreComparison({
               </button>
               {MANUAL_RETAILERS.map(store => (
                 <div className="manual-compare__store-actions" key={store}>
+                  <button className="ghost-button" type="button"
+                    onClick={() => void copyOwnTable(store, true)}>
+                    Kopieer ingevulde {store}-regels voor Excel
+                  </button>
                   <button className="ghost-button" type="button"
                     onClick={() => downloadTableFile(store)}>
                     Bewaar {store} met alle regels (.tsv)

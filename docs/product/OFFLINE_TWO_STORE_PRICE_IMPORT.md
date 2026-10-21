@@ -3,6 +3,10 @@
 **Beschikbaar in de bestaande navigatie: Vergelijk → Vergelijk twee winkels met eigen prijsdata.**
 De import gebruikt de bestaande ingredientenaggregatie, productmatching, gehele-verpakking-berekening en mandjesvergelijking. Er wordt geen live supermarkt geraadpleegd.
 
+## Handmatige Excel/Calc-invulbladen uitwisselen
+
+De **handmatige rekenhulp** kan nu haar huidige twee-winkelinvulblad meteen via de knop **Kopieer beide winkels als Excel-invulblad** in negen TSV-kolommen kopiëren. In de uitgebreide tabel kun je ook **alleen ingevulde PLUS- of DekaMarkt-regels** kopiëren. Bij geen klembordrechten verschijnt dezelfde inhoud in een handmatig selecteerbaar tekstvak. Importeren kan via **Geplakte tabel laden** of als `.tsv`/`.txt`-bestand; elke rij blijft gekoppeld aan dezelfde originele Planner-ingrediënt-ID, exacte hoeveelheid en eenheid. Onbekende bedragen blijven leeg en een losse winkelimport laat de andere winkel ongemoeid. Namen met een letterlijke apostrof of verborgen spreadsheetformuleprefix gaan veilig en omkeerbaar door de tabgescheiden export-/importroute. Bestanden met ongeldige UTF-8 worden geweigerd. Deze calculator kent geen oorspronkelijke retailer-SKU-identiteiten of brontijdstip: zijn rekenkundige verschil is **niet** de onafhankelijk geverifieerde bronvergelijking.
+
 ## Zonder bestand: rechtstreeks twee winkels invullen
 
 1. Plan je echte maaltijden in **Planner**. Ga naar **Vergelijk** → **Geen JSON? Vul de winkels hier in**.
