@@ -116,12 +116,18 @@ export function MixedStoreUnitBreakdown({
     }
   }
   return <details className="offline-price-workbench__full-breakdown mixed-store-route__unit-breakdown">
-    <summary>Vergelijk per ingrediënt de twee echte producten, eenheidsprijzen en pakbedragen</summary>
+    <summary>Vergelijk mijn twee bronproducten, eenheidsprijzen en pakbedragen per ingrediënt</summary>
     <p>De eenheidsprijs is alleen indicatief per kilogram, liter of stuk.
       De goedkoopste winkel voor jouw week wordt gekozen op het werkelijk benodigde
       <strong> aantal hele verpakkingen</strong> en bijbehorende regelbedrag.
       Een lagere prijs per kilo maakt een grotere verpakking niet automatisch
       goedkoper voor jouw benodigde hoeveelheid.</p>
+    {captured && <p role="status">Eigen bronmomenten: PLUS <strong>{captured.PLUS}</strong> en
+      DekaMarkt <strong>{captured.DekaMarkt}</strong>. Dit zijn opgeslagen
+      waarnemingen, geen live prijzen of zelfstandig bevestigd veldbewijs.</p>}
+    {eligibleNow && !eligibleNow() && <p role="alert">Deze vergelijking is
+      inmiddels verlopen of gewijzigd. Herzie de oorspronkelijke winkelbronnen
+      voordat je prijzen exporteert of hierop koopt.</p>}
     <div className="mixed-store-route__unit-controls" role="group"
       aria-label="Toon en sorteer vergeleken bronproducten">
       <label>Zoek ingrediënt, oorspronkelijk product of SKU
@@ -142,6 +148,10 @@ export function MixedStoreUnitBreakdown({
           onChange={event => setOnlyDifferences(event.currentTarget.checked)} />
         Toon alleen ingrediënten met een prijsverschil
       </label>
+      {(search || onlyDifferences || sortBy !== 'planner') && <button type="button"
+        onClick={() => { setSearch(''); setOnlyDifferences(false); setSortBy('planner') }}>
+        Toon weer de volledige Planner-volgorde
+      </button>}
       <p role="status">{distinct} van {comparisons.length} ingrediënten hebben
         een verschillend pakbedrag voor dezelfde benodigde hoeveelheid.
         {onlyDifferences ? ' Gelijke bedragen zijn tijdelijk verborgen.' : ''}
@@ -150,7 +160,7 @@ export function MixedStoreUnitBreakdown({
         {sortBy === 'unit-difference' && ' Alleen eenheidsprijzen met dezelfde basis (kg, liter of stuk) worden vergeleken. Onbekende of onvergelijkbare eenheden komen achteraan; je echte weekkosten blijven op hele pakken gebaseerd.'}</p>
     </div>
     {captured && eligibleNow && <p>
-      <button type="button" disabled={!visible.length} onClick={downloadVisibleComparison}>
+      <button type="button" disabled={!visible.length || !eligibleNow()} onClick={downloadVisibleComparison}>
         Download deze persoonlijke prijsverschillen (TXT)
       </button>
       <small>Inclusief originele SKU, pakbedrag, eenheidsprijs en bronmoment per winkel;
