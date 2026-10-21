@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { privateTwoStoreCoverageCsv, privateTwoStoreCoverageText, type CoverageExportLine } from './twoStoreCoverageExport.ts'
 import { freshReviewedBaskets, recentOwnCaptureInstant, type PrivateCaptureProgress, type PrivateReviewedBaskets, type OwnStore } from '../comparison/privateReviewedBasketBridge.ts'
-import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
+import { readablePlannerDemandAmount, type PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
 import './plannerTwoStoreCoverage.css'
 
 const STORES = ['PLUS', 'DekaMarkt'] as const
@@ -68,10 +68,9 @@ function cellFor(
 }
 
 function amountText(need: PlannerCaptureGuideNeed): string {
-  return typeof need.amount === 'number' && Number.isFinite(need.amount) &&
-    need.amount > 0 && need.amount <= 1_000_000
-    ? `${need.amount.toLocaleString('nl-NL', { useGrouping: false, maximumFractionDigits: 3 })} ${need.unit}`
-    : 'Hoeveelheid nog controleren'
+  const amount = readablePlannerDemandAmount(need.amount)
+  return amount === 'hoeveelheid nog controleren'
+    ? 'Hoeveelheid nog controleren' : amount + ' ' + need.unit
 }
 
 export function PlannerTwoStoreCoverage({

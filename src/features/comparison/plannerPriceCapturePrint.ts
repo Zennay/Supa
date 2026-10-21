@@ -1,5 +1,5 @@
 import { makeBlankPlannerCaptureCsv, type CaptureStore } from './plannerPriceCaptureSheet.ts'
-import type { PlannerCaptureGuideNeed } from './plannerPriceCaptureGuide.ts'
+import { readablePlannerDemandAmount, type PlannerCaptureGuideNeed } from './plannerPriceCaptureGuide.ts'
 
 // Only an inert local document is emitted; it never fetches external content.
 const htmlText = (raw: string): string => raw
@@ -19,8 +19,9 @@ export function makePrintablePlannerCaptureHtml(
   const sections = selectedStores.map((store, storeIndex) => {
     const rows = needs.map((need, index) => {
       const rowNumber = 2 + storeIndex * needs.length + index
-      const physical = need.amount === null || !Number.isFinite(need.amount)
-        ? 'Hoeveelheid onbekend' : String(need.amount) + ' ' + need.unit
+      const amount = readablePlannerDemandAmount(need.amount)
+      const physical = amount === 'hoeveelheid nog controleren'
+        ? 'Hoeveelheid nog controleren' : amount + ' ' + need.unit
       return '<tr>' +
         '<td class="need"><span class="number">CSV ' + rowNumber + '</span>' +
         '<strong>' + htmlText(need.label) + '</strong>' +

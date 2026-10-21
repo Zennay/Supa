@@ -12,7 +12,7 @@ import {
   type OwnStore, type PrivateCaptureProgress, type PrivateReviewedBaskets,
 } from '../comparison/privateReviewedBasketBridge.ts'
 import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
-import { makePlannerCaptureGuide } from '../comparison/plannerPriceCaptureGuide.ts'
+import { makePlannerCaptureGuide, readablePlannerDemandAmount } from '../comparison/plannerPriceCaptureGuide.ts'
 import { makeBlankPlannerCaptureCsv } from '../comparison/plannerPriceCaptureSheet.ts'
 import { pendingOwnSourceReviewCsv, pendingOwnSourceReviewText } from '../planner/pendingOwnSourceReviewCsv.ts'
 import './privateComparisonJourney.css'
@@ -481,9 +481,9 @@ export function PrivateComparisonJourney({
             <ol start={2 + storeIndex * captureNeeds.length}>
               {captureNeeds.map((need, index) => <li key={store + '-' + index + '-' + need.id}>
                 <strong>{need.label}</strong>
-                <small>{need.amount !== null && Number.isFinite(need.amount) && need.amount > 0
-                  ? 'Planner-vraag: ' + need.amount + ' ' + need.unit
-                  : 'Planner-hoeveelheid nog controleren'}</small>
+                <small>{readablePlannerDemandAmount(need.amount) === 'hoeveelheid nog controleren'
+                  ? 'Planner-hoeveelheid nog controleren'
+                  : 'Planner-vraag: ' + readablePlannerDemandAmount(need.amount) + ' ' + need.unit}</small>
               </li>)}
             </ol>
           </section>)}
@@ -556,10 +556,9 @@ export function PrivateComparisonJourney({
               key={JSON.stringify([store, need.id, index])}>
               <div>
                 <strong>{need.label}</strong>
-                <small>{need.amount !== null && need.amount !== undefined &&
-                  Number.isFinite(need.amount) && need.amount > 0
-                    ? need.amount + ' ' + (need.unit ?? 'eenheid')
-                    : 'Hoeveelheid nog controleren'}</small>
+                <small>{readablePlannerDemandAmount(need.amount ?? null) === 'hoeveelheid nog controleren'
+                  ? 'Hoeveelheid nog controleren'
+                  : readablePlannerDemandAmount(need.amount ?? null) + ' ' + (need.unit ?? 'eenheid')}</small>
                 <small>{need.reason}</small>
               </div>
               <button type="button" onClick={() => onReview(store, need.id)}>

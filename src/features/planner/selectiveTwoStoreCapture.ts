@@ -1,5 +1,5 @@
 import { makeBlankPlannerCaptureCsv, type CaptureStore } from '../comparison/plannerPriceCaptureSheet.ts'
-import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
+import { readablePlannerDemandAmount, type PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
 
 export type MissingStoreNeeds = Readonly<Record<CaptureStore, readonly PlannerCaptureGuideNeed[]>>
 const shops: readonly CaptureStore[] = ['PLUS', 'DekaMarkt']
@@ -80,8 +80,9 @@ export function selectiveTwoStoreCaptureGuide(needs: MissingStoreNeeds): string 
     output.push(store + ' · ' + needs[store].length + ' ontbrekende bronproducten')
     if (!needs[store].length) output.push('Niets opnieuw opnemen voor deze winkel.')
     for (const item of needs[store]) {
-      const amount = item.amount === null ? 'hoeveelheid onbekend'
-        : String(item.amount) + ' ' + clean(item.unit)
+      const physical = readablePlannerDemandAmount(item.amount)
+      const amount = physical === 'hoeveelheid nog controleren'
+        ? physical : physical + ' ' + clean(item.unit)
       output.push('CSV rij ' + row++ + ' · ' + clean(item.label) +
         ' · Planner-behoefte ' + amount)
     }
