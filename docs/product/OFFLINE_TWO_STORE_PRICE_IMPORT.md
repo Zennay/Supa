@@ -1225,3 +1225,11 @@ Anders staat er expliciet **Volledig prijsverschil nog onbekend**.
 Een bekende eigen bronprijs is nooit gelijk aan een publiek geverifieerde
 winkelprijs of onafhankelijk bewezen besparing. Verouderde bronnen worden
 niet automatisch ververst en er worden geen bronrechten afgeleid.
+
+## Volledige en gedeeltelijke winkelvergelijkingen meenemen (Home)
+
+Op **Home → Vergelijk dezelfde boodschappen** gebruikt Supa uitsluitend de lokaal geïmporteerde, daadwerkelijk bevestigde PLUS/DekaMarkt-bronopnames en de oorspronkelijke fysieke weekvraag. Zodra **beide volledige mandjes** tegelijk actueel en veilig vergelijkbaar zijn, verschijnen **Kopieer mijn volledige winkelvergelijking** en **Deel mijn privévergelijking (mobiel)**. De tekst komt uit exact dezelfde bestaande mandvergelijkings- en TXT-exportfunctie: originele bronmomenten, SKU’s, hele-pakprijzen, eenheidsprijzen en regelverschillen, inclusief duidelijke privébron-/geen-kassagarantie-vermelding. De Web Share-functie gebruikt uitsluitend een expliciete gebruikerstik; ontbrekende klembordrechten tonen een handmatig selecteerbare versie.
+
+Als **alleen afzonderlijke ingrediënten** al gepaard en geprijsd zijn, verschijnen in plaats daarvan **Kopieer bekende PLUS/Deka-regelprijzen voor Excel** en **Deel alleen bekende winkelregels (mobiel)**. Deze acties gebruiken exact de bestaande gedeeltelijke CSV-export. Zij tonen nooit een onvolledig mandtotaal of winkelwinnaar. Verlopen prijzen, ontbrekende SKU’s en niet-gecontroleerde bronregels verschijnen niet in een nieuw kostenbedrag. De handmatig selecteerbare deeltekst is gebonden aan de actuele week, bronopname en reviewstatus; bij wijziging verdwijnt een oude kopie.
+
+Het delen en kopiëren gebeurt uitsluitend na een gebruikersactie. Een gekozen externe app kan dan de eigen brongegevens in de tekst ontvangen: Supa uploadt deze niet zelfstandig. De oorspronkelijke PLUS/Deka-bronrechten, onafhankelijke veldvalidatie, kassaprijzen en publicatie van besparingsclaims worden hierdoor **niet** vastgesteld of versoepeld.
