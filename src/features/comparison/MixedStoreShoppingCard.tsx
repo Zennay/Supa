@@ -155,13 +155,18 @@ export function MixedStoreShoppingCard({
     ['Algemeen', 'PLUS', 'DekaMarkt'].includes(note.store) &&
     typeof note.label === 'string' && note.label.length > 0 &&
     note.label.length <= 140 && typeof note.done === 'boolean')
+  const visitedStores = new Set(plan.lines.map(line => line.store))
+  const offRouteManualNotes = validManualNotes.filter(note =>
+    note.store !== 'Algemeen' && !visitedStores.has(note.store))
   const visibleManualNotes = onlyOpen ? validManualNotes.filter(note => !note.done) : validManualNotes
   const personalText = [
     'PERSOONLIJKE BOODSCHAPPEN — GEEN SKU, BRONMOMENT OF PRIJS',
     ...visibleManualNotes.map(note => (note.done ? '☑ ' : '☐ ') +
       '[' + note.store + '] ' +
       note.label.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim() +
-      ' · prijs onbekend'),
+      (note.store !== 'Algemeen' && !visitedStores.has(note.store)
+        ? ' · BUITEN deze gekozen route · prijs onbekend'
+        : ' · prijs onbekend')),
     'Deze eigen regels tellen niet mee voor productkosten, winkelwinnaar of besparing.',
   ].join('\n')
   const printable = formatMixedStoreShoppingPlan(plan, captured, progress, appliedCostCents, onlyOpen) +
@@ -329,7 +334,7 @@ export function MixedStoreShoppingCard({
         plus, deka, route: plan, captured,
         checked: new Set(plan.lines.filter(line => done(line.key)).map(line => line.key)),
         extraVisitCostCents: appliedCostCents, strategy: mode,
-      }), validManualNotes)
+      }), validManualNotes, [...visitedStores])
       if (!eligibleNow()) throw Error('De bronopnames zijn inmiddels verlopen.')
       const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
       try {
@@ -371,7 +376,7 @@ export function MixedStoreShoppingCard({
       })
       const withExtras = saved.items.length
         ? appendUnpricedExtrasToMixedRouteCsv(reviewedCsv, saved.items) : reviewedCsv
-      const csv = appendManualUnpricedNotesToMixedRouteCsv(withExtras, validManualNotes)
+      const csv = appendManualUnpricedNotesToMixedRouteCsv(withExtras, validManualNotes, [...visitedStores])
       if (!eligibleNow()) throw Error('Bronopnames zijn intussen verlopen.')
       const url = URL.createObjectURL(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' }))
       try {
@@ -442,6 +447,13 @@ export function MixedStoreShoppingCard({
       <div><strong>DekaMarkt volledig</strong><p>{exactEuro.formatCents(mixed.dekaWholeCents)}</p></div>
       <div><strong>Mijn gekozen route</strong><p>{exactEuro.formatCents(plan.totalCents)}</p></div>
     </div>
+    {offRouteManualNotes.length > 0 && <p role="status"
+      className="mixed-store-route__budget">
+      <strong>{offRouteManualNotes.length} eigen ongeprijsde {offRouteManualNotes.length === 1
+        ? 'boodschap hoort' : 'boodschappen horen'} bij een winkel buiten jouw gekozen route.</strong>
+      {' '}Supa voegt die winkel niet stilzwijgend als stop toe. Kies zelf een andere
+      winkelroute of pas de winkelgroep aan in je persoonlijke Lijst.
+    </p>}
     {validManualNotes.length > 0 && <p role="status" className="mixed-store-route__budget">
       Daarnaast staan {validManualNotes.length} eigen ongeprijsde boodschappen op deze route,
       waarvan {validManualNotes.filter(note => !note.done).length} open.
@@ -666,7 +678,8 @@ export function MixedStoreShoppingCard({
       {(['PLUS', 'DekaMarkt', 'Algemeen'] as const).map(name => {
         const rows = visibleManualNotes.filter(note => note.store === name)
         return rows.length ? <div key={name}>
-          <strong>{name === 'Algemeen' ? 'Algemeen · wijs zelf een winkel toe' : name}</strong>
+          <strong>{name === 'Algemeen' ? 'Algemeen · wijs zelf een winkel toe'
+            : visitedStores.has(name) ? name : name + ' · buiten de gekozen route'}</strong>
           {onToggleManualNote && <button type="button" className="ghost-button" onClick={() => {
             const allDone = rows.every(note => note.done)
             if (!allDone && !window.confirm('Deze ' + rows.length + ' eigen ongeprijsde ' +

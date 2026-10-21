@@ -43,12 +43,16 @@ export function appendUnpricedExtrasToMixedRouteCsv(
  * Never pass the result back through a retailer-source importer. */
 export function appendManualUnpricedNotesToMixedRouteCsv(
   reviewedCsv: string, notes: readonly UnpricedShoppingNote[],
+  visitedStores: readonly ('PLUS' | 'DekaMarkt')[] = [],
 ): string {
   if (!reviewedCsv.startsWith('"soort",') ||
       !reviewedCsv.endsWith('\r\n') ||
       !Array.isArray(notes) || notes.length > 100)
     throw Error('Gebruik alleen een bestaande gecontroleerde privéroute.')
+  if (visitedStores.some(store => store !== 'PLUS' && store !== 'DekaMarkt'))
+    throw Error('De gekozen winkelroute heeft een ongeldige winkel.')
   if (!notes.length) return reviewedCsv
+  const onRoute = new Set(visitedStores)
   const admitted = normalizePrivateNotes({
     schema: 'supa-private-unpriced-notes-v1', notes: [...notes],
   })
@@ -58,8 +62,11 @@ export function appendManualUnpricedNotesToMixedRouteCsv(
     row[1] = note.id
     row[2] = note.label
     row[26] = note.done ? 'ja' : 'nee'
-    row[27] = 'Privé herinnering bij ' + note.store +
-      '; geen gecontroleerde winkel, SKU, bronmoment, pakprijs, eenheidsprijs of eurobedrag.'
+    row[27] = 'Eigen lijstgroep: ' + note.store +
+      (note.store === 'Algemeen' || onRoute.has(note.store)
+        ? '; op de gekozen persoonlijke route'
+        : '; BUITEN de gekozen route (winkel niet bezocht)') +
+      '; geen gecontroleerde SKU, bronmoment, pakprijs, eenheidsprijs of eurobedrag.'
     return row.map(value => literalCsv(value)).join(',')
   })
   const result = reviewedCsv + rows.join('\r\n') + '\r\n'

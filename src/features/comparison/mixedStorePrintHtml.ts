@@ -73,8 +73,14 @@ export function printMixedStoreRouteHtml(input: {
       (item.unit === 'piece' ? 'stuks' : clean(item.unit)) +
       ' · geen gecontroleerde winkelprijs</small></div></li>').join('') +
     '</ul></section>' : ''
+  const visitedStores = new Set(route.lines.map(line => line.store))
+  const offRoute = manual.filter(note =>
+    note.store !== 'Algemeen' && !visitedStores.has(note.store))
   const manualSection = manual.length
     ? '<section><h2>Mijn ongeprijsde boodschappen · persoonlijke herinneringen</h2>' +
+      (offRoute.length ? '<p><strong>Let op:</strong> ' + offRoute.length +
+        ' eigen winkelnotities horen bij een niet-gekozen winkel. Ze staan hieronder ' +
+        'apart vermeld en zijn niet als stop aan deze route toegevoegd.</p>' : '') +
       '<p><strong>Bedrag onbekend.</strong> Los van alle gecontroleerde ' +
       'winkelregels, hele-verpakkingsbedragen en mogelijke prijsverschillen.</p>' +
       ['PLUS', 'DekaMarkt', 'Algemeen'].map(store => {
@@ -85,6 +91,8 @@ export function printMixedStoreRouteHtml(input: {
             (note.done ? '&#9745;' : '&#9744;') +
             '</span><div><strong>' + clean(note.label) +
             '</strong><br><small>Zelf toegevoegd · prijs, SKU en bronmoment onbekend' +
+            (note.store !== 'Algemeen' && !visitedStores.has(note.store)
+              ? ' · BUITEN gekozen winkelroute' : ' · persoonlijke lijst') +
             '</small></div></li>').join('') + '</ul>'
       }).join('') + '</section>' : ''
   const summary = '<div class="totals"><p>PLUS hele mand <b>' +
