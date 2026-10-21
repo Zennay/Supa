@@ -14,6 +14,8 @@ const COLUMNS = [
   'dekaStatus', 'dekaProduct', 'dekaProductId', 'dekaPacks', 'dekaPackAmount', 'dekaPackUnit',
   'dekaPackCount', 'dekaPackPriceCents', 'dekaUnitPrice', 'dekaLineCents',
   'deltaCentsDekaMinusPlus',
+  'plusOriginalRequiredAmount', 'plusOriginalRequiredUnit',
+  'dekaOriginalRequiredAmount', 'dekaOriginalRequiredUnit',
 ]
 
 function cell(value: string | number): string {
@@ -37,7 +39,7 @@ function cell(value: string | number): string {
   return '"' + text.replace(/"/g, '""') + '"'
 }
 
-function lineFields(line: BasketTraceLine): (string | number)[] {
+function lineFields(line: BasketTraceLine, monetaryAllowed: boolean): (string | number)[] {
   // Ten fields per store, even when no source product or price is known.
   // A short row shifts the next store's columns into the wrong money fields.
   if (line.status !== 'matched') return [
@@ -50,8 +52,10 @@ function lineFields(line: BasketTraceLine): (string | number)[] {
     line.reasons.includes('explicit local user selection; not an automatic or verified retailer match')
       ? 'door gebruiker gekoppeld' : 'automatisch gekoppeld',
     line.productName, line.productId, line.packs, line.pack.amount,
-    line.pack.unit, line.pack.count, line.pricePerPackCents,
-    privateUnitPrice(line) ?? 'eenheidsprijs onbekend', line.lineTotalCents,
+    line.pack.unit, line.pack.count,
+    monetaryAllowed ? line.pricePerPackCents : '',
+    monetaryAllowed ? privateUnitPrice(line) ?? 'eenheidsprijs onbekend' : 'prijs onbekend; bron herzien',
+    monetaryAllowed ? line.lineTotalCents : '',
   ]
 }
 
@@ -126,9 +130,12 @@ function buildCsv(plus: OneStoreBasket, deka: OneStoreBasket,
       plusObservedAt, dekaObservedAt, state,
       plusLine.id, plusLine.ingredientLabel, plusLine.requirement.amount ?? '',
       plusLine.requirement.unit,
-      ...lineFields(plusLine), ...lineFields(dekaLine),
+      ...lineFields(plusLine, showMoneyDifference),
+      ...lineFields(dekaLine, showMoneyDifference),
       showMoneyDifference && plusLine.status === 'matched' && dekaLine.status === 'matched'
         ? dekaLine.lineTotalCents - plusLine.lineTotalCents : '',
+      plusLine.requirement.amount ?? '', plusLine.requirement.unit,
+      dekaLine.requirement.amount ?? '', dekaLine.requirement.unit,
     ]
   })
   const header = COLUMNS.map(cell).join(',')
@@ -168,13 +175,16 @@ export function privateComparisonHtml(
   const dekaLines = new Map(deka.lines.map(line => [line.id, line] as const))
   function product(line: BasketTraceLine) {
     if (line.status === 'unresolved') return '<strong>Niet gekoppeld</strong><br><small>Prijs onbekend — handmatig kiezen</small>'
-    return '<strong>' + clean(line.productName) + '</strong><br>' +
+    const physical = '<strong>' + clean(line.productName) + '</strong><br>' +
       '<small>Originele broncode: ' + clean(line.productId) + '</small><br>' +
-      clean(line.packs) + ' × ' + clean(money(line.pricePerPackCents)) +
-      ' · ' + clean(line.pack.count) + ' × ' + clean(line.pack.amount) + ' ' +
-      clean(line.pack.unit) + ' per verpakking<br><small>' +
+      clean(line.packs) + ' hele pakken · ' + clean(line.pack.count) + ' × ' +
+      clean(readablePlannerDemandAmount(line.pack.amount)) + ' ' +
+      clean(line.pack.unit) + ' per verpakking<br>'
+    return showDifference ? physical +
+      '<small>Pakprijs: ' + clean(money(line.pricePerPackCents)) + ' · ' +
       clean(privateUnitPrice(line) ?? 'Eenheidsprijs onbekend') + '</small><br><b>' +
-      clean(money(line.lineTotalCents)) + '</b>'
+      clean(money(line.lineTotalCents)) + '</b>' : physical +
+      '<small>Prijs onbekend — bron verouderd, onvolledig of niet volledig bevestigd.</small>'
   }
   const rows = plus.lines.map(line => {
     const other = dekaLines.get(line.id)
@@ -202,8 +212,9 @@ export function privateComparisonHtml(
     '</strong><small>' + (deka.totalCents === plus.totalCents ? 'Gelijk' :
       deka.totalCents > plus.totalCents ? 'PLUS is lager' : 'DekaMarkt is lager') +
     '</small></div></section>' :
-    '<p class="notice">Geen volledig en actueel vergelijkbare mandprijzen. Bekende afzonderlijke ' +
-    'productbedragen zijn alleen ter controle zichtbaar; ontbrekende prijzen zijn nooit € 0,00.</p>'
+    '<p class="notice">Geen volledig en actueel vergelijkbare mandprijzen. Originele ' +
+    'SKU’s en verpakkingen blijven zichtbaar; prijs- en eenheidsbedragen zijn verborgen ' +
+    'tot de bron en beide mandjes opnieuw zijn bevestigd. Onbekend is nooit € 0,00.</p>'
   return '<!doctype html><html lang="nl"><head><meta charset="utf-8">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1">' +
     '<meta name="referrer" content="no-referrer">' +
