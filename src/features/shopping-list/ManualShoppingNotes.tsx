@@ -883,8 +883,12 @@ export function ManualShoppingNotes({ notes, setNotes }: {
         </label>
         <details>
           <summary>Of plak vier kolommen uit Excel/Calc</summary>
-          <p>Plak rechtstreeks de vier kolommen van het eigen Supa-invulblad (ook met tabs), of de volledige Supa-CSV. Geen winkelprijsbestanden.
-            Na voorbereiden verschijnt de lijst hierboven; bevestig daarna zelf de voorinzage.</p>
+          <p>Plak de Supa-CSV, vier tabkolommen uit het eigen invulblad, of gewone
+            Excel/Calc-tabkolommen met kopjes <strong>artikel</strong> en <strong>winkel</strong>
+            (optioneel <strong>afgevinkt</strong>). De kolomvolgorde mag wisselen;
+            winkels zijn exact Algemeen, PLUS of DekaMarkt en vinkjes ja/nee.
+            Zonder vinkkolom is alles open. Geen prijs-, SKU- of bronkolommen.
+            Bekijk daarna de voorinzage en bevestig zelf.</p>
           <label>Privé-CSV-tekst
             <textarea rows={4} maxLength={32768} value={ownCsvPaste}
               onChange={event => setOwnCsvPaste(event.target.value)}

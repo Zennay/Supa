@@ -37,3 +37,22 @@ automatisch overschreven. De gebruiker kan de oude tab-/apparaatkopie eerst loka
 bekijken via dezelfde expliciete JSON-merge-voorinzage, of de betreffende oude
 kopie na een bevestiging wissen. Wissen verandert nooit de geopende lijst, andere
 opslagkopieën, prijsbronnen of handmatig gedownloade back-ups.
+
+### Algemene Excel/Calc-tabellen
+
+Naast het originele Supa-formaat accepteert het lokale plakveld nu een
+tabel met **exact** de kopjes `artikel` en `winkel` in willekeurige volgorde,
+eventueel gevolgd door `afgevinkt` (waarde `ja` of `nee`). Boodschappen
+zonder afvinkkolom beginnen open. Alleen `Algemeen`, `PLUS` en `DekaMarkt`
+zijn winkels; aanvullende prijs-, SKU-, hoeveelheid- of bronkolommen worden
+geweigerd in plaats van stilzwijgend genegeerd. Voorbeeld:
+
+```text
+artikel	winkel	afgevinkt
+Afwasmiddel	Algemeen	nee
+Havermout	PLUS	ja
+```
+
+De bestaande begrensde Supa-CSV-parser controleert vervolgens nogmaals de
+artikelnamen, dubbele regels en groepscodes. Het resultaat moet altijd door
+de gewone expliciete persoonlijke importvoorinzage voordat de lijst wijzigt.
