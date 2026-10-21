@@ -49,6 +49,7 @@ export function LocalObservationCaptureEditor({
   currentScope.current = currentFingerprint
   const changes = useRef(0)
   const latestRestore = useRef(0)
+  const draftInvalidated = useRef(false)
   const [snapshot, setSnapshot] = useState<Snapshot>(() => ({
     fingerprint: currentFingerprint, needs: [...needs], stores: [...stores],
   }))
@@ -59,6 +60,14 @@ export function LocalObservationCaptureEditor({
   const changed = snapshot.fingerprint !== currentFingerprint
   const rowKey = (store: CaptureStore, index: number) => store + ':' + index
   const row = (store: CaptureStore, index: number) => rows[rowKey(store, index)] ?? empty()
+  function invalidatePreviewOnce() {
+    // Typing on a phone should not repeatedly rebuild the entire Planner and
+    // invalidate the same accepted preview hundreds of times per product.
+    if (!draftInvalidated.current) {
+      draftInvalidated.current = true
+      onDraftChange?.()
+    }
+  }
   function edit(store: CaptureStore, index: number, field: Field, value: string) {
     const oldEntry = row(store, index)
     const droppingPrice = field === 'state' && value === 'unavailable' &&
@@ -74,13 +83,13 @@ export function LocalObservationCaptureEditor({
         ? { ...next, amount: '', count: '', cents: '' } : next }
     })
     setStatus('')
-    onDraftChange?.()
+    invalidatePreviewOnce()
   }
   function moment(store: CaptureStore, value: string) {
     ++changes.current
     setMoments(old => ({ ...old, [store]: value }))
     setStatus('')
-    onDraftChange?.()
+    invalidatePreviewOnce()
   }
   function reset() {
     if (Object.values(rows).some(r => r.state !== 'unseen') &&
@@ -89,7 +98,7 @@ export function LocalObservationCaptureEditor({
     ++latestRestore.current
     setSnapshot({ fingerprint: currentFingerprint, needs: [...needs], stores: [...stores] })
     setRows({}); setMoments({}); setStatus(''); setSearch('')
-    onDraftChange?.()
+    invalidatePreviewOnce()
   }
   function backupDraft() {
     try {
@@ -134,7 +143,7 @@ export function LocalObservationCaptureEditor({
       ++changes.current
       setRows(restored.rows); setMoments(restored.moments)
       setStatus('Privéconcept op dit toestel hersteld. Alle SKU’s, bronmomenten en prijzen moeten nog via de gewone broncontrole.')
-      onDraftChange?.()
+      invalidatePreviewOnce()
     } catch (cause) {
       setStatus(cause instanceof Error ? cause.message : 'Kon het lokale concept niet herstellen.')
     }
@@ -197,8 +206,9 @@ export function LocalObservationCaptureEditor({
           throw Error('Het Planner-weekmenu of de opnamebehoefte is veranderd. Bewaar eerst je concept en start een nieuwe opname voor het actuele mandje.')
         }
         if (!onReview) throw Error('Deze sectie kan de bron nog niet lokaal controleren.')
-        // Only source files enter the existing parser. This does not accept
-        // proposals, prices, permissions or product links automatically.
+        // A new preview will replace any previous one. The next edit MUST
+        // invalidate that new preview, even while its asynchronous parse runs.
+        draftInvalidated.current = false
         await onReview(files)
         setStatus('Broncontrole op dit toestel gestart. Controleer hierboven de oorspronkelijke SKU’s en bronmomenten, en bevestig eventueel overnemen altijd afzonderlijk.')
         document.getElementById('supa-price-sheet-review')?.scrollIntoView({
