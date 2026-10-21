@@ -7,9 +7,9 @@ import { privateUnitPrice } from './privateUnitPrice.ts'
 const COLUMNS = [
   'plusObservedAt', 'dekaObservedAt', 'comparisonStatus',
   'ingredientId', 'ingredient', 'requiredAmount', 'requiredUnit',
-  'plusStatus', 'plusProduct', 'plusPacks', 'plusPackAmount', 'plusPackUnit',
+  'plusStatus', 'plusProduct', 'plusProductId', 'plusPacks', 'plusPackAmount', 'plusPackUnit',
   'plusPackCount', 'plusPackPriceCents', 'plusUnitPrice', 'plusLineCents',
-  'dekaStatus', 'dekaProduct', 'dekaPacks', 'dekaPackAmount', 'dekaPackUnit',
+  'dekaStatus', 'dekaProduct', 'dekaProductId', 'dekaPacks', 'dekaPackAmount', 'dekaPackUnit',
   'dekaPackCount', 'dekaPackPriceCents', 'dekaUnitPrice', 'dekaLineCents',
   'deltaCentsDekaMinusPlus',
 ]
@@ -37,12 +37,12 @@ function cell(value: string | number): string {
 
 function lineFields(line: BasketTraceLine): (string | number)[] {
   if (line.status !== 'matched') return [
-    'niet gekoppeld', '', '', '', '', '', '', '',
+    'niet gekoppeld', '', '', '', '', '', '', '', '',
   ]
   return [
     line.reasons.includes('explicit local user selection; not an automatic or verified retailer match')
       ? 'door gebruiker gekoppeld' : 'automatisch gekoppeld',
-    line.productName, line.packs, line.pack.amount,
+    line.productName, line.productId, line.packs, line.pack.amount,
     line.pack.unit, line.pack.count, line.pricePerPackCents,
     privateUnitPrice(line) ?? 'eenheidsprijs onbekend', line.lineTotalCents,
   ]
@@ -147,6 +147,7 @@ export function privateComparisonHtml(
   function product(line: BasketTraceLine) {
     if (line.status === 'unresolved') return '<strong>Niet gekoppeld</strong><br><small>Prijs onbekend — handmatig kiezen</small>'
     return '<strong>' + clean(line.productName) + '</strong><br>' +
+      '<small>Originele broncode: ' + clean(line.productId) + '</small><br>' +
       clean(line.packs) + ' × ' + clean(money(line.pricePerPackCents)) +
       ' · ' + clean(line.pack.count) + ' × ' + clean(line.pack.amount) + ' ' +
       clean(line.pack.unit) + ' per verpakking<br><small>' +
