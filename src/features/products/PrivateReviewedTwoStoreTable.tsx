@@ -926,6 +926,27 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   const largest = changed.length ? [...changed].sort((a, b) =>
     Math.abs(b.plus.lineTotalCents - b.deka.lineTotalCents) -
     Math.abs(a.plus.lineTotalCents - a.deka.lineTotalCents))[0] : null
+  // Explain the complete basket independently from search and display filters.
+  const fullPriceDrivers = plus.basket.lines.flatMap(line => {
+    const alternate = dekaById.get(line.id)
+    return line.status === 'matched' && alternate
+      ? [{ id: line.id, label: line.ingredientLabel,
+        plusCents: line.lineTotalCents, dekaCents: alternate.lineTotalCents }]
+      : []
+  })
+  const grossPlusCents = fullPriceDrivers.reduce((sum, line) =>
+    sum + BigInt(Math.max(0, line.dekaCents - line.plusCents)), 0n)
+  const grossDekaCents = fullPriceDrivers.reduce((sum, line) =>
+    sum + BigInt(Math.max(0, line.plusCents - line.dekaCents)), 0n)
+  const cheaperAtPlus = fullPriceDrivers.filter(line => line.plusCents < line.dekaCents).length
+  const cheaperAtDeka = fullPriceDrivers.filter(line => line.dekaCents < line.plusCents).length
+  const samePrice = fullPriceDrivers.length - cheaperAtPlus - cheaperAtDeka
+  const visibleDriverIds = new Set(advantaged.map(row => row.plus.id))
+  const topDrivers = [...fullPriceDrivers].filter(line =>
+    visibleDriverIds.has(line.id) && line.plusCents !== line.dekaCents)
+    .sort((a, b) => Math.abs(b.plusCents - b.dekaCents) -
+      Math.abs(a.plusCents - a.dekaCents)).slice(0, 5)
+  const driverAnchor = (id: string) => 'private-reviewed-price-row-' + encodeURIComponent(id)
   const mix = createMixedStoreShoppingPlan(plus.basket, deka.basket)
   const splitTrip = !!mix && mix.lines.some(line => line.store === 'PLUS') &&
     mix.lines.some(line => line.store === 'DekaMarkt')
@@ -946,6 +967,12 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   const wholeCheapestCents = Math.min(plus.basket.totalCents, deka.basket.totalCents)
   const delta = deka.basket.totalCents - plus.basket.totalCents
   const cheapest: OwnStore = delta >= 0 ? 'PLUS' : 'DekaMarkt'
+  // Personal captures age out; this is a refresh prompt, not a live price claim.
+  const ageingSources = (['PLUS', 'DekaMarkt'] as const).filter(shop => {
+    const source = shop === 'PLUS' ? plus : deka
+    const instant = observedInstant(source.observedAt)
+    return instant !== null && Date.now() - instant.ms >= 6 * 24 * 60 * 60 * 1000
+  })
   const leader = delta === 0 ? 'Beide mandjes zijn even duur.'
     : (delta > 0 ? 'PLUS' : 'DekaMarkt') + ' is ' +
       money.format(Math.abs(delta) / 100) + ' goedkoper voor alle hele verpakkingen.'
@@ -990,6 +1017,43 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         of een berekening van werkelijk afgerekende producten.</small>
     </div>}
     <strong role="status">{leader}</strong>
+    <div className="private-reviewed-products__source-revisit">
+      <p>{ageingSources.length
+        ? 'De originele opname van ' + ageingSources.join(' en ') +
+          ' is minstens zes dagen oud. Controleer de producten en prijzen opnieuw; na zeven dagen wordt een volledige vergelijking geweigerd.'
+        : 'Dit prijsverschil gebruikt uitsluitend de twee volledige, door jou gecontroleerde eigen winkelopnames.'}</p>
+      <button type="button" onClick={onOpenComparison}>
+        Herzie mijn bronproducten of voeg een nieuw winkelmoment toe
+      </button>
+      <small>Bronmomenten worden niet ververst door deze knop. Alleen een echte nieuwe,
+        door jou beoordeelde opname kan prijzen vervangen.</small>
+    </div>
+    <section className="private-reviewed-products__difference-focus"
+      aria-label="Waar komt het volledige winkelprijsverschil vandaan?">
+      <h4>Welk mandje heeft welke goedkopere artikelen?</h4>
+      <p><strong>PLUS</strong> heeft {cheaperAtPlus} lagere hele-pakregelprijzen
+        ({exactEuro.formatCents(grossPlusCents)} opgeteld).</p>
+      <p><strong>DekaMarkt</strong> heeft {cheaperAtDeka} lagere hele-pakregelprijzen
+        ({exactEuro.formatCents(grossDekaCents)} opgeteld).</p>
+      <p>{samePrice} ingrediënten hebben een gelijk volledig regelbedrag.</p>
+      <p>Het saldo van de twee winkelvoordelen is {' '}
+        <strong>{exactEuro.formatCents(grossPlusCents >= grossDekaCents
+          ? grossPlusCents - grossDekaCents : grossDekaCents - grossPlusCents)}</strong>.
+        {' '}Dat is het prijsverschil tussen de twee volledige mandjes hierboven.</p>
+      <small>Dit zijn originele door jou gecontroleerde hele-verpakkingsprijzen,
+        geen kassabonbedrag en geen onafhankelijke besparingsclaim.
+        Zoek-, soort- en winkelfilters veranderen deze volledige optelling niet.</small>
+      {topDrivers.length > 0 && <div>
+        <h5>Grootste verschillen in je huidige selectie</h5>
+        <ol>{topDrivers.map(line => <li key={line.id}>
+          <button type="button" onClick={() => document.getElementById(
+            driverAnchor(line.id))?.scrollIntoView({ block: 'center', behavior: 'smooth' })}>
+            {line.label}: {exactEuro.formatCents(BigInt(Math.abs(line.plusCents - line.dekaCents)))}
+            {' '}goedkoper bij {line.plusCents < line.dekaCents ? 'PLUS' : 'DekaMarkt'}
+          </button>
+        </li>)}</ol>
+      </div>}
+    </section>
     <details className="private-reviewed-products__single-shop-panel">
       <summary>Ik ga naar één winkel · aparte lijst en printbare bron</summary>
       <div className="private-reviewed-products__source-coverage">
@@ -1117,7 +1181,8 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       Alle mandtotalen hierboven blijven
       gebaseerd op het volledige weekmenu, niet alleen de gefilterde producten.</p>
     <div className="private-reviewed-products__paired-rows">
-      {advantaged.map(({ plus: first, deka: second }) => <article key={first.id}>
+      {advantaged.map(({ plus: first, deka: second }) => <article
+        key={first.id} id={driverAnchor(first.id)} tabIndex={-1}>
         <h4>{first.ingredientLabel} · {first.requirement.amount} {first.requirement.unit}</h4>
         <div className="private-reviewed-products__paired-options">
           {product(first, 'PLUS')}{product(second, 'DekaMarkt')}
