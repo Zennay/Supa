@@ -5,6 +5,7 @@ import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
 import { exportLocalCaptureDraft, restoreLocalCaptureDraft } from './localCaptureEditorBackup.ts'
 import { incompleteCaptureFields, offlineCaptureFieldChecklist } from './localCaptureFieldProgress.ts'
 import { saveLocalCaptureTab, readLocalCaptureTab, clearLocalCaptureTab } from './localCaptureSessionDraft.ts'
+import { shopLabelEuroCents } from './shopLabelEuroCents.ts'
 
 type Row = {
   state: 'unseen' | 'available' | 'unavailable'
@@ -62,6 +63,8 @@ export function LocalObservationCaptureEditor({
   const [tabError, setTabError] = useState('')
   const [search, setSearch] = useState('')
   const [onlyOpen, setOnlyOpen] = useState(false)
+  const [euroDrafts, setEuroDrafts] = useState<Record<string, string>>({})
+  const [euroErrors, setEuroErrors] = useState<Record<string, string>>({})
   const [draftPaste, setDraftPaste] = useState('')
   const [draftCopy, setDraftCopy] = useState('')
   const [portable, setPortable] = useState<{ store: CaptureStore; text: string } | null>(null)
@@ -142,7 +145,7 @@ export function LocalObservationCaptureEditor({
       ++latestRestore.current
       setRows(stored.rows)
       setMoments(stored.moments)
-      setPortable(null); setDraftCopy(''); setDraftPaste('')
+      setPortable(null); setDraftCopy(''); setDraftPaste(''); setEuroDrafts({}); setEuroErrors({})
       invalidatePreviewOnce()
       setStatus('Eerdere invoer uit dit tabblad hervat. Alle winkelproducten en prijzen moeten nog door broncontrole.')
       setTabError('')
@@ -182,6 +185,11 @@ export function LocalObservationCaptureEditor({
       'Niet-beschikbaar kiezen wist de eerdere pakinhoud en prijs uit deze lokale conceptregel. Toch wijzigen?'
     )) return
     ++changes.current
+    if (field === 'cents' || field === 'state') {
+      const key = rowKey(store, index)
+      setEuroDrafts(old => ({ ...old, [key]: '' }))
+      setEuroErrors(old => ({ ...old, [key]: '' }))
+    }
     setRows(old => {
       const key = rowKey(store, index)
       const next = { ...(old[key] ?? empty()), [field]: value }
@@ -192,6 +200,25 @@ export function LocalObservationCaptureEditor({
     setPortable(null)
     setDraftCopy('')
     invalidatePreviewOnce()
+  }
+  function editEuro(store: CaptureStore, index: number, text: string) {
+    const key = rowKey(store, index)
+    if (row(store, index).cents !== '') edit(store, index, 'cents', '')
+    setEuroDrafts(old => ({ ...old, [key]: text }))
+    setEuroErrors(old => ({ ...old, [key]: '' }))
+  }
+  function applyEuro(store: CaptureStore, index: number) {
+    const key = rowKey(store, index)
+    try {
+      const cents = shopLabelEuroCents(euroDrafts[key] ?? '')
+      edit(store, index, 'cents', cents)
+      setStatus(store + ' regel ' + (index + 2) +
+        ': de zelf ingevoerde europrijs is exact ' + cents +
+        ' cent. Geen winkelprijs of productmatch automatisch bevestigd.')
+    } catch (cause) {
+      setEuroErrors(old => ({ ...old, [key]: cause instanceof Error
+        ? cause.message : 'Controleer het werkelijk afgelezen eurobedrag.' }))
+    }
   }
   function moment(store: CaptureStore, value: string) {
     ++changes.current
@@ -207,7 +234,7 @@ export function LocalObservationCaptureEditor({
     ++changes.current
     ++latestRestore.current
     setSnapshot({ fingerprint: currentFingerprint, needs: [...needs], stores: [...stores] })
-    setRows({}); setMoments({}); setStatus(''); setSearch(''); setOnlyOpen(false); setPortable(null); setDraftPaste(''); setDraftCopy('')
+    setRows({}); setMoments({}); setStatus(''); setSearch(''); setOnlyOpen(false); setPortable(null); setDraftPaste(''); setDraftCopy(''); setEuroDrafts({}); setEuroErrors({})
     // A new physical week must not quietly overwrite the previous tab copy.
     setTabAutosave(false)
     invalidatePreviewOnce()
@@ -287,7 +314,7 @@ export function LocalObservationCaptureEditor({
       }
       ++changes.current
       setRows(restored.rows); setMoments(restored.moments)
-      setPortable(null); setDraftCopy(''); setDraftPaste('')
+      setPortable(null); setDraftCopy(''); setDraftPaste(''); setEuroDrafts({}); setEuroErrors({})
       setStatus('Privéconcept op dit toestel hersteld. Alle SKU’s, bronmomenten en prijzen moeten nog via de gewone broncontrole.')
       invalidatePreviewOnce()
     } catch (cause) {
@@ -565,6 +592,22 @@ export function LocalObservationCaptureEditor({
                 <input type="text" inputMode="numeric" value={value.cents} placeholder="bijv. 199"
                   onChange={event => edit(store, index, 'cents', event.currentTarget.value)} />
               </label>
+              <label>Of: lees het echte prijskaartje af in euro (€)
+                <input type="text" inputMode="decimal" maxLength={32}
+                  value={euroDrafts[rowKey(store, index)] ?? ''}
+                  placeholder="bijv. € 1,99 (niet 199)"
+                  onChange={event => editEuro(store, index, event.currentTarget.value)} />
+              </label>
+              <button type="button" className="ghost-button"
+                disabled={!(euroDrafts[rowKey(store, index)] ?? '').trim()}
+                onClick={() => applyEuro(store, index)}>
+                Zet mijn afgelezen europrijs exact om naar centen
+              </button>
+              {euroErrors[rowKey(store, index)] &&
+                <small role="alert">{euroErrors[rowKey(store, index)]}</small>}
+              <small>Je zelf getypte europrijs wordt pas een bronconcept na
+                expliciete omzetting. Bij € 1,99 komt er 199 in het centenveld.
+                De echte winkelopname en persoonlijke matchcontrole blijven vereist.</small>
             </>}
             <small>Dit is een handmatig bronconcept, geen bevestigde productmatch.
               Dezelfde SKU meerdere keren invoeren binnen één winkel is ongeldig.</small>

@@ -4,6 +4,17 @@ import type { CaptureStore } from './plannerPriceCaptureSheet.ts'
 import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
 import { observedInstant } from '../../domain/offlineReviewedImport.ts'
 
+// CSV spreadsheet applications can execute formula-shaped labels even when
+// they are quoted. Refuse potentially executable or visually manipulated
+// original identifiers rather than silently altering a retailer SKU/name.
+export function safeOriginalCaptureLabel(value: string): boolean {
+  if (!value || value !== value.trim() ||
+      !/[\p{L}\p{N}]/u.test(value) ||
+      /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(value)) return false
+  const normalized = value.normalize('NFKC')
+  return !/^[\p{White_Space}\p{Cf}\p{Mn}\p{Mc}\p{Me}]*[=+@-]/u.test(normalized)
+}
+
 export type CaptureFieldNeed = {
   index: number
   need: PlannerCaptureGuideNeed
@@ -35,13 +46,16 @@ export function incompleteCaptureFields(
           missing.push('dubbele artikelcode; origineel bronproduct maar één keer vastleggen')
         seenSku.add(row.sku.trim())
       }
-      if (!row.sku.trim()) missing.push('originele artikelcode')
-      if (!row.name.trim()) missing.push('originele productnaam')
+      if (!safeOriginalCaptureLabel(row.sku))
+        missing.push('geldige, spreadsheetveilige originele artikelcode')
+      if (!safeOriginalCaptureLabel(row.name))
+        missing.push('geldige, spreadsheetveilige originele productnaam')
       if (!['g', 'kg', 'ml', 'l', 'piece'].includes(row.unit))
         missing.push('geobserveerde verpakkingseenheid')
       if (row.state === 'available') {
         const amount = Number(row.amount.trim())
-        if (!row.amount.trim() || !Number.isFinite(amount) || amount <= 0 ||
+        if (!/^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/u.test(row.amount.trim()) ||
+            !Number.isFinite(amount) || amount <= 0 ||
             amount > 100000 || (row.unit === 'piece' && !Number.isSafeInteger(amount)))
           missing.push('geldige echte pakinhoud')
         const count = Number(row.count.trim())

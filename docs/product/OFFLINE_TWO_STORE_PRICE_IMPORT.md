@@ -1335,3 +1335,28 @@ oude mobiele formuliergegevens overschrijven; herstel is nooit een
 prijsbevestiging of winkelautorisatie.
 
 **Snelle refresh:** bij ingeschakelde tabopslag bewaart Supa ook bij het verbergen of verlaten van de pagina direct een lokale versie. Sommige mobiele browsers sluiten zonder event; download voor duurzaam behoud zelf je privé-JSON. Een andere Planner-week overschrijft de vorige sessie niet.
+
+## Zelf afgelezen schapprijs direct als eurobedrag invullen
+
+Bij elk werkelijk zelf waargenomen beschikbaar winkelproduct kun je nu
+optioneel **Of: lees het echte prijskaartje af in euro (€)** kiezen. Typ de
+oorspronkelijke prijs exact, bijvoorbeeld **1,99**, **€ 1,99** of **1.99**,
+en druk afzonderlijk op **Zet mijn afgelezen europrijs exact om naar centen**.
+De mobiele app vult daarmee precies **199** in het bestaande veld
+**Originele hele-verpakkingprijs in eurocenten** in. Conversie verloopt via
+hele getallen, zonder binaire floating-point afronding. Ongeldige getallen,
+duizendtalscheiding, meer of minder dan twee decimalen, negatieve of
+ongepast hoge bedragen worden niet omgezet. Een werkelijk geobserveerde
+nulprijs is alleen expliciet nul; niets wordt vanuit productnaam of
+boodschappenlijst geschat. Zolang je eurotekst nog niet apart hebt
+bevestigd, blijft de oorspronkelijke centprijs leeg. Het tijdelijke
+eurotypveld wordt niet als prijsbron opgeslagen of gedeeld.
+
+Dezelfde invoercontrole wijst verdachte spreadsheet-formules in originele
+SKU/productnaam, onzichtbare opmaak en niet-exacte zesdecimalenverpakking
+af vóór het lokale CSV/TSV-exportbestand wordt aangemaakt. Echte
+productidentiteit wordt niet stilzwijgend herschreven. Bij afwijzing blijft
+het huidige formulier bewerkbaar en meldt Supa welk fysiek veld moet
+worden gecorrigeerd. De bestaande bronimport en persoonlijke matchreview
+blijven daarnaast ongewijzigd verplicht; deze invoergemakken geven
+geen retailerrechten of publieke besparingsclaim.
