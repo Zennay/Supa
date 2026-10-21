@@ -437,10 +437,22 @@ export function LocalObservationCaptureEditor({
           throw Error('Het Planner-weekmenu of de opnamebehoefte is veranderd. Bewaar eerst je concept en start een nieuwe opname voor het actuele mandje.')
         }
         if (!onReview) throw Error('Deze sectie kan de bron nog niet lokaal controleren.')
-        // A new preview will replace any previous one. The next edit MUST
-        // invalidate that new preview, even while its asynchronous parse runs.
+        // Capture the exact physical draft revision. A user can change
+        // observations while the canonical converter is loading; never
+        // announce the old result as the current one after such an edit.
+        const submittedRevision = changes.current
+        const submittedScope = snapshot.fingerprint
         draftInvalidated.current = false
         await onReview(files)
+        if (changes.current !== submittedRevision ||
+            currentScope.current !== submittedScope) {
+          // A late parser must not leave an accepted-looking stale preview.
+          // Parent clears its candidate and invalidates in-flight imports.
+          onDraftChange?.()
+          draftInvalidated.current = true
+          setStatus('De winkelinvoer is veranderd terwijl de bron werd geopend. Gebruik alleen een nieuwe controle van de huidige originele invoer.')
+          return
+        }
         setStatus('Broncontrole op dit toestel gestart. Controleer hierboven de oorspronkelijke SKU’s en bronmomenten, en bevestig eventueel overnemen altijd afzonderlijk.')
         document.getElementById('supa-price-sheet-review')?.scrollIntoView({
           behavior: 'smooth', block: 'start',

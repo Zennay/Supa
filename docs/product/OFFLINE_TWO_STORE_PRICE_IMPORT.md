@@ -1399,3 +1399,19 @@ geen ongefundeerde winkelwinnaar. Een verschil en eventuele besparing
 vereisen nog steeds dezelfde fysieke vraag bij twee winkels, werkelijk
 rechtmatig vastgelegde bronprijzen en de canonieke persoonlijke
 match-/versheidscontrole.
+
+## Ontbrekende winkelproducten mobiel aanvullen vanuit dezelfde broncontrole
+
+De PLUS/Deka-bronpreview bevat nu ook een werkende knop
+**Controleer mijn echte winkelopname in Supa** bij de apart getoonde ontbrekende
+winkelregels. Die gebruikt opnieuw de oorspronkelijke negenkoloms-importer,
+in plaats van de eerder alleen als concept bruikbare mobiele invoer dood te
+laten lopen. Zowel de volledige Planner-opname als de los gekozen nieuwe
+winkelproducten hergebruiken dezelfde broncontrole en vereisen afzonderlijk
+bewuste acceptatie van SKU, pakinhoud en prijzen. Een concept in de open
+preview wordt niet bij elke toetsaanslag verborgen; na een expliciete
+nieuwe indiening wordt de oude bronpreview vervangen. Als tijdens het
+asynchroon openen van een eigen bronbestand de originele formulierinvoer
+wijzigt, meldt het formulier dat het oudere resultaat niet meer bij de
+huidige broninvoer hoort. Ook bronprijzen in die preview blijven
+onbevestigd, en een ontbrekende of oude tweede winkel blijft onbekend.

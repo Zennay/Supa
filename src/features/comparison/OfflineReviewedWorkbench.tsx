@@ -481,6 +481,14 @@ export function OfflineReviewedWorkbench({
     }
   }
 
+  function invalidateOwnMobileSourcePreview() {
+    // When an original mobile draft changes, discard the asynchronous
+    // candidate instead of letting a late import overwrite newer input.
+    ++importRevision.current
+    setCapturePreview(null)
+    setWeekExportMessage('Je eigen nog onbevestigde winkelinvoer is gewijzigd. Bekijk de nieuwe bron opnieuw.')
+  }
+
   async function previewFilledCsv(files: File[]) {
     if (files.length === 0) return
     const version = ++importRevision.current
@@ -2560,11 +2568,7 @@ export function OfflineReviewedWorkbench({
             stores={captureSheetStore === 'both' ? stores : [captureSheetStore]}
             delimiter={captureDelimiter}
             onReview={files => previewFilledCsv(files)}
-            onDraftChange={() => {
-              ++importRevision.current
-              setCapturePreview(null)
-              setWeekExportMessage('Je eigen nog onbevestigde winkelinvoer is gewijzigd. Bekijk de nieuwe bron opnieuw.')
-            }}
+            onDraftChange={invalidateOwnMobileSourcePreview}
             captureKey={captureWeek + ':' + captureSheetStore + ':' + captureDelimiter} />
           <a className="ghost-button" href={`${import.meta.env.BASE_URL}private-basket-mapping.html`} target="_blank" rel="noopener noreferrer">
             Open uitgebreide privévergelijker
@@ -2785,6 +2789,7 @@ export function OfflineReviewedWorkbench({
                     {missing > 0 && <details>
                       <summary>{store}: vul ontbrekende bronregels mobiel in zonder download</summary>
                       <PortableBlankCapture purpose="missing"
+                        onReview={files => previewFilledCsv(files)}
                         needs={missingNeeds}
                         needsAtClick={() => missingPreviewCaptureNeeds(store)}
                         stores={[store]} delimiter={captureDelimiter}
@@ -3295,6 +3300,7 @@ export function OfflineReviewedWorkbench({
                       {missingPriceCaptureNeeds[store].length > 0 &&
                         <PortableBlankCapture purpose="missing"
                           onReview={files => previewFilledCsv(files)}
+                          onDraftChange={invalidateOwnMobileSourcePreview}
                           needs={missingPriceCaptureNeeds[store]}
                           needsAtClick={() => missingCaptureNeedsNow(store)}
                           stores={[store]}
