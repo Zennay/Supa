@@ -105,7 +105,12 @@ export function importUnpricedShoppingPaste(source: string): Row[] {
   })
   // Route both formats through the same exact validation for labels, stores,
   // duplicates and opt-in preview. No SKU, price or retailer proof is inferred.
+  // A copied Supa cell already contains the literal-text apostrophe from its
+  // CSV export. Re-escaping that cell would turn a leading '=...' label into
+  // an extra apostrophe. Ordinary untrusted tables require the escape.
+  const rawQuote = (value: string) => '"' + value.replace(/"/gu, '""') + '"'
+  const encode = supa ? rawQuote : quote
   const csv = '\ufeff' + header + '\r\n' +
-    originalRows.map(cells => cells.map(quote).join(';')).join('\r\n') + '\r\n'
+    originalRows.map(cells => cells.map(encode).join(';')).join('\r\n') + '\r\n'
   return importUnpricedShoppingCsv(csv)
 }
