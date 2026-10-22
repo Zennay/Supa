@@ -15,6 +15,7 @@ import { replaceOwnStoreCapture, type CaptureRefreshChanges } from './combineOwn
 import { privateSourceChangeCsv } from './privateSourceChangeCsv.ts'
 import { readOwnSourceTextFile } from '../comparison/readLocalCaptureDraftFiles.ts'
 import { combineTwoOwnShopCaptures, splitOwnStorePastedSheets } from '../comparison/combineOwnStoreCaptures.ts'
+import { ManualOwnSourceEntry } from './ManualOwnSourceEntry.tsx'
 import './plannerQuickSourcePaste.css'
 
 type Preview = { raw: string; normalized: string; data: OfflinePriceSnapshots; needScope: string }
@@ -501,6 +502,10 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
         en originele bronmomenten. Ook eigen JSON met één of beide winkels kan.
         Alles wordt lokaal gecontroleerd:
         een geldige import bewijst geen bronrechten of actuele winkelprijzen.</p>
+      <ManualOwnSourceEntry busy={busy} onPreview={raw => {
+        changeDraft(raw)
+        void inspectSource(raw)
+      }} />
       <div className={'supa-planner-source-paste__drop' + (dropActive ? ' is-dragging' : '')}
         onDragOver={event => {
           if (!Array.from(event.dataTransfer.types).includes('Files')) return
