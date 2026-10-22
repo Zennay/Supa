@@ -40,9 +40,14 @@ export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
   }, [identity])
   async function openPasteFile(file?: File) {
     if (!file) return
+    const originalIdentity = identity
     try {
       if (!file.size || file.size > 20000) throw Error('Selecteer een tekstbestand van maximaal 20 kB.')
       const text = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      if (currentIdentity.current !== originalIdentity) {
+        setNotice('Het weekmenu veranderde tijdens het lezen. Kies het bestand opnieuw.')
+        return
+      }
       if (new TextEncoder().encode(text).length > 20000) throw Error('Tekstbestand te groot.')
       setPaste(text)
       setPendingPaste(null)
