@@ -881,6 +881,102 @@ export function OfflineReviewedWorkbench({
     return output
   }
 
+  function pairedMatchReviewHtml(): string {
+    if (!currentPreview || !pairedPreviewRows)
+      throw new Error('Geen twee echte winkelbronnen voor deze Planner-week.')
+    const clean = (value: string) =>
+      value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim().slice(0, 180)
+    const h = (value: string) => clean(value)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+    const instant = (store: CaptureStore) =>
+      currentPreview.stores.find(entry => entry.retailer === store)?.observedAt ??
+      imported?.captures[store]?.observedAt ?? 'geen bronmoment'
+    const rows = pairedPreviewRows.map(row => {
+      const plusKnown = pairedPreviewComparable && Boolean(row.plusCode) &&
+        row.plusPacks !== null && Number.isSafeInteger(row.plusPacks) && row.plusPacks > 0 &&
+        row.plusCents !== null && Number.isSafeInteger(row.plusCents) && row.plusCents >= 0
+      const dekaKnown = pairedPreviewComparable && Boolean(row.dekaCode) &&
+        row.dekaPacks !== null && Number.isSafeInteger(row.dekaPacks) && row.dekaPacks > 0 &&
+        row.dekaCents !== null && Number.isSafeInteger(row.dekaCents) && row.dekaCents >= 0
+      const rawDelta = plusKnown && dekaKnown ? row.dekaCents! - row.plusCents! : null
+      const delta = rawDelta !== null && Number.isSafeInteger(rawDelta) ? rawDelta : null
+      const plusPrice = plusKnown
+        ? h(row.plusCode!) + ' · ' + row.plusPacks + ' hele pakken · ' +
+          h(exactEuro.formatCents(row.plusCents!)) +
+          (row.plusUnitRate ? ' · ' + h(row.plusUnitRate) : '')
+        : (row.plusCode ? 'SKU ' + h(row.plusCode) + ' · prijs onbekend' : 'geen bruikbare match')
+      const dekaPrice = dekaKnown
+        ? h(row.dekaCode!) + ' · ' + row.dekaPacks + ' hele pakken · ' +
+          h(exactEuro.formatCents(row.dekaCents!)) +
+          (row.dekaUnitRate ? ' · ' + h(row.dekaUnitRate) : '')
+        : (row.dekaCode ? 'SKU ' + h(row.dekaCode) + ' · prijs onbekend' : 'geen bruikbare match')
+      const difference = delta === null ? 'Onbekend; geen betrouwbaar paar.'
+        : (delta > 0 ? '+' : delta < 0 ? '−' : '') +
+          h(exactEuro.formatCents(Math.abs(delta))) + ' (DekaMarkt minus PLUS)'
+      return '<tr><th scope="row">' + h(row.label) + '</th><td>' +
+        h((row.amount === null ? 'hoeveelheid onbekend' : String(row.amount)) + ' ' + row.unit) +
+        '</td><td>' + plusPrice + '</td><td>' + dekaPrice + '</td><td>' +
+        difference + '</td></tr>'
+    }).join('')
+    const total = pairedPreviewSummary?.completeDifferenceCents
+    const summary = pairedPreviewSummary
+      ? '<p>PLUS: ' + (pairedPreviewSummary.plus.cents === null ? 'bedrag onbekend' :
+          (pairedPreviewSummary.plus.complete ? 'voorlopige kandidaat-som ' : 'bekende deelprijs ') +
+          h(exactEuro.formatCents(pairedPreviewSummary.plus.cents))) +
+        ' (' + pairedPreviewSummary.plus.priced + '/' + pairedPreviewSummary.rows +
+        ' geprijsde regels; ' + pairedPreviewSummary.plus.missing + ' onbekend).</p>' +
+        '<p>DekaMarkt: ' + (pairedPreviewSummary.deka.cents === null ? 'bedrag onbekend' :
+          (pairedPreviewSummary.deka.complete ? 'voorlopige kandidaat-som ' : 'bekende deelprijs ') +
+          h(exactEuro.formatCents(pairedPreviewSummary.deka.cents))) +
+        ' (' + pairedPreviewSummary.deka.priced + '/' + pairedPreviewSummary.rows +
+        ' geprijsde regels; ' + pairedPreviewSummary.deka.missing + ' onbekend).</p>' +
+        '<p><strong>Compleet mandverschil:</strong> ' + (total === null
+          ? 'onbekend — niet alle hele-pakprijzen zijn bruikbaar.'
+          : (total > 0 ? '+' : total < 0 ? '−' : '') +
+            h(exactEuro.formatCents(Math.abs(total))) + ' (DekaMarkt minus PLUS).') + '</p>'
+      : '<p>Prijsdekking en mandverschil onbekend.</p>'
+    const html = '<!doctype html><html lang="nl"><head><meta charset="utf-8">' +
+      '<meta name="viewport" content="width=device-width, initial-scale=1">' +
+      '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'">' +
+      '<title>Supa · privé winkelprijscontrole</title><style>' +
+      'body{font:15px/1.45 system-ui,sans-serif;color:#202720;margin:1.5rem}' +
+      'h1{font-size:1.5rem} .notice{padding:.8rem;background:#fff4dd;border-left:4px solid #a76d19}' +
+      'table{border-collapse:collapse;width:100%;margin-top:1rem} th,td{border:1px solid #cbd3cb;padding:.5rem;text-align:left;vertical-align:top;overflow-wrap:anywhere}' +
+      'thead{background:#eef4ef} th{font-weight:700} .meta{color:#4c594f;font-size:.9rem}' +
+      '@page{size:A4 landscape;margin:12mm}@media print{.no-print{display:none}body{margin:0;font-size:10pt}tr{break-inside:avoid}}' +
+      '</style></head><body><h1>Supa · privé prijs- en SKU-controle</h1>' +
+      '<p class="notice">Onbevestigde productvoorstellen en persoonlijke broninvoer. Geen onafhankelijk geverifieerde winkelprijzen, productgelijkwaardigheid, bronrechten of besparingsbewijs. Onbekend is niet €0.</p>' +
+      '<p class="meta">PLUS bronmoment: ' + h(instant('PLUS')) +
+      ' · DekaMarkt bronmoment: ' + h(instant('DekaMarkt')) + '</p>' +
+      '<section><h2>Prijsdekking voor hetzelfde fysieke Planner-mandje</h2>' + summary + '</section>' +
+      '<p>Een deelprijs is geen totaalkost. Een compleet rekenkundig verschil blijft voorlopig totdat de originele SKU, verpakking, beschikbaarheid en prijs per winkel zijn gecontroleerd.</p>' +
+      '<table><thead><tr><th>Planner-ingrediënt</th><th>Benodigd</th><th>PLUS</th><th>DekaMarkt</th><th>Verschil</th></tr></thead><tbody>' +
+      rows + '</tbody></table><p class="meta">Lokaal gegenereerd door Supa. Geen externe bronnen of scripts geladen.</p>' +
+      '<p class="no-print"><button onclick="window.print()">Afdrukken / opslaan als PDF</button></p></body></html>'
+    if (new TextEncoder().encode(html).length > 512000)
+      throw new Error('Te veel ingrediënten voor één lokaal HTML-bestand.')
+    return html
+  }
+
+  function downloadPairedMatchHtml() {
+    if (!currentPreview || !pairedPreviewRows || busy) return
+    try {
+      const output = pairedMatchReviewHtml()
+      const url = URL.createObjectURL(new Blob([output], { type: 'text/html;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-prive-plus-deka-prijscontrole.html'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setWeekExportMessage('De privé winkelprijscontrole is lokaal als HTML opgeslagen; het document bevat geen externe scripts of bronnen.')
+    } catch {
+      setWeekExportMessage('De HTML-controlelijst kon niet lokaal worden opgeslagen; eerdere winkeldata bleven behouden.')
+    }
+  }
+
   function downloadPairedMatchReview() {
     if (!currentPreview || !pairedPreviewRows || busy) return
     try {
@@ -3214,6 +3310,10 @@ export function OfflineReviewedWorkbench({
                   <button type="button" className="ghost-button"
                     disabled={busy} onClick={downloadPairedMatchReview}>
                     Download offline SKU- en voorlopige prijscontrole (TXT)
+                  </button>
+                  <button type="button" className="ghost-button"
+                    disabled={busy} onClick={downloadPairedMatchHtml}>
+                    Download afdrukbare prijscontrole (HTML)
                   </button>
                   <button type="button" className="ghost-button"
                     disabled={busy} onClick={() => { void copyPairedMatchReview() }}>
