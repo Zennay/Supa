@@ -11,6 +11,7 @@ import { calculateDecimalPackCount } from './domain/decimalPackArithmetic.ts'
 import { privateBasketMissingReason } from './domain/privateBasketMissingReason.ts'
 import type { BasketTraceLine, OneStoreBasket } from './domain/basket.ts'
 import type { MatchUnit } from './domain/matching.ts'
+import { readOwnSourceTextFile } from './features/comparison/readLocalCaptureDraftFiles.ts'
 
 type StoreName = 'PLUS' | 'DekaMarkt'
 type ObservedProduct = {
@@ -213,7 +214,10 @@ function demandFrom(value: unknown): Demand {
 
 async function readSource(file: File): Promise<string> {
   if (!file.size || file.size > limit) throw Error('Bronbestand is te groot of leeg')
-  return new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+  // Keep the standalone comparison workbench on the same strict file decoder as
+  // Planner and the React Vergelijk UI. Excel Unicode Text (.txt/.tsv) is decoded
+  // only when its UTF-16 LE/BE BOM is explicit; CSV/JSON remain strict UTF-8.
+  return readOwnSourceTextFile(file)
 }
 function parseOneOwnSource(raw: string, convertOwnStoreCsv: (csv: string) => string): Source {
   // Supa's existing standalone source validator handles user-saved JSON;
