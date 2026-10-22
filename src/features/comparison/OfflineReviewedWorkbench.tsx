@@ -695,13 +695,19 @@ export function OfflineReviewedWorkbench({
         line.status === 'unresolved').map(line => line.id) ?? [])
       return plannerCaptureNeeds.filter(need => unresolved.has(need.id))
     }
-    // A fresh, truly paired retained shop needs no new capture. An old or
-    // >24h-distant source requires a new complete physical observation.
+    // A retained shop may be fresh and within 24h yet still fail to match
+    // particular PHYSICAL ingredients. It must appear in the missing-item
+    // export and blank CSV too; otherwise a valid time stamp falsely hides
+    // missing products. Only actual mapped original SKUs count as proposals.
     if (imported?.captures[store]) {
       const kept = currentPreview.retainedOther
-      return kept?.retailer === store &&
-        (!kept.within24h || !freshPreviewInstant(kept.observedNs))
-        ? plannerCaptureNeeds : []
+      if (kept?.retailer !== store ||
+          !kept.within24h || !freshPreviewInstant(kept.observedNs))
+        return plannerCaptureNeeds
+      if (!pairedPreviewRows) return plannerCaptureNeeds
+      const unresolved = new Set(pairedPreviewRows.filter(row =>
+        !(store === 'PLUS' ? row.plusCode : row.dekaCode)).map(row => row.id))
+      return plannerCaptureNeeds.filter(need => unresolved.has(need.id))
     }
     return plannerCaptureNeeds
   }
