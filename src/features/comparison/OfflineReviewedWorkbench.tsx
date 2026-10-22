@@ -1466,6 +1466,7 @@ export function OfflineReviewedWorkbench({
   // that the manual editor and pasted CSV use.
   async function stageSelectedSource(file: File, selectedForPlan?: string) {
     const version = ++importRevision.current
+    const selectedWeek = captureWeekRef.current
     setPendingReplacement(null)
     setBusy(true)
     try {
@@ -1484,8 +1485,9 @@ export function OfflineReviewedWorkbench({
         source = (module.convertOwnStoreCsv as (input: string) => string)(raw)
       }
       if (version !== importRevision.current) return
-      if (selectedForPlan !== undefined && selectedForPlan !== currentlySelectedPlan.current) {
-        setMessage('Je weekmenu veranderde tijdens het lezen van dit bestand. Kies het opnieuw voor de huidige week.')
+      if (selectedWeek !== captureWeekRef.current ||
+          (selectedForPlan !== undefined && selectedForPlan !== currentlySelectedPlan.current)) {
+        setMessage('Je fysieke Planner-week veranderde tijdens het lezen. Kies het bronbestand opnieuw voor de huidige ingrediënten.')
         return
       }
       acceptManualSource(source)
@@ -1508,6 +1510,7 @@ export function OfflineReviewedWorkbench({
     // new files pass canonical admission. An invalid attempt is not a source
     // revocation, and must not erase the user's previous complete basket.
     const version = ++importRevision.current
+    const selectedWeek = captureWeekRef.current
     setPendingReplacement(null)
     setBusy(true)
     try {
@@ -1529,14 +1532,19 @@ export function OfflineReviewedWorkbench({
         }
         sources.push(json)
       }
-      if (selectedForPlan !== undefined && selectedForPlan !== currentlySelectedPlan.current) {
-        setMessage('Je weekmenu veranderde tijdens het lezen. Selecteer deze twee opnames opnieuw voor je huidige week.')
+      if (selectedWeek !== captureWeekRef.current ||
+          (selectedForPlan !== undefined && selectedForPlan !== currentlySelectedPlan.current)) {
+        setMessage('Je fysieke Planner-week veranderde tijdens het lezen. Selecteer de twee opnames opnieuw.')
         return
       }
       // Preserve original SKUs, null prices and observation timestamps. The
       // canonical parser is the final authority for this composed capture.
       const combined = combineTwoOwnShopCaptures(sources)
       if (version !== importRevision.current) return
+      if (selectedWeek !== captureWeekRef.current) {
+        setMessage('Je Planner-ingrediënten zijn veranderd. Herkies de twee originele bronbestanden.')
+        return
+      }
       if (imported) {
         stageBothStoreReplacement(combined, version)
         return
