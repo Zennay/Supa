@@ -117,7 +117,10 @@ export function CapturePairedPreview({
   }, [plus, deka, within24h, sourceFresh])
   const norm = (value: string) => value.normalize('NFKD')
     .replace(/\p{M}/gu, '').toLocaleLowerCase('nl-NL')
-  const filter = norm(query.trim())
+  // A user may search across original ingredient, PLUS SKU and Deka SKU
+  // in any order (e.g. "tomaat PLUS123"). Never change a physical match,
+  // sourced fact or price based on the display-only search.
+  const searchWords = norm(query.trim()).split(/\s+/u).filter(Boolean)
   // A field reviewer first needs to find the physical items that still
   // prevent a complete two-store match. Sorting only changes presentation;
   // original source row order and identifiers remain intact in exports.
@@ -129,10 +132,13 @@ export function CapturePairedPreview({
   const dekaOpen = rows.filter(row => perStoreOpen(row, 'DekaMarkt')).length
   const visible = rows.filter(row => (!openOnly || row.open) &&
     (storeFilter === 'all' || perStoreOpen(row, storeFilter)) &&
-    (!filter || norm([
-      row.label, row.left?.product ?? '', row.left?.originalSku ?? '',
-      row.right?.product ?? '', row.right?.originalSku ?? '',
-    ].join(' ')).includes(filter)))
+    (searchWords.length === 0 || (() => {
+      const originalFields = norm([
+        row.label, row.left?.product ?? '', row.left?.originalSku ?? '',
+        row.right?.product ?? '', row.right?.originalSku ?? '',
+      ].join(' '))
+      return searchWords.every(word => originalFields.includes(word))
+    })()))
     .sort((a, b) => Number(b.open) - Number(a.open))
   const missing = rows.filter(row => row.open).length
   const selectedOpen = storeFilter === 'all' ? missing :
