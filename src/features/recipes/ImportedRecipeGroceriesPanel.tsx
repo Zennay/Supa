@@ -975,8 +975,8 @@ export function ImportedRecipeGroceriesPanel({
         </label>
         {(result!.contributorsByLine[line.key]?.length ?? 0) > 1 && <details className="recipe-collection-groceries__sources">
           <summary>Bekijk de oorspronkelijke ingrediëntbijdragen ({result!.contributorsByLine[line.key].length})</summary>
-          <ul>{result!.contributorsByLine[line.key].map((source, index) =>
-            <li key={index}>
+          <ul>{result!.contributorsByLine[line.key].map(source =>
+            <li key={JSON.stringify([source.recipeId, source.ingredientLabel, source.amount, source.unit])}>
               <strong>{source.recipeTitle}</strong>
               {plannerDaysDistinct && plannerAssignments.some(row => row.recipeId === source.recipeId) &&
                 <small>{plannerAssignments.find(row => row.recipeId === source.recipeId)?.day}</small>}
@@ -1012,8 +1012,8 @@ export function ImportedRecipeGroceriesPanel({
             className="recipe-collection-groceries__variant">
             <summary>{change.draft.title} · {change.portions} porties ·
               {' '}{change.draft.ingredients.length} ingrediënten</summary>
-            <ul>{change.draft.ingredients.map((ingredient, index) =>
-              <li key={index}>{ingredient.original}
+            <ul>{change.draft.ingredients.map(ingredient =>
+              <li key={ingredient.clientId}>{ingredient.original}
                 {ingredient.reviewReason &&
                   <strong> — Controle nodig: {ingredient.reviewReason}</strong>}</li>)}</ul>
             <small>De originele bron blijft intact; dit is nog geen winkelprijs of match.</small>
