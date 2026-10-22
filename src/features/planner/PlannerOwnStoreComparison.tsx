@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { freshReviewedBaskets, recentOwnCaptureInstant, type PrivateReviewedBaskets, type PrivateCaptureProgress, type OwnStore, type PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
 import { privatePriceAgeNotice } from '../comparison/privatePriceAgeNotice.ts'
 import { currentPrivateRouteChoice } from '../comparison/privateRouteChoice.ts'
@@ -52,6 +52,10 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
   onChooseRouteLine: (choice: Omit<PrivateRouteChoice, 'serial'>) => void
 }) {
   const [downloadMessage, setDownloadMessage] = useState('')
+  // Do not authorize an asynchronous copy/download against a source object
+  // that another render (e.g. another tab's replacement) has already removed.
+  const currentReviewedRef = useRef(reviewed)
+  currentReviewedRef.current = reviewed
   const [copyableStore, setCopyableStore] = useState<{
     store: OwnStore
     receipt: NonNullable<PrivateReviewedBaskets['stores'][OwnStore]>
@@ -463,7 +467,7 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
     }
   }
 
-  async function downloadSelectedProductPrices(ids: string[], action: 'download' | 'copy') {
+  async function downloadSelectedProductPrices(ids: string[], action: 'download' | 'copy' | 'csv') {
     // Export the actual current reviewed pair, never stale rows held by a
     // filtered child view. A filtered selection is NOT a full basket total.
     const current = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
@@ -512,15 +516,48 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       'Voor een betrouwbaar HEEL-MANDTOTAAL gebruik je de volledige vergelijking, niet deze selectie.',
       '',
     ].join('\n')
-    if (action === 'copy') {
-      const originalPlus = current.stores.PLUS
-      const originalDeka = current.stores.DekaMarkt
-      const sameSources = () => {
-        const latest = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
-        return !!latest && latest.planKey === current.planKey &&
-          latest.stores.PLUS === originalPlus && latest.stores.DekaMarkt === originalDeka &&
-          ownStoreWeekComparison(latest).status === 'comparable'
+    const originalPlus = current.stores.PLUS
+    const originalDeka = current.stores.DekaMarkt
+    const sameSources = () => {
+      const currentlyRendered = currentReviewedRef.current
+      const latest = freshReviewedBaskets(
+        currentlyRendered, currentlyRendered?.planKey ?? '', Date.now())
+      return !!latest && latest.planKey === current.planKey &&
+        latest.stores.PLUS === originalPlus && latest.stores.DekaMarkt === originalDeka &&
+        ownStoreWeekComparison(latest).status === 'comparable'
+    }
+    if (action === 'csv') {
+      try {
+        // CSV code can load separately; an expired/replaced source may NOT
+        // survive that await as an authorized spreadsheet price.
+        const { selectedOwnPriceCsv } = await import('./selectedOwnPriceCsv.ts')
+        if (!sameSources()) throw Error('De originele winkelbronnen zijn veranderd of verlopen.')
+        const csv = selectedOwnPriceCsv({
+          lines: selected, totalOriginalLines: paired.lines.length,
+          plusObservedAt: originalPlus.observedAt,
+          dekaObservedAt: originalDeka.observedAt,
+        })
+        if (!sameSources()) throw Error('De originele winkelbronnen zijn veranderd of verlopen.')
+        const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+        try {
+          const link = document.createElement('a')
+          link.href = url
+          link.download = 'supa-eigen-geselecteerde-productprijzen.csv'
+          document.body.append(link)
+          try { link.click() } finally { link.remove() }
+        } finally {
+          window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+        }
+        setFilteredCopy(null)
+        setDownloadMessage(selected.length + ' oorspronkelijke productprijsregels als privé-CSV bewaard. Geen volledig mandtotaal.')
+      } catch (error) {
+        setFilteredCopy(null)
+        setDownloadMessage(error instanceof Error ? error.message :
+          'Het privéprijsblad kon niet veilig worden opgeslagen.')
       }
+      return
+    }
+    if (action === 'copy') {
       try {
         if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable')
         await navigator.clipboard.writeText(content)
@@ -540,6 +577,10 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
         setFilteredCopy({ planKey: current.planKey, plus: originalPlus, deka: originalDeka, text: content })
         setDownloadMessage('Klembordtoegang ontbreekt. Selecteer de gefilterde privétekst hieronder om handmatig te kopiëren.')
       }
+      return
+    }
+    if (!sameSources()) {
+      setDownloadMessage('De bron is gewijzigd of verlopen voordat de selectie kon worden bewaard.')
       return
     }
     const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }))
