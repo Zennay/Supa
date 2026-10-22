@@ -1012,8 +1012,8 @@ export function ImportedRecipeGroceriesPanel({
             className="recipe-collection-groceries__variant">
             <summary>{change.draft.title} · {change.portions} porties ·
               {' '}{change.draft.ingredients.length} ingrediënten</summary>
-            <ul>{change.draft.ingredients.map(ingredient =>
-              <li key={ingredient.clientId}>{ingredient.original}
+            <ul>{change.draft.ingredients.map((ingredient, index) =>
+              <li key={index}>{ingredient.original}
                 {ingredient.reviewReason &&
                   <strong> — Controle nodig: {ingredient.reviewReason}</strong>}</li>)}</ul>
             <small>De originele bron blijft intact; dit is nog geen winkelprijs of match.</small>
