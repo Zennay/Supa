@@ -300,14 +300,15 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
       <label>Eigen JSON-selectiebestand openen
         <input type="file" accept=".json,application/json" onChange={async event => {
           setPortablePreview(null)
-          const file = event.currentTarget.files?.[0]
+          const input = event.currentTarget
+          const file = input.files?.[0]
+          input.value = ''
           if (!file) return
           if (file.size > 16_384) { setPortableMessage('Bestand te groot (maximaal 16 kB).'); return }
           try {
             setPortableText(await file.text())
             setPortableMessage('Lokale tekst geladen. Kies Voorbeeld controleren vóór toevoegen.')
           } catch { setPortableMessage('Kon het lokale bestand niet lezen.') }
-          event.currentTarget.value = ''
         }} />
       </label>
       <label>Of plak eigen JSON
