@@ -35,13 +35,17 @@ function reviewReasons(recipe: SavedRecipe): string[] {
   }
   for (const ingredient of recipe.ingredients) {
     const name = (ingredient.label || ingredient.original || 'Ingrediënt').slice(0, 160)
+    const original = typeof ingredient.original === 'string'
+      ? ingredient.original.replace(/[\r\n\t\u0000-\u001f\u007f]/gu, ' ').trim().slice(0, 180)
+      : ''
+    const sourceNote = original && original !== name ? ' · originele regel: ' + original : ''
     if (ingredient.reviewReason) {
-      reasons.add(name + ': ' + ingredient.reviewReason)
+      reasons.add(name + ': ' + ingredient.reviewReason + sourceNote)
     } else if (ingredient.amount === null || !Number.isFinite(ingredient.amount) ||
         ingredient.amount <= 0 || !units.includes(ingredient.unit ?? '')) {
-      reasons.add(name + ': voer een geldige metrische hoeveelheid in.')
+      reasons.add(name + ': voer een geldige metrische hoeveelheid in.' + sourceNote)
     } else if (ingredient.unit === 'piece' && !Number.isSafeInteger(ingredient.amount)) {
-      reasons.add(name + ': ' + ingredient.amount + ' stuks is geen heel aantal; corrigeer dit in Mijn recepten.')
+      reasons.add(name + ': ' + ingredient.amount + ' stuks is geen heel aantal; corrigeer dit in Mijn recepten.' + sourceNote)
     }
   }
   if (toPlannerRecipe(recipe, { usage: 'unpriced-demand' }) === null && reasons.size === 0) {
