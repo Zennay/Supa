@@ -47,3 +47,11 @@ export function saveUnpricedShoppingProgress(
     return null
   }
 }
+
+/** Removing a discovery item must not resurrect an old completed tick on re-add. */
+export function clearUnpricedShoppingProduct(id: string): void {
+  if (!validId(id)) return
+  const snapshot = readUnpricedShoppingProgress()
+  if (!snapshot.writable || !snapshot.doneIds.includes(id)) return
+  saveUnpricedShoppingProgress(snapshot, snapshot.doneIds.filter(value => value !== id))
+}
