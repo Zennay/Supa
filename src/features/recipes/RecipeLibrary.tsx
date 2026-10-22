@@ -64,6 +64,23 @@ const examples = curatedFigmaRecipes.map(recipe => ({
 }))
 
 const blank = { title: '', servings: '2', minutes: '20', ingredients: '', steps: '' }
+/** Read local recipe/link files without guessing legacy encodings. UTF-16 is
+ * accepted only when a .txt/.md workflow declares its byte order with a BOM;
+ * HTML and JSON-LD remain strict UTF-8 to avoid silently reinterpreting data. */
+function decodeLocalRecipeCollectionFile(buffer: ArrayBuffer, format: 'plain' | 'jsonld' | 'html' | 'links'): string {
+  const bytes = new Uint8Array(buffer)
+  const allowBomUtf16 = format === 'plain' || format === 'links'
+  const encoding = allowBomUtf16 && bytes.length >= 2
+    ? bytes[0] === 0xff && bytes[1] === 0xfe ? 'utf-16le'
+      : bytes[0] === 0xfe && bytes[1] === 0xff ? 'utf-16be' : 'utf-8'
+    : 'utf-8'
+  try {
+    return new TextDecoder(encoding, { fatal: true }).decode(bytes).replace(/^\uFEFF/u, '').trim()
+  } catch {
+    throw new Error('Bestand bevat geen geldige tekstcodering. Gebruik UTF-8; voor .txt/.md-recept- en linklijsten mag ook UTF-16 met BOM.')
+  }
+}
+
 function initialLibrary(): LibraryState {
   if (typeof window === 'undefined') return { recipes: [], raw: null, error: null }
   try { return readRecipeLibrary(window.localStorage) }
@@ -651,7 +668,6 @@ export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
         throw new Error(format === 'links'
           ? 'Kies maximaal acht gevulde .txt/.md-linklijsten, samen maximaal 32 kB.'
           : 'Kies maximaal 15 gevulde tekstbestanden, samen maximaal 500 kB.')
-      const decoder = new TextDecoder('utf-8', { fatal: true })
       const sources: string[] = []
       for (const file of files) {
         if (revision !== collectionReadVersion.current) return
@@ -667,7 +683,7 @@ export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
             : 'Kies alleen .json- en .jsonld-receptbestanden.'
           throw new Error(reason)
         }
-        const content = decoder.decode(await file.arrayBuffer()).replace(/^\uFEFF/u, '').trim()
+        const content = decodeLocalRecipeCollectionFile(await file.arrayBuffer(), format)
         if (!content) throw new Error('Eén van de gekozen receptbestanden is leeg.')
         sources.push(content)
       }
