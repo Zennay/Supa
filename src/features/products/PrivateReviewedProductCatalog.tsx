@@ -40,7 +40,7 @@ const PlannerQuickSourcePaste = lazy(async () => {
 /** Read-only personally reviewed basket sources, never an inferred live catalog. */
 export function PrivateReviewedProductCatalog({ reviewed, progress, captureNeeds, budget, onOpenComparison, onOpenList, onOpenMixedRoute, onChooseRouteLine, onReviewIngredient, onAddMissingToOwnList, onImportSourceFiles, fileWarning, checked, onToggleChecked, onMarkCheckedBatch, incomingSearch }: {
   reviewed: PrivateReviewedBaskets | null
-  incomingSearch?: { serial: number; text: string }
+  incomingSearch?: { serial: number; text: string; store?: 'all' | OwnStore }
   progress: PrivateCaptureProgress | null
   captureNeeds: readonly PlannerCaptureGuideNeed[]
   budget: number
@@ -63,11 +63,14 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, captureNeeds
     // Only explicit Figma-to-owned-source navigation forwards text. Never
     // treat demo products as source matches or price information.
     setQuery(incomingSearch.text.slice(0, 120))
-    setStore('all')
+    // A historical card is a search hint, never a new retailer price or SKU.
+    // Preserve its explicit shop to avoid showing a different shop's similarly
+    // named item as the intended one. General search still covers both.
+    setStore(incomingSearch.store ?? 'all')
     setOnlyUnbought(false)
     setUnitFilter('all')
     setOrder('source')
-  }, [incomingSearch?.serial, incomingSearch?.text])
+  }, [incomingSearch?.serial, incomingSearch?.text, incomingSearch?.store])
   const [onlyUnbought, setOnlyUnbought] = useState(false)
   const [lastBulkTick, setLastBulkTick] = useState<{ shop: OwnStore; lines: readonly Matched[] } | null>(null)
   const [unitFilter, setUnitFilter] = useState<'all' | 'kg' | 'liter' | 'stuk'>('all')
@@ -295,6 +298,16 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, captureNeeds
     <h2>Mijn echte bronartikelen voor dit weekmenu</h2>
     <p>Alleen jouw zelf gecontroleerde productregels, geen actuele winkelcatalogus of kassagarantie.
       Historische ontwerpvoorbeelden elders op de pagina tellen niet mee.</p>
+    {incomingSearch && incomingSearch.serial > 0 && incomingSearch.store &&
+      incomingSearch.store !== 'all' && <div role="status"
+        className="private-reviewed-products__historical-handoff">
+        <strong>Zoeken in jouw eigen {incomingSearch.store}-bron</strong>
+        <p>Je kwam via een historische productkaart voor {incomingSearch.text}.
+          Alleen de naam en de winkel worden gebruikt om je <em>eigen</em> bron te doorzoeken.
+          Een historische kaart is geen actuele prijs, geen SKU-match en geen bewijs van beschikbaarheid.
+          Zonder eigen gecontroleerde opname blijft de prijs onbekend.</p>
+        <button type="button" onClick={onOpenComparison}>Open Vergelijk om echte bronproducten te controleren</button>
+      </div>}
     <label className="private-reviewed-products__own-upload">
       <strong>Eigen PLUS/DekaMarkt-productbron openen</strong>
       <span>1–2 rechtmatig verkregen CSV-, TSV-, TXT- of Supa JSON-bestanden.

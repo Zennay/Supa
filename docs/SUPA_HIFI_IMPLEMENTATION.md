@@ -62,3 +62,7 @@ The M2 Firefox workflow enters Planner from the new Home before replaying all ex
 - The personal-source list, unpriced planner checklist and demo shopping list are also split into on-demand chunks with loading announcements, while keeping their existing mount/storage contracts.
 - Planner week-recovery controls and the optional share-text editor are also lazy-loaded; the share editor chunk is fetched only when the user requests copy text.
 - This is discovery-only behavior: it does not add current retailer prices, change source rights, or feed demo values into the private reviewed-basket calculator.
+
+## Eigen winkelbron doorzoeken vanaf historische productkaart (22 oktober 2026)
+
+Een historische PLUS- of DekaMarkt-kaart gebruikt **Zoek in eigen bron** uitsluitend als winkelgericht, ongeprijsd zoekverzoek. De zichtbare productnaam en gekozen winkel worden doorgegeven aan de bestaande, lokaal beoordeelde complete én gedeeltelijke broncatalogus. Dit filtert dezelfde winkel, zodat een identiek artikel bij een andere winkel niet als impliciete match verschijnt. De kop boven de eigen broncatalogus meldt expliciet dat een historisch voorbeeld geen actuele SKU-match, bronautorisatie, prijs of beschikbaarheidsclaim is. Bij nul eigen prijsdata blijven de bestaande lokale bronimport en vergelijking bereikbaar. De normale algemene productzoekopdracht zoekt zoals voorheen in beide winkels. Niets schrijft naar bronopnames, bestaande productkeuzes of de rekenkundige volledige-mandvergelijking.

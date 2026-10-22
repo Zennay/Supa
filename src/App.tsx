@@ -194,9 +194,9 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [ownPriceImportSignal, setOwnPriceImportSignal] = useState(0)
   const [incomingPriceFiles, setIncomingPriceFiles] = useState<PrivateSourceFileHandoff | null>(null)
   const [listSourceFileWarning, setListSourceFileWarning] = useState('')
-  const [ownCatalogSearchIntent, setOwnCatalogSearchIntent] = useState({
-    serial: 0, text: '',
-  })
+  const [ownCatalogSearchIntent, setOwnCatalogSearchIntent] = useState<{
+    serial: number; text: string; store: 'all' | OwnStore
+  }>({ serial: 0, text: '', store: 'all' })
   // Separate, explicitly unpriced human notes. Never counted in shop totals.
   const [manualShoppingNotes, setManualShoppingNotes] = useState<UnpricedShoppingNote[]>([])
   const nextPriceFileSerial = useRef(0)
@@ -911,9 +911,9 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               <p>Deze ontwerpen zijn geen actuele winkelprijzen of geautoriseerde aanbiedingen.
                 Alleen jouw hierboven persoonlijk bevestigde bronregels tellen mee.</p>
               <HiFiHome view="products" onNavigate={navigate} activeDays={activeDays}
-                onOpenOwnSources={term => {
+                onOpenOwnSources={(term, store) => {
                   setOwnCatalogSearchIntent(previous => ({
-                    serial: previous.serial + 1, text: term.slice(0, 120),
+                    serial: previous.serial + 1, text: term.slice(0, 120), store: store ?? 'all',
                   }))
                   const source = document.getElementById('supa-real-source-catalog')
                   source?.focus({ preventScroll: true })
@@ -929,9 +929,9 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
                 aan Lijst toevoegen. Voor actuele prijzen gebruik je de bronimport hierboven.
                 Alle getoonde voorbeeldprijzen en aanbiedingen zijn demo, geen live data.</p>
               <HiFiHome view="products" onNavigate={navigate} activeDays={activeDays}
-                onOpenOwnSources={term => {
+                onOpenOwnSources={(term, store) => {
                   setOwnCatalogSearchIntent(previous => ({
-                    serial: previous.serial + 1, text: term.slice(0, 120),
+                    serial: previous.serial + 1, text: term.slice(0, 120), store: store ?? 'all',
                   }))
                   const source = document.getElementById('supa-real-source-catalog')
                   source?.focus({ preventScroll: true })

@@ -63,7 +63,7 @@ type Props = {
   onToggleProduct: (id: string) => void
   onAddRecipeGroceries?: (labels: readonly string[]) => string | null
   /** Jump to the actual own-source importer; Figma/historical cards are demo. */
-  onOpenOwnSources?: (query: string) => void
+  onOpenOwnSources?: (query: string, store?: 'PLUS' | 'DekaMarkt') => void
   activeDays?: readonly string[]
 }
 
@@ -251,7 +251,7 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct,
     : `${item.name} toegevoegd zonder prijsclaim. Open Lijst om je keuze te bekijken.`) }}>
   {addedProducts.includes(item.id) ? '✓ In lijst' : '+ Lijst'}
 </button>
-<button type="button" className="hifi-source-match" aria-label={`Zoek ${item.name} in mijn eigen gecontroleerde winkelbron`} onClick={() => { if (onOpenOwnSources) onOpenOwnSources(item.name); else onNavigate("basket") }}>Zoek in eigen bron →</button><a className="hifi-source-link" href={item.sourceUrl} target="_blank" rel="noopener noreferrer" aria-label={`Bekijk bronpagina bij ${item.store}: ${item.name}`}>Bron ↗</a></div></article>)}</div>
+<button type="button" className="hifi-source-match" aria-label={`Zoek ${item.name} in mijn eigen gecontroleerde winkelbron`} onClick={() => { if (onOpenOwnSources) onOpenOwnSources(item.name, item.store); else onNavigate("basket") }}>Zoek in eigen bron →</button><a className="hifi-source-link" href={item.sourceUrl} target="_blank" rel="noopener noreferrer" aria-label={`Bekijk bronpagina bij ${item.store}: ${item.name}`}>Bron ↗</a></div></article>)}</div>
       {historical.length === 0 && <div className="hifi-empty-state" role="status"><p className="hifi-empty">Geen historische productwaarnemingen gevonden met deze zoekopdracht en filters.</p><button type="button" className="hifi-empty-reset" onClick={clearSearchAndFilters}>Wis zoekopdracht en filters</button></div>}
     </section>}
     {(view === 'home' || (view === 'products' && productSource === 'figma')) && <section className="hifi-section" aria-labelledby="hifi-products-title">

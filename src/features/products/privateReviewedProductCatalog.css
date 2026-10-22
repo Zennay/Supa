@@ -264,3 +264,9 @@ background:#e7f4eb!important}
   gap:.65rem 1rem; margin-block:.8rem 1.2rem; }
 .private-reviewed-products__bulk-shopping p { margin:0; }
 .private-reviewed-products__bulk-shopping small { flex:1 1 100%; }
+
+/* Historical card handoff is discovery only: never a priced/product-approved row. */
+.private-reviewed-products__historical-handoff { display:grid; gap:.4rem; padding:.85rem 1rem;
+  border:1px solid #b8d1c2; border-radius:12px; background:#f6faf7; overflow-wrap:anywhere; }
+.private-reviewed-products__historical-handoff p { margin:0; }
+.private-reviewed-products__historical-handoff button { justify-self:start; min-height:44px; }
