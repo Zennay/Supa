@@ -62,7 +62,7 @@ function UnitPriceGap({ item }: { item: ComparedOwnLine }) {
 export function PlannerOwnProductDeltas({ lines, onChooseLine, onExportSelection }: {
   lines: ComparedOwnLine[]
   onChooseLine: (ingredientId: string, store: OwnStore) => void
-  onExportSelection: (ingredientIds: string[], action: 'download' | 'copy' | 'csv') => void
+  onExportSelection: (ingredientIds: string[], action: 'download' | 'copy' | 'csv' | 'print') => void
 }) {
   const [filter, setFilter] = useState<DifferenceFilter>('all')
   const [unitFamily, setUnitFamily] = useState<'all' | 'kg' | 'liter' | 'stuk'>('all')
@@ -191,9 +191,14 @@ export function PlannerOwnProductDeltas({ lines, onChooseLine, onExportSelection
         onClick={() => onExportSelection(visibleLines.map(line => line.id), 'csv')}>
         Bewaar deze {visibleLines.length} prijsregels als spreadsheet-CSV
       </button>
+      <button type="button" className="ghost-button"
+        disabled={visibleLines.length === 0}
+        onClick={() => onExportSelection(visibleLines.map(line => line.id), 'print')}>
+        Afdrukbaar overzicht van deze {visibleLines.length} prijsregels
+      </button>
       <small>Bevat uitsluitend zichtbare, bevestigde producten met oorspronkelijke
         SKU, pakprijzen, eenheidsprijzen, regelverschillen en bronmomenten. De CSV
-        gebruikt Nederlandse puntkomma-kolommen; geen volledig mandtotaal.</small>
+        gebruikt Nederlandse puntkomma-kolommen. Het afdrukbare HTML-overzicht werkt offline; geen volledig mandtotaal.</small>
     </div>
     {visibleLines.length > 0
       ? <>
