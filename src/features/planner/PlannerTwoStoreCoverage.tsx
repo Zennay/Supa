@@ -313,6 +313,14 @@ export function PlannerTwoStoreCoverage({
     <div className="supa-two-store-coverage__export-actions"
       role="group" aria-label="Alleen openstaande winkelbroncontroles meenemen">
       <strong>{openForFilter} openstaande ingrediënten voor {worklistTarget}</strong>
+      <label>Kies winkel voor mijn werkblad
+        <select value={storeFilter}
+          onChange={event => setStoreFilter(event.currentTarget.value as 'both' | OwnStore)}>
+          <option value="both">Beide winkels</option>
+          <option value="PLUS">PLUS</option>
+          <option value="DekaMarkt">DekaMarkt</option>
+        </select>
+      </label>
       <p>Neem uitsluitend nog te controleren originele PLUS-/DekaMarkt-ingrediënten mee.
         Deze selectie is gebaseerd op de actuele bronstatus en niet op een zoekfilter;
         het andere winkelresultaat blijft per ingrediënt ter context zichtbaar.</p>
