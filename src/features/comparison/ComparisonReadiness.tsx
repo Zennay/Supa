@@ -3,6 +3,11 @@ import type { OneStoreBasket } from '../../domain/basket.ts'
 import type { OfflineCapture } from '../../domain/offlineReviewedImport.ts'
 
 type StoreId = 'PLUS' | 'DekaMarkt'
+type PendingSourceReview = { id: string; ingredientLabel: string; productId: string; productName: string }
+
+function singleLine(value: string): string {
+  return value.replace(/[\r\n\t\u0000-\u001f\u007f\u2028\u2029]/gu, ' ').trim().slice(0, 200)
+}
 
 /**
  * An actionable guide for private, already-admitted local price observations.
@@ -10,7 +15,7 @@ type StoreId = 'PLUS' | 'DekaMarkt'
  */
 export function ComparisonReadiness({
   plus, deka, sourceFresh, pairedWithin24h, comparable,
-  captures, nowMs, onOpenPlanner, onReviewMissing, onOpenImport, pendingHumanReview = 0, onReviewFirstPending,
+  captures, nowMs, onOpenPlanner, onReviewMissing, onOpenImport, pendingHumanReview = 0, pendingReviewByStore, onReviewFirstPending,
 }: {
   plus: OneStoreBasket
   deka: OneStoreBasket
@@ -20,6 +25,7 @@ export function ComparisonReadiness({
   captures: { PLUS: OfflineCapture; DekaMarkt: OfflineCapture }
   nowMs: number
   pendingHumanReview?: number
+  pendingReviewByStore?: Readonly<Record<StoreId, readonly PendingSourceReview[]>>
   onReviewFirstPending?: () => void
   onOpenPlanner?: () => void
   onReviewMissing: (store: StoreId, ingredientId: string) => void
@@ -81,7 +87,12 @@ export function ComparisonReadiness({
       const unresolved = basket.lines.filter(line => line.status === 'unresolved')
       return [
         '', `${store} · ${unresolved.length} nog niet gekoppelde ingrediënten`,
-        ...unresolved.map(line => `☐ ${line.ingredientLabel} · ${line.id} · prijs en match onbekend`),
+        ...unresolved.map(line => `☐ ${singleLine(line.ingredientLabel)} · ${singleLine(line.id)} · prijs en match onbekend`),
+        ...(pendingReviewByStore?.[store].length
+          ? [`${pendingReviewByStore[store].length} voorgestelde bronartikelregels wachten op jouw controle:`,
+              ...pendingReviewByStore[store].map(item =>
+                `☐ ${singleLine(item.ingredientLabel)} · ${singleLine(item.productName)} · originele SKU ${singleLine(item.productId)} · niet bevestigd`)]
+          : []),
         ...(unresolved.length === 0 ? ['Geen onopgeloste productkoppelingen in dit mandje.'] : []),
       ]
     }),

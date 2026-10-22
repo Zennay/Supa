@@ -3407,6 +3407,22 @@ export function OfflineReviewedWorkbench({
                     nowMs={clockMs}
                     pendingHumanReview={perStoreReview.reduce((sum, item) =>
                       sum + item.required - item.accepted, 0)}
+                    pendingReviewByStore={{
+                      PLUS: basketPair.plus.lines.filter(line =>
+                        line.status === 'matched' &&
+                        !isAcceptedKey(reviewedLineKey('PLUS', imported.captures.PLUS!.observedAt, line))
+                      ).flatMap(line => line.status === 'matched' ? [{
+                        id: line.id, ingredientLabel: line.ingredientLabel,
+                        productId: line.productId, productName: line.productName,
+                      }] : []),
+                      DekaMarkt: basketPair.deka.lines.filter(line =>
+                        line.status === 'matched' &&
+                        !isAcceptedKey(reviewedLineKey('DekaMarkt', imported.captures.DekaMarkt!.observedAt, line))
+                      ).flatMap(line => line.status === 'matched' ? [{
+                        id: line.id, ingredientLabel: line.ingredientLabel,
+                        productId: line.productId, productName: line.productName,
+                      }] : []),
+                    }}
                     onReviewFirstPending={() => {
                       const pending = stores.flatMap(store => {
                         const basket = store === 'PLUS' ? basketPair.plus : basketPair.deka
