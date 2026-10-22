@@ -935,7 +935,29 @@ export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
     setPreview(null)
     try {
       const draft = importPlainTextRecipe(pastedSource)
-      adoptImportedRecipe(draft, 'Recepttekst lokaal herkend. Controleer hoeveelheden en stappen vóór opslaan.')
+      let sourceUrl = draft.sourceUrl
+      const warnings = [...draft.warnings]
+      // If the user switched from URL import to the offline text fallback,
+      // preserve that explicitly entered source link unless the text itself
+      // supplies a more precise Bron: line. This is attribution only; no fetch.
+      if (!sourceUrl && url.trim()) {
+        try {
+          sourceUrl = safeRecipeSourceUrl(url.trim())
+          const canonicalOriginal = new URL(url.trim())
+          canonicalOriginal.hash = ''
+          if (sourceUrl !== canonicalOriginal.toString()) warnings.push(
+            'De bronlink is veilig opgeschoond; controleer de openbare bronvermelding.')
+        } catch {
+          warnings.push('De opgegeven bronlink was ongeldig of niet openbaar HTTPS en is niet bewaard; controleer de bronvermelding.')
+        }
+      }
+      const attributed = {
+        ...draft,
+        source: sourceUrl ? 'url' as const : 'manual' as const,
+        sourceUrl,
+        warnings: [...new Set(warnings)],
+      }
+      adoptImportedRecipe(attributed, 'Recepttekst lokaal herkend. Controleer hoeveelheden en stappen vóór opslaan.')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Kon deze recepttekst niet inlezen.')
     }
