@@ -1660,6 +1660,14 @@ export function OfflineReviewedWorkbench({
   async function loadFile(file?: File, addSecond = false) {
     if (!file) return
     const version = ++importRevision.current
+    // FileReader and dynamic imports may finish after a user changes their
+    // selected recipes/days. Never admit an old week's capture into the
+    // newly selected physical basket or silently inherit prior reviews.
+    const selectedWeek = captureWeekRef.current
+    const requireSameWeek = () => {
+      if (captureWeekRef.current !== selectedWeek)
+        throw new Error('Je Planner-week is tijdens het lezen veranderd. Kies het bronbestand opnieuw voor de huidige fysieke ingrediënten.')
+    }
     setPendingReplacement(null)
     setBusy(true)
     try {
@@ -1686,6 +1694,7 @@ export function OfflineReviewedWorkbench({
         content = (module.convertOwnStoreCsv as (input: string) => string)(raw)
       }
       if (version !== importRevision.current) return
+      requireSameWeek()
       if (addSecond) {
         if (!imported || Object.keys(imported.captures).length !== 1)
           throw new Error('Voeg alleen bij precies één bestaande eigen winkelopname een tweede winkel toe.')
@@ -1703,6 +1712,7 @@ export function OfflineReviewedWorkbench({
           captures: [...previousRaw.captures, ...addedRaw.captures],
         })
         const result = parseOfflinePriceSnapshots(combined, Date.now())
+        requireSameWeek()
         setText(combined)
         setImported(result)
         setClockMs(Date.now())
@@ -1724,6 +1734,7 @@ export function OfflineReviewedWorkbench({
           return
         }
         if (version !== importRevision.current) return
+        requireSameWeek()
         setText(content)
         setImported(admitted)
         setReviewedLines({})
