@@ -602,7 +602,11 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
             <p>{capture.products.length} originele SKU's;
               {' '}{priced} met vastgelegde (niet per se actuele) pakprijs en
               {' '}{capture.products.length - priced} zonder bruikbare prijs.</p>
-            <small>Oorspronkelijk bronmoment: {dateText.format(new Date(capture.observedMs))}</small>
+            <small>Oorspronkelijk bronmoment: {dateText.format(new Date(capture.observedMs))}.
+              {' '}{recentOwnCaptureInstant(capture.observedAt, now)
+                ? 'Originele bron is nog binnen de lokale tijdsgrens; productreview blijft verplicht.'
+                : 'Deze winkelbron is verouderd of ongeldig. Neem de werkelijke producten en prijzen opnieuw op.'}
+            </small>
             <details className="supa-planner-source-paste__products">
               <summary>Bekijk originele SKU’s, verpakkingen en ontbrekende prijzen</summary>
               <p role="status">Bronpreview: {visibleProducts.length} van {capture.products.length}
@@ -629,8 +633,13 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
                   </li>
                 })}
               </ul>
-              {visibleProducts.length === 0 && <li>Geen originele SKU's bij deze filters.
-                Wis de filters of zoek op een andere productnaam of artikelcode.</li>}
+              {visibleProducts.length === 0 && <p role="status">
+                Geen originele SKU's bij deze filters. Je bestaande bronopname blijft behouden.
+                <button type="button" className="ghost-button"
+                  onClick={() => { setSourceSearch(''); setIncompleteOnly(false) }}>
+                  Toon alle originele producten opnieuw
+                </button>
+              </p>}
               {visibleProducts.length > 24 &&
                 <small>Toon hier de eerste 24 gevonden SKU's. Verfijn je zoekterm
                   of bekijk alle oorspronkelijke producten in Vergelijk.</small>}
