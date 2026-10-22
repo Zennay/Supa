@@ -73,6 +73,9 @@ export function createRecipeServer({ root = resolve('dist'), fetchHtml = fetchRe
           }
         } finally {
           clearTimeout(bodyDeadline)
+          // The inactivity timeout protects body receipt only; do not let it
+          // expire during the separate, bounded upstream recipe fetch.
+          req.setTimeout(0)
         }
         const payload = JSON.parse(body)
         if (!payload || typeof payload !== 'object' || Array.isArray(payload) ||
