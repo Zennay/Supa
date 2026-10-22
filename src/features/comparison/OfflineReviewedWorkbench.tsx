@@ -389,7 +389,7 @@ export function OfflineReviewedWorkbench({
   currentlySelectedPlan.current = planKey
   const [pendingReplacement, setPendingReplacement] = useState<{
     sourceText: string; newText: string
-    version: number; store: typeof stores[number]
+    version: number; week: string; store: typeof stores[number]
     preview: ReturnType<typeof describePrivateStoreCaptureChange>
   } | null>(null)
 
@@ -397,6 +397,7 @@ export function OfflineReviewedWorkbench({
     sourceText: string
     newText: string
     version: number
+    week: string
     snapshots: OfflinePriceSnapshots
     changes: { store: typeof stores[number]; previousAt: string | null
       nextAt: string; previousCount: number; nextCount: number
@@ -1250,21 +1251,23 @@ export function OfflineReviewedWorkbench({
     })
     setPendingReplacement(null)
     setPendingTwoStore({ sourceText: text, newText: input, version,
-      snapshots: next, changes })
+      week: captureWeekRef.current, snapshots: next, changes })
     setMessage('Twee originele bronbestanden gecontroleerd; vergelijk eerst de wijzigingen. Geen oude winkeldata of vinkjes zijn vervangen.')
   }
 
   async function downloadTwoStoreChanges() {
     const pending = pendingTwoStore
     if (!pending || pending.version !== importRevision.current ||
-        pending.sourceText !== text) {
+        pending.sourceText !== text || pending.week !== captureWeekRef.current) {
       setMessage('Het wijzigingenoverzicht is verouderd; laad je eigen bronnen opnieuw.')
       return
     }
     try {
       const { twoStoreReplacementCsv } = await import('./twoStoreReplacementCsv.ts')
-      if (pending.version !== importRevision.current || pending.sourceText !== currentActiveSource.current)
-        throw new Error('De actieve winkelopnames zijn veranderd. Bekijk de nieuwe bronbestanden opnieuw.')
+      if (pending.version !== importRevision.current ||
+          pending.sourceText !== currentActiveSource.current ||
+          pending.week !== captureWeekRef.current)
+        throw new Error('De Planner-week of winkelbron veranderde. Bekijk beide originele bronbestanden opnieuw.')
       const content = twoStoreReplacementCsv(pending.sourceText, pending.newText, Date.now())
       const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }))
       try {
@@ -1283,7 +1286,7 @@ export function OfflineReviewedWorkbench({
   function confirmBothStoreReplacement() {
     const pending = pendingTwoStore
     if (!pending || pending.version !== importRevision.current ||
-        pending.sourceText !== text) {
+        pending.sourceText !== text || pending.week !== captureWeekRef.current) {
       setPendingTwoStore(null)
       setMessage('De actieve winkelopnames zijn ondertussen gewijzigd. Laad de twee nieuwe bestanden opnieuw.')
       return
@@ -1353,7 +1356,7 @@ export function OfflineReviewedWorkbench({
             return
           }
           setPendingReplacement({ sourceText: text, newText: input, store,
-            version: importRevision.current, preview })
+            week: captureWeekRef.current, version: importRevision.current, preview })
           setMessage(store + ': bekijk eerst de bronverschillen en bevestig de vervanging. De andere winkel blijft behouden.')
           return
         }
@@ -1671,7 +1674,8 @@ export function OfflineReviewedWorkbench({
       }
       if (selectedWeek !== captureWeekRef.current)
         throw new Error('De Planner-ingrediënten zijn veranderd. Bekijk de bronvervanging opnieuw.')
-      setPendingReplacement({ sourceText: text, newText: json, store, version, preview })
+      setPendingReplacement({ sourceText: text, newText: json, store,
+        week: selectedWeek, version, preview })
       setMessage(store + ': nieuw bronbestand geldig gelezen. Bekijk eerst welke originele producten en prijzen wijzigen. De twee bestaande winkelopnames zijn nog niet vervangen.')
     } catch (error) {
       if (version === importRevision.current)
@@ -1688,7 +1692,7 @@ export function OfflineReviewedWorkbench({
     if (!proposed) return
     setPendingReplacement(null)
     if (!imported || importRevision.current !== proposed.version ||
-        text !== proposed.sourceText) {
+        text !== proposed.sourceText || proposed.week !== captureWeekRef.current) {
       setMessage('Je oorspronkelijke winkeldata zijn ondertussen gewijzigd. Importeer de gewenste vervanging opnieuw.')
       return
     }
