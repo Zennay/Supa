@@ -15,7 +15,7 @@ Supa kan eigen recepten lokaal bewaren en omzetten naar het interne receptformaa
 - **schema.org/Recipe JSON-LD** in een lokaal opgeslagen HTML-bestand.
 - **schema.org Recipe-microdata** (itemscope/itemprop) wanneer de HTML geen JSON-LD-scriptblokken bevat.
 - Losse JSON/JSON-LD-bestanden, arrays, @graph en schema.org ItemList → ListItem → item-wrappers met Recipe-objecten, plus gewone tekst en Markdown via de bijbehorende importkeuze.
-- Bij een deployment met de beveiligde link-API: plak één tot acht openbare HTTPS-receptlinks per regel of upload een `.txt`-/`.md`-linklijst (maximaal acht bestanden, samen 32 kB). Rechtstreekse URL's, Markdown-bullets/genummerde lijsten, `<https://…>`-autolinks en `[receptnaam](https://…)` werken. Iedere niet-lege regel moet precies één link bevatten; de bestaande URL-validatie en SSRF-beveiligde serverroute blijven verplicht. Alle herkende recepten blijven concepten tot je ze controleert en zelf bewaart.
+- Bij een deployment met de beveiligde link-API: plak één tot acht openbare HTTPS-receptlinks per regel of upload een `.txt`-/`.md`-linklijst (maximaal acht bestanden, samen 32 kB). Rechtstreekse URL's, Markdown-koppen/scheidingslijnen, bullets/genummerde lijsten, `<https://…>`-autolinks en `[receptnaam](https://…)` werken. Iedere niet-lege regel moet precies één link bevatten; de bestaande URL-validatie en SSRF-beveiligde serverroute blijven verplicht. Alle herkende recepten blijven concepten tot je ze controleert en zelf bewaart.
 
 Bij HTML met JSON-LD gebruikt Supa eerst de JSON-LD-bron. Microdata is de terugvalroute wanneer er geen JSON-LD-scriptblokken aanwezig zijn. Niet iedere website publiceert bruikbare receptmetadata; gebruik dan de gewone tekstimport of voer het recept handmatig in.
 

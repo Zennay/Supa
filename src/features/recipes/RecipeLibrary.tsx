@@ -1025,7 +1025,7 @@ export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
             ? 'Tomatensoep\nIngrediënten:\n500 g tomaten\nBereiding:\nKook tomaten\n---\nPasta\nIngrediënten:\n200 g pasta\nBereiding:\nKook pasta'
             : collectionFormat === 'html'
               ? '<script type="application/ld+json">{"@type":"Recipe","name":"...","recipeIngredient":["250 g ..."]}</script>'
-              : collectionFormat === 'links' ? 'https://voorbeeld.nl/recept/soep\nhttps://voorbeeld.nl/recept/pasta'
+              : collectionFormat === 'links' ? '# Mijn recepten\n\n- [Tomatensoep](https://voorbeeld.nl/recept/soep)\n- https://voorbeeld.nl/recept/pasta'
               : '{"@context":"https://schema.org","@graph":[{"@type":"Recipe","name":"...","recipeIngredient":["250 g ..."],"recipeInstructions":["..."]}]}'}
           onChange={event => {
             collectionAbort.current?.abort(); setCollectionBusy(false)

@@ -5,8 +5,13 @@ import { reviewRecipe } from './recipeLibrary.ts'
 
 /** Accept a direct URL or a conventional Markdown list item, then apply the
  * same strict public-HTTPS source policy used by the single-link importer. */
-function normalizeRecipeLinkLine(line: string, lineNumber: number): string {
-  let candidate = line.trim().replace(/^(?:[-*+•]\s+|\d{1,3}[.)]\s+)/u, '').trim()
+function normalizeRecipeLinkLine(line: string, lineNumber: number): string | null {
+  const trimmed = line.trim()
+  // Real-world .md lists commonly start with a heading and separate sections
+  // with a thematic break. Ignore only unambiguous Markdown structure; prose
+  // or any malformed non-empty line still fails with its original line number.
+  if (/^#{1,6}\s+\S/u.test(trimmed) || /^(?:-{3,}|(?:\*\s*){3,}|(?:_\s*){3,})$/u.test(trimmed)) return null
+  let candidate = trimmed.replace(/^(?:[-*+•]\s+|\d{1,3}[.)]\s+)/u, '').trim()
   const markdown = /^\[[^\]\r\n]{1,180}\]\((https:\/\/[^()\s]+)\)$/iu.exec(candidate)
   if (markdown) candidate = markdown[1]
   else {
@@ -38,13 +43,14 @@ export async function importRecipeLinksCollection(
   if (typeof text !== 'string' || !text.trim() || text.length > 32_000) {
     throw new Error('Plak maximaal acht openbare HTTPS-receptlinks, één per regel; Markdown-bullets en [naam](https://…) zijn toegestaan.')
   }
-  const rawUrls = text.split(/\r\n?|\n/u)
+  const urls = text.split(/\r\n?|\n/u)
     .map((line, index) => ({ line: line.trim(), lineNumber: index + 1 }))
     .filter(item => item.line.length > 0)
-  if (rawUrls.length < 1 || rawUrls.length > 8) {
-    throw new Error('Kies één tot acht openbare receptlinks per import.')
+    .map(item => normalizeRecipeLinkLine(item.line, item.lineNumber))
+    .filter((url): url is string => url !== null)
+  if (urls.length < 1 || urls.length > 8) {
+    throw new Error('Kies één tot acht openbare receptlinks per import. Markdown-koppen en scheidingslijnen tellen niet mee.')
   }
-  const urls = rawUrls.map(item => normalizeRecipeLinkLine(item.line, item.lineNumber))
   if (new Set(urls).size !== urls.length) {
     throw new Error('Dezelfde receptlink staat meerdere keren in deze import.')
   }
