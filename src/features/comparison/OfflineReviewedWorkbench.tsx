@@ -408,6 +408,7 @@ export function OfflineReviewedWorkbench({
   const [weekExportMessage, setWeekExportMessage] = useState('')
   const [captureSheetStore, setCaptureSheetStore] = useState<'both' | CaptureStore>('both')
   const [capturePreviewShown, setCapturePreviewShown] = useState<Record<CaptureStore, number>>({ PLUS: 20, DekaMarkt: 20 })
+  const [pairedOnlyMissing, setPairedOnlyMissing] = useState(false)
   const [capturePreviewSearch, setCapturePreviewSearch] = useState<Record<CaptureStore, string>>({ PLUS: '', DekaMarkt: '' })
   const [capturePreviewSort, setCapturePreviewSort] = useState<Record<CaptureStore, 'source' | 'name' | 'sku' | 'price' | 'unknown'>>({ PLUS: 'source', DekaMarkt: 'source' })
   const [capturePreview, setCapturePreview] = useState<{
@@ -494,6 +495,7 @@ export function OfflineReviewedWorkbench({
     if (files.length === 0) return
     const version = ++importRevision.current
     setCapturePreview(null)
+    setPairedOnlyMissing(false)
     setCapturePreviewShown({ PLUS: 20, DekaMarkt: 20 })
     setCapturePreviewSearch({ PLUS: '', DekaMarkt: '' })
     setCapturePreviewSort({ PLUS: 'source', DekaMarkt: 'source' })
@@ -2790,8 +2792,19 @@ export function OfflineReviewedWorkbench({
                     voor identieke Planner-hoeveelheden. Controleer beide originele SKU's,
                     verpakkingen en opnametijden zelf. Geen prijsverschil of besparing is bevestigd.
                   </p>
+                  <label>
+                    <input type="checkbox" checked={pairedOnlyMissing}
+                      onChange={event => setPairedOnlyMissing(event.currentTarget.checked)} />
+                    {' '}Toon alleen ingrediënten zonder bruikbaar matchvoorstel bij één of beide winkels
+                  </label>
+                  {pairedOnlyMissing &&
+                    pairedPreviewRows.every(row => row.plusCode && row.dekaCode) && (
+                    <p role="status">Voor ieder ingrediënt is in beide winkels een
+                      voorstel gevonden. Controleer beide oorspronkelijke artikelen alsnog.</p>
+                  )}
                   <ul>
-                    {pairedPreviewRows.map(row => (
+                    {pairedPreviewRows.filter(row =>
+                      !pairedOnlyMissing || !row.plusCode || !row.dekaCode).map(row => (
                       <li key={row.id}>
                         <strong>{row.label}</strong>
                         {' '}· {row.amount ?? 'hoeveelheid onbekend'} {row.unit}
