@@ -27,6 +27,19 @@ export function exportUnpricedShoppingCsv(notes: readonly Row[]): string {
   return '\ufeff' + header + '\r\n' + notes.map(note =>
     ['eigen', note.store, note.label, note.done ? 'ja' : 'nee'].map(quote).join(';')).join('\r\n') + '\r\n'
 }
+/** The same four private columns as CSV, for spreadsheet-native file exchange.
+ * Keep formula-shaped and literal apostrophe labels inert; reject cell-breaking
+ * characters instead of silently changing a user's original grocery text.
+ */
+export function exportUnpricedShoppingTsv(notes: readonly Row[]): string {
+  const lines = notes.map(note => {
+    if (safeLabel(note.label) !== note.label)
+      throw Error('Een boodschappenomschrijving bevat ongeldige tabeltekens.')
+    return ['eigen', note.store, note.label, note.done ? 'ja' : 'nee']
+      .map(spreadsheetSafe).join('\t')
+  })
+  return '\ufeff' + header.replace(/;/gu, '\t') + '\r\n' + lines.join('\r\n') + '\r\n'
+}
 /** Strict bounded semicolon CSV reader; no spreadsheet formula execution. */
 export function importUnpricedShoppingCsv(source: string): Row[] {
   if (new TextEncoder().encode(source).length > 32768) throw Error('CSV groter dan 32 kB.')
