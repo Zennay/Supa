@@ -540,12 +540,21 @@ export function OfflineReviewedWorkbench({
     }
     const forStore = (retailer: CaptureStore): Map<string, Candidate> | null => {
       const newShop = preview.stores.find(shop => shop.retailer === retailer)
-      if (newShop?.matching) return new Map(newShop.matching.lines.map(line =>
-        [line.id, line.status === 'matched' ? {
+      if (newShop?.matching) return new Map(newShop.matching.lines.map(line => {
+        // Use the original physical pack fields and existing exact unit-price
+        // helper. PreviewMatchLine only contains a display unitPrice string;
+        // it never carried an independently certified price-rate object.
+        const unit = line.status === 'matched' ? privatePackUnitRate({
+          amount: line.packAmount, unit: line.packUnit ?? '',
+          count: line.packCount ?? 0, priceCents: line.pricePerPackCents,
+        }) : null
+        return [line.id, line.status === 'matched' ? {
           sku: line.originalSku, packs: line.packs,
-          cents: line.lineTotalCents, unitRate: line.unitRate,
-          unitCents: line.unitCents, unitFamily: line.unitFamily,
-        } : unknown] as const))
+          cents: line.lineTotalCents, unitRate: line.unitPrice,
+          unitCents: unit?.roundedCentsPerUnit ?? null,
+          unitFamily: unit?.unit ?? null,
+        } : unknown] as const
+      }))
       if (preview.retainedOther?.retailer !== retailer) return null
       const retained = imported?.captures[retailer]
       if (!retained) return null
@@ -2572,63 +2581,6 @@ export function OfflineReviewedWorkbench({
       setCoverageMessage('Geen geldig kort invulblad. Gebruik het volledige Planner-invulblad.')
     }
   }
-  function downloadCoverageChecklist(onlyOpen = false) {
-    if (!imported || coverageRows.length === 0) return
-    // Refresh source age at the moment the field list is downloaded rather
-    // than reusing the 60-second screen clock. The list is a work aid, never
-    // authoritative evidence of a current shop price.
-    const nowNs = BigInt(Date.now()) * 1_000_000n
-    const rows = coverageRows.map(row => ({
-      ...row,
-      ...Object.fromEntries(stores.map(store => {
-        const captured = imported.captures[store]
-        const fresh = !!captured &&
-          nowNs >= captured.observedNs - 300_000_000_000n &&
-          nowNs - captured.observedNs <= 604_800_000_000_000n
-        const item = row[store]
-        return [store, !fresh && item.status === 'Persoonlijk bevestigd'
-          ? { ...item, status: 'Eigen opname verouderd of toekomstig; opnieuw opnemen' }
-          : olderPairCapture === store && item.status === 'Persoonlijk bevestigd'
-            ? { ...item, status: 'Ouder bronmoment; neem binnen 24 uur van de andere winkel opnieuw op' }
-            : item]
-      })),
-    })) as typeof coverageRows
-    const selected = onlyOpen ? rows.filter(row =>
-      stores.some(store => row[store].status !== 'Persoonlijk bevestigd')) : rows
-    if (!selected.length) {
-      setCoverageMessage('Geen open productcontroles. Alle beschikbare eigen bronartikelen zijn afzonderlijk bevestigd.')
-      return
-    }
-    const content = [
-      onlyOpen ? 'SUPA · uitsluitend OPEN winkelproductcontroles uit jouw Planner' :
-        'SUPA · privé veld- en productcontrole voor exact dezelfde Planner-vraag',
-      'Geen prijs- of bronrechtenbewijs. Ontbrekend/verlopen is onbekend, niet EUR 0.',
-      ...stores.map(store => store + ' · eigen waarneming: ' +
-        (imported.captures[store]?.observedAt ?? 'ONTBREEKT')),
-      '',
-      ...selected.flatMap(row => [
-        row.label.replace(/[\r\n\u0000-\u001f\u007f-\u009f]/gu, ' ') +
-          ' · ' + (row.amount ?? '?') + ' ' + row.unit,
-        '  PLUS: ' + row.PLUS.status + (row.PLUS.product ? ' · voorgesteld bronartikel ' + row.PLUS.product.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ') : ''),
-        '  DekaMarkt: ' + row.DekaMarkt.status + (row.DekaMarkt.product ? ' · voorgesteld bronartikel ' + row.DekaMarkt.product.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ') : ''),
-      ]),
-      'Controleer iedere SKU, verpakking en prijs tegen je eigen bron. Geen publieke besparingsclaim.',
-    ].join('\n')
-    const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }))
-    try {
-      const link = document.createElement('a')
-      link.href = url
-      link.download = onlyOpen ? 'supa-alleen-open-winkelcontroles.txt' :
-        'supa-prive-dekking-en-ontbrekende-producten.txt'
-      document.body.append(link)
-      try { link.click() } finally { link.remove() }
-      setCoverageMessage((onlyOpen ? 'Alleen de ' + selected.length + ' nog open Planner-regels' :
-        'Alle ' + selected.length + ' Planner-regels') +
-        ' lokaal bewaard met bronstatus per winkel. Geen prijzen of bronrechten toegevoegd.')
-    } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
-  }
-
-
   function buildStoreCoverageGuide(store: CaptureStore): { content: string; count: number } | null {
     if (!imported || coverageRows.length === 0) return null
     const nowNs = BigInt(Date.now()) * 1_000_000n
