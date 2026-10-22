@@ -20,11 +20,15 @@ const missingMinutesWarning = 'Bereidingstijd ontbreekt of is onduidelijk'
 // Physical fractional pieces (e.g. half an egg) need explicit human review in
 // the existing recipe/scaler workflow; never silently mark them basket-ready.
 function reviewedForBasket(recipe: SavedRecipe): RecipeWithIngredients | null {
-  // Shopping demand needs verified portions and ingredients, not a prep-time estimate.
-  // The dedicated unpriced-demand mode preserves an unknown duration without inventing it.
+  // Shopping demand needs verified portions and bounded physical quantities,
+  // not a prep-time estimate. Keep this eligibility check aligned with the
+  // final admission guard so a card cannot look ready and fail only on selection.
+  // Unknown duration remains unknown in the dedicated unpriced-demand mode.
   const reviewed = toPlannerRecipe(recipe, { usage: 'unpriced-demand' })
   if (!reviewed || reviewed.ingredients.some(item =>
-    item.unit === 'piece' && item.amount !== null && !Number.isInteger(item.amount))) return null
+    item.amount === null || !Number.isFinite(item.amount) || item.amount <= 0 ||
+    item.amount > 100000 || !units.includes(item.unit) ||
+    (item.unit === 'piece' && !Number.isSafeInteger(item.amount)))) return null
   return reviewed
 }
 function reviewReasons(recipe: SavedRecipe): string[] {
@@ -47,8 +51,10 @@ function reviewReasons(recipe: SavedRecipe): string[] {
     } else if (ingredient.amount === null || !Number.isFinite(ingredient.amount) ||
         ingredient.amount <= 0 || !units.includes(ingredient.unit ?? '')) {
       reasons.add(name + ': voer een geldige metrische hoeveelheid in.' + sourceNote)
+    } else if (ingredient.amount > 100000) {
+      reasons.add(name + ': de hoeveelheid is groter dan 100.000; controleer de oorspronkelijke receptregel.' + sourceNote)
     } else if (ingredient.unit === 'piece' && !Number.isSafeInteger(ingredient.amount)) {
-      reasons.add(name + ': ' + ingredient.amount + ' stuks is geen heel aantal; corrigeer dit in Mijn recepten.' + sourceNote)
+      reasons.add(name + ': ' + ingredient.amount + ' stuks is geen veilig heel aantal; corrigeer dit in Mijn recepten.' + sourceNote)
     }
   }
   if (toPlannerRecipe(recipe, { usage: 'unpriced-demand' }) === null && reasons.size === 0) {
