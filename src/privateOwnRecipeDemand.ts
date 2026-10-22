@@ -15,7 +15,7 @@ const convertButton = document.querySelector<HTMLButtonElement>('#own-recipes-to
 const status = document.querySelector<HTMLElement>('#own-recipe-status')!
 const choices = document.querySelector<HTMLElement>('#own-recipe-choices')!
 const reviewNeeded = document.querySelector<HTMLElement>('#own-recipe-review-needed')!
-const units = ['g', 'kg', 'ml', 'l', 'piece']
+const units = ['g', 'ml', 'piece'] // canonical planner units after kg/l normalization
 const missingMinutesWarning = 'Bereidingstijd ontbreekt of is onduidelijk'
 // Physical fractional pieces (e.g. half an egg) need explicit human review in
 // the existing recipe/scaler workflow; never silently mark them basket-ready.
