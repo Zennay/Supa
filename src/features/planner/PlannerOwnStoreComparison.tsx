@@ -468,7 +468,7 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
     }
   }
 
-  async function downloadSelectedProductPrices(ids: string[], action: 'download' | 'copy' | 'csv') {
+  async function downloadSelectedProductPrices(ids: string[], action: 'download' | 'copy' | 'csv' | 'print') {
     // Export the actual current reviewed pair, never stale rows held by a
     // filtered child view. A filtered selection is NOT a full basket total.
     const current = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
@@ -527,6 +527,35 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       return !!latest && latest.planKey === current.planKey &&
         latest.stores.PLUS === originalPlus && latest.stores.DekaMarkt === originalDeka &&
         ownStoreWeekComparison(latest).status === 'comparable'
+    }
+    if (action === 'print') {
+      try {
+        const { selectedOwnPricePrintHtml } = await import('./selectedOwnPricePrintHtml.ts')
+        if (!sameSources()) throw Error('De originele winkelbronnen zijn veranderd of verlopen.')
+        const html = selectedOwnPricePrintHtml({
+          lines: selected, totalOriginalLines: paired.lines.length,
+          plusObservedAt: originalPlus.observedAt,
+          dekaObservedAt: originalDeka.observedAt,
+        })
+        if (!sameSources()) throw Error('De originele winkelbronnen zijn veranderd of verlopen.')
+        const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
+        try {
+          const link = document.createElement('a')
+          link.href = url
+          link.download = 'supa-eigen-geselecteerde-productprijzen-afdruk.html'
+          document.body.append(link)
+          try { link.click() } finally { link.remove() }
+        } finally {
+          window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+        }
+        setFilteredCopy(null)
+        setDownloadMessage(selected.length + ' gecontroleerde productprijskaarten privé opgeslagen als afdrukbaar HTML-bestand. Geen mandtotaal.')
+      } catch (error) {
+        setFilteredCopy(null)
+        setDownloadMessage(error instanceof Error ? error.message :
+          'De gefilterde privéprijskaarten konden niet veilig worden opgeslagen.')
+      }
+      return
     }
     if (action === 'csv') {
       try {
