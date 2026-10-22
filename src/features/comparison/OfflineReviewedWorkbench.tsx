@@ -2191,8 +2191,8 @@ export function OfflineReviewedWorkbench({
       setCoverageMessage('Geen geldig kort invulblad. Gebruik het volledige Planner-invulblad.')
     }
   }
-  function downloadCoverageChecklist(onlyOpen = false) {
-    if (!imported || coverageRows.length === 0) return
+  function buildCoverageChecklist(onlyOpen: boolean): { content: string; count: number } | null {
+    if (!imported || coverageRows.length === 0) return null
     // Refresh source age at the moment the field list is downloaded rather
     // than reusing the 60-second screen clock. The list is a work aid, never
     // authoritative evidence of a current shop price.
@@ -2233,7 +2233,13 @@ export function OfflineReviewedWorkbench({
       ]),
       'Controleer iedere SKU, verpakking en prijs tegen je eigen bron. Geen publieke besparingsclaim.',
     ].join('\n')
-    const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }))
+    return { content, count: selected.length }
+  }
+
+  function downloadCoverageChecklist(onlyOpen = false) {
+    const snapshot = buildCoverageChecklist(onlyOpen)
+    if (!snapshot) return
+    const url = URL.createObjectURL(new Blob([snapshot.content], { type: 'text/plain;charset=utf-8' }))
     try {
       const link = document.createElement('a')
       link.href = url
@@ -2241,8 +2247,8 @@ export function OfflineReviewedWorkbench({
         'supa-prive-dekking-en-ontbrekende-producten.txt'
       document.body.append(link)
       try { link.click() } finally { link.remove() }
-      setCoverageMessage((onlyOpen ? 'Alleen de ' + selected.length + ' nog open Planner-regels' :
-        'Alle ' + selected.length + ' Planner-regels') +
+      setCoverageMessage((onlyOpen ? 'Alleen de ' + snapshot.count + ' nog open Planner-regels' :
+        'Alle ' + snapshot.count + ' Planner-regels') +
         ' lokaal bewaard met bronstatus per winkel. Geen prijzen of bronrechten toegevoegd.')
     } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
   }
