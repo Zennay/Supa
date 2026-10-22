@@ -1,6 +1,6 @@
 import { lazy, Suspense, useMemo, useState, type FormEvent } from 'react'
 import type { PlannedMeal, Recipe } from '../../domain/types'
-import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../domain/basket.ts'
+import type { RecipeWithIngredients } from '../../domain/basket.ts'
 import { buildIngredientReuseInsight } from '../../domain/ingredientReuse.ts'
 import { IngredientReuseCard } from './IngredientReuseCard.tsx'
 // Previewing a proposed replacement is optional: do not pull its entire
@@ -131,14 +131,6 @@ export function PlannerView({
   ), [recipes])
   const hasIngredientData = ingredientRecipes.length > 0 &&
     ingredientRecipes.length === recipes.length
-  // The source-match preview can inspect up to 200 physical requirements
-  // against two local price files. Keep that exact Planner demand stable
-  // while users change unrelated UI controls such as budget or filters.
-  const captureNeeds = useMemo(() => {
-    if (!hasIngredientData) return []
-    try { return aggregatePlanIngredients(plannedMeals, ingredientRecipes, activeDays) }
-    catch { return [] }
-  }, [hasIngredientData, plannedMeals, ingredientRecipes, activeDays])
   const pieceReviewLabels = useMemo(() => {
     const byId = new Map(ingredientRecipes.map(recipe => [recipe.id, recipe]))
     const active = new Set(activeDays)
@@ -388,7 +380,8 @@ export function PlannerView({
       <Suspense fallback={<p role="status" aria-live="polite">Eigen PLUS/Deka-winkelvergelijking laden…</p>}>
       <PlannerOwnStoreComparison reviewed={ownReviewed ?? null} captureProgress={captureProgress ?? null}
         preferred={preferredOwnStore}
-        captureNeeds={captureNeeds}
+        plannedMeals={plannedMeals} ingredientRecipes={ingredientRecipes}
+        activeDays={activeDays} hasIngredientData={hasIngredientData}
         hasDemand={activeDays.length > 0} budget={budget}
         onSelect={onOwnSourceChange}
         onOpenComparison={onOpenComparison}
