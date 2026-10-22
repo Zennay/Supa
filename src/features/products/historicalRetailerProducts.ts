@@ -74,6 +74,6 @@ export function filterHistoricalProducts(
         (store !== 'all' && item.store !== store)) return false
     const pack = parseHistoricalPack(item.pack)
     if (packFilter !== 'all' && (pack?.kind ?? 'other') !== packFilter) return false
-    return productFieldsMatchTerms([item.name, item.pack, item.store, item.capturedAt, item.sourceUrl, item.id], terms)
+    return productFieldsMatchTerms([item.name, item.pack, pack?.label, item.store, item.capturedAt, item.sourceUrl, item.id], terms)
   })
 }
