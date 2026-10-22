@@ -47,6 +47,7 @@ import { CaptureMatchingPreview, type PreviewMatchLine } from './CaptureMatching
 import { CapturePairedPreview } from './CapturePairedPreview.tsx'
 import { completePreviewProposal } from './privateTwoStorePreviewChecklist.ts'
 import { samePrivatePhysicalDemand } from './samePrivatePhysicalDemand.ts'
+import { readOwnSourceTextFile } from './readLocalCaptureDraftFiles.ts'
 import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
 import { freshReviewedBaskets, recentOwnCaptureInstant, type PrivateReviewedBaskets, type PrivateCaptureProgress, type PrivateReviewFocus } from './privateReviewedBasketBridge.ts'
 import './offlineReviewedWorkbench.css'
@@ -561,7 +562,7 @@ export function OfflineReviewedWorkbench({
       for (const file of files) {
         if (!file.size || file.size > 256000)
           throw Error('Elk ingevuld CSV-bestand moet gevuld zijn en maximaal 256 kB bevatten.')
-        const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+        const raw = await readOwnSourceTextFile(file)
         const summary = (module.previewOwnStoreCsv as (v: string) => {
           stores: CapturePreviewStore[]; unobservedOtherStoreRows: number
         })(raw)
@@ -1626,7 +1627,7 @@ export function OfflineReviewedWorkbench({
     try {
       if (!file.size || file.size > 256000)
         throw new Error('Bronbestand is leeg of groter dan 256 kB.')
-      const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      const raw = await readOwnSourceTextFile(file)
       const isCsv = isPrivateCaptureCsv(file, raw)
       let source = raw
       if (isCsv) {
@@ -1671,7 +1672,7 @@ export function OfflineReviewedWorkbench({
       for (const file of files) {
         if (!file.size || file.size > 256000)
           throw new Error('Elk origineel winkelbestand moet gevuld zijn en maximaal 256 kB bevatten.')
-        const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+        const raw = await readOwnSourceTextFile(file)
         const isCsv = isPrivateCaptureCsv(file, raw)
         let json = raw
         if (isCsv) {
@@ -1737,7 +1738,7 @@ export function OfflineReviewedWorkbench({
     try {
       if (!file.size || file.size > 256000)
         throw new Error('Een aanvulbestand moet gevuld zijn en maximaal 256 kB bevatten.')
-      const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      const raw = await readOwnSourceTextFile(file)
       const isCsv = isPrivateCaptureCsv(file, raw)
       let source = raw
       if (isCsv) {
@@ -1786,7 +1787,7 @@ export function OfflineReviewedWorkbench({
     try {
       if (!file.size || file.size > 256000)
         throw new Error('Nieuwe winkelopname is leeg of groter dan 256 kB.')
-      const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      const raw = await readOwnSourceTextFile(file)
       const isCsv = isPrivateCaptureCsv(file, raw)
       let json = raw
       if (isCsv) {
@@ -1864,7 +1865,7 @@ export function OfflineReviewedWorkbench({
       }
       // The same canonical local CSV converter is already used by the
       // independent browser mapping wizard. It does not request retailer data.
-      const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      const raw = await readOwnSourceTextFile(file)
       const isCsv = isPrivateCaptureCsv(file, raw)
       let content = raw
       if (isCsv) {
