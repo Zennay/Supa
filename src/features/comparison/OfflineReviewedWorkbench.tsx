@@ -912,22 +912,19 @@ export function OfflineReviewedWorkbench({
   // Use physical Planner needs only; a match hint never becomes a retailer SKU.
   function missingPreviewCaptureNeeds(store: CaptureStore) {
     if (!currentPreview) return []
+    if (needsFullPreviewRecapture(store)) return plannerCaptureNeeds
     const source = currentPreview.stores.find(item => item.retailer === store)
     if (source) {
       const unresolved = new Set(source.matching?.lines.filter(line =>
         line.status === 'unresolved').map(line => line.id) ?? [])
       return plannerCaptureNeeds.filter(need => unresolved.has(need.id))
     }
-    // A retained shop may be fresh and within 24h yet still fail to match
-    // particular PHYSICAL ingredients. It must appear in the missing-item
-    // export and blank CSV too; otherwise a valid time stamp falsely hides
-    // missing products. Only actual mapped original SKUs count as proposals.
+    // Retained second-shop SKUs still need a physical match. Its raw
+    // capture may be comparable even if the NEW incoming source is older:
+    // only the truly older shop needs a complete recapture, not both.
     if (imported?.captures[store]) {
-      const kept = currentPreview.retainedOther
-      if (kept?.retailer !== store ||
-          !kept.within24h || !freshPreviewInstant(kept.observedNs))
-        return plannerCaptureNeeds
-      if (!pairedPreviewRows) return plannerCaptureNeeds
+      if (currentPreview.retainedOther?.retailer !== store ||
+          !pairedPreviewRows) return plannerCaptureNeeds
       const unresolved = new Set(pairedPreviewRows.filter(row =>
         !(store === 'PLUS' ? row.plusCode : row.dekaCode)).map(row => row.id))
       return plannerCaptureNeeds.filter(need => unresolved.has(need.id))
