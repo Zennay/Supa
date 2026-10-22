@@ -2241,7 +2241,18 @@ export function OfflineReviewedWorkbench({
       '', 'Nog te controleren in beide winkels:',
       ...stores.flatMap(store => {
         const basket = store === 'PLUS' ? basketPair?.plus : basketPair?.deka
-        if (!basket) return [`${store}: alle producten en prijzen nog onbekend.`]
+        if (!basket) {
+          // The admitted Planner week is shared physical demand even when the
+          // second retailer has no original price catalogue at all. Give the
+          // shopper real quantities to collect, never pretend a source match.
+          const knownDemand = basketPair?.plus ?? basketPair?.deka
+          return [`${store}: geen eigen bron of geaccepteerde productmatches; prijzen onbekend.`,
+            ...(knownDemand?.lines.map(line =>
+              `☐ ${line.ingredientLabel.replace(/[\r\n\t]/gu, ' ').slice(0, 180)} · ` +
+              `${readablePlannerDemandAmount(line.requirement.amount)} ${line.requirement.unit} benodigd` +
+              ' · zoek werkelijk corresponderend artikel en pakprijs') ??
+              ['Kies een Planner-weekmenu om de fysieke behoefte vast te leggen.'])]
+        }
         const missing = basket.lines.filter(line => line.status === 'unresolved')
         return [`${store}: ${missing.length} niet gekoppelde ingrediënten`,
           ...missing.map(line => `☐ ${line.ingredientLabel.replace(/[\r\n\t]/gu, ' ').slice(0, 180)} · prijs onbekend`)]
