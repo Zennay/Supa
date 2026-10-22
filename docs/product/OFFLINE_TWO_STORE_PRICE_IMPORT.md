@@ -1544,3 +1544,16 @@ Iedere bron wordt apart tegen het bestaande canonieke winkelschema gecontroleerd
 - Zowel de in-app tabel voor een volledig bevestigd twee-winkelmandje als het paneel met twee bevestigde deelprijzen, de privé-CSV en de offline HTML-afdruk tonen naast het verschil in hele-pakkosten ook het afgeronde eenheidsprijsverschil per kg, liter of stuk.
 - Dit veld blijft leeg tenzij beide oorspronkelijke regels persoonlijk bevestigd en actueel zijn, de twee bronmomenten binnen 24 uur vallen, dezelfde fysieke behoefte vergelijken en de eenheidsprijsfamilie overeenkomt. Een ontbrekende of onvergelijkbare eenheidsprijs wordt niet als nul weergegeven.
 - Het verschil per eenheid is alleen een hulpmiddel per ingrediëntregel; het vervangt het betaalbare verschil in hele verpakkingen niet en vormt geen compleet mandtotaal, bronrecht of onafhankelijke besparingsclaim.
+
+
+## Gefilterde persoonlijke prijsselectie uit Planner (22 oktober 2026)
+
+In **Planner → hetzelfde weekmandje → productprijzen, verpakkingen en regelverschillen** kan een gebruiker de oorspronkelijke geaccepteerde PLUS- en DekaMarkt-prijsregels zoeken en per winkellager of eenheidsfamilie filteren. De zichtbare selectie kan op drie manieren worden bewaard:
+
+- **Privé-TXT:** leesbare tekst met oorspronkelijke fysieke behoefte, SKU, pakinhoud, multipack, hele verpakkingen, bronpakprijs, regelbedrag, indicatieve eenheidsprijs en regelprijsverschil.
+- **Kopiëren:** dezelfde privétekst voor mobiel delen; als klembordtoegang ontbreekt, verschijnt een selecteerbaar tekstvak zolang de bronnen geldig blijven.
+- **Spreadsheet-CSV:** UTF-8 met BOM, Nederlandse puntkommascheiding en afzonderlijke kolommen voor oorspronkelijke SKU, pak-/eenheidsprijs, hele-pakregelprijs, bronmomenten en DekaMarkt-minus-PLUS-regelverschil. De bestaande literalCsv-beveiliging behandelt onbetrouwbare productnamen veilig voor spreadsheetimport.
+
+Deze acties gebruiken uitsluitend de reeds toegelaten, persoonlijk gecontroleerde, volledige fysieke twee-winkelvergelijking uit freshReviewedBaskets en ownStoreWeekComparison. Na asynchroon laden van de CSV-bundel controleert de app opnieuw het daadwerkelijk laatst gerenderde bronpaar en opnieuw vóór de bestandsaanmaak. Ontbrekend, verlopen of vervangen bronmateriaal leidt niet tot een nieuwe prijs-export.
+
+De filterselectie bevat nadrukkelijk **geen opgeteld subtotaal, hele-mandtotaal of besparingsclaim**. Een geldige oorspronkelijke hele-mandvergelijking blijft elders in de Planner zichtbaar. Bronrechten, retailer-scraping, externe authenticiteit en het afzonderlijke menselijke PLUS/Deka-veldonderzoek worden door deze lokale export niet gewijzigd.
