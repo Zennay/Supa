@@ -317,7 +317,7 @@ export function CapturePairedPreview({
       <label>Zoek origineel ingrediënt of bronproduct
         <input type="search" value={query} maxLength={120}
           onChange={event => { setQuery(event.currentTarget.value); setLimit(25) }}
-          placeholder="Zoek in beide winkels" />
+          placeholder="Bijv. tomaat PLUS123" />
       </label>
       <label><input type="checkbox" checked={openOnly}
         onChange={event => { setOpenOnly(event.currentTarget.checked); setLimit(25) }} />
@@ -332,6 +332,12 @@ export function CapturePairedPreview({
           <option value="DekaMarkt">Alleen DekaMarkt-controles ({dekaOpen})</option>
         </select>
       </label>
+      {(query || openOnly || storeFilter !== 'all') && (
+        <button type="button" className="ghost-button"
+          onClick={() => { setQuery(''); setOpenOnly(false); setStoreFilter('all'); setLimit(25) }}>
+          Wis zoek- en controlefilters
+        </button>
+      )}
     </div>
     <p role="status">{Math.min(limit, visible.length)} van {visible.length} regels zichtbaar.
       {storeFilter !== 'all' ? ' Alleen fysieke regels waar ' + storeFilter +
