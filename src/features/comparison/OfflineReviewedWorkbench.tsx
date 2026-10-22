@@ -815,7 +815,14 @@ export function OfflineReviewedWorkbench({
         const comparable = pairedPreviewComparable && row.plusCode && row.dekaCode &&
           row.plusPacks !== null && row.dekaPacks !== null &&
           row.plusCents !== null && row.dekaCents !== null
-        const delta = comparable ? row.dekaCents! - row.plusCents! : null
+        const plusPriceKnown = pairedPreviewComparable && Boolean(row.plusCode) &&
+          row.plusPacks !== null && Number.isSafeInteger(row.plusPacks) && row.plusPacks > 0 &&
+          row.plusCents !== null && Number.isSafeInteger(row.plusCents) && row.plusCents >= 0
+        const dekaPriceKnown = pairedPreviewComparable && Boolean(row.dekaCode) &&
+          row.dekaPacks !== null && Number.isSafeInteger(row.dekaPacks) && row.dekaPacks > 0 &&
+          row.dekaCents !== null && Number.isSafeInteger(row.dekaCents) && row.dekaCents >= 0
+        const delta = plusPriceKnown && dekaPriceKnown
+          ? row.dekaCents! - row.plusCents! : null
         const priceKnown = delta !== null && Number.isSafeInteger(delta)
         const unitCandidate = priceKnown &&
           row.plusUnitFamily !== null && row.plusUnitFamily === row.dekaUnitFamily &&
@@ -831,13 +838,13 @@ export function OfflineReviewedWorkbench({
             ' ' + plain(row.unit),
           '  PLUS: ' + (row.plusCode ? plain(row.plusCode) + ' · nog te controleren' :
             'geen bruikbaar bronartikel · opnieuw zoeken of zelf opnemen') +
-            (priceKnown ? ' · ' + row.plusPacks + ' hele pakken · voorlopig ' +
+            (plusPriceKnown ? ' · ' + row.plusPacks + ' hele pakken · voorlopig ' +
               exactEuro.formatCents(row.plusCents!) +
               (row.plusUnitRate ? ' · ' + row.plusUnitRate : '') :
               ' · voorlopige regelprijs onbekend'),
           '  DekaMarkt: ' + (row.dekaCode ? plain(row.dekaCode) + ' · nog te controleren' :
             'geen bruikbaar bronartikel · opnieuw zoeken of zelf opnemen') +
-            (priceKnown ? ' · ' + row.dekaPacks + ' hele pakken · voorlopig ' +
+            (dekaPriceKnown ? ' · ' + row.dekaPacks + ' hele pakken · voorlopig ' +
               exactEuro.formatCents(row.dekaCents!) +
               (row.dekaUnitRate ? ' · ' + row.dekaUnitRate : '') :
               ' · voorlopige regelprijs onbekend'),
@@ -3250,8 +3257,14 @@ export function OfflineReviewedWorkbench({
                   )}
                   <ul>
                     {pairedPreviewDisplayed.map(row => {
-                      const pairedCents = row.deltaCents !== null
-                      const delta = row.deltaCents
+                      const plusPriceKnown = pairedPreviewComparable && Boolean(row.plusCode) &&
+                        row.plusPacks !== null && Number.isSafeInteger(row.plusPacks) && row.plusPacks > 0 &&
+                        row.plusCents !== null && Number.isSafeInteger(row.plusCents) && row.plusCents >= 0
+                      const dekaPriceKnown = pairedPreviewComparable && Boolean(row.dekaCode) &&
+                        row.dekaPacks !== null && Number.isSafeInteger(row.dekaPacks) && row.dekaPacks > 0 &&
+                        row.dekaCents !== null && Number.isSafeInteger(row.dekaCents) && row.dekaCents >= 0
+                      const pairedCents = plusPriceKnown && dekaPriceKnown && row.deltaCents !== null
+                      const delta = pairedCents ? row.deltaCents : null
                       const unitCandidate = pairedCents &&
                         row.plusUnitCents !== null && row.dekaUnitCents !== null &&
                         row.plusUnitFamily !== null && row.plusUnitFamily === row.dekaUnitFamily
@@ -3264,14 +3277,16 @@ export function OfflineReviewedWorkbench({
                         <strong>{row.label}</strong>
                         {' '}· {row.amount ?? 'hoeveelheid onbekend'} {row.unit}
                         <div>PLUS: {row.plusCode ? 'voorstel ' + row.plusCode : 'nog geen bruikbare match'}
-                          {pairedCents && <> · {row.plusPacks} hele pak(ken),
+                          {plusPriceKnown && <> · {row.plusPacks} hele pak(ken),
                             {' '}{exactEuro.formatCents(row.plusCents!)}
                             {row.plusUnitRate ? ' · ' + row.plusUnitRate : ''}</>}
+                          {!plusPriceKnown && <small> · voorlopige prijs onbekend</small>}
                         </div>
                         <div>DekaMarkt: {row.dekaCode ? 'voorstel ' + row.dekaCode : 'nog geen bruikbare match'}
-                          {pairedCents && <> · {row.dekaPacks} hele pak(ken),
+                          {dekaPriceKnown && <> · {row.dekaPacks} hele pak(ken),
                             {' '}{exactEuro.formatCents(row.dekaCents!)}
                             {row.dekaUnitRate ? ' · ' + row.dekaUnitRate : ''}</>}
+                          {!dekaPriceKnown && <small> · voorlopige prijs onbekend</small>}
                         </div>
                         {delta !== null && Number.isSafeInteger(delta) && (
                           <small>
