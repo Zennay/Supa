@@ -72,6 +72,20 @@ function provenanceMatches(source, observation) {
 function ingestSafeReviewedEvidence(record) {
   // Internal only: record already detached at the public entrypoint.
   const { key, parser } = validatedInput(record)
+  // Product-detail source identity must be an exact canonical HTTPS article
+  // path, never a credential-bearing query or an unreviewed fragment. A bare
+  // '?' or '#' is also ambiguous even when URL.search/hash normalize to ''.
+  // Listing/search adapters retain their own approved query policy.
+  if (record.source.kind === 'product') {
+    const rawUrl = record.source.url
+    let article
+    try { article = typeof rawUrl === 'string' ? new URL(rawUrl) : null } catch { article = null }
+    if (!article || rawUrl.length > 2048 || /[?#]/.test(rawUrl) ||
+        article.href !== rawUrl || article.protocol !== 'https:' ||
+        article.username || article.password || article.port) {
+      return { key, accepted: false, reason: 'unsafe-product-source-url', observations: [] }
+    }
+  }
   let parsed
   try {
     parsed = parser(record)
