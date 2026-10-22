@@ -388,6 +388,21 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
     } catch { setMessage('Kon de ongeprijsde CSV niet bewaren.') }
   }
+  function downloadOwnTsvTemplate() {
+    // A blank personal Excel/Calc template, not retailer source evidence.
+    // Deliberately no prices, SKUs, or inferred matches.
+    const template = '\ufeffartikel\twinkel\tafgevinkt\r\n\tAlgemeen\tnee\r\n'
+    try {
+      const uri = URL.createObjectURL(new Blob([template], { type: 'text/tab-separated-values;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = uri
+        link.download = 'supa-leeg-eigen-boodschappenblad.tsv'
+        document.body.append(link); link.click(); link.remove()
+        setMessage('Leeg Excel/Calc-TSV-invulblad opgeslagen. Vul het artikel in en bewaar het als TSV.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
+    } catch { setMessage('Kon het lege privé-TSV-invulblad niet bewaren.') }
+  }
   function prepareOwnCsvPreview(source: string, pasted = false) {
     const incoming = pasted ? importUnpricedShoppingPaste(source) : importUnpricedShoppingCsv(source)
     const draft = incoming.map(item => (item.done ? '☑ ' : '☐ ') +
@@ -1080,6 +1095,9 @@ export function ManualShoppingNotes({ notes, setNotes }: {
         </label>
         <button type="button" onClick={() => downloadOwnCsv('template')}>
           Download leeg CSV-invulblad voor eigen boodschappen
+        </button>
+        <button type="button" onClick={downloadOwnTsvTemplate}>
+          Download leeg Excel/Calc-TSV-invulblad
         </button>
         <label>Importeer eigen ongeprijsde CSV of Excel/Calc-TSV (max. 32 kB; geen retailerprijzen)
           <input type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" onChange={event => {
