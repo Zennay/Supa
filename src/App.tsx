@@ -61,6 +61,7 @@ const ObservationView = lazy(async () => {
 import { IdentityAvatar } from './components/IdentityAvatar.tsx'
 import { HiFiHome, HiFiDemoList } from './features/home/HiFiHome'
 import { clearUnpricedShoppingProduct } from './features/home/unpricedShoppingProgress'
+import { clearUnpricedShoppingDetails } from './features/home/unpricedShoppingDetails'
 import { readRecipeLibrary } from './features/recipes/recipeLibrary'
 import { toPlannerRecipe } from './features/recipes/plannerRecipes'
 import { curatedFigmaRecipes } from './features/recipes/curatedFigmaRecipes'
@@ -255,7 +256,10 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const toggleDesignProduct = (id: string) => {
     // A removed discovery item is a new shopping task if the user re-adds it
     // later; its previous local tick must not silently return as purchased.
-    if (designProductIds.includes(id)) clearUnpricedShoppingProduct(id)
+    if (designProductIds.includes(id)) {
+      clearUnpricedShoppingProduct(id)
+      clearUnpricedShoppingDetails(id)
+    }
     setDesignProductIds(current => current.includes(id) ? current.filter(item => item !== id) : current.length < 100 ? [...current, id] : current)
     setProductSelectionTouched(true)
   }
