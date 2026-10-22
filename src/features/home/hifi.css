@@ -184,6 +184,53 @@ body { background: #e9eeec; }
 .hifi-source-link { border-radius: 20px; background: #e2f5ed; color: #005135; padding: 10px 12px; min-height: 44px; display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; text-decoration: none; }
 .hifi-products .hifi-product-source-tabs button { white-space: normal; }
 
+/* Private, identity-only Producten shortlist. It never carries retailer prices,
+   source permission, or a verified SKU match across devices. */
+.hifi-products .hifi-catalog-tools {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  min-width: 0; padding: 12px; border: 1px solid #d8e7dd;
+  border-radius: 14px; background: #fff;
+}
+.hifi-products .hifi-catalog-tools p,
+.hifi-products .hifi-catalog-tools small {
+  flex: 1 1 100%; margin: 0; color: #53675b; font-size: 12px; line-height: 1.45;
+}
+.hifi-products .hifi-catalog-tools button {
+  flex: 1 1 145px; min-height: 44px; border: 1px solid #84a18f;
+  border-radius: 10px; padding: 9px 12px; background: #e7f2e8;
+  color: #18452f; font-size: 12px; font-weight: 650;
+}
+.hifi-products .hifi-catalog-tools button[aria-pressed="true"] {
+  background: #23573e; color: #fff;
+}
+.hifi-products .hifi-catalog-tools button:disabled { opacity: .55; cursor: not-allowed; }
+.hifi-products .hifi-product-portable {
+  min-width: 0; padding: 12px 16px; border: 1px solid #d8e7dd;
+  border-radius: 16px; background: #fff; color: #294b36;
+}
+.hifi-products .hifi-product-portable summary {
+  display: flex; align-items: center; min-height: 44px;
+  cursor: pointer; font-size: 14px; font-weight: 650;
+}
+.hifi-products .hifi-product-portable[open] { display: grid; gap: 10px; }
+.hifi-products .hifi-product-portable p {
+  margin: 0; color: #53675b; font-size: 12px; line-height: 1.45;
+}
+.hifi-products .hifi-product-portable label { display: grid; gap: 6px; font-size: 13px; }
+.hifi-products .hifi-product-portable input,
+.hifi-products .hifi-product-portable textarea {
+  box-sizing: border-box; width: 100%; min-width: 0; padding: 10px;
+  border: 1px solid #acbcae; border-radius: 10px;
+  background: #f7faf7; color: #26372b; font: inherit;
+}
+.hifi-products .hifi-product-portable button {
+  min-height: 44px; padding: 10px 12px; border: 1px solid #84a18f;
+  border-radius: 10px; background: #e7f2e8; color: #18452f;
+  font-size: 13px; font-weight: 650;
+}
+.hifi-products .hifi-product-portable button:disabled { opacity: .5; cursor: not-allowed; }
+
+
 /* Figma Products 3064:3125 — screen-first layout, source controls secondary. */
 .hifi-products { gap: 16px; }
 .hifi-products .hifi-products-heading { min-height: 50px; }
