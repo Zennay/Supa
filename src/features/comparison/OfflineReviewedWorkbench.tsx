@@ -2925,6 +2925,12 @@ export function OfflineReviewedWorkbench({
                     voor identieke Planner-hoeveelheden. Controleer beide originele SKU's,
                     verpakkingen en opnametijden zelf. Geen prijsverschil of besparing is bevestigd.
                   </p>
+                  <p role="status" className={pairedPreviewComparable
+                    ? 'disclaimer' : 'offline-price-workbench__capture-alert'}>
+                    {pairedPreviewComparable
+                      ? 'Bronmomenten zijn binnen zeven dagen en binnen 24 uur van elkaar. Onderstaande hele-pakbedragen zijn alleen rekenkundige voorbeelden uit jouw eigen ingevoerde, nog niet goedgekeurde bronproducten. Productgelijkwaardigheid en besparing zijn NIET vastgesteld.'
+                      : 'Een of beide bronmomenten zijn verouderd, niet vergelijkbaar binnen 24 uur of onvoldoende bekend. Daarom blijven voorlopige regelprijzen en prijsverschillen hier onbekend.'}
+                  </p>
                   {currentPreview.retainedOther && (
                     <p className="disclaimer" role="status">
                       {currentPreview.retainedOther.retailer} is de werkelijk eerder
@@ -2948,14 +2954,37 @@ export function OfflineReviewedWorkbench({
                   )}
                   <ul>
                     {pairedPreviewRows.filter(row =>
-                      !pairedOnlyMissing || !row.plusCode || !row.dekaCode).map(row => (
-                      <li key={row.id}>
+                      !pairedOnlyMissing || !row.plusCode || !row.dekaCode).map(row => {
+                      const pairedCents = pairedPreviewComparable && row.plusCode && row.dekaCode &&
+                        row.plusCents !== null && row.dekaCents !== null &&
+                        row.plusPacks !== null && row.dekaPacks !== null
+                      const delta = pairedCents ? row.dekaCents! - row.plusCents! : null
+                      return <li key={row.id}>
                         <strong>{row.label}</strong>
                         {' '}· {row.amount ?? 'hoeveelheid onbekend'} {row.unit}
-                        {' '}· PLUS: {row.plusCode ? 'voorstel ' + row.plusCode : 'nog geen bruikbare match'}
-                        {' '}· DekaMarkt: {row.dekaCode ? 'voorstel ' + row.dekaCode : 'nog geen bruikbare match'}
+                        <div>PLUS: {row.plusCode ? 'voorstel ' + row.plusCode : 'nog geen bruikbare match'}
+                          {pairedCents && <> · {row.plusPacks} hele pak(ken),
+                            {' '}{exactEuro.formatCents(row.plusCents!)}
+                            {row.plusUnitRate ? ' · ' + row.plusUnitRate : ''}</>}
+                        </div>
+                        <div>DekaMarkt: {row.dekaCode ? 'voorstel ' + row.dekaCode : 'nog geen bruikbare match'}
+                          {pairedCents && <> · {row.dekaPacks} hele pak(ken),
+                            {' '}{exactEuro.formatCents(row.dekaCents!)}
+                            {row.dekaUnitRate ? ' · ' + row.dekaUnitRate : ''}</>}
+                        </div>
+                        {delta !== null && Number.isSafeInteger(delta) && (
+                          <small>
+                            Voorlopig rekenkundig verschil (DekaMarkt minus PLUS):
+                            {' '}{delta > 0 ? '+' : delta < 0 ? '−' : ''}
+                            {exactEuro.formatCents(Math.abs(delta))}.
+                            {' '}Niet bevestigd: bronartikel, onderlinge gelijkwaardigheid
+                            en echte aankoopprijs moeten nog worden gecontroleerd.
+                          </small>
+                        )}
+                        {!pairedCents && <small>Geen betrouwbaar vergelijkbare
+                          regelprijs uit beide bronnen; onbekend, niet €0.</small>}
                       </li>
-                    ))}
+                    })}
                   </ul>
                 </details>
               )}
