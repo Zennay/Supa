@@ -70,3 +70,10 @@ The M2 Firefox workflow enters Planner from the new Home before replaying all ex
 - Verwijderen van een selectie wist, als opslag dat toestaat, de oude afvinkstatus. Hele persoonlijke selectie en uitsluitend nog te kopen kunnen afzonderlijk als lokale TXT worden bewaard.
 - Een knop kopieert uitsluitend nog te kopen op het klembord; bij geweigerde toegang is handmatige tekstselectie mogelijk.
 - De status is handmatig bijgehouden: geen kassabon, bronrecht, SKU-match, voorraad, actuele prijs, besparing of gecontroleerde aankoop. Planner, persoonlijk goedgekeurde winkelprijzen en echte winkelafvinkingen blijven onaangeroerd. Geen QA- of regressiesuites geschreven of gedraaid.
+
+## Personal shopping quantities and notes (22 October 2026, existing PR #3959)
+
+- The independently selected, **unpriced** Products → Lijst items now accept an explicitly user-entered whole quantity from 1 to 99 and an optional note up to 120 characters. Counts are user intentions, **not** known pack sizes or retail purchase units.
+- Quantity and note stay in a separate versioned, bounded on-device record. Cross-tab updates are adopted; unknown future versions and concurrently changed records are not overwritten. Removing a selected product also clears its personal details where storage permits.
+- The mobile Lijst interface includes accessible quantity and note fields for historical source identities, Figma examples, and retained old selection IDs. Full and open-only TXT/clipboard text explicitly includes each user's count and note, while every original price field stays unknown or demo-only.
+- Existing observed-store imports, SKU/pack reviews, matching, planner demands, price arithmetic, M3 rights, and source evidence gates remain entirely separate. This feature makes **no** verified retailer price, stock, savings, or purchase claim. No additional QA suites were authored or run.
