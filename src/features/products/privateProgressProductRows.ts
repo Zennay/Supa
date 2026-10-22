@@ -137,6 +137,22 @@ function knownUnitGap(plus: PrivateKnownProduct, deka: PrivateKnownProduct): Pri
 
 const knownGapEuros = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 
+/** Readable, advisory unit-price gap between two *fully matched* original
+ * package lines. Reuse the partial-source comparator's exact quantity basis:
+ * a litre is never ranked against a kilogram. This is not basket savings.
+ */
+export function privateMatchedUnitPriceGap(
+  plus: Extract<BasketTraceLine, { status: 'matched' }>,
+  deka: Extract<BasketTraceLine, { status: 'matched' }>,
+): string {
+  if (!plus || !deka || plus.status !== 'matched' || deka.status !== 'matched' ||
+      plus.id !== deka.id || plus.ingredientLabel !== deka.ingredientLabel ||
+      !samePhysicalDemand(plus.requirement, deka.requirement)) {
+    return 'Geen vergelijkbare eenheidsprijs: controleer beide originele producten.'
+  }
+  return formatKnownUnitGap(knownUnitGap(originalCompleteProduct(plus), originalCompleteProduct(deka)))
+}
+
 /** Advisory per-unit difference, not a whole-package basket difference. */
 export function formatKnownUnitGap(gap: PrivateKnownUnitGap | null): string {
   if (!gap) return 'Eenheidsprijsverschil onbekend: ongelijksoortige of ongeldige eenheden.'
