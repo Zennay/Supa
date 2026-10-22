@@ -1562,8 +1562,8 @@ export function ManualShoppingNotes({ notes, setNotes }: {
           <strong>{bulkPreview.incoming.length} nieuwe persoonlijke artikelen</strong>
           <p>{bulkPreview.duplicateCount} dubbele regels overgeslagen.
             Alle winkelprijzen blijven onbekend. Je bestaande vinkjes veranderen niet.</p>
-          <ul>{bulkPreview.incoming.slice(0, 15).map((item, index) =>
-            <li key={index}>{item.done ? '☑' : '☐'} [{item.store}] {item.label}</li>)}</ul>
+          <ul>{bulkPreview.incoming.slice(0, 15).map(item =>
+            <li key={JSON.stringify([item.store, item.label])}>{item.done ? '☑' : '☐'} [{item.store}] {item.label}</li>)}</ul>
           {bulkPreview.incoming.length > 15 && <p>En {bulkPreview.incoming.length - 15} andere.</p>}
           <button type="button" onClick={confirmBulk}>Bevestig toevoegen aan eigen lijst</button>
           <button type="button" onClick={() => setBulkPreview(null)}>Annuleer import</button>
@@ -1938,8 +1938,8 @@ export function ManualShoppingNotes({ notes, setNotes }: {
         <p>{repeatFilePreview.items.length} persoonlijke ongeprijsde artikelen. Dit bestand bevat geen
           afvinkingen, SKU's of bronprijzen. Alleen het lokale herhaalsjabloon wordt vervangen,
           niet de huidige boodschappenlijst. Herhalen vraagt daarna apart om bevestiging.</p>
-        <ul>{repeatFilePreview.items.slice(0, 15).map((item, index) =>
-          <li key={index}>☐ [{item.store}] {item.label}</li>)}</ul>
+        <ul>{repeatFilePreview.items.slice(0, 15).map(item =>
+          <li key={JSON.stringify([item.store, item.label])}>☐ [{item.store}] {item.label}</li>)}</ul>
         {repeatFilePreview.items.length > 15 &&
           <p>En {repeatFilePreview.items.length - 15} andere artikelen; download en inspecteer
             het JSON-bestand als je deze volledige lijst wilt controleren.</p>}
@@ -1969,7 +1969,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
           </button>)}
         </div>
         <ul className="manual-shopping-notes__repeat-items" aria-label="Kies artikelen voor herhaalronde">{repeatPreview.additions.map((item, index) =>
-          <li key={index}><label><input type="checkbox"
+          <li key={JSON.stringify([item.store, item.label])}><label><input type="checkbox"
             checked={repeatPreview.selectedIndices.includes(index)}
             onChange={event => {
               const checked = event.currentTarget.checked
