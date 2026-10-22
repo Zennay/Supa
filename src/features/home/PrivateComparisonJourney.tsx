@@ -65,6 +65,8 @@ export function PrivateComparisonJourney({
   // Search is presentation-only; source admission and basket totals are unchanged.
   const [completeQuery, setCompleteQuery] = useState('')
   const [showAllComplete, setShowAllComplete] = useState(false)
+  const [completeStoreFilter, setCompleteStoreFilter] = useState<'all' | 'plus' | 'deka' | 'equal'>('all')
+  const [completeSort, setCompleteSort] = useState<'impact' | 'name' | 'plus-price' | 'deka-price'>('impact')
   const [showAllPartial, setShowAllPartial] = useState(false)
   const [showTargetedCapture, setShowTargetedCapture] = useState(false)
   const [showTwoStoreCoverage, setShowTwoStoreCoverage] = useState(false)
@@ -142,11 +144,25 @@ export function PrivateComparisonJourney({
   const completeWords = completeQuery.normalize('NFKC').toLocaleLowerCase('nl-NL')
     .trim().split(/\s+/u).filter(Boolean).slice(0, 12)
   const filteredFullLinePairs = fullLinePairs.filter(row => {
+    // The canonical comparator's Deka-minus-PLUS delta is the only basis for
+    // these per-item presentation filters; no partial sum or fake offer data.
+    if (completeStoreFilter === 'plus' && row.deltaCents <= 0) return false
+    if (completeStoreFilter === 'deka' && row.deltaCents >= 0) return false
+    if (completeStoreFilter === 'equal' && row.deltaCents !== 0) return false
     const haystack = [row.id, row.ingredientLabel,
       row.plusLine.productId, row.plusLine.productName,
       row.dekaLine.productId, row.dekaLine.productName,
     ].join(' ').normalize('NFKC').toLocaleLowerCase('nl-NL')
     return completeWords.every(word => haystack.includes(word))
+  }).sort((a, b) => {
+    if (completeSort === 'name')
+      return a.ingredientLabel.localeCompare(b.ingredientLabel, 'nl-NL')
+    if (completeSort === 'plus-price')
+      return b.plusLine.lineTotalCents - a.plusLine.lineTotalCents
+    if (completeSort === 'deka-price')
+      return b.dekaLine.lineTotalCents - a.dekaLine.lineTotalCents
+    return Math.abs(b.deltaCents) - Math.abs(a.deltaCents) ||
+      a.ingredientLabel.localeCompare(b.ingredientLabel, 'nl-NL')
   })
   const visibleFullLinePairs = showAllComplete || completeWords.length
     ? filteredFullLinePairs : filteredFullLinePairs.slice(0, 3)
@@ -835,12 +851,37 @@ export function PrivateComparisonJourney({
           onChange={event => { setCompleteQuery(event.currentTarget.value); setShowAllComplete(true) }}
           placeholder="Bijvoorbeeld tomaten 500 g" />
       </label>
+      <div className="private-comparison-journey__partial-search">
+        <label>Toon verschillen
+          <select value={completeStoreFilter} onChange={event => {
+            setCompleteStoreFilter(event.currentTarget.value as typeof completeStoreFilter)
+            setShowAllComplete(true)
+          }}>
+            <option value="all">Alle gecontroleerde producten</option>
+            <option value="plus">PLUS heeft lagere hele-pakkosten</option>
+            <option value="deka">DekaMarkt heeft lagere hele-pakkosten</option>
+            <option value="equal">Beide winkels even duur</option>
+          </select>
+        </label>
+        <label>Volgorde
+          <select value={completeSort} onChange={event =>
+            setCompleteSort(event.currentTarget.value as typeof completeSort)}>
+            <option value="impact">Grootste prijsverschil eerst</option>
+            <option value="name">Ingrediëntnaam A–Z</option>
+            <option value="plus-price">Hoogste PLUS-regelbedrag eerst</option>
+            <option value="deka-price">Hoogste Deka-regelbedrag eerst</option>
+          </select>
+        </label>
+      </div>
       <small role="status">{filteredFullLinePairs.length} van {fullLinePairs.length}
-        {' '}fysieke ingrediënten zichtbaar · geen andere prijsberekening.</small>
+        {' '}fysieke ingrediënten zichtbaar · filters veranderen nooit het volledige mandbedrag.</small>
       {visibleFullLinePairs.length === 0 && <div role="status">
-        <p>Geen gecontroleerde productregels gevonden voor deze zoekterm.</p>
-        <button type="button" onClick={() => { setCompleteQuery(''); setShowAllComplete(false) }}>
-          Wis zoekterm en toon grootste verschillen
+        <p>Geen gecontroleerde productregels gevonden met deze zoekterm of dit filter.</p>
+        <button type="button" onClick={() => {
+          setCompleteQuery(''); setCompleteStoreFilter('all')
+          setCompleteSort('impact'); setShowAllComplete(false)
+        }}>
+          Wis filters en toon grootste verschillen
         </button>
       </div>}
       <ul>{visibleFullLinePairs.map(row => <li key={row.id}>
@@ -869,7 +910,7 @@ export function PrivateComparisonJourney({
             })}
           </div>
         </li>)}</ul>
-      {!showAllComplete && !completeWords.length && fullLinePairs.length > 3 &&
+      {!showAllComplete && !completeWords.length && completeStoreFilter === 'all' && fullLinePairs.length > 3 &&
         <button type="button" onClick={() => setShowAllComplete(true)}>
           Bekijk alle {fullLinePairs.length} prijsverschillen per ingrediënt
         </button>}
