@@ -102,7 +102,8 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct,
   const [message, setMessage] = useState('')
   const [sortByPrice, setSortByPrice] = useState(false)
   const [unitFilter, setUnitFilter] = useState<DemoUnitFilter>('all')
-  const [productSource, setProductSource] = useState<'history' | 'figma'>('figma')
+  const [productSource, setProductSource] = useState<'history' | 'figma'>('history')
+  const [expandedFigmaExamples, setExpandedFigmaExamples] = useState(false)
   const [storeFilter, setStoreFilter] = useState<'all' | 'PLUS' | 'DekaMarkt'>('all')
   const dialog = useRef<HTMLDialogElement>(null)
   useEffect(() => {
@@ -133,10 +134,17 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct,
     (view === 'products' ? product.id !== 'bananas' : !product.id.startsWith('figma-')) &&
     includesQuery([product.name, product.store, product.unit, product.unitPrice, product.old, product.price, product.id]) &&
     (!favoritesOnly || favorites.includes(product.id))), unitFilter)
-  const products = sortByPrice ? orderDemoProductsByUnitPrice(matchingProducts) :
-    view === 'products' ? [...matchingProducts].sort((left, right) =>
+  // The four prominent Figma cards are the browsing preview, not the entire
+  // design asset collection. Extra examples remain searchable and can be
+  // expanded explicitly; neither view supplies real retailer prices.
+  const featuredFigmaIds = new Set(['cola-regular', 'cola-zero', 'cola-pack', 'figma-paprika'])
+  const visibleFigmaMatches = expandedFigmaExamples || queryTerms.length > 0 || favoritesOnly
+    ? matchingProducts
+    : matchingProducts.filter(product => featuredFigmaIds.has(product.id))
+  const products = sortByPrice ? orderDemoProductsByUnitPrice(visibleFigmaMatches) :
+    view === 'products' ? [...visibleFigmaMatches].sort((left, right) =>
       ['cola-regular', 'cola-zero', 'figma-paprika', 'figma-watermelon', 'figma-cola-classic', 'figma-arla-milk', 'figma-heineken', 'figma-pastry', 'figma-muffins', 'figma-peanut-butter', 'figma-fruit', 'figma-ginger', 'cola-pack'].indexOf(left.id) -
-      ['cola-regular', 'cola-zero', 'figma-paprika', 'figma-watermelon', 'figma-cola-classic', 'figma-arla-milk', 'figma-heineken', 'figma-pastry', 'figma-muffins', 'figma-peanut-butter', 'figma-fruit', 'figma-ginger', 'cola-pack'].indexOf(right.id)) : matchingProducts
+      ['cola-regular', 'cola-zero', 'figma-paprika', 'figma-watermelon', 'figma-cola-classic', 'figma-arla-milk', 'figma-heineken', 'figma-pastry', 'figma-muffins', 'figma-peanut-butter', 'figma-fruit', 'figma-ginger', 'cola-pack'].indexOf(right.id)) : visibleFigmaMatches
   const historical = filterHistoricalProducts(historicalRetailerProducts, '', storeFilter).filter(item =>
     includesQuery([item.name, item.pack, item.store, item.capturedAt, item.sourceUrl, item.id]) &&
     (!favoritesOnly || favorites.includes(item.id)))
@@ -254,6 +262,7 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct,
         <div className="hifi-product-copy"><h3>{product.name}</h3><div className="hifi-product-price"><span>{product.unit}</span>{product.old && <del>{product.old}</del>}{product.price ? <strong>{product.price}</strong> : <small className="hifi-unpriced">Prijsvoorbeeld ontbreekt</small>}</div></div>
         <div className="hifi-product-actions"><button className="hifi-product-favorite" aria-label={`Favoriet: ${product.name}`} aria-pressed={favorites.includes(product.id)} onClick={() => toggleFavorite(product.id)}><FigmaImage asset={a.imgHeartButton} alt="" /></button><button aria-label={`${addedProducts.includes(product.id) ? 'Verwijder' : 'Voeg toe'}: ${product.name}`} aria-pressed={addedProducts.includes(product.id)} onClick={() => { onToggleProduct(product.id); setMessage(addedProducts.includes(product.id) ? `${product.name} verwijderd uit je demolijst.` : `${product.name} toegevoegd aan je demolijst.`) }}>{addedProducts.includes(product.id) ? <span className="hifi-added">✓</span> : <FigmaImage asset={a.imgFrame7121} alt="" />}</button></div>
       </article>)}</div>
+      {view === 'products' && productSource === 'figma' && queryTerms.length === 0 && !favoritesOnly && <button type="button" className="hifi-go-to-own" aria-expanded={expandedFigmaExamples} onClick={() => setExpandedFigmaExamples(open => !open)}>{expandedFigmaExamples ? 'Toon vier uitgelichte voorbeelden' : 'Toon alle Figma-voorbeelden'}</button>}
       {products.length === 0 && <div className="hifi-empty-state" role="status"><p className="hifi-empty">Geen producten gevonden. Pas je zoekopdracht aan of wis je filters.</p><button type="button" className="hifi-empty-reset" onClick={clearSearchAndFilters}>Wis zoekopdracht en filters</button></div>}
     </section>}
     <p className="hifi-feedback" role="status">{message}</p>
