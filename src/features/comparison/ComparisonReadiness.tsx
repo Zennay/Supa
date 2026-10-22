@@ -1,7 +1,14 @@
+import { useState } from 'react'
 import type { OneStoreBasket } from '../../domain/basket.ts'
 import type { OfflineCapture } from '../../domain/offlineReviewedImport.ts'
+import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
 
 type StoreId = 'PLUS' | 'DekaMarkt'
+type PendingSourceReview = { id: string; ingredientLabel: string; productId: string; productName: string }
+
+function singleLine(value: string): string {
+  return value.replace(/[\r\n\t\u0000-\u001f\u007f\u2028\u2029]/gu, ' ').trim().slice(0, 200)
+}
 
 /**
  * An actionable guide for private, already-admitted local price observations.
@@ -9,7 +16,7 @@ type StoreId = 'PLUS' | 'DekaMarkt'
  */
 export function ComparisonReadiness({
   plus, deka, sourceFresh, pairedWithin24h, comparable,
-  captures, nowMs, onOpenPlanner, onReviewMissing, onOpenImport, pendingHumanReview = 0, onReviewFirstPending,
+  captures, nowMs, onOpenPlanner, onReviewMissing, onOpenImport, pendingHumanReview = 0, pendingReviewByStore, onReviewFirstPending,
 }: {
   plus: OneStoreBasket
   deka: OneStoreBasket
@@ -19,11 +26,13 @@ export function ComparisonReadiness({
   captures: { PLUS: OfflineCapture; DekaMarkt: OfflineCapture }
   nowMs: number
   pendingHumanReview?: number
+  pendingReviewByStore?: Readonly<Record<StoreId, readonly PendingSourceReview[]>>
   onReviewFirstPending?: () => void
   onOpenPlanner?: () => void
   onReviewMissing: (store: StoreId, ingredientId: string) => void
   onOpenImport: () => void
 }) {
+  const [exportMessage, setExportMessage] = useState('')
   const sources = (['PLUS', 'DekaMarkt'] as const).map(store => {
     const observation = captures[store]
     const ageMs = nowMs - observation.observedMs
@@ -63,6 +72,53 @@ export function ComparisonReadiness({
   })
   const needsSource = !sourceFresh || !pairedWithin24h
   const isReady = comparable && hasDemand && !needsSource && incomplete.length === 0
+  // One portable, strictly unpriced follow-up round for BOTH retailers. This
+  // preserves the original store and capture timestamp but never invents an
+  // EAN/SKU, a comparable price or an independently observed source.
+  const captureWorklist = [
+    'Supa · mijn eigen twee-winkel broncontrole',
+    'Alleen privé ingevoerde bronmomenten; geen actuele retailerclaim of besparing.',
+    `PLUS: ${captures.PLUS.observedAt} (${sources[0].readableAge})`,
+    `DekaMarkt: ${captures.DekaMarkt.observedAt} (${sources[1].readableAge})`,
+    !sourceFresh ? 'ACTIE: vernieuw verlopen/toekomstige bronmomenten.' : '',
+    !pairedWithin24h ? `ACTIE: vernieuw ${refreshStore}; bronmomenten verschillen ${gapText} uur.` : '',
+    !hasDemand ? 'ACTIE: kies eerst een weekmenu in Planner.' : '',
+    ...(['PLUS', 'DekaMarkt'] as const).flatMap(store => {
+      const basket = store === 'PLUS' ? plus : deka
+      const unresolved = basket.lines.filter(line => line.status === 'unresolved')
+      return [
+        '', `${store} · ${unresolved.length} nog niet gekoppelde ingrediënten`,
+        ...unresolved.map(line => `☐ ${singleLine(line.ingredientLabel)} · ${readablePlannerDemandAmount(line.requirement.amount)} ${line.requirement.unit} · ${singleLine(line.id)} · prijs en match onbekend`),
+        ...(pendingReviewByStore?.[store].length
+          ? [`${pendingReviewByStore[store].length} voorgestelde bronartikelregels wachten op jouw controle:`,
+              ...pendingReviewByStore[store].map(item =>
+                `☐ ${singleLine(item.ingredientLabel)} · ${singleLine(item.productName)} · originele SKU ${singleLine(item.productId)} · niet bevestigd`)]
+          : []),
+        ...(unresolved.length === 0 ? ['Geen onopgeloste productkoppelingen in dit mandje.'] : []),
+      ]
+    }),
+    pendingHumanReview > 0
+      ? `ACTIE: controleer nog ${pendingHumanReview} voorgestelde bronartikelregels handmatig (SKU, verpakking en prijs).`
+      : '',
+    '', 'Vul ontbrekende artikelen uitsluitend aan met jouw eigen toegestane waarnemingen.',
+    'Controleer fysieke hoeveelheden en echte pakprijzen opnieuw vóór vergelijking.',
+  ].filter(Boolean).join('\n')
+  function downloadCaptureWorklist() {
+    const blob = new Blob([captureWorklist + '\n'], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    try {
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'supa-openstaande-plus-deka-broncontrole.txt'
+      link.click()
+      setExportMessage('Privéwerkblad voor beide winkels lokaal gedownload. Geen prijzen overgenomen.')
+    } catch {
+      setExportMessage('Download niet beschikbaar. Selecteer en kopieer de tekst hieronder.')
+    } finally {
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    }
+  }
+
   const steps: Array<{ id: string; heading: string; detail: string;
     action?: string; onClick?: () => void;
     secondaryAction?: string; onSecondaryClick?: () => void }> = []
@@ -115,6 +171,20 @@ export function ComparisonReadiness({
             'zichtbaar, maar is geen volledige besparing.'}
       </p>
     </div>
+    {!isReady && <details className="offline-readiness__worklist">
+      <summary>Bewaar alle open PLUS- en Deka-controles voor je volgende winkelronde</summary>
+      <p>Een gecombineerde, ongeprijsde actielijst met originele bronmomenten, open
+        ingrediënten en handmatige controles. Hiermee kun je offline verder, zonder
+        dat Supa ontbrekende prijzen of matches invult.</p>
+      <button type="button" onClick={downloadCaptureWorklist}>
+        Download beide winkels als TXT
+      </button>
+      {exportMessage && <p role="status">{exportMessage}</p>}
+      <label>Of selecteer en kopieer de actielijst
+        <textarea rows={10} readOnly spellCheck={false} value={captureWorklist}
+          onFocus={event => event.currentTarget.select()} />
+      </label>
+    </details>}
     <div className="offline-readiness__source-times" aria-label="Ouderdom van privébronnen">
       {sources.map(item => <div key={item.store}>
         <strong>{item.store}</strong>

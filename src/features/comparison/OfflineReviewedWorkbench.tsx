@@ -2201,6 +2201,38 @@ export function OfflineReviewedWorkbench({
   if (imported && Object.keys(imported.captures).length === 2 && !imported.pairedWithin24h) {
     comparisonNextSteps.push('De twee eigen winkelopnames liggen meer dan 24 uur uiteen. Neem beide prijzen opnieuw op binnen één tijdcontext.')
   }
+  // A one-store import must still produce an actionable offline worklist.
+  // Demand comes only from the selected Planner week, never from a guessed
+  // competitor catalogue or synthetic retailer prices.
+  const oneStoreWorklist = imported &&
+    (!imported.captures.PLUS || !imported.captures.DekaMarkt) ? [
+      'Supa · ontbrekende winkelbron bij hetzelfde Planner-mandje',
+      'Privé bronopvolging; géén actuele retailerprijs of besparingsclaim.',
+      ...stores.map(store => imported.captures[store]
+        ? `${store}: eigen opname ${imported.captures[store]!.observedAt}`
+        : `${store}: GEEN eigen bronopname; vul uitsluitend echt geobserveerde gegevens in.`),
+      '', 'Nog te controleren in beide winkels:',
+      ...stores.flatMap(store => {
+        const basket = store === 'PLUS' ? basketPair?.plus : basketPair?.deka
+        if (!basket) {
+          // The admitted Planner week is shared physical demand even when the
+          // second retailer has no original price catalogue at all. Give the
+          // shopper real quantities to collect, never pretend a source match.
+          const knownDemand = basketPair?.plus ?? basketPair?.deka
+          return [`${store}: geen eigen bron of geaccepteerde productmatches; prijzen onbekend.`,
+            ...(knownDemand?.lines.map(line =>
+              `☐ ${line.ingredientLabel.replace(/[\r\n\t]/gu, ' ').slice(0, 180)} · ` +
+              `${readablePlannerDemandAmount(line.requirement.amount)} ${line.requirement.unit} benodigd` +
+              ' · zoek werkelijk corresponderend artikel en pakprijs') ??
+              ['Kies een Planner-weekmenu om de fysieke behoefte vast te leggen.'])]
+        }
+        const missing = basket.lines.filter(line => line.status === 'unresolved')
+        return [`${store}: ${missing.length} niet gekoppelde ingrediënten`,
+          ...missing.map(line => `☐ ${line.ingredientLabel.replace(/[\r\n\t]/gu, ' ').slice(0, 180)} · prijs onbekend`)]
+      }),
+      '', 'Voer bronrechten, verpakking, tijdstip en werkelijke prijzen apart en expliciet in.',
+    ].join('\n') : null
+
   const canShowDifference = !!imported && currentEnough && imported.pairedWithin24h &&
     allReviewed && !!basketPair?.comparison?.claimable
   /** Exact click-time gate; a 60-second render clock must never authorize
@@ -3364,6 +3396,25 @@ export function OfflineReviewedWorkbench({
               <h4>Wat ontbreekt nog voor hetzelfde winkelmandje?</h4>
               <ul>{comparisonNextSteps.map(step => <li key={step}>{step}</li>)}</ul>
               <p>Werk de ontbrekende feiten in je eigen bron of Planner bij. De vergelijking rekent niets bij op basis van aannames.</p>
+              {oneStoreWorklist && <details>
+                <summary>Neem ontbrekende tweede winkel mee als offline actielijst</summary>
+                <p>Dit blad bevat alleen jouw oorspronkelijke bronmoment en nog niet
+                  bevestigde ingrediëntbehoeften; geen overgenomen winkelprijzen.</p>
+                <button type="button" onClick={() => {
+                  const url = URL.createObjectURL(new Blob([oneStoreWorklist + '\n'],
+                    { type: 'text/plain;charset=utf-8' }))
+                  try {
+                    const link = document.createElement('a')
+                    link.href = url
+                    link.download = 'supa-ontbrekende-tweede-winkel.txt'
+                    link.click()
+                  } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+                }}>Download actielijst (TXT)</button>
+                <label>Kopieer zonder downloadtoestemming
+                  <textarea rows={9} readOnly spellCheck={false} value={oneStoreWorklist}
+                    onFocus={event => event.currentTarget.select()} />
+                </label>
+              </details>}
             </section>
           )}
           {!basketPair ? <p role="alert">Deze planning kon niet veilig aan de import worden gekoppeld.</p> : (
@@ -3380,6 +3431,22 @@ export function OfflineReviewedWorkbench({
                     nowMs={clockMs}
                     pendingHumanReview={perStoreReview.reduce((sum, item) =>
                       sum + item.required - item.accepted, 0)}
+                    pendingReviewByStore={{
+                      PLUS: basketPair.plus.lines.filter(line =>
+                        line.status === 'matched' &&
+                        !isAcceptedKey(reviewedLineKey('PLUS', imported.captures.PLUS!.observedAt, line))
+                      ).flatMap(line => line.status === 'matched' ? [{
+                        id: line.id, ingredientLabel: line.ingredientLabel,
+                        productId: line.productId, productName: line.productName,
+                      }] : []),
+                      DekaMarkt: basketPair.deka.lines.filter(line =>
+                        line.status === 'matched' &&
+                        !isAcceptedKey(reviewedLineKey('DekaMarkt', imported.captures.DekaMarkt!.observedAt, line))
+                      ).flatMap(line => line.status === 'matched' ? [{
+                        id: line.id, ingredientLabel: line.ingredientLabel,
+                        productId: line.productId, productName: line.productName,
+                      }] : []),
+                    }}
                     onReviewFirstPending={() => {
                       const pending = stores.flatMap(store => {
                         const basket = store === 'PLUS' ? basketPair.plus : basketPair.deka
