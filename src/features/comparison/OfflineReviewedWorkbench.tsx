@@ -2720,14 +2720,19 @@ export function OfflineReviewedWorkbench({
                 </p>
               )}
               {currentPreview.stores.map(store => {
-                const query = capturePreviewSearch[store.retailer]
-                  .normalize('NFC').trim().toLocaleLowerCase('nl-NL')
+                // Reuse the canonical discovery-only accent folding. Each word
+                // may match a different original field (name, SKU, packaging).
+                // Search never changes observed values, prices, source timestamps
+                // or the physical product matching proposal.
+                const terms = searchableSourceText(capturePreviewSearch[store.retailer])
+                  .split(/\s+/u).filter(Boolean)
                 const filteredProducts = store.previewProducts.filter(product => {
-                  if (!query) return true
-                  const searchable = [product.name, product.id, product.packAmount, product.packUnit]
-                    .map(value => String(value ?? '')).join(' ')
-                    .normalize('NFC').toLocaleLowerCase('nl-NL')
-                  return searchable.includes(query)
+                  if (!terms.length) return true
+                  const searchable = searchableSourceText([
+                    product.name, product.id, product.packAmount ?? '',
+                    product.packUnit, product.packCount ?? '',
+                  ].join(' '))
+                  return terms.every(term => searchable.includes(term))
                 })
                 const sort = capturePreviewSort[store.retailer]
                 const visibleProducts = [...filteredProducts].sort((a, b) => {
@@ -2752,7 +2757,7 @@ export function OfflineReviewedWorkbench({
                   <label>Zoek in originele producten op naam, broncode of verpakking
                     <input type="search" maxLength={100}
                       value={capturePreviewSearch[store.retailer]}
-                      placeholder="Bijv. tomaten of SKU"
+                      placeholder="Bijv. creme PLUS123 500 g"
                       onChange={event => {
                         const value = event.currentTarget.value
                         setCapturePreviewSearch(current => ({
@@ -2776,7 +2781,7 @@ export function OfflineReviewedWorkbench({
                     </select>
                   </label>
                   <p role="status">{visibleProducts.length} van {store.previewProducts.length} originele artikelen gevonden.
-                    {' '}Zoeken verandert bronprijzen of productmatches niet.</p>
+                    {' '}Zoekwoorden mogen in verschillende velden staan; zoeken verandert bronprijzen of productmatches niet.</p>
                   <ul>
                     {shownProducts.map(product => {
                       const rate = privatePackUnitRate({
