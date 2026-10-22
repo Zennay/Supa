@@ -1280,7 +1280,8 @@ export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
           <p>Plak een zelf verkregen recept, ook als Markdown uit een notitie of website.
             Nederlandse en Engelse koppen zoals Ingrediënten, Ingredients, Bereiding, Method en Directions worden herkend,
             net als lijstjes en genummerde stappen. Porties en tijd zijn optioneel;
-            ontbrekende of onduidelijke hoeveelheden blijven ter controle staan.
+            een optionele regel Bron: https://… bewaart alleen de openbare bronvermelding.
+            Ontbrekende of onduidelijke hoeveelheden blijven ter controle staan.
             De omzetting blijft lokaal, zonder website- of prijsverzoek.</p>
           <label>Of kies een lokaal tekst- of Markdownbestand (.txt of .md, maximaal 500 kB)
             <input type="file" accept=".txt,.md,text/plain,text/markdown"
@@ -1289,7 +1290,7 @@ export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
           {pasteFileMessage && <p role="status">{pasteFileMessage}</p>}
           <label>Recepttekst (maximaal 500 kB)
             <textarea required rows={12} maxLength={500000}
-              placeholder={'Pasta met spinazie\nPorties: 2\nTijd: 20 minuten\nIngrediënten:\n- 200 g pasta\n- 100 g spinazie\nBereiding:\n1. Kook pasta'}
+              placeholder={'Pasta met spinazie\nPorties: 2\nTijd: 20 minuten\nBron: https://voorbeeld.nl/recept/pasta\nIngrediënten:\n- 200 g pasta\n- 100 g spinazie\nBereiding:\n1. Kook pasta'}
               value={pastedSource} onChange={event => setPastedSource(event.target.value)} />
           </label>
           <button className="recipe-primary" type="submit">Zet tekst om naar receptconcept</button>
