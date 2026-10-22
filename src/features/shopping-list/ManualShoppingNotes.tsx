@@ -1146,6 +1146,57 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       setRepeatMessage(error instanceof Error ? error.message : 'Herhaalronde geweigerd.')
     }
   }
+  function selectedRepeatRoundText(): string {
+    const preview = repeatPreview
+    if (!preview || !preview.selectedIndices.length ||
+        preview.raw !== repeatRaw ||
+        window.localStorage.getItem(PRIVATE_SHOPPING_TEMPLATE_KEY) !== preview.raw ||
+        preview.original !== serializePrivateNotes(notes))
+      throw Error('Je lijst of opgeslagen herhaalronde is veranderd. Bekijk de selectie opnieuw.')
+    const selected = new Set(preview.selectedIndices)
+    if (selected.size !== preview.selectedIndices.length ||
+        [...selected].some(index => !Number.isSafeInteger(index) || index < 0 || index >= preview.additions.length) ||
+        selected.size > 100 - notes.length)
+      throw Error('Ongeldige of te grote selectie. Kies je artikelen opnieuw.')
+    return [
+      'SUPA · PRIVÉ HERHAALRONDE · ' + preview.name,
+      'Uitsluitend door jou gekozen eigen boodschappen; geen winkelprijzen of productmatching.', '',
+      ...preview.additions.filter((_, index) => selected.has(index))
+        .map(item => '☐ [' + item.store + '] ' + item.label),
+      '', 'Geen supermarktbron, SKU, besparingsclaim of automatische opslag.', '',
+    ].join('\n')
+  }
+  function downloadSelectedRepeatRoundText() {
+    try {
+      const text = selectedRepeatRoundText()
+      const uri = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = uri
+        link.download = 'supa-geselecteerde-herhaalronde.txt'
+        document.body.append(link); link.click(); link.remove()
+      } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
+      setRepeatMessage('Je gekozen, ongeprijsde herhaalartikelen zijn als TXT gedownload. De actieve lijst bleef gelijk.')
+    } catch (error) {
+      setRepeatPreview(null)
+      setRepeatMessage(error instanceof Error ? error.message : 'De gekozen herhaalronde kon niet worden gedownload.')
+    }
+  }
+  async function shareSelectedRepeatRoundText() {
+    try {
+      const text = selectedRepeatRoundText()
+      if (typeof navigator.share !== 'function') {
+        downloadSelectedRepeatRoundText()
+        return
+      }
+      await navigator.share({ title: 'Mijn SUPA herhaalronde', text })
+      setRepeatMessage('Alleen je gekozen, ongeprijsde herhaalartikelen zijn naar het mobiele deelmenu gestuurd.')
+    } catch (error) {
+      setRepeatMessage(error instanceof DOMException && error.name === 'AbortError'
+        ? 'Mobiel delen geannuleerd; je huidige boodschappen zijn ongewijzigd.'
+        : error instanceof Error ? error.message : 'Delen niet beschikbaar. Gebruik de TXT-download.')
+    }
+  }
   function downloadSelectedRepeatTemplate() {
     if (!selectedVisible.length) return
     try {
@@ -1849,6 +1900,17 @@ export function ManualShoppingNotes({ notes, setNotes }: {
           onClick={confirmRepeatTemplate}>
           Voeg {repeatPreview.selectedIndices.length} gekozen artikelen toe
         </button>
+        <div className="manual-shopping-notes__repeat-shops" role="group"
+          aria-label="Geselecteerde privé-herhaalronde zonder toevoegen meenemen">
+          <button type="button" disabled={!repeatPreview.selectedIndices.length}
+            onClick={downloadSelectedRepeatRoundText}>
+            Download gekozen herhaalartikelen (TXT)
+          </button>
+          <button type="button" disabled={!repeatPreview.selectedIndices.length}
+            onClick={() => void shareSelectedRepeatRoundText()}>
+            Deel gekozen herhaalartikelen (mobiel)
+          </button>
+        </div>
         <button type="button" onClick={() => setRepeatPreview(null)}>Annuleer herhaalronde</button>
       </div>}
       {repeatMessage && <p role="status" aria-live="polite">{repeatMessage}</p>}
