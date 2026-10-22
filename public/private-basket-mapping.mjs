@@ -3,6 +3,7 @@
  * No storage, remote requests, inferred product equivalence or monetary computation.
  */
 import { convertOwnStoreCsv } from './offline-two-store-csv.mjs'
+import { readOwnSourceTextFile } from './own-source-text.mjs'
 
 const stores = ['PLUS', 'DekaMarkt']
 const units = ['g', 'kg', 'ml', 'l', 'piece']
@@ -578,7 +579,10 @@ async function readLocalFile(file) {
   if (!file || !file.size || file.size > maxBytes) {
     throw Error('Ieder bronbestand moet tussen 1 en 256.000 bytes groot zijn.')
   }
-  return new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+  // Reuse the same strict UTF-8 / explicit UTF-16 TSV decoder as Planner and
+  // the extended comparator; the existing canonical CSV converter still admits
+  // every original nine-column source before any match or price is accepted.
+  return readOwnSourceTextFile(file)
 }
 
 function parseSingleSource(text) {
