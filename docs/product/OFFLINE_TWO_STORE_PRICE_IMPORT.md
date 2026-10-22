@@ -1527,3 +1527,9 @@ Iedere bron wordt apart tegen het bestaande canonieke winkelschema gecontroleerd
 
 - Na import kan per winkel een aparte tekstgids worden gekopieerd of gedownload. De gids bevat alleen de Planner-behoefte, eigen bronmoment, status en eventueel het voorgestelde bronartikel; geen prijsbedragen of bewijs van retailerrechten.
 - Ontbrekende, verouderde of niet binnen 24 uur vergelijkbare bronmomenten worden expliciet als onbekend/heropnemen gemarkeerd. De gids leest de actuele bronstatus op het moment van genereren en weigert niet-beschikbare of gewijzigde gegevens als actuele vergelijking te presenteren.
+
+## Per-eenheidsprijsverschil in privé-export (22 oktober 2026)
+
+- De bestaande privé-CSV en offline HTML-afdruk tonen naast het verschil in hele-pakkosten ook het afgeronde eenheidsprijsverschil in cent per kg, liter of stuk.
+- Dit veld blijft leeg tenzij beide oorspronkelijke regels persoonlijk bevestigd en actueel zijn, de twee bronmomenten binnen 24 uur vallen, dezelfde fysieke behoefte vergelijken en de eenheidsprijsfamilie overeenkomt. Een ontbrekende of onvergelijkbare eenheidsprijs wordt niet als nul weergegeven.
+- Het verschil per eenheid is alleen een hulpmiddel per ingrediëntregel; het vervangt het betaalbare verschil in hele verpakkingen niet en vormt geen compleet mandtotaal, bronrecht of onafhankelijke besparingsclaim.
