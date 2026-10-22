@@ -85,3 +85,21 @@
     flex: 1 1 100%;
   }
 }
+
+/* The opt-in field-worklist actions are a full-width usable block, not
+   accidentally squeezed among horizontally arranged export buttons. */
+.supa-two-store-coverage__export-actions[aria-label="Alleen openstaande winkelbroncontroles meenemen"] {
+  padding: .8rem;
+  border: 1px solid #d8e3d9;
+  border-radius: 10px;
+  background: #f8faf9;
+}
+.supa-two-store-coverage__export-actions[aria-label="Alleen openstaande winkelbroncontroles meenemen"] > strong,
+.supa-two-store-coverage__export-actions[aria-label="Alleen openstaande winkelbroncontroles meenemen"] > p {
+  flex: 1 1 100%;
+  margin: 0;
+  line-height: 1.45;
+}
+.supa-two-store-coverage__export-actions[aria-label="Alleen openstaande winkelbroncontroles meenemen"] > button {
+  min-width: 0;
+}
