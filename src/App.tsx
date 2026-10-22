@@ -29,6 +29,7 @@ const ShoppingListView = lazy(async () => {
 })
 import type { UnpricedShoppingNote } from './features/shopping-list/ManualShoppingNotes.tsx'
 import { applyPlannerPersonalNotes } from './features/comparison/applyPlannerPersonalNotes.ts'
+import type { PersonalNoteDraft } from './features/comparison/plannerPersonalNotes.ts'
 import { serializePrivateNotes } from './features/shopping-list/manualShoppingNotesBackup.ts'
 const ManualShoppingNotes = lazy(async () => {
   const module = await import('./features/shopping-list/ManualShoppingNotes.tsx')
@@ -201,6 +202,21 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   })
   // Separate, explicitly unpriced human notes. Never counted in shop totals.
   const [manualShoppingNotes, setManualShoppingNotes] = useState<UnpricedShoppingNote[]>([])
+  // Shared by unpriced Planner and a source-reviewed store list: a verified
+  // capture must not make the original unpriced week impossible to transfer.
+  const addPlannerNotes = useCallback((incoming: readonly PersonalNoteDraft[], expected: string): string => {
+    if (serializePrivateNotes(manualShoppingNotes) !== expected) {
+      throw Error('De persoonlijke lijst is intussen veranderd. Er is niets toegevoegd.')
+    }
+    const proposed = applyPlannerPersonalNotes(manualShoppingNotes, incoming, expected)
+    setManualShoppingNotes(current => {
+      // Retain concurrent changes rather than replacing another live copy.
+      try { return serializePrivateNotes(current) === expected ? proposed.notes : current }
+      catch { return current }
+    })
+    return proposed.added + ' Planner-ingrediënten toegevoegd aan je ongeprijsde lijst. ' +
+      'Geen winkelprijs of SKU gekoppeld.'
+  }, [manualShoppingNotes])
   const nextPriceFileSerial = useRef(0)
   const [privateReviewed, setPrivateReviewed] = useState<PrivateReviewedBaskets | null>(null)
   const [privateCaptureProgress, setPrivateCaptureProgress] = useState<PrivateCaptureProgress | null>(null)
@@ -1212,21 +1228,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
                 onToggleManualNote={id => setManualShoppingNotes(previous => previous.map(note =>
                   note.id === id ? { ...note, done: !note.done } : note))}
                 onOpenPriceImport={openOwnPriceImport} onOpenRecipes={() => navigate('recipes')}
-                onAddPersonalNotes={(incoming, expected) => {
-                  if (serializePrivateNotes(manualShoppingNotes) !== expected) {
-                    throw Error('De persoonlijke lijst is intussen veranderd. Er is niets toegevoegd.')
-                  }
-                  const proposed = applyPlannerPersonalNotes(manualShoppingNotes, incoming, expected)
-                  setManualShoppingNotes(current => {
-                    // Recheck the exact snapshot during React's actual state update.
-                    // Never replace concurrent edits or another tab's new list.
-                    try {
-                      return serializePrivateNotes(current) === expected ? proposed.notes : current
-                    } catch { return current }
-                  })
-                  return proposed.added + ' Planner-ingrediënten toegevoegd aan mijn eigen ongeprijsde lijst. ' +
-                    'Geen winkelprijs of SKU gekoppeld.'
-                }} />
+                onAddPersonalNotes={addPlannerNotes} />
               </Suspense>
               {tab === 'list' && (designProductIds.length > 0
                 ? <section aria-label="Mijn expliciet toegevoegde producten">
@@ -1261,6 +1263,21 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               routeChoice={privateRouteChoice}
               routeCostIntent={mixedCostIntent} />
             </Suspense>
+            {visitedList && <details className="demo-comparison-disclosure">
+              <summary>Neem mijn Planner-ingrediënten ook over als ongeprijsde boodschappen</summary>
+              <p className="disclaimer">De gecontroleerde winkelbron en prijsvergelijking blijven
+                ongewijzigd. Je kunt dezelfde fysieke week apart voor PLUS en DekaMarkt
+                als persoonlijke, ongeprijsde controlelijst voorbereiden.</p>
+              <Suspense fallback={<p role="status">Planner-ingrediënten laden…</p>}>
+                <UnpricedPlannerChecklist plan={plannedMeals} recipes={recipes} activeDays={activeDays}
+                  manualNotes={manualShoppingNotes}
+                  onToggleManualNote={id => setManualShoppingNotes(previous => previous.map(note =>
+                    note.id === id ? { ...note, done: !note.done } : note))}
+                  onOpenPriceImport={openOwnPriceImport}
+                  onOpenRecipes={() => navigate('recipes')}
+                  onAddPersonalNotes={addPlannerNotes} />
+              </Suspense>
+            </details>}
           </div>
         )}
         {visitedList && (
