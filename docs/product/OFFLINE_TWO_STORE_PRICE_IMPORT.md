@@ -54,6 +54,20 @@ In **Vergelijk → Gebruik ditzelfde weekmenu met jouw eigen winkelbronbestanden
 
 Onder het afzonderlijke per-winkel vervolgformulier voor ontbrekende of verlopen producten kun je dezelfde mobiele velden invullen en downloaden; wanneer **Controleer mijn echte winkelopname in Supa** beschikbaar is, gebruikt die uitsluitend de bovenstaande bestaande strikte browserimport. Elke nieuwe waarneming vereist een echt nieuw bronmoment. Publicatie en empirische claims wachten nog op aparte rechten-, review- en veldbewijsgates.
 
+## Twee losse winkel-CSV's zonder bestanden plakken
+
+In **Vergelijk → Plak eigen winkelopname(s)** kun je ook twee originele
+negenkoloms-CSV-bladen direct achter elkaar plakken. Zet uitsluitend een
+losse regel met `---` tussen de volledige PLUS- en DekaMarkt-bladen.
+Ieder blad houdt de eigen kop, oorspronkelijke SKU's, prijs in centen,
+beschikbaarheid en echte waarnemingstijd. Dit werkt met komma-, puntkomma-
+en tabgescheiden Supa-CSV. De bestaande converter en bronparser toetsen
+eerst beide winkels; tweemaal dezelfde winkel of een ongeldig blad wordt
+als geheel afgewezen zonder bestaande gegevens te wijzigen. Zijn beide
+winkels al geladen, dan verschijnt eerst de bestaande wijzigingen-preview
+met expliciete vervangbevestiging. Een prijsverschil ontstaat pas na
+bevestigde fysieke matches en volledige vergelijkbare eigen bronnen.
+
 ## Leeg opnameblad invullen, nakijken en bewust importeren
 1. Maak in **Planner** je echte weekmenu, kies in **Vergelijk** één of beide winkels en download het **lege prijsinvulblad (CSV)** plus de opnamegids met dezelfde regelnummers. Geen regel bevat een verzonnen productcode, moment of prijs.
 2. Vul in het CSV-bestand uitsluitend daadwerkelijk geobserveerde bronvelden in: oorspronkelijke productcode, naam, verpakkingsinhoud/eenheid, multipack-aantal, prijs in hele centen, waarnemingstijd met UTC-offset en beschikbaarheid. Laat een niet-geobserveerde regel **helemaal leeg**, behalve de bestaande winkel/eindwaarde `false` en een optionele eenheidshint. Een deels ingevulde regel geeft nu expliciet het foutieve CSV-regelnummer in plaats van ongemerkt te verdwijnen.
