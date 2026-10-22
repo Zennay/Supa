@@ -7,8 +7,17 @@ const markdownStrong = /^\*\*(.+?)\*\*:?$/u
 const bulletPrefix = /^(?:[-*•]\s+|\d{1,3}[.)]\s+)/u
 const checkboxPrefix = /^(?:[-*•]\s*)?\[[ xX]\]\s+/u
 
+/** Accept common Markdown metadata such as **Porties:** 2 or
+ * **Bron**: https://… without stripping the original source value. */
+function metadataText(line: string): string {
+  return line.replace(headingPrefix, '')
+    .replace(/^\*\*([^*\r\n:]{1,60}):\*\*\s*/u, '$1: ')
+    .replace(/^\*\*([^*\r\n:]{1,60})\*\*\s*:\s*/u, '$1: ')
+    .trim()
+}
+
 function headingText(line: string): string {
-  return line.replace(headingPrefix, '').replace(markdownStrong, '$1')
+  return metadataText(line).replace(markdownStrong, '$1')
     .replace(/:$/u, '').trim()
 }
 
@@ -82,7 +91,7 @@ export function importPlainTextRecipe(raw: string): UserRecipeDraft {
       // Preserve a sanitized public attribution when a recipe is shared as
       // Markdown/plain text. This is metadata only: it never fetches the URL
       // or turns the recipe into a verified retailer product or price.
-      const sourceLine = /^(?:bron(?:link|url)?|source(?:\s+url)?)\s*:\s*(.*)$/iu.exec(original.replace(headingPrefix, '').replace(markdownStrong, '$1').trim())
+      const sourceLine = /^(?:bron(?:link|url)?|source(?:\s+url)?)\s*:\s*(.*)$/iu.exec(metadataText(original))
       if (sourceLine) {
         if (sawSourceLine) throw new Error('Gebruik maximaal één Bron:-regel per recept.')
         sawSourceLine = true
