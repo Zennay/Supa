@@ -18,6 +18,7 @@ import { pendingOwnSourceReviewCsv, pendingOwnSourceReviewText } from '../planne
 import { ownStoreWeekComparison } from '../planner/ownStoreBudgetComparison.ts'
 import { printableOwnStoreComparison } from '../planner/downloadOwnStoreComparison.ts'
 import './privateComparisonJourney.css'
+import './privateComparisonComplete.css'
 
 const PlannerQuickSourcePaste = lazy(async () => {
   const mod = await import('../planner/PlannerQuickSourcePaste.tsx')
