@@ -1109,8 +1109,12 @@ export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
         <label className="recipe-collection-label">Kies welke 15 recepten je als Markdown meeneemt
           <select value={Math.min(collectionExportBatch, Math.ceil(markdownExportable.length / 15) - 1)}
             onChange={event => { setCollectionExportBatch(Number(event.currentTarget.value)); setCollectionError(''); setCollectionMessage('') }}>
-            {Array.from({ length: Math.ceil(markdownExportable.length / 15) }, (_, index) => <option
-              value={index} key={index}>Recepten {index * 15 + 1} t/m {Math.min(markdownExportable.length, (index + 1) * 15)}</option>)}
+            {Array.from({ length: Math.ceil(markdownExportable.length / 15) }, (_, pageIndex) => ({
+              value: pageIndex,
+              start: pageIndex * 15 + 1,
+              end: Math.min(markdownExportable.length, (pageIndex + 1) * 15),
+            })).map(page => <option
+              key={page.start} value={page.value}>Recepten {page.start} t/m {page.end}</option>)}
           </select>
         </label>}
       <div className="recipe-backup-panel__actions">
@@ -1367,8 +1371,8 @@ export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
             blijven ook na opslaan bestaan. Alleen een daadwerkelijke correctie van de
             hoeveelheid of eenheid kan een ingrediëntwaarschuwing opheffen.
             Tot die tijd blijft de Planner- en winkelprijsvergelijking geblokkeerd.</p>
-          <ul>{preview.warnings.map((warning, index) =>
-            <li key={index}>{warning}</li>)}</ul>
+          <ul>{preview.warnings.map(warning =>
+            <li key={warning}>{warning}</li>)}</ul>
         </div>}
         {sourceOnlyRecipeWarnings(preview).length > 0 && <button type="button"
           className="ghost-button" onClick={() => setPreview(current =>
@@ -1387,8 +1391,8 @@ export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
           <p>De oorspronkelijke import bevat nog {selected.warnings.length}
             {' '}waarschuwing(en). Supa kan deze ingrediënten nog niet veilig
             in Planner, Boodschappen of Vergelijk gebruiken. Je originele tekst blijft bewaard.</p>
-          <ul>{selected.warnings.map((warning, index) =>
-            <li key={index}>{warning}</li>)}</ul>
+          <ul>{selected.warnings.map(warning =>
+            <li key={warning}>{warning}</li>)}</ul>
           <button type="button" onClick={() => openSavedRecipeEditor(selected)}>
             Corrigeer de oorspronkelijke hoeveelheden
           </button>
@@ -1447,8 +1451,8 @@ export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
               aria-label="Controleer alle hoeveelheden vóór bewaren">
               <strong>Nieuwe variant: {portionVariantPreview.draft.title}</strong>
               <p>Deze hoeveelheden worden ongeprijsd bewaard. Productmatching blijft apart.</p>
-              <ul>{portionVariantPreview.draft.ingredients.map((ingredient, index) =>
-                <li key={index}>{ingredient.original}</li>)}</ul>
+              <ul>{portionVariantPreview.draft.ingredients.map(ingredient =>
+                <li key={ingredient.clientId}>{ingredient.original}</li>)}</ul>
               <div className="recipe-backup-panel__actions">
                 <button type="button" onClick={() => savePortionVariant(selected)}>
                   Bevestig en bewaar deze variant
