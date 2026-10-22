@@ -74,7 +74,7 @@ export function privatePackUnitRate(pack: {
       captured.amount === null ||
       !Number.isSafeInteger(captured.count) || captured.count <= 0 ||
       captured.priceCents === null || !Number.isSafeInteger(captured.priceCents) ||
-      captured.priceCents < 0) return null
+      captured.priceCents <= 0) return null
   const quantity = decimalQuantity(captured.amount)
   if (!quantity) return null
   const factor = captured.unit === 'g' || captured.unit === 'ml' ? 1000n : 1n
@@ -86,8 +86,8 @@ export function privatePackUnitRate(pack: {
   const roundedCents = (2n * numerator + denominator) / (2n * denominator)
   const milliCents = (2000n * numerator + denominator) / (2n * denominator)
   const max = BigInt(Number.MAX_SAFE_INTEGER)
-  if (!Number.isFinite(centsPerUnit) || centsPerUnit < 0 ||
-      roundedCents > max || milliCents > max) return null
+  if (!Number.isFinite(centsPerUnit) || centsPerUnit <= 0 ||
+      roundedCents <= 0n || roundedCents > max || milliCents > max) return null
   return {
     unit: captured.unit === 'g' || captured.unit === 'kg' ? 'kg' :
       captured.unit === 'ml' || captured.unit === 'l' ? 'liter' : 'stuk',
