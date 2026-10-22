@@ -644,15 +644,29 @@ export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
     const revision = ++collectionReadVersion.current
     setCollectionError(''); setCollectionMessage(''); setCollectionPreview(null)
     try {
-      if (files.length > 15 || files.some(file => !file.size || file.size > 500_000) ||
-          files.reduce((bytes, file) => bytes + file.size, 0) > 500_000)
-        throw new Error('Kies maximaal 15 gevulde tekstbestanden, samen maximaal 500 kB.')
+      const maxFiles = format === 'links' ? 8 : 15
+      const maxBytes = format === 'links' ? 32_000 : 500_000
+      if (files.length > maxFiles || files.some(file => !file.size || file.size > maxBytes) ||
+          files.reduce((bytes, file) => bytes + file.size, 0) > maxBytes)
+        throw new Error(format === 'links'
+          ? 'Kies maximaal acht gevulde .txt/.md-linklijsten, samen maximaal 32 kB.'
+          : 'Kies maximaal 15 gevulde tekstbestanden, samen maximaal 500 kB.')
       const decoder = new TextDecoder('utf-8', { fatal: true })
       const sources: string[] = []
       for (const file of files) {
         if (revision !== collectionReadVersion.current) return
-        if (!(format === 'plain' ? /\.(?:txt|md)$/iu : format === 'html' ? /\.html?$/iu : /\.(?:json|jsonld)$/iu).test(file.name))
-          throw new Error(format === 'plain' ? 'Kies alleen .txt- en .md-receptbestanden.' : format === 'html' ? 'Kies alleen .html- en .htm-receptbestanden.' : 'Kies alleen .json- en .jsonld-receptbestanden.')
+        const allowedName = format === 'plain' || format === 'links'
+          ? /\.(?:txt|md)$/iu.test(file.name)
+          : format === 'html' ? /\.html?$/iu.test(file.name)
+          : /\.(?:json|jsonld)$/iu.test(file.name)
+        if (!allowedName) {
+          const reason = format === 'links'
+            ? 'Kies alleen .txt- en .md-bestanden met openbare receptlinks.'
+            : format === 'plain' ? 'Kies alleen .txt- en .md-receptbestanden.'
+            : format === 'html' ? 'Kies alleen .html- en .htm-receptbestanden.'
+            : 'Kies alleen .json- en .jsonld-receptbestanden.'
+          throw new Error(reason)
+        }
         const content = decoder.decode(await file.arrayBuffer()).replace(/^\uFEFF/u, '').trim()
         if (!content) throw new Error('Eén van de gekozen receptbestanden is leeg.')
         sources.push(content)
@@ -660,16 +674,16 @@ export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
       if (revision !== collectionReadVersion.current) return
       const combined = format === 'plain'
         ? sources.join('\n---\n')
-        : format === 'html' ? sources.join('\n')
+        : format === 'html' || format === 'links' ? sources.join('\n')
         : sources.length === 1 ? sources[0] : JSON.stringify(sources.map(source => {
           try { return JSON.parse(source) }
           catch { throw new Error('Een van de JSON-LD-bestanden bevat ongeldige JSON.') }
         }))
-      if (new TextEncoder().encode(combined).length > 500_000)
-        throw new Error('De verzamelde recepten zijn groter dan 500 kB.')
+      if (new TextEncoder().encode(combined).length > maxBytes)
+        throw new Error(format === 'links' ? 'De linklijsten zijn samen groter dan 32 kB.' : 'De verzamelde recepten zijn groter dan 500 kB.')
       setCollectionFormat(format)
       setCollectionText(combined)
-      setCollectionMessage(files.length + ' lokale ' + (format === 'jsonld' ? 'JSON-LD-' : format === 'html' ? 'HTML-' : 'tekst') + 'bestanden gelezen. Controleer de afzonderlijke recepten en originele hoeveelheden vóór import.')
+      setCollectionMessage(files.length + ' lokale ' + (format === 'jsonld' ? 'JSON-LD-' : format === 'html' ? 'HTML-' : format === 'links' ? 'receptlink-' : 'tekst') + 'bestanden gelezen. Controleer de afzonderlijke recepten en originele hoeveelheden vóór import.')
     } catch (cause) {
       if (revision === collectionReadVersion.current)
         setCollectionError(cause instanceof Error ? cause.message : 'Kon deze receptbestanden niet lezen.')
@@ -986,21 +1000,22 @@ export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
         : collectionFormat === 'html'
           ? 'Lees schema.org/Recipe uit opgeslagen HTML-webpagina’s, zonder scripts uit te voeren of iets op internet te openen.'
           : collectionFormat === 'links'
-            ? 'Plak maximaal acht openbare HTTPS-receptlinks. Alleen na jouw klik worden ze via de bestaande beveiligde receptimport opgehaald. Bij mislukking blijft de bibliotheek onveranderd.'
+            ? 'Plak of upload maximaal acht openbare HTTPS-receptlinks. Directe URL’s en Markdown-bullets/genummerde links werken. Alleen na jouw klik worden ze via de bestaande beveiligde receptimport opgehaald; bij mislukking blijft de bibliotheek onveranderd.'
           : 'Kies 1–15 Recipe-objecten uit een JSON-LD-array of @graph. Bronlinks en winkelprijzen worden niet aangenomen.'}</p>
-      {collectionFormat !== 'links' && <label className="recipe-collection-label">{collectionFormat === 'plain'
+      <label className="recipe-collection-label">{collectionFormat === 'plain'
         ? 'Importeer .txt/.md-bestanden (samen maximaal 500 kB)'
         : collectionFormat === 'html' ? 'Importeer .html/.htm-bestanden (samen maximaal 500 kB)'
+        : collectionFormat === 'links' ? 'Importeer .txt/.md-linklijsten (maximaal 8 bestanden, samen 32 kB)'
         : 'Importeer .json/.jsonld-bestanden (samen maximaal 500 kB)'}
         <input type="file" multiple key={collectionFormat}
-          accept={collectionFormat === 'plain'
+          accept={collectionFormat === 'plain' || collectionFormat === 'links'
             ? '.txt,.md,text/plain,text/markdown'
             : collectionFormat === 'html' ? '.html,.htm,text/html' : '.json,.jsonld,application/json'}
           onChange={event => {
             const files = Array.from(event.currentTarget.files ?? [])
             void loadPlainRecipeCollection(files, collectionFormat); event.currentTarget.value = ''
           }} />
-      </label>}
+      </label>
       <label className="recipe-collection-label">{collectionFormat === 'plain'
         ? 'Recepttekst (titel, Ingrediënten:, Bereiding:)' : collectionFormat === 'html' ? 'HTML-bron van lokaal opgeslagen recepten'
         : collectionFormat === 'links' ? 'Openbare HTTPS-receptlinks (één per regel)'
