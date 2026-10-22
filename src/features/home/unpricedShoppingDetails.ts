@@ -64,3 +64,11 @@ export function saveUnpricedShoppingDetails(
     return null
   }
 }
+
+/** Remove only this item's private note/count; preserve unknown future storage. */
+export function clearUnpricedShoppingDetails(id: string): void {
+  if (!validId(id)) return
+  const snapshot = readUnpricedShoppingDetails()
+  if (!snapshot.writable || !snapshot.entries.some(entry => entry.id === id)) return
+  saveUnpricedShoppingDetails(snapshot, snapshot.entries.filter(entry => entry.id !== id))
+}
