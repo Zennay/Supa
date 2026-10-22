@@ -1109,17 +1109,17 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       const known = new Set(notes.map(note => privateNoteDuplicateKey(note.store, note.label)))
       const additions = template.items.filter(note => !known.has(privateNoteDuplicateKey(note.store, note.label)))
       const capacity = 100 - notes.length
-      // Never silently truncate a saved template. When space is limited the
-      // shopper chooses which articles to bring into this shopping round.
-      const selectedIndices = additions.length <= capacity
-        ? additions.map((_, index) => index) : []
+      // Export/print a complete saved selection even if the active list is
+      // full. Only the separate explicit "add to active list" action must fit
+      // its 100-line limit; do not silently truncate either operation.
+      const selectedIndices = additions.map((_, index) => index)
       setRepeatPreview({
         name: template.name, raw: repeatRaw, original: serializePrivateNotes(notes),
         additions, skipped: template.items.length - additions.length, selectedIndices,
       })
       setRepeatMessage(additions.length + ' nieuwe eigen artikelen gevonden.' +
         (additions.length > capacity
-          ? ' Er is ruimte voor ' + capacity + ' artikelen; kies zelf een selectie.'
+          ? ' Voor toevoegen is plaats voor ' + capacity + ' artikelen; afdrukken en delen kan met alle gekozen artikelen.'
           : ' Controleer de selectie en bevestig voordat ze worden toegevoegd.'))
     } catch (error) {
       setRepeatProtected(true)
@@ -1131,8 +1131,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       ...current,
       selectedIndices: current.additions
         .map((item, index) => item.store === shop ? index : -1)
-        .filter(index => index >= 0)
-        .slice(0, Math.max(0, 100 - notes.length)),
+        .filter(index => index >= 0),
     } : current)
   }
   function confirmRepeatTemplate() {
@@ -1175,8 +1174,8 @@ export function ManualShoppingNotes({ notes, setNotes }: {
     const selected = new Set(preview.selectedIndices)
     if (selected.size !== preview.selectedIndices.length ||
         [...selected].some(index => !Number.isSafeInteger(index) || index < 0 || index >= preview.additions.length) ||
-        selected.size > 100 - notes.length)
-      throw Error('Ongeldige of te grote selectie. Kies je artikelen opnieuw.')
+        selected.size > preview.additions.length)
+      throw Error('Ongeldige selectie. Kies je artikelen opnieuw.')
     return {
       name: preview.name,
       items: preview.additions.filter((_, index) => selected.has(index)),
@@ -1934,7 +1933,9 @@ export function ManualShoppingNotes({ notes, setNotes }: {
           {repeatPreview.additions.length} nieuwe artikelen je deze ronde wilt kopen.
           Vinkjes starten open en tellen nooit mee als winkelprijs.</p>
         <p role="status">{repeatPreview.selectedIndices.length} gekozen; maximaal {Math.max(0, 100 - notes.length)}
-          extra artikelen passen nog op je persoonlijke lijst.</p>
+          extra artikelen passen nog op je persoonlijke lijst.
+          {repeatPreview.selectedIndices.length > 100 - notes.length &&
+            ' Kies een kleinere selectie om toe te voegen; downloaden en delen kan altijd zonder lijstwijziging.'}</p>
         <button type="button" onClick={() => setRepeatPreview(current => current ? {
           ...current, selectedIndices: current.additions
             .slice(0, Math.max(0, 100 - notes.length)).map((_, index) => index),
@@ -1956,7 +1957,6 @@ export function ManualShoppingNotes({ notes, setNotes }: {
               setRepeatPreview(current => {
                 if (!current) return current
                 const selected = new Set(current.selectedIndices)
-                if (checked && selected.size >= Math.max(0, 100 - notes.length)) return current
                 if (checked) selected.add(index)
                 else selected.delete(index)
                 return { ...current, selectedIndices: [...selected].sort((a, b) => a - b) }
