@@ -1509,3 +1509,10 @@ De werkbladexport maakt geen prijzen, actuele retailerwaarnemingen, SKU-toestemm
 Naast twee afzonderlijk geselecteerde bronbestanden ondersteunt de bestaande **Planner → eigen bron bekijken** nu één rechtstreeks geplakt CSV-/TSV-/Excel-blok met de volledige negenkoloms **PLUS**-opname, precies één afzonderlijke regel `---` en daarna de volledige negenkoloms **DekaMarkt**-opname. Beide originele winkelkoppen blijven vereist. Dezelfde gedeelde `combineOwnStoreCaptures`-admission geldt ook voor de twee winkelbestandsinvoer en afzonderlijke winkel-plakvelden én in **Vergelijk**; er wordt geen alternatieve productmatching- of prijsengine geïntroduceerd.
 
 Iedere bron wordt apart tegen het bestaande canonieke winkelschema gecontroleerd; dubbele winkels, ontbrekende retailercaptures, te grote bestanden en ongeldige tijdstippen worden geweigerd. Originele retailer-ID, SKU, bronmoment, verpakking, beschikbaarheid en eventuele onbekende pakprijs worden onveranderd overgenomen. Alleen fysiek passend en persoonlijk beoordeeld bronmateriaal mag meetellen; een prijsverschil blijft onbekend totdat hetzelfde fysieke mandje bij beide winkels compleet en actueel is.
+
+## Mobiele overdracht van winkelstatus en bevestigd mandverschil (22 oktober 2026)
+
+- De actuele privévergelijker kan de **open** of **volledige** winkelcontroles lokaal kopiëren of als TXT bewaren. De tekst bevat Planner-regels, per-winkel bronstatus en bronmomenten, maar geen prijsbedragen of bronrechtenbewijs.
+- Als de browser klembordtoegang weigert, verschijnt dezelfde controlelijst als selecteerbare tekst. Bij een bron- of Planner-weekwissel tijdens kopiëren wordt de actie als verouderd gemeld.
+- Een volledig, persoonlijk bevestigd prijsverschil kan met één knop worden gekopieerd. De klik en afronding controleren opnieuw of bron, Planner-week, revisie en actualiteit nog geldig zijn; anders wordt geen actuele vergelijking geclaimd.
+- De bestaande leesbare tekst blijft handmatig selecteerbaar. Onvolledige, verouderde of gewijzigde bronnen blijven uitgesloten van een volledig mandverschil.
