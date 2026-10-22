@@ -1516,3 +1516,9 @@ Iedere bron wordt apart tegen het bestaande canonieke winkelschema gecontroleerd
 - Als de browser klembordtoegang weigert, verschijnt dezelfde controlelijst als selecteerbare tekst. Bij een bron- of Planner-weekwissel tijdens kopiëren wordt de actie als verouderd gemeld.
 - Een volledig, persoonlijk bevestigd prijsverschil kan met één knop worden gekopieerd. De klik en afronding controleren opnieuw of bron, Planner-week, revisie en actualiteit nog geldig zijn; anders wordt geen actuele vergelijking geclaimd.
 - De bestaande leesbare tekst blijft handmatig selecteerbaar. Onvolledige, verouderde of gewijzigde bronnen blijven uitgesloten van een volledig mandverschil.
+
+## Voorinzage: hetzelfde fysieke mandje bij twee winkels (22 oktober 2026)
+
+- Na invoer van twee toegestane eigen winkelopnames toont de importvoorinzage dezelfde Planner-behoefte naast de voorlopige match per winkel. De voorlopige hele-pakbedragen en het kandidaatverschil verschijnen alleen wanneer beide bronmomenten actueel zijn en binnen 24 uur van elkaar liggen.
+- De voorinzage blijft nadrukkelijk **onbevestigd**: productgelijkwaardigheid, beschikbaarheid en prijs zijn nog niet gevalideerd. Onbekende, verouderde of onveilig optelbare regels blijven onbekend; deelbedragen worden nooit als bewezen totaal of besparing gepresenteerd.
+- De bestaande volledige vergelijking blijft leidend na afzonderlijke menselijke bevestiging van ieder winkelartikel en iedere prijs. De voorinzage wijzigt geen brondata, acceptatiestatus of retailerrechten.
