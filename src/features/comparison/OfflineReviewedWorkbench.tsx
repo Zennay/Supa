@@ -2764,12 +2764,20 @@ export function OfflineReviewedWorkbench({
                     a.name.localeCompare(b.name, 'nl-NL')
                 })
                 const shownProducts = visibleProducts.slice(0, capturePreviewShown[store.retailer])
+                const unitRateUnknown = store.previewProducts.filter(product =>
+                  !privatePackUnitRate({
+                    amount: product.packAmount, unit: product.packUnit,
+                    count: product.packCount ?? 0,
+                    priceCents: product.available ? product.priceCents : null,
+                  })).length
                 return (
                 <details key={'details-' + store.retailer}>
                   <summary>{store.retailer}: originele ingevoerde artikelen bekijken
                     {' '}({store.unavailableProducts} zonder bruikbare pakprijs)</summary>
                   <p>Oorspronkelijk ingevoerd bronmoment:
-                    {' '}<time>{store.observedAt}</time>. Nog géén match- of herkomstbevestiging.</p>
+                    {' '}<time>{store.observedAt}</time>. Nog géén match- of herkomstbevestiging.
+                    {' '}{unitRateUnknown} van {store.previewProducts.length} originele producten hebben
+                    {' '}nog geen berekenbare eenheidsprijs; controleer pakinhoud, multipack en bronprijs.</p>
                   <label>Zoek in originele producten op naam, broncode of verpakking
                     <input type="search" maxLength={100}
                       value={capturePreviewSearch[store.retailer]}
