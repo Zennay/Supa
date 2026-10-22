@@ -17,12 +17,20 @@ export function partialReviewedPricePrintHtml(rows: readonly (readonly string[])
         '<p>Prijs onbekend</p>') +
       (cells[1] ? '<small>Eigen bronmoment: ' + esc(cells[1]) + '</small>' : '') + '</div>'
   }
-  const content = rows.slice(1).map(row => '<section class="ingredient"><h2>' +
-    esc(row[1]) + ' · ' + esc(row[2]) + ' ' + esc(row[3]) + ' nodig</h2>' +
-    '<div class="shops">' + shop(row, 4, 'PLUS') + shop(row, 15, 'DekaMarkt') +
-    '</div><p>' + (row[26] ? 'Verschil DekaMarkt min PLUS: ' +
-      esc(row[26]) + ' cent voor deze ingrediëntregel.' :
-      'Verschil onbekend — geen compleet bevestigd prijzenpaar.') + '</p></section>').join('')
+  const content = rows.slice(1).map(row => {
+    const unitDifference = row[28] !== undefined && row[28] !== '' &&
+      row[29] !== undefined && row[29] !== ''
+      ? '<p>Eenheidsprijsverschil DekaMarkt min PLUS: ' + esc(row[28]) +
+        ' cent per ' + esc(row[29]) + ' (afgerond; alleen dezelfde maateenheidfamilie).</p>'
+      : ''
+    return '<section class="ingredient"><h2>' +
+      esc(row[1]) + ' · ' + esc(row[2]) + ' ' + esc(row[3]) + ' nodig</h2>' +
+      '<div class="shops">' + shop(row, 4, 'PLUS') + shop(row, 15, 'DekaMarkt') +
+      '</div><p>' + (row[26] !== undefined && row[26] !== '' ? 'Verschil DekaMarkt min PLUS: ' +
+        esc(row[26]) + ' cent voor deze ingrediëntregel.' :
+        'Verschil onbekend — geen compleet bevestigd prijzenpaar.') + '</p>' +
+      unitDifference + '</section>'
+  }).join('')
   return '<!doctype html><html lang="nl"><head><meta charset="utf-8">' +
     `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">` +
     '<meta name="viewport" content="width=device-width,initial-scale=1">' +
