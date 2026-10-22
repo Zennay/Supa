@@ -60,6 +60,36 @@ const priceStatus = document.querySelector('#price-status')
 const add = document.querySelector('#add')
 let captures = null
 let nextId = 1
+let ownPriceExpiryTimer = null
+function refreshOwnPriceLabels() {
+  updateCoverage()
+  for (const row of lines.querySelectorAll('.ingredient')) {
+    for (const store of stores) {
+      const select = row.querySelector('[data-store="' + store + '"]')
+      if (select?.value) updateSelect(select, store, row.querySelector('.unit').value)
+    }
+  }
+}
+function scheduleOwnPriceExpiry() {
+  if (ownPriceExpiryTimer !== null) window.clearTimeout(ownPriceExpiryTimer)
+  ownPriceExpiryTimer = null
+  if (!captures) return
+  const nowNs = BigInt(Date.now()) * 1000000n
+  const upcoming = stores.map(store => captures[store]
+    ? observedNs(captures[store].observedAt) : null)
+    .filter(time => time !== null && time <= nowNs && time + WEEK_NS >= nowNs)
+    .map(time => time + WEEK_NS)
+  if (!upcoming.length) return
+  const deadline = upcoming.reduce((minimum, time) => time < minimum ? time : minimum)
+  const durationMs = Math.max(100, Math.ceil(Number((deadline - nowNs) / 1000000n)) + 100)
+  ownPriceExpiryTimer = window.setTimeout(() => {
+    ownPriceExpiryTimer = null
+    refreshOwnPriceLabels()
+  }, durationMs)
+}
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) refreshOwnPriceLabels()
+})
 
 const classify = (unit) => ['g', 'kg'].includes(unit) ? 'weight'
   : ['ml', 'l'].includes(unit) ? 'volume' : unit === 'piece' ? 'count' : null
@@ -133,6 +163,36 @@ function observedPackDescription(product) {
       ' · indicatief ' + ownEuro.format(advisory) + '/' + family : '')
 }
 
+// Read-only preview for an explicitly chosen OWN observed SKU. The source
+// must be recent; only the canonical TS calculator may decide whole packs.
+function ownPhysicalPricePreview(row, store, product) {
+  if (pendingManualEdit || !product || !captures?.[store] || !product.available) return null
+  const age = ageNs(captures[store].observedAt, Date.now())
+  if (age === null || needsRecapture(age)) return null
+  const raw = row.querySelector('.amount').value.trim()
+  const amount = raw ? numeric(raw) : null
+  const request = {
+    amount, unit: row.querySelector('.unit').value, product, outcome: null,
+  }
+  document.dispatchEvent(new CustomEvent('supa:private-pack-preview', { detail: request }))
+  return request.outcome
+}
+function chosenWholePackPreview(row, store, product) {
+  if (pendingManualEdit) return 'Eerst de handmatige bronwijziging accepteren of annuleren.'
+  if (!product || !captures?.[store] || !product.available) return ''
+  const age = ageNs(captures[store].observedAt, Date.now())
+  if (age === null || needsRecapture(age))
+    return 'Oorspronkelijke opname is niet actueel; geen bruikbaar prijsadvies.'
+  const chosen = ownPhysicalPricePreview(row, store, product)
+  if (!chosen) return 'Geen geldig aantal hele verpakkingen voor deze fysieke behoefte.'
+  const duplicate = Array.from(lines.querySelectorAll('.ingredient'))
+    .filter(other => other.querySelector('[data-store="' + store + '"]').value === product.id).length > 1
+  if (duplicate) return 'Deze SKU is ook aan een ander ingrediënt gekoppeld; eerst fysieke behoeften samenvoegen.'
+  return 'Alleen deze fysieke regel: ' + chosen.packs + ' hele verpakking(en) × ' +
+    ownEuro.format(product.priceCents / 100) + ' = ' +
+    ownEuro.format(chosen.cents / 100) + ' (eigen bron, indicatief; geen volledig mandje).'
+}
+
 // Selection records a human-confirmed product identity, not its purchasability.
 function observedProducts(store, unit) {
   const capture = captures?.[store]
@@ -149,6 +209,9 @@ function availableProducts(store, unit) {
 }
 
 function updateCoverage() {
+  // Avoid leaving an apparently price-ready old source visible in an idle tab:
+  // the original observation itself determines when the source expires.
+  scheduleOwnPriceExpiry()
   const rows = Array.from(lines.querySelectorAll('.ingredient'))
   if (!rows.length) {
     coverage.textContent = 'Nog geen ingrediënten in de fysieke mandvraag.'
@@ -158,6 +221,13 @@ function updateCoverage() {
     coverage.textContent = rows.length + ' fysieke ingrediëntregels zonder toegelaten eigen winkelopnames. ' +
       'De ongeprijsde lijst blijft beschikbaar; geen supermarktbedragen bekend.'
     coverage.className = 'notice warning'
+    return
+  }
+  if (pendingManualEdit) {
+    coverage.className = 'notice warning'
+    coverage.textContent = 'Er staat een onbevestigde handmatige winkelbronwijziging open. ' +
+      'De vorige opname blijft veilig bewaard, maar huidige dekking en prijzen staan op HOLD ' +
+      'tot je de echte bronwijziging accepteert of annuleert. De ongeprijsde lijst blijft bruikbaar.'
     return
   }
   const messages = stores.map(store => {
@@ -173,18 +243,21 @@ function updateCoverage() {
       const sku = row.querySelector('[data-store="' + store + '"]').value
       if (!sku) continue
       if (countBySku.get(sku) > 1) { duplicated++; continue }
-      const input = row.querySelector('.amount').value.trim()
-      const amount = input === '' ? null : numeric(input)
       const unit = row.querySelector('.unit').value
-      if (amount !== null && validText(row.querySelector('.label').value.trim())) {
-        if (availableProducts(store, unit).some(p => p.id === sku)) ready++
-        else if (observedProducts(store, unit).some(p => p.id === sku)) knownButUnpriced++
-      }
+      const product = observedProducts(store, unit).find(p => p.id === sku)
+      if (!product) continue
+      // The same canonical whole-pack pricing used for the displayed preview
+      // determines readiness here. Merely selecting an SKU with a pack price
+      // must not mark a fractional piece, stale capture or impossible pack as
+      // a ready physical shopping line.
+      if (validText(row.querySelector('.label').value.trim()) &&
+          ownPhysicalPricePreview(row, store, product)) ready++
+      else knownButUnpriced++
     }
     return store + ': ' + ready + ' van ' + rows.length +
       ' fysieke regels met uniek gekozen, prijsbaar eigen product' +
       (knownButUnpriced ? ' · ' + knownButUnpriced +
-        ' gekoppeld maar niet prijsbaar/beschikbaar' : '') +
+        ' gekoppeld maar niet actueel of niet als hele verpakkingen prijsbaar' : '') +
       (duplicated ? ' · ' + duplicated + ' regels met dubbel gekozen SKU' : '')
   })
   const now = Date.now()
@@ -236,6 +309,8 @@ function updateSelect(select, store, unit) {
   const search = row.querySelector('[data-search-store="' + store + '"]')
   const query = search.value.trim().toLocaleLowerCase('nl')
   const chosen = select.value
+  const age = captures?.[store] ? ageNs(captures[store].observedAt, Date.now()) : null
+  const priceCurrent = !pendingManualEdit && age !== null && !needsRecapture(age)
   const all = observedProducts(store, unit)
   const kept = all.find(product => product.id === chosen)
   const filtered = all.filter(product => !query ||
@@ -256,13 +331,19 @@ function updateSelect(select, store, unit) {
   for (const product of shown) {
     const pack = product.packAmount === null ? 'verpakking onbekend'
       : String(product.packAmount).replace('.', ',') + ' ' + product.packUnit
-    const state = !product.available ? ' · niet leverbaar'
-      : product.priceCents === null || product.packAmount === null
-        ? ' · prijs/verpakking onbekend' : ''
+    const state = pendingManualEdit ? ' · handmatig concept open: prijs tijdelijk onbekend'
+      : !priceCurrent ? ' · oude/toekomstige opname: huidige prijs onbekend'
+      : !product.available ? ' · niet leverbaar'
+        : product.priceCents === null || product.packAmount === null
+          ? ' · prijs/verpakking onbekend' :
+          ' · ' + ownEuro.format(product.priceCents / 100) + ' per pak (eigen opname)'
     const option = new Option(product.name + ' · ' + pack + ' · ID ' + product.id + state, product.id)
     select.add(option)
   }
   select.value = kept ? kept.id : ''
+  // Remember the previous human choice so a later SKU change can refresh
+  // the feedback on BOTH rows that shared that SKU, not only the edited one.
+  select.dataset.lastChoice = select.value
   const chosenProduct = all.find(product => product.id === select.value)
   row.querySelector('[data-matches-store="' + store + '"]').textContent =
     String(filtered.length) + ' waargenomen eigen bronartikelen met compatibele eenheidsfamilie; ' +
@@ -272,11 +353,14 @@ function updateSelect(select, store, unit) {
       '), bewust niet automatisch gekozen. ' : '') +
     (chosenProduct
       ? 'Gekozen SKU ' + chosenProduct.id + ': ' +
-        (!chosenProduct.available ? 'niet leverbaar; niet in winkelmandprijs' :
-          chosenProduct.priceCents === null || chosenProduct.packAmount === null
-            ? 'prijs of verpakking ontbreekt; blijft onbekend'
-            : observedPackDescription(chosenProduct)) +
-        '. Controleer zelf de echte productnaam, voorraad en verpakking.'
+        (pendingManualEdit ? 'handmatig bronconcept open; prijs tijdelijk onbekend' :
+          !priceCurrent ? 'oorspronkelijke opname verlopen/toekomstig; huidige prijs onbekend' :
+          !chosenProduct.available ? 'niet leverbaar; niet in winkelmandprijs' :
+            chosenProduct.priceCents === null || chosenProduct.packAmount === null
+              ? 'prijs of verpakking ontbreekt; blijft onbekend'
+              : observedPackDescription(chosenProduct)) +
+        '. Controleer zelf de echte productnaam, voorraad en verpakking. ' +
+        chosenWholePackPreview(row, store, chosenProduct)
       : 'Kies expliciet de juiste winkel-SKU; geen automatische productmatch.')
 }
 function invalidateUnpricedDemand() {
@@ -336,6 +420,14 @@ function addIngredient(restored = null) {
   amount.maxLength = 24
   amount.className = 'amount'
   if (restored !== null && restored.amount !== null) amount.value = String(restored.amount)
+  // Refresh the physical pack-price indication when a human finishes
+  // changing demand. The full basket totals remain gated by Compare.
+  for (const input of [label, amount]) input.addEventListener('change', () => {
+    for (const store of stores) {
+      updateSelect(row.querySelector('[data-store="' + store + '"]'), store,
+        row.querySelector('.unit').value)
+    }
+  })
   const unit = node('select')
   unit.className = 'unit'
   for (const item of units) unit.add(new Option(item === 'piece' ? 'stuk (piece)' : item, item))
@@ -363,7 +455,18 @@ function addIngredient(restored = null) {
     storesGrid.append(box)
     filter.addEventListener('input', () => updateSelect(select, store, unit.value))
     select.addEventListener('change', () => {
+      const previous = select.dataset.lastChoice || ''
+      const chosen = select.value
       updateSelect(select, store, unit.value)
+      // Recompute affected historical/current siblings after a user resolves
+      // or creates a duplicate SKU. Never move the other user's selection.
+      if (previous || chosen) for (const sibling of lines.querySelectorAll('.ingredient')) {
+        if (sibling === row) continue
+        const siblingSelect = sibling.querySelector('[data-store="' + store + '"]')
+        if (siblingSelect && ((previous && siblingSelect.value === previous) ||
+            (chosen && siblingSelect.value === chosen)))
+          updateSelect(siblingSelect, store, sibling.querySelector('.unit').value)
+      }
       updateCoverage()
     })
   }
@@ -490,6 +593,44 @@ function parseSingleSource(text) {
     captures: [verified[Object.keys(verified)[0]]] }
 }
 
+// Expose only known static converter diagnostics and the CSV row number.
+// Never display raw JSON parser exceptions, file contents, paths or arbitrary
+// source text as an error; users still need a concrete row to repair.
+function readableSourceImportFailure(cause) {
+  const message = cause instanceof Error ? cause.message : ''
+  const row = /^CSV-regel ([1-9]\d{0,5}): (.+)$/.exec(message)
+  const allowed = new Set([
+    'verwacht negen kolommen.', 'onbekende winkel.', 'product-ID ongeldig.',
+    'eenheid moet g/kg/ml/l/piece zijn.',
+    'beschikbaarheid moet true/false of ja/nee zijn.',
+    'werkelijke ISO-tijd met UTC-Z of een numerieke tijdzone-offset vereist.',
+    'productnaam ongeldig of ontbreekt.', 'dubbele product-ID.',
+    'verpakkingsinhoud ongeldig.',
+    'een verpakking met losse stuks vereist een heel aantal stuks.',
+    'prijs in hele eurocenten vereist.', 'multipack-aantal ongeldig.',
+    'beschikbaar product vereist gemeten verpakking, multipack en prijs.',
+    'een winkelopname mag maar één waarnemingstijd hebben.',
+    'maximaal 1.000 producten per winkel.',
+  ])
+  if (row && allowed.has(row[2])) return 'Corrigeer CSV-regel ' + row[1] +
+    ': ' + row[2] + ' Bewaar daarna de volledige originele winkelopname opnieuw.'
+  if (message.startsWith('Kolomkop moet exact zijn: '))
+    return 'De CSV mist de oorspronkelijke negen kolommen in de juiste volgorde: ' +
+      'retailer, observedAt, id, name, packAmount, packUnit, packCount, priceCents, available. ' +
+      'Exporteer een nieuw Supa-invulblad of behoud de originele kolomkop.'
+  if (message === 'CSV vereist expliciet de echte waarnemingen van de geselecteerde winkel(s).')
+    return 'Het bestand bevat nog geen volledige echte winkelproductwaarneming. ' +
+      'Vul uitsluitend zelf gecontroleerde SKU, tijd, pakinhoud, beschikbaarheid en prijs in.'
+  if (/256 kB|256 KB/.test(message))
+    return 'De eigen broninvoer overschrijdt de lokale limiet van 256 kB. ' +
+      'Gebruik een kleiner oorspronkelijk winkelbestand.'
+  if (message.includes('het originele bestand') || message.includes('het originele bestand.'))
+    return 'Het bestandsvak komt niet overeen met de originele winkelcode. ' +
+      'Plaats PLUS uitsluitend bij PLUS en DekaMarkt uitsluitend bij DekaMarkt.'
+  return 'Het bestand voldoet niet aan het toegestane originele CSV-/JSON-formaat. ' +
+    'Controleer de echte brongegevens en gebruik de originele negenkoloms CSV.'
+}
+
 async function loadSources() {
   const revision = ++sourceRevision
   // Keep the last admitted source and manual choices during a new file read;
@@ -601,13 +742,14 @@ async function loadSources() {
       return needsRecapture(age)
     })
     notice(sourceStatus, descriptions.join('\n'), gap === null || gap > DAY_NS || expired ? 'warning' : '')
-  } catch {
+  } catch (error) {
     if (revision !== sourceRevision) return
     sourceInput.value = ''
     plusInput.value = ''
     dekaInput.value = ''
-    notice(sourceStatus, 'Nieuw bestand geweigerd. Controleer de strikte CSV-koppen, winkelopnames en echte brondata. ' +
-      (captures ? 'De vorige geldige bron en je SKU-keuzes blijven beschikbaar.' : 'Nog geen geldige bron aanwezig.'), 'error')
+    notice(sourceStatus, readableSourceImportFailure(error) + ' ' +
+      (captures ? 'De vorige geldige bron en jouw SKU-keuzes blijven beschikbaar.' :
+        'Er is nog geen geldige winkelbron overgenomen.'), 'error')
   }
   refresh()
 }

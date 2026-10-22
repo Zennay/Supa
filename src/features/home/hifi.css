@@ -89,6 +89,9 @@ body { background: #e9eeec; }
 .hifi-added { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: #def5ed; color: #006642; font-weight: bold; }
 .hifi-feedback:empty { display: none; }
 .hifi-feedback, .hifi-empty { font-size: 14px; line-height: 1.4; }
+.hifi-empty-state { display: grid; justify-items: start; gap: 10px; padding: 16px; border: 1px solid var(--line); border-radius: 14px; background: white; }
+.hifi-empty-state .hifi-empty { margin: 0; }
+.hifi-empty-reset { min-height: 44px; padding: 9px 14px; border: 1px solid #78967f; border-radius: 12px; background: #e8f1e7; color: #254e38; font: inherit; font-weight: 650; }
 .hifi-feedback { background: white; border-radius: 12px; padding: 12px; }
 .hifi-home .hifi-page-title { font-size: 24px; }
 .hifi-products-heading { display: flex; align-items: center; justify-content: space-between; }
@@ -336,3 +339,25 @@ body { background: #e9eeec; }
   color: #254e38; font-weight: 750; cursor: pointer; margin-left: auto; }
 .hifi-go-to-list:focus-visible { outline: 3px solid #226f52; outline-offset: 3px; }
 @media(max-width:420px) { .hifi-go-to-list { font-size: .82rem; padding: .5rem .6rem; } }
+
+/* P0 accessibility: every Figma-derived control has a keyboard-visible focus
+   ring, including search, source tabs, filters, product actions and Shoplist. */
+.hifi-home :is(button, a, input, select, textarea, summary):focus-visible,
+.hifi-nav button:focus-visible {
+  outline: 3px solid #005135;
+  outline-offset: 3px;
+}
+
+@media (forced-colors: active) {
+  .hifi-home :is(button, a, input, select, textarea, summary):focus-visible,
+  .hifi-nav button:focus-visible {
+    outline-color: Highlight;
+  }
+}
+
+/* Distinguish owned, reviewed products from historic Figma catalogue examples. */
+.hifi-products-heading { flex-wrap: wrap; gap: 8px; }
+.hifi-products .hifi-go-to-own { min-height: 44px; padding: 8px 11px;
+  border: 1px solid #346b54; border-radius: 12px; color: #164734;
+  background: #e1f1e6; font: inherit; font-weight: 700; cursor: pointer; }
+.hifi-products .hifi-go-to-own:focus-visible { outline: 3px solid #346b54; outline-offset: 2px; }

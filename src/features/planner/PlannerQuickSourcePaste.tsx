@@ -13,9 +13,10 @@ import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureG
 import { PlannerSourceMatchPreview } from './PlannerSourceMatchPreview.tsx'
 import { replaceOwnStoreCapture, type CaptureRefreshChanges } from './combineOwnSourceCapture.ts'
 import { privateSourceChangeCsv } from './privateSourceChangeCsv.ts'
+import { readOwnSourceTextFile } from '../comparison/readLocalCaptureDraftFiles.ts'
 import './plannerQuickSourcePaste.css'
 
-type Preview = { raw: string; normalized: string; data: OfflinePriceSnapshots }
+type Preview = { raw: string; normalized: string; data: OfflinePriceSnapshots; needScope: string }
 const limit = 256000
 const dateText = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -36,20 +37,28 @@ async function normalizedOwnSource(raw: string): Promise<string> {
 }
 
 /** Local preview using the same converter and source contract as Vergelijk. */
-export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredient, hasDemand, needs }: {
+export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredient, hasDemand, needs, initiallyOpen = false }: {
+  initiallyOpen?: boolean
   onImport: (files: File[]) => void
   onRecapture: (store: 'PLUS' | 'DekaMarkt') => void
   onReviewIngredient?: (store: 'PLUS' | 'DekaMarkt', ingredientId: string) => void
   hasDemand: boolean
   needs: readonly PlannerCaptureGuideNeed[]
 }) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(initiallyOpen)
   const [draft, setDraft] = useState('')
   const [sourceSearch, setSourceSearch] = useState('')
   const [incompleteOnly, setIncompleteOnly] = useState(false)
   const [separateDrafts, setSeparateDrafts] = useState({ PLUS: '', DekaMarkt: '' })
   const [updateDraft, setUpdateDraft] = useState('')
   const [preview, setPreview] = useState<Preview | null>(null)
+  // A local source preview is tied to one exact physical Planner demand.
+  // Previous SKU proposals cannot silently survive a changed selected week.
+  const needScope = JSON.stringify(needs.map(item =>
+    [item.id, item.label, item.amount, item.unit, item.query]))
+  const liveNeedScope = useRef(needScope)
+  liveNeedScope.current = needScope
+  const currentPreview = preview?.needScope === needScope ? preview : null
   const [undoSnapshot, setUndoSnapshot] = useState<Preview | null>(null)
   const [refreshSummary, setRefreshSummary] = useState<{
     store: 'PLUS' | 'DekaMarkt'; changes: CaptureRefreshChanges
@@ -59,7 +68,7 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
   const [message, setMessage] = useState('')
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
-    if (!preview) return
+    if (!currentPreview) return
     const refresh = () => setNow(Date.now())
     refresh()
     const timer = window.setInterval(refresh, 60_000)
@@ -70,14 +79,14 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
       document.removeEventListener('visibilitychange', refresh)
       window.removeEventListener('focus', refresh)
     }
-  }, [preview])
+  }, [currentPreview])
   // This is not the originally cached freshness flag: a tab can stay open
   // past seven days while the original retailer capture does not change.
   const liveAdmission = useMemo(() => {
-    if (!preview) return null
-    try { return parseOfflinePriceSnapshots(preview.normalized, now) }
+    if (!currentPreview) return null
+    try { return parseOfflinePriceSnapshots(currentPreview.normalized, now) }
     catch { return null } // e.g. device clock moved back beyond source time
-  }, [preview, now])
+  }, [currentPreview, now])
   const revision = useRef(0)
   function changeDraft(raw: string) {
     ++revision.current
@@ -96,7 +105,7 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
       const normalized = await normalizedOwnSource(raw)
       if (ticket !== revision.current) return
       const data = parseOfflinePriceSnapshots(normalized, Date.now())
-      setPreview({ raw, normalized, data })
+      setPreview({ raw, normalized, data, needScope })
       setMessage('Structuur lokaal herkend. Controleer de bronmomenten en prijsdekking.')
     } catch (cause) {
       if (ticket === revision.current)
@@ -117,12 +126,13 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
     }
     setBusy(true)
     try {
-      const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      const raw = await readOwnSourceTextFile(file)
       if (ticket !== revision.current) return
       setDraft(raw)
       await inspectSource(raw)
-    } catch {
-      if (ticket === revision.current) setMessage('Bronbestand moet geldige UTF-8 CSV, TSV of JSON bevatten.')
+    } catch (cause) {
+      if (ticket === revision.current)
+        setMessage(cause instanceof Error ? cause.message : 'Bronbestand niet herkend.')
     } finally {
       if (ticket === revision.current) setBusy(false)
     }
@@ -142,7 +152,7 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
       for (const file of files) {
         if (file.size === 0 || file.size > limit)
           throw new Error('Elk bestand moet gevuld en maximaal 256 kB zijn.')
-        const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+        const raw = await readOwnSourceTextFile(file)
         if (ticket !== revision.current) return
         const normalized = await normalizedOwnSource(raw)
         if (ticket !== revision.current) return
@@ -164,7 +174,7 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
       const data = parseOfflinePriceSnapshots(combined, Date.now())
       if (ticket !== revision.current) return
       setDraft(combined)
-      setPreview({ raw: combined, normalized: combined, data })
+      setPreview({ raw: combined, normalized: combined, data, needScope })
       setMessage('Twee originele winkelbestanden lokaal gecombineerd voor preview. Alle SKU’s en bronmomenten blijven ongewijzigd.')
     } catch (cause) {
       if (ticket === revision.current)
@@ -178,8 +188,8 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
   // deliberate, whole-capture replacement, never a merger of historical SKU
   // prices under an invented common observation timestamp.
   async function useNewStoreCapture(file: File | undefined) {
-    if (!file || !preview || preview.raw !== draft) return
-    const original = preview.normalized
+    if (!file || !currentPreview || currentPreview.raw !== draft) return
+    const original = currentPreview.normalized
     const ticket = ++revision.current
     setMessage('')
     if (file.size === 0 || file.size > limit) {
@@ -188,21 +198,21 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
     }
     setBusy(true)
     try {
-      const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      const raw = await readOwnSourceTextFile(file)
       if (ticket !== revision.current) return
       const normalized = await normalizedOwnSource(raw)
       if (ticket !== revision.current) return
       const result = replaceOwnStoreCapture(original, normalized, Date.now())
       const data = parseOfflinePriceSnapshots(result.normalized, Date.now())
-      if (ticket !== revision.current) return
+      if (ticket !== revision.current || needScope !== liveNeedScope.current) return
       // One-step undo lives only in React memory. No browser persistence,
       // retailer cache, remote upload or implicit Workbench approval.
-      setUndoSnapshot(preview)
+      setUndoSnapshot(currentPreview)
       setRefreshSummary({ store: result.retailer, changes: result.changes })
       setDraft(result.normalized)
       // Do not retain a second raw copy of the just-ingested private source.
       setUpdateDraft('')
-      setPreview({ raw: result.normalized, normalized: result.normalized, data })
+      setPreview({ raw: result.normalized, normalized: result.normalized, data, needScope })
       setMessage(result.retailer + ': originele nieuwere winkelopname ' +
         (result.action === 'replaced' ? 'vervangt de oudere opname' : 'is toegevoegd') +
         '. ' + (Object.keys(data.captures).length === 2
@@ -219,7 +229,7 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
   }
 
   function downloadRefreshChanges() {
-    if (!refreshSummary) return
+    if (!refreshSummary || !currentPreview) return
     try {
       const csv = privateSourceChangeCsv(refreshSummary.store, refreshSummary.changes)
       const url = URL.createObjectURL(new Blob([csv], {
@@ -239,7 +249,7 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
   }
 
   function undoStoreReplacement() {
-    if (!undoSnapshot || busy) return
+    if (!undoSnapshot || undoSnapshot.needScope !== needScope || busy) return
     ++revision.current
     try {
       // Restoring a preview is NOT approval of an old retailer price.
@@ -295,7 +305,7 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
       const data = parseOfflinePriceSnapshots(normalized, Date.now())
       if (ticket !== revision.current) return
       setDraft(normalized)
-      setPreview({ raw: normalized, normalized, data })
+      setPreview({ raw: normalized, normalized, data, needScope })
       setMessage(provided.length === 2
         ? 'Twee originele bronnen lokaal gecombineerd. Controleer de SKU’s en bronmomenten in Vergelijk.'
         : provided[0] + ' lokaal herkend; de andere winkel blijft ongeprijsd.')
@@ -324,21 +334,21 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
     }
   }
   const nextSourceToCapture = (() => {
-    if (!preview) return null
-    const shops = preview.data.captures
+    if (!currentPreview) return null
+    const shops = currentPreview.data.captures
     const stale = (['PLUS', 'DekaMarkt'] as const).find(store =>
       shops[store] && !recentOwnCaptureInstant(shops[store]!.observedAt, now))
     if (stale) return stale
     const missing = (['PLUS', 'DekaMarkt'] as const).find(store => !shops[store])
     if (missing) return missing
-    if (shops.PLUS && shops.DekaMarkt && !preview.data.pairedWithin24h)
+    if (shops.PLUS && shops.DekaMarkt && !currentPreview.data.pairedWithin24h)
       return shops.PLUS.observedNs <= shops.DekaMarkt.observedNs ? 'PLUS' : 'DekaMarkt'
     return null
   })()
 
   async function downloadPairedStoreRecapture(kind: 'csv' | 'csv-excel' | 'guide') {
-    if (!preview || preview.raw !== draft) return
-    const original = preview
+    if (!currentPreview || currentPreview.raw !== draft) return
+    const original = currentPreview
     const ticket = revision.current
     try {
       // Small trusted local formatter is already loaded: the download remains
@@ -374,8 +384,8 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
 
   async function downloadFullStoreRecapture(store: 'PLUS' | 'DekaMarkt',
     kind: 'csv' | 'csv-excel' | 'guide') {
-    if (!preview || preview.raw !== draft) return
-    const original = preview
+    if (!currentPreview || currentPreview.raw !== draft) return
+    const original = currentPreview
     const ticket = revision.current
     try {
       // Same synchronous private exporter as the combined field sheet.
@@ -406,11 +416,11 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
   }
 
   function downloadCurrentSourceRepairList(store: 'PLUS' | 'DekaMarkt') {
-    if (!preview || preview.raw !== draft) return
+    if (!currentPreview || currentPreview.raw !== draft) return
     try {
       // No field evidence, permission or timestamp is synthesized. The
       // original source is re-read at click; the list is only a field task.
-      const current = parseOfflinePriceSnapshots(preview.normalized, Date.now())
+      const current = parseOfflinePriceSnapshots(currentPreview.normalized, Date.now())
       const capture = current.captures[store]
       if (!capture) throw new Error(store + ': oorspronkelijke bron ontbreekt.')
       const term = productSearchText(sourceSearch.trim())
@@ -437,13 +447,13 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
   }
 
   function downloadCanonicalPreview() {
-    if (!preview || preview.raw !== draft) return
+    if (!currentPreview || currentPreview.raw !== draft) return
     try {
       // Re-admit the actual local source at export time, never transform
       // unavailable, stale or unreviewed prices into confirmed basket totals.
-      const current = parseOfflinePriceSnapshots(preview.normalized, Date.now())
+      const current = parseOfflinePriceSnapshots(currentPreview.normalized, Date.now())
       const count = Object.keys(current.captures).length
-      const bytes = new TextEncoder().encode(preview.normalized)
+      const bytes = new TextEncoder().encode(currentPreview.normalized)
       if (bytes.length > limit) throw new Error('Genormaliseerde bron te groot.')
       const url = URL.createObjectURL(new Blob([bytes], { type: 'application/json' }))
       try {
@@ -462,15 +472,15 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
   }
 
   function handoff(focus?: { store: 'PLUS' | 'DekaMarkt'; ingredientId: string }) {
-    if (!preview || preview.raw !== draft) return
+    if (!currentPreview || currentPreview.raw !== draft) return
     try {
-      const current = parseOfflinePriceSnapshots(preview.normalized, Date.now())
+      const current = parseOfflinePriceSnapshots(currentPreview.normalized, Date.now())
       // Old sources may still be inspected or renewed. Only the canonical
       // Workbench can admit an amount into a current complete basket.
       if (!current.currentEnough) {
         setMessage('Oude opname: in Vergelijk alleen voor broncontrole of vernieuwing; geen actueel prijsverschil.')
       }
-      const file = new File([preview.normalized], 'supa-eigen-winkelbron.json',
+      const file = new File([currentPreview.normalized], 'supa-eigen-winkelbron.json',
         { type: 'application/json' })
       if (file.size > limit) throw new Error('Genormaliseerde bron te groot.')
       if (focus && (!current.captures[focus.store] ||
@@ -520,7 +530,9 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
             event.currentTarget.value = ''
             if (files.length) void previewFiles(files)
           }} />
-        <small>Eén bestand mag beide winkels bevatten; twee aparte bestanden moeten ieder precies één verschillende winkel bevatten.</small>
+        <small>Eén bestand mag beide winkels bevatten; twee aparte bestanden moeten ieder precies één verschillende winkel bevatten.
+          Excel/Calc Unicode Text (.txt of .tsv met UTF-16-BOM) wordt lokaal gelezen;
+          CSV en JSON blijven UTF-8. Een bestand blijft onbevestigd tot de bestaande bron- en SKU-controle.</small>
       </label>
       </div>
       <div className="supa-planner-source-paste__separate">
@@ -552,8 +564,12 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
         {busy ? 'Bron wordt lokaal gelezen…' : 'Controleer mijn winkelbron'}
       </button>
       {message && <p role="status" aria-live="polite">{message}</p>}
-      {preview && <div className="supa-planner-source-paste__preview">
-        <strong>{Object.keys(preview.data.captures).length} eigen winkelopname(s) gevonden</strong>
+      {preview && !currentPreview && <p role="alert">
+        Je fysieke Planner-vraag is gewijzigd. Controleer de originele bron opnieuw
+        voordat je een productmatch of winkelprijs aan dit mandje koppelt.
+      </p>}
+      {currentPreview && <div className="supa-planner-source-paste__preview">
+        <strong>{Object.keys(currentPreview.data.captures).length} eigen winkelopname(s) gevonden</strong>
         <div className="supa-planner-source-paste__source-filter">
           <label>Zoek in originele bronproducten of SKU's
             <input type="search" maxLength={120} value={sourceSearch}
@@ -571,7 +587,7 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
           </button>}
         </div>
         {(['PLUS', 'DekaMarkt'] as const).map(store => {
-          const capture = preview.data.captures[store]
+          const capture = currentPreview.data.captures[store]
           if (!capture) return <p key={store}>{store}: geen bron; geen prijs beschikbaar.</p>
           const priced = capture.products.filter(completeOwnSourceProduct).length
           const query = productSearchText(sourceSearch.trim())
@@ -586,7 +602,11 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
             <p>{capture.products.length} originele SKU's;
               {' '}{priced} met vastgelegde (niet per se actuele) pakprijs en
               {' '}{capture.products.length - priced} zonder bruikbare prijs.</p>
-            <small>Oorspronkelijk bronmoment: {dateText.format(new Date(capture.observedMs))}</small>
+            <small>Oorspronkelijk bronmoment: {dateText.format(new Date(capture.observedMs))}.
+              {' '}{recentOwnCaptureInstant(capture.observedAt, now)
+                ? 'Originele bron is nog binnen de lokale tijdsgrens; productreview blijft verplicht.'
+                : 'Deze winkelbron is verouderd of ongeldig. Neem de werkelijke producten en prijzen opnieuw op.'}
+            </small>
             <details className="supa-planner-source-paste__products">
               <summary>Bekijk originele SKU’s, verpakkingen en ontbrekende prijzen</summary>
               <p role="status">Bronpreview: {visibleProducts.length} van {capture.products.length}
@@ -613,8 +633,13 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
                   </li>
                 })}
               </ul>
-              {visibleProducts.length === 0 && <li>Geen originele SKU's bij deze filters.
-                Wis de filters of zoek op een andere productnaam of artikelcode.</li>}
+              {visibleProducts.length === 0 && <p role="status">
+                Geen originele SKU's bij deze filters. Je bestaande bronopname blijft behouden.
+                <button type="button" className="ghost-button"
+                  onClick={() => { setSourceSearch(''); setIncompleteOnly(false) }}>
+                  Toon alle originele producten opnieuw
+                </button>
+              </p>}
               {visibleProducts.length > 24 &&
                 <small>Toon hier de eerste 24 gevonden SKU's. Verfijn je zoekterm
                   of bekijk alle oorspronkelijke producten in Vergelijk.</small>}
@@ -648,7 +673,7 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
             </div>
           </section>
         })}
-        {preview.data.captures.PLUS && preview.data.captures.DekaMarkt &&
+        {currentPreview.data.captures.PLUS && currentPreview.data.captures.DekaMarkt &&
           <div className="supa-planner-source-paste__recapture">
             <strong>Beide winkels echt opnieuw vastleggen in één spreadsheet</strong>
             <p>Een samenhangend invulblad voor de oorspronkelijke PLUS- én
@@ -671,9 +696,9 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
           </div>}
         <p>{!liveAdmission?.currentEnough
           ? 'Oude of toekomstige bron. Vernieuw je werkelijke waarnemingen.'
-          : preview.data.pairedWithin24h
+          : currentPreview.data.pairedWithin24h
             ? 'Beide opnames binnen 24 uur; SKU, pakken en volledige mand nog te controleren.'
-            : Object.keys(preview.data.captures).length === 2
+            : Object.keys(currentPreview.data.captures).length === 2
               ? 'Bronmomenten meer dan 24 uur uiteen: geen volledig prijsverschil mogelijk.'
               : 'Nog maar één winkelbron. De andere winkel blijft ongeprijsd.'}</p>
         {!liveAdmission && <p role="alert">

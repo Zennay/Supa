@@ -6,6 +6,7 @@ import {
   type OwnStore, type PrivateCaptureProgress, type PrivateReviewedBaskets,
 } from '../comparison/privateReviewedBasketBridge.ts'
 import { confirmedPartialBasket } from '../planner/confirmedPartialBasket.ts'
+import { privateKnownPricePairs, formatKnownUnitGap } from '../products/privateProgressProductRows.ts'
 import { privatePartialShoppingExport } from './privatePartialShoppingExport.ts'
 import { privatePartialPhysicalShoppingTick } from './privatePhysicalShoppingTick.ts'
 import './partialReviewedShoppingList.css'
@@ -16,17 +17,20 @@ const STORES: readonly OwnStore[] = ['PLUS', 'DekaMarkt']
  * the exact source SKU/pack identity with a later complete basket, but never
  * grant product approval or act as a price or savings authority. */
 export function PartialReviewedShoppingList({
-  progress, complete, checked, setChecked, onOpenComparison, onReviewIngredient,
+  progress, complete, checked, setChecked, onOpenComparison, onOpenProducts, onReviewIngredient,
 }: {
   progress: PrivateCaptureProgress | null
   complete: PrivateReviewedBaskets | null
   checked: Record<string, boolean>
   setChecked: Dispatch<SetStateAction<Record<string, boolean>>>
   onOpenComparison: () => void
+  onOpenProducts: () => void
   onReviewIngredient: (store: OwnStore, ingredientId: string) => void
 }) {
   const [preferred, setPreferred] = useState<OwnStore>('PLUS')
   const [message, setMessage] = useState('')
+  const [showAllMissing, setShowAllMissing] = useState(false)
+  const [missingQuery, setMissingQuery] = useState('')
   const [copyFallback, setCopyFallback] = useState<{ key: string; text: string } | null>(null)
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -49,6 +53,11 @@ export function PartialReviewedShoppingList({
   const capture = store && progress?.stores[store]
   const summary = store ? confirmedPartialBasket(progress, store, now) : null
   const rows = capture?.confirmedSourceLines ?? []
+  // Information only: compare identical physical demand at TWO current,
+  // individually admitted original capture instants. A delta never changes
+  // this store's checked shopping task or creates a whole-basket winner.
+  const pairByIngredient = new Map(privateKnownPricePairs(progress, complete, now).map(
+    pair => [pair.ingredientId, pair]))
   const identity = capture && progress ? JSON.stringify([
     progress.planKey, store, capture.observedAt,
     rows.map(row => [
@@ -72,6 +81,11 @@ export function PartialReviewedShoppingList({
     ...capture.missingIngredients,
     ...capture.awaitingReviewIngredients,
   ]
+  const search = missingQuery.trim().normalize('NFKC').toLocaleLowerCase('nl-NL')
+  const filteredNeeds = incompleteNeeds.filter(item => !search ||
+    [item.label, item.id].some(value =>
+      value.normalize('NFKC').toLocaleLowerCase('nl-NL').includes(search)))
+  const shownNeeds = showAllMissing ? filteredNeeds : filteredNeeds.slice(0, 8)
   function setTick(line: (typeof rows)[number]) {
     if (!confirmedPartialBasket(progress, store, Date.now()) ||
         !recentOwnCaptureInstant(capture!.observedAt, Date.now())) {
@@ -169,9 +183,14 @@ export function PartialReviewedShoppingList({
         <span className="eyebrow">Eigen bronproducten · nog niet compleet</span>
         <h3>Neem al bevestigde winkelproducten mee</h3>
       </div>
-      <button type="button" className="ghost-button" onClick={onOpenComparison}>
-        Controleer mijn ontbrekende producten
-      </button>
+      <div className="supa-partial-shop__actions">
+        <button type="button" className="ghost-button" onClick={onOpenProducts}>
+          Vergelijk gecontroleerde producten in Producten
+        </button>
+        <button type="button" className="ghost-button" onClick={onOpenComparison}>
+          Controleer ontbrekende bronproducten
+        </button>
+      </div>
     </header>
     {validStores.length > 1 && <div className="supa-partial-shop__switch" aria-label="Kies eigen winkelbron">
       {validStores.map(option => <button key={option} type="button"
@@ -204,6 +223,33 @@ export function PartialReviewedShoppingList({
           </span>
         </label>
         <strong>{exactEuro.formatCents(line.lineTotalCents)}</strong>
+        {pairByIngredient.has(line.ingredientId) && (() => {
+          const pair = pairByIngredient.get(line.ingredientId)!
+          const otherShop = store === 'PLUS' ? 'DekaMarkt' : 'PLUS'
+          const otherPacks = store === 'PLUS' ? pair.dekaPacks : pair.plusPacks
+          const otherCents = store === 'PLUS' ? pair.dekaCents : pair.plusCents
+          const ownCents = store === 'PLUS' ? pair.plusCents : pair.dekaCents
+          const difference = ownCents - otherCents
+          const otherProduct = store === 'PLUS' ? pair.dekaProduct : pair.plusProduct
+          return <p className="supa-partial-shop__individual-delta">
+            <small>{otherShop}: {otherProduct.productName} · SKU {otherProduct.productId} ·
+              {' '}{otherProduct.packCount} × {otherProduct.packAmount} {otherProduct.packUnit} per pak ·
+              {' '}{otherProduct.unitRate ?? 'eenheidsprijs onbekend'}.</small>
+            <small>{otherShop}: {otherPacks} hele pakken ·
+              {' '}{exactEuro.formatCents(otherCents)} voor dezelfde hoeveelheid.
+              {' '}Eigen bronprijs, geen kassagarantie.</small>
+            <strong>{difference === 0
+              ? 'Gelijke hele-pakprijs voor dit ingrediënt.'
+              : exactEuro.formatCents(Math.abs(difference)) +
+                ' lagere hele-pakkosten bij ' +
+                (difference > 0 ? otherShop : store) + ' voor alleen deze regel.'}</strong>
+            <small>{formatKnownUnitGap(pair.unitGap)} Indicatief per eenheid;</small>
+            <small>{pair.basis === 'complete-and-partial'
+              ? 'De andere winkel heeft een compleet gecontroleerd mandje; jouw winkel nog niet. '
+              : ''}Andere ingrediënten blijven onbekend. Dit is geen
+              besparing op het volledige winkelmandje.</small>
+          </p>
+        })()}
         <button type="button" className="ghost-button"
           onClick={() => onReviewIngredient(store, line.ingredientId)}>
           Controleer SKU in Vergelijk
@@ -215,7 +261,15 @@ export function PartialReviewedShoppingList({
       <p>Hier staan de nog ongeprijsde ingrediënten van hetzelfde fysieke weekmenu.
         Ook als de andere winkel al compleet is, blijven deze hoeveelheden
         onafhankelijk zichtbaar. Ze tellen niet mee in het deelbedrag hierboven.</p>
-      {incompleteNeeds.slice(0, 8).map(item =>
+      <label className="supa-partial-shop__missing-search">
+        Zoek ontbrekend ingrediënt
+        <input type="search" maxLength={120} value={missingQuery}
+          onChange={event => setMissingQuery(event.currentTarget.value)}
+          placeholder="Bijvoorbeeld melk of rijst" />
+      </label>
+      <small>{filteredNeeds.length} van {incompleteNeeds.length} nog te beoordelen
+        of ongeprijsde ingrediënten in deze winkel.</small>
+      {shownNeeds.map(item =>
         <button type="button" key={item.id} className="ghost-button"
           onClick={() => onReviewIngredient(store, item.id)}>
           {item.label} · {typeof item.amount === 'number' &&
@@ -224,8 +278,14 @@ export function PartialReviewedShoppingList({
               : 'hoeveelheid nog controleren'} ·
           {' '}bronproduct controleren
         </button>)}
-      {incompleteNeeds.length > 8 &&
-        <small>En nog {incompleteNeeds.length - 8} andere ingrediënten.</small>}
+      {filteredNeeds.length > 8 && <button type="button" className="ghost-button"
+        aria-expanded={showAllMissing}
+        onClick={() => setShowAllMissing(previous => !previous)}>
+        {showAllMissing ? 'Toon de eerste acht producten' :
+          'Bekijk alle ' + filteredNeeds.length + ' ontbrekende producten'}
+      </button>}
+      {!filteredNeeds.length && <p role="status">Geen openstaand ingrediënt
+        gevonden met deze zoekterm. Wis het zoekveld om alle te tonen.</p>}
     </div>}
     <div className="supa-partial-shop__actions">
       <button type="button" onClick={() => void produce('copy')}>Kopieer gecontroleerde deellijst</button>

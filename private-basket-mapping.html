@@ -48,6 +48,14 @@ button:disabled{background:#b6c6bc;cursor:not-allowed}.secondary{background:#e5e
  #result #next-actions{break-inside:avoid}
 }
 
+.store-coverage{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:14px 0;padding:16px;background:#f7faf6;border:1px solid #d6e0d4;border-radius:12px}
+.coverage-shop{min-width:0;display:grid;gap:8px}
+.coverage-shop label{font-size:14px;line-height:1.4}
+.coverage-shop progress{width:100%;height:16px;accent-color:#17643e}
+.store-coverage>.muted,.coverage-actions{grid-column:1/-1;margin:0}
+.coverage-actions{display:flex;gap:10px 18px;flex-wrap:wrap}
+.coverage-actions a{display:inline-flex;align-items:center;min-height:40px;overflow-wrap:anywhere}
+@media(max-width:650px){.store-coverage{grid-template-columns:1fr}}
 @media(max-width:650px){.grid,.stores{grid-template-columns:1fr}section{padding:15px}.row-actions button{flex:1}}
 .observation-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px}
 .observed-product{padding:16px;border:1px solid #d6e0d4;border-radius:12px;margin:12px 0;background:#fcfefd}
@@ -113,6 +121,16 @@ Productnamen en prijzen komen uitsluitend uit jouw eigen bestanden.</p>
 <p>Geen CSV klaar? Vul zelf producten in die je <strong>daadwerkelijk</strong> bij PLUS en/of DekaMarkt hebt waargenomen. Een tweede echte winkelopname kan later aan je eerste worden toegevoegd zonder die eerste opnieuw te verzinnen of in te voeren.
 Dit is een lokale invoerhulp, geen scraper. Laat onbekende prijzen leeg en bevestig alleen werkelijk gecontroleerde beschikbaarheid.
 Tijdstippen en artikel-ID's worden niet automatisch bedacht of ingevuld.</p>
+<aside id="manual-demand-context" class="ingredient" hidden aria-label="Mijn fysieke weekbehoefte tijdens handmatige winkelopname">
+<h3>Mijn gekozen weekboodschappen als geheugensteun</h3>
+<p>Na jouw expliciete Planner-import verschijnt hier de oorspronkelijke fysieke vraag.
+Deze ingrediënten zijn <strong>geen</strong> waargenomen winkelartikelen, productmatches, prijzen of voorraad.
+Vul rechts of hieronder uitsluitend werkelijk gecontroleerde winkelproducten in.</p>
+<label for="manual-demand-query">Zoek ingrediënt in mijn gekozen mandje</label>
+<input id="manual-demand-query" type="search" maxlength="120" autocomplete="off" placeholder="Bijvoorbeeld rijst of paprika">
+<p id="manual-demand-count" class="muted" role="status" aria-live="polite"></p>
+<ol id="manual-demand-items" style="max-height:270px;overflow:auto;padding-left:24px"></ol>
+</aside>
 <label for="manual-store-mode">Van welke winkel(s) heb je werkelijk producten waargenomen?</label>
 <select id="manual-store-mode"><option value="both">PLUS en DekaMarkt</option><option value="PLUS">Alleen PLUS</option><option value="DekaMarkt">Alleen DekaMarkt</option></select>
 <small>Met één winkel kun je al een eigen mand en budget maken. De andere winkel blijft volledig onbekend, zonder fictieve opname.</small>
@@ -217,6 +235,29 @@ Bewaar desgewenst je <strong>lokale bron- en mandinvoersessie</strong> inclusief
 <section id="result" hidden aria-label="Vergelijking van de eigen winkelmandjes">
 <h2>Jouw mandje · PLUS tegenover DekaMarkt</h2>
 <div id="summary" class="notice" role="status" aria-live="polite"></div>
+<div class="store-coverage" id="store-coverage" aria-label="Dekking van de werkelijke winkelprijsopnames">
+  <div class="coverage-shop">
+    <label for="coverage-plus"><strong>PLUS</strong> · <span id="coverage-plus-text">Nog geen complete eigen prijsregels</span></label>
+    <progress id="coverage-plus" value="0" max="1"></progress>
+  </div>
+  <div class="coverage-shop">
+    <label for="coverage-deka"><strong>DekaMarkt</strong> · <span id="coverage-deka-text">Nog geen complete eigen prijsregels</span></label>
+    <progress id="coverage-deka" value="0" max="1"></progress>
+  </div>
+  <p class="muted">Dit toont alleen hoeveel fysieke regels een recente en volledig bekende eigen prijs hebben. Een winkelwinnaar of besparing verschijnt pas bij twee complete, tijdig gekoppelde opnames.</p>
+  <nav class="coverage-actions" aria-label="Ontbrekende eigen winkelproducten aanvullen">
+    <a href="#source-title">Open eigen CSV/JSON-prijsbron</a>
+    <a href="#manual-observations">Voer echt waargenomen winkelprijzen in</a>
+    <a href="#next-actions">Bekijk ontbrekende prijsregels</a>
+  </nav>
+  <div class="coverage-actions">
+    <button id="blank-plus-recapture" type="button" class="secondary">Leeg PLUS-heropnameblad (CSV)</button>
+    <button id="blank-deka-recapture" type="button" class="secondary">Leeg DekaMarkt-heropnameblad (CSV)</button>
+    <button id="guide-plus-recapture" type="button">PLUS-rijgids (TXT)</button>
+    <button id="guide-deka-recapture" type="button">DekaMarkt-rijgids (TXT)</button>
+  </div>
+  <small class="muted" style="grid-column:1/-1">Deze lege bestanden bevatten bewust geen bronproducten, tijden of prijzen. Gebruik ze om een volledige nieuwe waarneming van dezelfde fysieke vraag vast te leggen. Een losse ontbrekende rij is geen nieuwe complete winkelopname.</small>
+</div>
 <div id="budget-panel" style="padding:12px;margin-top:12px;border:1px solid #d6e0d4;border-radius:10px">
 <label id="budget-label" for="budget-euros">Optioneel: eigen budget voor dit hele mandje (€)</label>
 <input id="budget-euros" type="text" inputmode="decimal" placeholder="Bijv. 50,00" maxlength="12" style="width:160px;max-width:100%" autocomplete="off">

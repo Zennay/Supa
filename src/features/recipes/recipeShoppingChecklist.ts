@@ -1,6 +1,7 @@
 import type { SavedRecipe } from './recipeLibrary.ts'
 import { scaledMetricPortionAmount } from '../../domain/metricPortionScale.ts'
 import { sumDecimalAmounts } from '../../domain/decimalPackArithmetic.ts'
+import { readablePlannerDemandAmount } from '../comparison/plannerPriceCaptureGuide.ts'
 
 export type OwnRecipeChecklistLine = {
   key: string
@@ -29,26 +30,37 @@ export type OwnRecipeChecklist = {
 export function formatOwnRecipeChecklist(
   checklist: OwnRecipeChecklist,
   checked: Readonly<Record<string, boolean>>,
+  onlyOutstanding = false,
 ): string {
+  const remaining = onlyOutstanding
+    ? checklist.lines.filter(line => line.needsReview || checked[line.key] !== true)
+    : checklist.lines
   return [
     checklist.recipeCount
       ? `Mijn receptenbundel: ${checklist.recipeCount} eigen recepten`
       : `Mijn recept: ${checklist.title} — ${checklist.portions} porties`,
-    'Eigen ongeprijsde boodschappenlijst · controleer hoeveelheden en verpakking zelf.',
-    ...checklist.lines.map(line => line.needsReview
+    onlyOutstanding
+      ? 'Alleen nog te kopen of controleren · DIT IS NIET het volledige fysieke mandje.'
+      : 'Eigen ongeprijsde boodschappenlijst · controleer hoeveelheden en verpakking zelf.',
+    ...(remaining.length ? remaining.map(line => line.needsReview
       ? `[?] ${line.original} — hoeveelheid handmatig controleren`
-      : `${checked[line.key] ? '[x]' : '[ ]'} ${compactAmount(line.amount!)} ${line.unit === 'piece' ? 'stuks' : line.unit} ${line.label}`),
+      : `${checked[line.key] ? '[x]' : '[ ]'} ${readableRecipeShoppingAmount(line.amount!)} ${line.unit === 'piece' ? 'stuks' : line.unit} ${line.label}`)
+      : ['Alle controleerbare boodschappen zijn afgevinkt.']),
     'Prijzen, winkelvoorraad en besparingen zijn onbekend.',
   ].join('\n')
 }
 
-function compactAmount(amount: number): string {
-  // The existing private paste importer deliberately refuses ambiguous
-  // Dutch dotted thousands (1.250 g can be misread as 1.25 g).
-  // Therefore owner-exported TXT must never insert grouping separators.
-  return Number(amount.toFixed(3)).toLocaleString('nl-NL', {
-    useGrouping: false, maximumFractionDigits: 3,
-  })
+export function readableRecipeShoppingAmount(amount: number): string {
+  // Source amounts are canonical physical demand, not a price or display
+  // estimate. Reuse the exact decimal formatter of the capture worksheet:
+  // toFixed(3) could otherwise round a positive quantity to zero or alter a
+  // valid fractional need during copy/paste into the user's own shopping List.
+  const exact = readablePlannerDemandAmount(amount)
+  if (exact === 'hoeveelheid nog controleren')
+    throw new Error('Controleer eerst de oorspronkelijke fysieke hoeveelheid.')
+  // The existing NL private paste path accepts decimal commas. Never add
+  // grouping separators (e.g. 1.250 g could mean a different amount).
+  return exact.replace('.', ',')
 }
 
 /**
@@ -103,4 +115,36 @@ export function ownRecipeShoppingChecklist(recipe: SavedRecipe, portions: number
 
   const partial: OwnRecipeChecklist = { title: recipe.title, portions, lines, canCopy: lines.length > 0, copyText: '' }
   return { ...partial, copyText: formatOwnRecipeChecklist(partial, {}) }
+}
+
+
+/** Transfer already-combined personal demand into the existing unpriced List.
+ * Unreviewed source quantities remain explicit questions, never guessed grams,
+ * article codes, stock or a price. This is NOT a retailer import format. */
+export function personalRecipeShoppingNoteLabels(
+  lines: readonly OwnRecipeChecklistLine[],
+): string[] {
+  if (!Array.isArray(lines) || lines.length < 1 || lines.length > 100)
+    throw new Error('Kies 1–100 nog openstaande eigen boodschappen.')
+  const clean = (value: string) => value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ')
+    .replace(/\s+/gu, ' ').trim()
+  return lines.map(line => {
+    if (typeof line.original !== 'string' || typeof line.label !== 'string')
+      throw new Error('Een oorspronkelijk receptingrediënt ontbreekt.')
+    const raw = line.needsReview
+      ? 'Controleer hoeveelheid: ' + clean(line.original)
+      : (() => {
+          if (typeof line.amount !== 'number' || !Number.isFinite(line.amount) ||
+              line.amount <= 0 || line.amount > 1_000_000 ||
+              !['g', 'ml', 'piece'].includes(line.unit ?? '') ||
+              (line.unit === 'piece' && !Number.isSafeInteger(line.amount)))
+            throw new Error('De fysieke hoeveelheid is veranderd; controleer het recept opnieuw.')
+          return readableRecipeShoppingAmount(line.amount) +
+            (line.unit === 'piece' ? ' stuks ' : ' ' + line.unit + ' ') + clean(line.label)
+        })()
+    const label = clean(raw)
+    if (!label || label.length > 140 || !/[\p{L}\p{N}]/u.test(label))
+      throw new Error('Een receptomschrijving is te lang of ongeldig voor je eigen Lijst (maximaal 140 tekens).')
+    return label
+  })
 }

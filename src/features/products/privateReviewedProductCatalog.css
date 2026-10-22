@@ -51,3 +51,216 @@ padding:1rem;background:#f3f8f3;border:1px solid #cbdccb;border-radius:12px}
 .private-reviewed-products__progress small{line-height:1.45}
 @media(max-width:620px){.private-reviewed-products__progress{grid-template-columns:1fr}}
 .private-reviewed-products__age { display:block; margin:.35rem 0; padding:.6rem; border-left:3px solid #a47638; background:#faf5ea; color:#624c2c; line-height:1.45; }
+
+.private-reviewed-products__difference-focus{display:grid;gap:.35rem;padding:.8rem 1rem;
+background:#f3f8f3;border:1px solid #c0d3c2;border-radius:10px}
+.private-reviewed-products__difference-focus p{margin:0}
+.private-reviewed-products__difference-focus small{line-height:1.45}
+.private-reviewed-products__source-revisit{display:grid;gap:.5rem;padding:.75rem 1rem;
+ border:1px solid #d9caa8;border-left:4px solid #a47638;border-radius:10px;background:#fbf6ea}
+.private-reviewed-products__source-revisit p{margin:0}
+.private-reviewed-products__source-revisit small{line-height:1.45}
+.private-reviewed-products__source-revisit button{justify-self:start}
+
+.private-reviewed-products__receipt-actions{display:flex;flex-wrap:wrap;align-items:start;gap:.65rem}
+.private-reviewed-products__receipt-actions button{flex:1 1 260px}
+.private-reviewed-products__receipt-actions small,.private-reviewed-products__receipt-actions p{flex:1 1 100%;margin:0;line-height:1.45}
+
+.private-reviewed-products__advantage-filter{display:flex;flex-wrap:wrap;gap:.55rem}
+.private-reviewed-products__advantage-filter button{flex:1 1 180px}
+.private-reviewed-products__advantage-filter button[aria-pressed=true]{border-color:#236d4d;
+background:#e7f4eb;color:#255336;font-weight:650}
+
+.private-reviewed-products__unit-caveat{padding:.65rem .8rem;border-left:3px solid #a47638;background:#faf5ea;color:#624c2c;line-height:1.45}
+
+/* Keep standalone trip tools reachable after both sources are matched, without
+   making the paired price difference or primary shopping route disappear. */
+.private-reviewed-products__single-shop-panel{padding:.85rem;border:1px solid #cbdccb;
+  border-radius:12px;background:#f8faf8}
+.private-reviewed-products__single-shop-panel>summary{cursor:pointer;font-weight:650;
+  padding:.45rem;min-height:44px;display:list-item}
+.private-reviewed-products__single-shop-panel .private-reviewed-products__source-coverage{
+  margin:.65rem 0}
+.private-reviewed-products__single-shop-panel>small{display:block;line-height:1.5}
+.private-reviewed-products__single-trip-actions{display:grid;gap:.5rem;min-width:0}
+.private-reviewed-products__single-trip-actions button{width:100%;text-align:left}
+.private-reviewed-products__shop-progress{display:grid;gap:.4rem;padding:.65rem;
+  border-radius:9px;background:#eef5ef;border:1px solid #ccdacd;min-width:0}
+.private-reviewed-products__shop-progress label{display:grid;gap:.25rem;font-size:.9rem}
+.private-reviewed-products__shop-progress progress{width:100%;height:12px;accent-color:#27734c}
+.private-reviewed-products__shop-progress strong{font-size:1rem}
+.private-reviewed-products__shop-progress small{line-height:1.45}
+
+.private-reviewed-products__trip-cost{display:grid;gap:.55rem;padding:1rem;
+  border:1px solid #b8d0bd;border-radius:12px;background:#fff}
+.private-reviewed-products__trip-cost label{display:grid;gap:.3rem;font-weight:650}
+.private-reviewed-products__trip-cost input{max-width:220px}
+.private-reviewed-products__trip-cost p{line-height:1.5}
+.private-reviewed-products__trip-cost [role=alert]{color:#8b3b23;font-weight:650}
+.private-reviewed-products__trip-cost small{line-height:1.45}
+
+.private-reviewed-products__manual-copy{display:grid;gap:.6rem;min-width:0;
+  border:1px solid #c5d8c7;padding:1rem;border-radius:12px;background:#f5faf6}
+.private-reviewed-products__manual-copy p{line-height:1.5;margin:0}
+.private-reviewed-products__manual-copy textarea{width:100%;box-sizing:border-box;
+  resize:vertical;min-height:140px;padding:.7rem;border-radius:8px;
+  font:13px/1.5 ui-monospace,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+
+.private-reviewed-products__shopping-filter{display:flex;gap:.55rem;flex-wrap:wrap;
+  padding:.7rem;background:#edf5ee;border:1px solid #cbdccb;border-radius:12px}
+.private-reviewed-products__shopping-filter button{flex:1 1 160px}
+.private-reviewed-products__shopping-filter button[aria-pressed=true]{background:#dbefdf;
+  border-color:#236d4d;font-weight:700;color:#204c32}
+
+
+/* Missing physical products are not zero-priced items: keep the incomplete
+   weekly basket's unresolved ingredient list visible next to known costs. */
+.private-reviewed-products__missing {
+  padding:.8rem;
+  background:#fff9ee;
+  border:1px solid #d8bb80;
+  border-radius:10px;
+  min-width:0;
+}
+.private-reviewed-products__missing summary {
+  min-height:44px;
+  cursor:pointer;
+  font-weight:650;
+  align-content:center;
+}
+.private-reviewed-products__missing ul {
+  padding-left:1.3rem;
+  margin:.65rem 0;
+  max-height:260px;
+  overflow:auto;
+  overflow-wrap:anywhere;
+}
+.private-reviewed-products__missing li { padding:.25rem 0; }
+.private-reviewed-products__missing button { margin-top:.4rem; width:100%; }
+
+
+/* The shopper can still recover missing SKU / price inputs when every match
+   is unresolved; the whole basket must not appear as a zero-euro basket. */
+.private-reviewed-products__missing-empty {
+  display:grid;
+  gap:.75rem;
+  padding:.9rem;
+  border:1px solid #d8bb80;
+  border-radius:12px;
+  background:#fffaf1;
+}
+.private-reviewed-products__missing-empty > p { margin:0; }
+
+
+/* Separate unpriced capture progress from the admitted whole-pack price ledger.
+   This can render even when zero complete retailer baskets are available. */
+.private-reviewed-products__capture-progress {
+  display:grid; gap:.7rem; padding:1rem; background:#edf6ef;
+  border:1px solid #aecfb6; border-radius:14px; min-width:0;
+}
+.private-reviewed-products__capture-progress h3,
+.private-reviewed-products__capture-progress p { margin:0; }
+.private-reviewed-products__capture-grid {
+  display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.8rem;
+}
+.private-reviewed-products__capture-grid article {
+  display:grid; gap:.6rem; align-content:start; min-width:0; padding:.85rem;
+  border:1px solid #c5d9ca; border-radius:12px; background:white;
+}
+.private-reviewed-products__capture-grid article h4 { margin:0; }
+.private-reviewed-products__capture-grid progress { width:100%; height:12px; accent-color:#236d4d; }
+.private-reviewed-products__capture-grid small { line-height:1.5; }
+.private-reviewed-products__capture-grid .private-reviewed-products__missing ul {
+  display:grid; gap:.5rem; list-style:none; padding:0;
+}
+.private-reviewed-products__capture-grid .private-reviewed-products__missing li {
+  display:grid; gap:.35rem; overflow-wrap:anywhere;
+  padding:.6rem; background:white; border-radius:8px;
+}
+@media(max-width:650px) {
+  .private-reviewed-products__capture-grid { grid-template-columns:1fr; }
+}
+
+
+/* Admitted individual private pack prices remain separate from a complete basket total. */
+.private-reviewed-products__confirmed-lines {
+  border:1px solid #b9d2c2; border-radius:10px; background:#f7fbf7; padding:.65rem;
+}
+.private-reviewed-products__confirmed-lines summary {
+  min-height:44px; cursor:pointer; font-weight:650; align-content:center;
+}
+.private-reviewed-products__confirmed-lines ul {
+  list-style:none; display:grid; gap:.6rem; margin:.5rem 0 0; padding:0;
+  max-height:420px; overflow:auto;
+}
+.private-reviewed-products__confirmed-lines li {
+  display:grid; gap:.35rem; padding:.65rem; background:white;
+  border:1px solid #d5e4d9; border-radius:9px; overflow-wrap:anywhere;
+}
+.private-reviewed-products__confirmed-lines li button { justify-self:start; }
+
+/* Retain the central recipes/Planner Producten affordances. */
+.private-reviewed-products__own-upload{display:grid;gap:.6rem;background:white;border:1px dashed #abc8b1;border-radius:15px;padding:1rem}
+.private-reviewed-products__own-upload span{font-size:.9rem;line-height:1.5;color:#47624f}
+.private-reviewed-products__own-upload input{width:100%;max-width:100%}
+.private-reviewed-products__upload-error{color:#922b2b;font-weight:700}
+.private-reviewed-products__pending{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}
+.private-reviewed-products__pending article{display:grid;align-content:start;gap:.65rem;border:1px solid #d8e5d9;border-radius:15px;padding:1rem;background:white;min-width:0;overflow-wrap:anywhere}
+.private-reviewed-products__pending header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.4rem}
+.private-reviewed-products__pending h3{margin:0;font-size:1.05rem}
+.private-reviewed-products__pending header span{font-size:.82rem;color:#48624e}
+.private-reviewed-products__pending progress{width:100%;height:12px;accent-color:#2e7552}
+.private-reviewed-products__pending button{margin-top:auto}
+.private-reviewed-products__pending{grid-template-columns:1fr}
+.private-reviewed-products__trip-calculator{display:grid;gap:.65rem;padding:.85rem;
+background:#fff;border:1px solid #c0d3c2;border-radius:11px}
+.private-reviewed-products__trip-calculator label{display:grid;gap:.4rem}
+.private-reviewed-products__trip-calculator input{width:100%;max-width:340px}
+.private-reviewed-products__trip-calculator div{display:grid;gap:.4rem}
+.private-reviewed-products__trip-calculator :is(p,small){margin:0;line-height:1.45}
+.private-reviewed-products__trip-calculator [role=alert]{color:#922b2b;font-weight:700}
+.private-reviewed-products__paste-access{display:grid;gap:.35rem}
+.private-reviewed-products__paste-access small{line-height:1.45}
+.private-reviewed-products__match-queue{display:grid;gap:.5rem}
+.private-reviewed-products__match-queue ul{padding:0;margin:0;list-style:none;display:grid;gap:.45rem}
+.private-reviewed-products__match-queue li{display:flex;flex-wrap:wrap;align-items:center;
+justify-content:space-between;gap:.55rem;border:1px solid #d7e3d8;background:#fff;
+border-radius:9px;padding:.65rem}
+.private-reviewed-products__match-queue li>div{display:grid;gap:.2rem;min-width:0;overflow-wrap:anywhere}
+.private-reviewed-products__match-queue li small{line-height:1.4}
+.private-reviewed-products__match-queue li button{flex:0 1 auto}
+.private-reviewed-products__card-difference{padding:.65rem .75rem;border-radius:8px;
+background:#e7f4eb;border:1px solid #c0d3c2;color:#255336;font-weight:600;
+line-height:1.45}
+.private-reviewed-products__route-choice{font-weight:650;border-color:#236d4d!important;
+background:#e7f4eb!important}
+.private-reviewed-products__copy-fallback label{font-weight:650}
+.private-reviewed-products__copy-fallback textarea{display:block;width:100%;max-width:100%;box-sizing:border-box;
+  min-height:160px;padding:.75rem;border:1px solid #9aae9e;border-radius:8px;
+  font:inherit;font-size:.88rem;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;
+  color:#183c2a;background:#fff}
+.private-reviewed-products__copy-fallback textarea:focus-visible{
+  outline:3px solid #247a59;outline-offset:2px}
+.private-reviewed-products__copy-fallback button{justify-self:start}
+.private-reviewed-products__missing-transfer p{ margin:0; font-size:.9rem; line-height:1.5; }
+.private-reviewed-products__missing-transfer button{ width:100%; }
+@media(max-width:620px){.private-reviewed-products__pending{grid-template-columns:1fr}}
+
+/* Actual individually confirmed products can be browsed before a complete
+   basket exists, without making an incomplete cost a basket total. */
+.private-reviewed-products__partial-cards{display:grid;gap:.8rem;padding:1rem;
+  background:#f5f9f5;border:1px solid #d0dfd2;border-radius:14px;min-width:0}
+.private-reviewed-products__partial-cards h3{margin:0}
+.private-reviewed-products__partial-cards p{line-height:1.5;margin:0}
+.private-reviewed-products__partial-cards>.private-reviewed-products__grid{margin:.25rem 0}
+.private-reviewed-products__partial-cards article{align-content:start}
+.private-reviewed-products__partial-cards article button{margin-top:auto}
+
+/* Grocery in-store controls; never mistaken for retailer price approvals. */
+.private-reviewed-products__open-filter { display:flex!important; flex-direction:row;
+  align-items:center; gap:.55rem; min-width:min(220px,100%); }
+.private-reviewed-products__open-filter input { width:auto; flex:none; }
+.private-reviewed-products__bulk-shopping { display:flex; flex-wrap:wrap; align-items:center;
+  gap:.65rem 1rem; margin-block:.8rem 1.2rem; }
+.private-reviewed-products__bulk-shopping p { margin:0; }
+.private-reviewed-products__bulk-shopping small { flex:1 1 100%; }

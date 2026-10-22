@@ -54,6 +54,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
     selectedIndices: number[];
   } | null>(null)
   const [exportVisible, setExportVisible] = useState(false)
+  const [spreadsheetFallback, setSpreadsheetFallback] = useState('')
   const [message, setMessage] = useState('')
   const [lastRemoved, setLastRemoved] = useState<{ note: UnpricedShoppingNote; index: number } | null>(null)
   const [pendingDuplicateChoice, setPendingDuplicateChoice] = useState<{
@@ -435,6 +436,24 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
     } catch { setMessage('Kon de ongeprijsde CSV niet bewaren.') }
   }
+  async function copyOwnSpreadsheet() {
+    // Export all privately entered notes, not the currently filtered rows.
+    // The matching import route requires all four Supa columns.
+    const snapshot = exportUnpricedShoppingTsv(notes)
+    if (new TextEncoder().encode(snapshot).length > 32768) {
+      setMessage('De spreadsheetlijst is te groot; download de CSV in plaats daarvan.')
+      return
+    }
+    setSpreadsheetFallback('')
+    try {
+      if (!navigator.clipboard?.writeText) throw Error('clipboard unavailable')
+      await navigator.clipboard.writeText(snapshot)
+      setMessage('Alle eigen ongeprijsde boodschappen als vier kolommen gekopieerd. Plak in Excel/Calc, of plak de tabel later terug in Supa. Geen winkelprijzen.')
+    } catch {
+      setSpreadsheetFallback(snapshot)
+      setMessage('Automatisch kopiëren is niet beschikbaar. Selecteer de vier kolommen hieronder en kopieer ze zelf.')
+    }
+  }
   function downloadOwnTsv(mode: 'all' | 'visible' = 'all') {
     const rows = mode === 'visible' ? routeItems : notes
     if (!rows.length) return
@@ -505,7 +524,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       // No retailer prices or SKUs: still requires explicit review and confirmation.
       prepareOwnCsvPreview(source, extension === 'tsv')
     } catch (error) {
-      if (serial === bulkFileSerial.current) setMessage(error instanceof Error ? error.message : 'CSV geweigerd.')
+      if (serial === bulkFileSerial.current) setMessage(error instanceof Error ? error.message : 'CSV of TSV geweigerd.')
     }
   }
   function addBulk(event: FormEvent) {
@@ -1934,6 +1953,9 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       <button type="button" disabled={!notes.length} onClick={() => downloadOwnCsv('all')}>
         Hele eigen ongeprijsde lijst (CSV voor Excel)
       </button>
+      <button type="button" disabled={!notes.length} onClick={() => void copyOwnSpreadsheet()}>
+        Kopieer alle boodschappen als Excel-tabel (4 kolommen)
+      </button>
       <button type="button" disabled={!visible.length} onClick={() => downloadOwnTsv('visible')}>
         Zichtbare winkelronde (TSV voor Excel/Calc)
       </button>
@@ -1957,6 +1979,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
         {backupPreview.additions.length > 15 &&
           <li>En {backupPreview.additions.length - 15} andere nieuwe boodschappen.</li>}
       </ul>}
+
       <p>Bestaande artikelen en vinkjes worden niet overschreven. Dubbelen met een ander ID
         maar dezelfde winkel en omschrijving worden overgeslagen. Conflicterende IDs en meer
         dan 100 artikelen worden geweigerd. Niets wordt geüpload of geprijsd.</p>
@@ -1969,6 +1992,11 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       <button type="button" className="ghost-button" onClick={undoLastImport}>
         Herstel laatste import uit {lastImport.source} ({lastImport.added.length} eigen artikelen)
       </button>}
+    {spreadsheetFallback && <label>Vierkoloms Supa-tabel om handmatig te kopiëren
+      <textarea readOnly spellCheck={false} rows={7} value={spreadsheetFallback}
+        onFocus={event => event.currentTarget.select()} />
+      <small>Persoonlijke, ongeprijsde lijst op het moment van kopiëren; geen actuele winkelsnapshot.</small>
+    </label>}
     {exportVisible && visible.length > 0 && <label>Kopieer mijn ongeprijsde boodschappen
       <textarea rows={Math.min(selected.length + 6, 15)} readOnly value={exportText}
         onFocus={event => event.currentTarget.select()} /></label>}

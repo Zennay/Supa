@@ -33,8 +33,10 @@ const header = [
 export function literalCsv(value: unknown, signedMoneyDelta = false): string {
   const raw = String(value ?? '')
   // NFKC discovers compatibility characters (e.g. full-width equals);
-  // invisible marks may precede spreadsheet formula operators.
-  const prefix = /^[\p{White_Space}\p{Cf}\p{Mn}\p{Mc}\p{Me}]*[=+@-]/u
+  // invisible marks and format controls may precede formula operators.
+  // Apply the same conservative boundary to personal price reports and
+  // shopping-note exports; NFKC changes only inspection, not original text.
+  const prefix = /^[\p{White_Space}\p{Default_Ignorable_Code_Point}\p{Mark}]*[=+@\-\u2212]/u
   // A negative difference is canonical arithmetic, not untrusted formula text.
   // All other user-supplied text still receives conservative formula escaping.
   const text = signedMoneyDelta && /^-\d+$/.test(raw)

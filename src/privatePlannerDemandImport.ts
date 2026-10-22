@@ -94,7 +94,7 @@ const handoffKey = 'supa:private-planner-week-handoff:v1'
 const acceptHandoff = document.querySelector<HTMLButtonElement>('#week-handoff-accept')!
 const cancelHandoff = document.querySelector<HTMLButtonElement>('#week-handoff-cancel')!
 const currentLines = document.querySelector<HTMLElement>('#lines')!
-const preview = document.querySelector<HTMLElement>('#week-import-preview')!
+const preview = document.querySelector<HTMLDetailsElement>('#week-import-preview')!
 const previewItems = document.querySelector<HTMLOListElement>('#week-import-preview-items')!
 let stagedHandoff: PrivateDemand | null = null
 function presentStagedWeek(demand: PrivateDemand, source: string) {
@@ -120,6 +120,10 @@ function presentStagedWeek(demand: PrivateDemand, source: string) {
     previewItems.append(remaining)
   }
   preview.hidden = false
+  // The physical review is the purpose of this handoff. A collapsed
+  // details widget made the original ingredient preview effectively invisible
+  // even after navigating to the acceptance area.
+  preview.open = true
   info.textContent = source + ' staat klaar: ' +
     demand.selectedMealCount + ' geselecteerde maaltijden en ' +
     demand.ingredients.length + ' originele fysieke ingrediënten. ' +
@@ -133,6 +137,7 @@ function discardStage() {
   cancelHandoff.hidden = true
   cancelHandoff.disabled = true
   preview.hidden = true
+  preview.open = false
   previewItems.replaceChildren()
 }
 try {
@@ -142,7 +147,16 @@ try {
     window.sessionStorage.removeItem(handoffKey)
     if (!saved.length || new TextEncoder().encode(saved).length > maxBytes)
       throw Error('Het doorgestuurde weekmenu is leeg of te groot.')
-    presentStagedWeek(demandFromWeek(readWeek(JSON.parse(saved))), 'Jouw doorgestuurde Planner-week')
+    const handoff = demandFromWeek(readWeek(JSON.parse(saved)))
+    presentStagedWeek(handoff, 'Jouw doorgestuurde Planner-week')
+    // Direct recipe/Planner navigation should land at the actual pending
+    // review, not at the manual source form above it. Merely focus and scroll;
+    // never auto-accept or overwrite the user's existing product selections.
+    window.requestAnimationFrame(() => {
+      if (stagedHandoff !== handoff || preview.hidden) return
+      preview.scrollIntoView({ block: 'start', behavior: 'auto' })
+      acceptHandoff.focus({ preventScroll: true })
+    })
   }
 } catch {
   discardStage()
@@ -173,6 +187,22 @@ acceptHandoff.addEventListener('click', () => {
     ' maaltijden en ' + demand.ingredients.length + ' fysieke ingrediënten. ' +
     'Kies nu jouw werkelijk geobserveerde producten per winkel; onbekende prijzen blijven onbekend.'
   info.className = 'notice'
+  // Source capture/import lives above the demand section in the existing
+  // comparator. After accepting the real physical basket, offer visible
+  // shortcuts instead of leaving the user to hunt through earlier sections.
+  // These are navigation only: neither link imports a file, invents a price,
+  // nor changes an existing shop capture.
+  for (const [fragment, label] of [
+    ['#source-title', 'Open mijn bestaande PLUS/Deka bronbestanden'],
+    ['#manual-observations', 'Vul eigen echte winkelprijzen handmatig in'],
+  ] as const) {
+    const link = document.createElement('a')
+    link.href = fragment
+    link.textContent = label
+    link.style.display = 'inline-block'
+    link.style.margin = '10px 14px 0 0'
+    info.append(document.createElement('br'), link)
+  }
 })
 
 upload.addEventListener('change', async () => {

@@ -4,7 +4,7 @@ import { figmaAssets as a } from '../home/figmaAssets'
 import { createManualRecipeDraft, importRecipeFromHtml, type UserRecipeDraft } from '../../domain/userRecipeImport'
 import { safeRecipeSourceUrl } from '../../domain/recipeSourceUrl'
 import { RECIPE_LIBRARY_KEY, readRecipeLibrary, saveRecipeLibrary, reviewRecipe, retainUnresolvedRecipeReview, sourceOnlyRecipeWarnings, acknowledgeRecipeSourceWarnings, type LibraryState, type SavedRecipe } from './recipeLibrary.ts'
-import { importRecipeLink } from './importRecipeLink'
+import { importRecipeLink, RecipeLinkImportUnavailableError } from './importRecipeLink'
 import { importRecipeLinksCollection } from './importRecipeLinksCollection'
 import { importPlainTextRecipe } from './importPlainTextRecipe'
 import { importPlainTextRecipeCollection } from './importPlainTextRecipeCollection'
@@ -14,7 +14,7 @@ import { ownRecipeAsMarkdown } from './ownRecipeMarkdown'
 import { prepareRecipeBackupImport, serializeRecipeBackup, type RecipeBackupPreview, RECIPE_BACKUP_MAX_BYTES } from './recipeBackup'
 import { curatedFigmaRecipes } from './curatedFigmaRecipes'
 import { m2InitialPlan } from '../../data/m2Fixture'
-import { ownRecipeShoppingChecklist, formatOwnRecipeChecklist } from './recipeShoppingChecklist'
+import { ownRecipeShoppingChecklist, formatOwnRecipeChecklist, personalRecipeShoppingNoteLabels, readableRecipeShoppingAmount } from './recipeShoppingChecklist'
 import { ImportedRecipeGroceriesPanel } from './ImportedRecipeGroceriesPanel'
 import { exportOwnRecipeChecklistCsv } from './recipeShoppingCsv'
 import { toPlannerRecipe } from './plannerRecipes.ts'
@@ -76,7 +76,10 @@ function initialFavorites(): RecipeFavorites {
   catch { return { ids: [], raw: null, error: 'Favorieten kunnen niet worden geopend in deze browser.' } }
 }
 
-export function RecipeLibrary({ onBack }: { onBack: () => void }) {
+export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
+  onBack: () => void
+  onAddRecipeGroceries?: (labels: readonly string[]) => string | null
+}) {
   const [library, setLibrary] = useState(initialLibrary)
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<'all' | 'own' | 'favorites'>('all')
@@ -463,6 +466,39 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       setMessage(cause instanceof Error ? cause.message : 'Herstellen is niet gelukt; andere recepten zijn onaangeroerd.')
     }
   }
+  function addSingleRecipeToOwnList() {
+    if (!onAddRecipeGroceries || !selected || !('savedAt' in selected) ||
+        !ownShopping?.canCopy) return
+    try {
+      const source = selected
+      const assertCurrent = () => {
+        const latest = readRecipeLibrary(window.localStorage)
+        if (latest.error || !latest.recipes.some(item =>
+          item.id === source.id && JSON.stringify(item) === JSON.stringify(source)))
+          throw Error('Dit originele recept is in een ander tabblad gewijzigd of verwijderd. Open het opnieuw.')
+      }
+      assertCurrent()
+      const remaining = ownShopping.lines.filter(line =>
+        line.needsReview || shoppingChecks[line.key] !== true)
+      // The per-line scaler does not represent *global* import warnings.
+      // Respect the same source-review admission as the combined recipe List:
+      // a not-yet-admitted recipe can only contribute explicitly unreviewed
+      // questions, never seemingly confirmed quantities.
+      const sourceReviewed = !!toPlannerRecipe(source, { usage: 'unpriced-demand' })
+      const labels = personalRecipeShoppingNoteLabels(sourceReviewed ? remaining :
+        remaining.map(line => ({ ...line, needsReview: true })))
+      if (!window.confirm('Voeg ' + labels.length +
+          ' nog openstaande ingrediënten van dit eigen recept toe aan je ongeprijsde Lijst? ' +
+          'De gekozen porties gelden alleen voor deze lijst; je Planner, winkelprijzen en oude vinkjes blijven intact.')) return
+      assertCurrent()
+      const failure = onAddRecipeGroceries(labels)
+      if (failure) setPrivateWeekMessage(failure)
+    } catch (error) {
+      setPrivateWeekMessage(error instanceof Error ? error.message :
+        'De receptboodschappen konden niet veilig worden overgenomen.')
+    }
+  }
+
   function downloadOwnRecipeChecklist() {
     if (!ownShopping?.canCopy) return
     try {
@@ -796,7 +832,16 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       const draft = await importRecipeLink(url, controller.signal)
       if (controller.signal.aborted) return
       adoptImportedRecipe(draft, 'Recept opgehaald. Controleer de gegevens en sla het daarna op.')
-    } catch (e) { if (!controller.signal.aborted) setError(e instanceof Error ? e.message : 'Importeren is niet gelukt.') }
+    } catch (e) {
+      if (!controller.signal.aborted) {
+        if (e instanceof RecipeLinkImportUnavailableError) {
+          setMode('paste')
+          setError('Automatische linkimport is op deze website niet beschikbaar. De openbare link blijft behouden als bronvermelding. Open de receptpagina en upload lokaal opgeslagen HTML/JSON-LD of plak de JSON-LD hieronder; Supa verwerkt die lokaal zonder scripts uit te voeren.')
+        } else {
+          setError(e instanceof Error ? e.message : 'Importeren is niet gelukt.')
+        }
+      }
+    }
     finally { if (!controller.signal.aborted) setBusy(false) }
   }
   function adoptImportedRecipe(draft: UserRecipeDraft, messageText: string) {
@@ -1112,6 +1157,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       <summary>Maak één boodschappenlijst van mijn eigen recepten</summary>
       <ImportedRecipeGroceriesPanel recipes={library.recipes}
         recentIds={lastImportedIds} onEdit={recipe => openSavedRecipeEditor(recipe)}
+        onAddToOwnList={onAddRecipeGroceries}
         onSavePortionVariants={saveBatchPortionVariants} />
     </details>}
     <section className="recipe-backup-panel" aria-label="Eigen recepten meenemen naar een ander apparaat">
@@ -1329,7 +1375,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
                 <input type="checkbox" checked={!!shoppingChecks[line.key]}
                   onChange={event => setShoppingChecks(current => ({ ...current, [line.key]: event.currentTarget.checked }))} />
                 <span>{line.needsReview ? `${line.original} — hoeveelheid controleren`
-                  : `${line.amount?.toLocaleString('nl-NL', { maximumFractionDigits: 3 })} ${line.unit === 'piece' ? 'stuks' : line.unit} ${line.label}`}</span>
+                  : `${line.amount === null ? 'hoeveelheid controleren' : readableRecipeShoppingAmount(line.amount)} ${line.unit === 'piece' ? 'stuks' : line.unit} ${line.label}`}</span>
               </label>
             </li>)}</ul>
             {!shoppingVisible.length && <p role="status">Alle boodschappen voor dit recept afgevinkt.</p>}
@@ -1341,6 +1387,10 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
               aria-label="Kopieer mijn ongeprijsde boodschappenlijst"
               value={selectedRecipeShoppingText} onFocus={event => event.currentTarget.select()} />}
             {showShoppingCopy && <button type="button" onClick={() => shoppingCopy.current?.select()}>Selecteer alle tekst</button>}
+            {onAddRecipeGroceries && <button type="button"
+              onClick={addSingleRecipeToOwnList}>
+              Zet openstaande ingrediënten van dit recept op Lijst
+            </button>}
             <button type="button" onClick={downloadOwnRecipeChecklist}>Download ongeprijsde lijst (TXT)</button>
             <button type="button" onClick={downloadOwnRecipeChecklistCsv}>Download ongeprijsde lijst (CSV)</button>
             <button type="button" onClick={downloadForPrivateComparison}>Gebruik dit recept in winkelvergelijker (JSON)</button>

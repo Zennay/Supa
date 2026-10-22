@@ -6,7 +6,9 @@ export type ManualRetailer = 'PLUS' | 'DekaMarkt'
 export type ManualQuote = Readonly<{
   product: string
   packAmount: string
-  packUnit: MatchUnit
+  packUnit: MatchUnit | ''
+  /** Explicit count of units inside one physically priced multipack. */
+  packCount?: string
   price: string
 }>
 export type ManualEntries = Record<string, ManualQuote>
@@ -61,29 +63,56 @@ export function manualPriceCents(raw: string): number | null {
   return Number.isSafeInteger(cents) && cents >= 0 && cents <= 999999 ? cents : null
 }
 
+/** Exact half-up cent rate for an entered physical multipack, without binary float rounding.
+ * Whole-pack basket cents remain the sole authority for store totals. */
+function exactManualUnitPriceCents(
+  rawAmount: string, unit: MatchUnit, count: number, cents: number,
+): number | null {
+  const [whole, fraction = ''] = rawAmount.trim().replace(',', '.').split('.')
+  if (!/^(?:0|[1-9]\d{0,5})$/.test(whole) || !/^\d{0,6}$/.test(fraction) ||
+      !Number.isSafeInteger(count) || count < 1 ||
+      !Number.isSafeInteger(cents) || cents < 0) return null
+  const quantity = BigInt(whole + fraction)
+  const baseFactor = unit === 'kg' || unit === 'l' ? 1000n : 1n
+  const rateFactor = unit === 'piece' ? 1n : 1000n
+  const denominator = quantity * baseFactor * BigInt(count)
+  if (denominator <= 0n) return null
+  const numerator = BigInt(cents) * rateFactor * 10n ** BigInt(fraction.length)
+  const roundedCents = (2n * numerator + denominator) / (2n * denominator)
+  return roundedCents <= BigInt(Number.MAX_SAFE_INTEGER)
+    ? Number(roundedCents) : null
+}
+
 function evaluatedQuote(need: ManualNeed, quote: ManualQuote | undefined) {
   const empty = { state: 'missing' as const, packs: null, lineCents: null, unitPriceCents: null }
   if (!quote || !quote.product.trim() && !quote.packAmount.trim() && !quote.price.trim()) return empty
   const amount = amountValue(quote.packAmount)
+  const countRaw = quote.packCount ?? ''
+  const count = /^(?:[1-9]\d{0,2}|1000)$/.test(countRaw) ? Number(countRaw) : null
   const cents = manualPriceCents(quote.price)
   const name = quote.product.trim()
   if (need.amount === null || !Number.isFinite(need.amount) || need.amount <= 0 ||
       name.length < 2 || name.length > 160 || /[\u0000-\u001f\u007f]/u.test(name) ||
-      !unitsFor(need.unit).includes(quote.packUnit) || amount === null || cents === null) {
+      !unitsFor(need.unit).includes(quote.packUnit as MatchUnit) ||
+      amount === null || count === null || cents === null ||
+      // An indivisible item cannot form a valid fractional shopping demand
+      // or a fractional physical pack, even if decimal arithmetic could round
+      // the resulting number of packages up.
+      (need.unit === 'piece' && !Number.isSafeInteger(need.amount)) ||
+      (quote.packUnit === 'piece' && !Number.isSafeInteger(amount))) {
     return { state: 'invalid' as const, packs: null, lineCents: null, unitPriceCents: null }
   }
   const packs = calculateDecimalPackCount(
     [{ amount: need.amount, unit: need.unit }],
-    { amount, unit: quote.packUnit, count: 1 },
+    { amount, unit: quote.packUnit as MatchUnit, count },
   )
   if (packs === null || packs > 10000 || !Number.isSafeInteger(packs * cents) ||
       packs * cents > 100000000) {
     return { state: 'invalid' as const, packs: null, lineCents: null, unitPriceCents: null }
   }
-  const baseAmount = (quote.packUnit === 'kg' || quote.packUnit === 'l') ? amount * 1000 : amount
-  const unitPriceCents = baseAmount > 0 && quote.packUnit !== 'piece'
-    ? Math.round(1000 * cents / baseAmount)
-    : null // EUR per kg or liter, in cents, for this one entered pack.
+  const unitPriceCents = exactManualUnitPriceCents(
+    quote.packAmount, quote.packUnit as MatchUnit, count, cents,
+  ) // Private display only: cents per kg, liter or piece, never basket cents.
   return {
     state: 'complete' as const,
     packs,

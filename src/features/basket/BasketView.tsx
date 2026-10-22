@@ -125,9 +125,10 @@ export function BasketView({
             Deze oudere rekenhulp werkt uitsluitend met losse, door jou ingetypte bedragen;
             er is geen bronmoment, SKU-bewijs of overgang naar geverifieerde winkelmandjes.</p>
           {openedManualFallback && <Suspense fallback={<p role="status">Rekenhulp openen…</p>}>
+            {/* Keep the component mounted across Planner changes. Its own strict
+                demand signature quarantines old entries and offers a private
+                export; a demand-derived React key previously discarded them. */}
             <ManualStoreComparison
-              key={JSON.stringify([manualPlan, manualActiveDays,
-                manualRecipes.map(recipe => [recipe.id, recipe.ingredients])])}
               plan={manualPlan}
               recipes={manualRecipes}
               activeDays={manualActiveDays}

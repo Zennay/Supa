@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { privateTwoStoreCoverageCsv, privateTwoStoreCoverageText, type CoverageExportLine } from './twoStoreCoverageExport.ts'
 import { freshReviewedBaskets, recentOwnCaptureInstant, type PrivateCaptureProgress, type PrivateReviewedBaskets, type OwnStore } from '../comparison/privateReviewedBasketBridge.ts'
-import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
+import { readablePlannerDemandAmount, type PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
 import './plannerTwoStoreCoverage.css'
 
 const STORES = ['PLUS', 'DekaMarkt'] as const
@@ -20,7 +20,29 @@ function cellFor(
   // whole-pack ledger for each export action. An old React prop is no longer
   // enough to call an otherwise visible store "ready".
   const receipt = admitted?.stores[store]
-  if (receipt) return { kind: 'ready', text: 'Heel mandje gecontroleerd' }
+  if (receipt) {
+    // A canonical source may be partially priced. Do not turn admission
+    // of the envelope into an approval for every physical ingredient.
+    const matches = receipt.basket.lines.filter(line => line.id === id)
+    if (matches.length !== 1) return {
+      kind: 'review', text: 'Ingrediënt ontbreekt in deze bronmand: controle vereist',
+    }
+    const line = matches[0]
+    if (line.status === 'matched') {
+      const full = receipt.basket.unresolvedLineCount === 0 &&
+        receipt.basket.matchedLineCount === receipt.basket.lines.length &&
+        receipt.basket.lines.length > 0
+      return { kind: 'ready', text: full
+        ? 'SKU, verpakking en volledig mandje bevestigd'
+        : 'SKU en verpakking bevestigd · ander ingrediënt nog ongeprijsd' }
+    }
+    const previous = progress?.stores[store]
+    if (previous?.fresh && previous.observedAt === receipt.observedAt &&
+        previous.awaitingReviewIngredients.some(item => item.id === id)) return {
+      kind: 'review', text: 'Controleer originele SKU en verpakking',
+    }
+    return { kind: 'missing', text: 'Fysiek ingrediënt nog zonder bevestigde prijs' }
+  }
   if (reviewed?.stores[store]) return {
     kind: 'expired', text: 'Bron verlopen of mandregels gewijzigd: controle vereist',
   }
@@ -35,15 +57,20 @@ function cellFor(
   if (capture.awaitingReviewIngredients.some(item => item.id === id)) {
     return { kind: 'review', text: 'Controleer originele SKU en verpakking' }
   }
-  if (capture.demandLineCount < 1) return { kind: 'review', text: 'Koppeling nog niet beoordeeld' }
-  return { kind: 'reviewed', text: 'SKU gekoppeld · mandje nog onvolledig' }
+  // Only the actual admitted and owner-reviewed SKU detail may count as a
+  // locally linked ingredient. Non-missing progress counters are not proof.
+  const confirmed = capture.confirmedSourceLines?.filter(item => item.ingredientId === id) ?? []
+  if (confirmed.length === 1) return {
+    kind: 'reviewed',
+    text: 'Originele SKU gekoppeld · volledig mandtotaal nog onbekend',
+  }
+  return { kind: 'review', text: 'Productmatch nog niet persoonlijk bevestigd' }
 }
 
 function amountText(need: PlannerCaptureGuideNeed): string {
-  return typeof need.amount === 'number' && Number.isFinite(need.amount) &&
-    need.amount > 0 && need.amount <= 1_000_000
-    ? `${need.amount.toLocaleString('nl-NL', { useGrouping: false, maximumFractionDigits: 3 })} ${need.unit}`
-    : 'Hoeveelheid nog controleren'
+  const amount = readablePlannerDemandAmount(need.amount)
+  return amount === 'hoeveelheid nog controleren'
+    ? 'Hoeveelheid nog controleren' : amount + ' ' + need.unit
 }
 
 export function PlannerTwoStoreCoverage({
@@ -84,10 +111,10 @@ export function PlannerTwoStoreCoverage({
   const nextAction = (
     pending.flatMap(({ need, cells }) => STORES.map((store, index) => ({
       need, store, cell: cells[index],
-    }))).find(item => item.cell.kind === 'review' || item.cell.kind === 'missing') ??
+    })).filter(item => storeFilter === 'both' || item.store === storeFilter)).find(item => item.cell.kind === 'review' || item.cell.kind === 'missing') ??
     pending.flatMap(({ need, cells }) => STORES.map((store, index) => ({
       need, store, cell: cells[index],
-    }))).find(item => item.cell.kind === 'source' || item.cell.kind === 'expired') ??
+    })).filter(item => storeFilter === 'both' || item.store === storeFilter)).find(item => item.cell.kind === 'source' || item.cell.kind === 'expired') ??
     null
   )
   function openNextAction() {
@@ -113,13 +140,19 @@ export function PlannerTwoStoreCoverage({
     const cell = item.cells[storeFilter === 'PLUS' ? 0 : 1]
     return cell.kind !== 'ready' && cell.kind !== 'reviewed'
   })
-  function exportRows(at: number): CoverageExportLine[] {
+  function exportRows(
+    at: number, onlyOpen = false, selected: 'both' | OwnStore = 'both',
+  ): CoverageExportLine[] {
     // A previously rendered tab may have crossed its freshness boundary.
     // Recheck before emitting the private, locally downloadable status list.
     const current = freshReviewedBaskets(safeReviewed, safeReviewed?.planKey ?? '', at)
     return needs.map(need => {
       const plus = cellFor('PLUS', need.id, safeProgress, safeReviewed, current, at)
       const deka = cellFor('DekaMarkt', need.id, safeProgress, safeReviewed, current, at)
+      const plusOpen = plus.kind !== 'ready' && plus.kind !== 'reviewed'
+      const dekaOpen = deka.kind !== 'ready' && deka.kind !== 'reviewed'
+      if (onlyOpen && !(selected === 'both' ? plusOpen || dekaOpen :
+        selected === 'PLUS' ? plusOpen : dekaOpen)) return null
       return {
         ingredientId: need.id, ingredient: need.label, demand: amountText(need),
         plusStatus: plus.text,
@@ -129,7 +162,7 @@ export function PlannerTwoStoreCoverage({
         dekaObservedAt: safeProgress?.stores.DekaMarkt?.observedAt ??
           safeReviewed?.stores.DekaMarkt?.observedAt ?? '',
       }
-    })
+    }).filter((line): line is CoverageExportLine => line !== null)
   }
   function downloadCoverage() {
     setExportMessage('')
@@ -168,6 +201,76 @@ export function PlannerTwoStoreCoverage({
       } catch { setExportMessage('Lijst is gewijzigd of te groot. Open de actuele Planner opnieuw.') }
     }
   }
+  // Export a worklist, not the filtered screen slice: no ingredient is lost
+  // because the user happened to search for another product before leaving.
+  // Recalculate original SKU/source freshness *at click time*.
+  const openForFilter = items.filter(item =>
+    storeFilter === 'both' ? item.cells.some(cell =>
+      cell.kind !== 'ready' && cell.kind !== 'reviewed')
+      : (() => {
+          const target = item.cells[storeFilter === 'PLUS' ? 0 : 1]
+          return target.kind !== 'ready' && target.kind !== 'reviewed'
+        })()).length
+  const worklistTarget = storeFilter === 'both' ? 'beide winkels' : storeFilter
+
+  function exportWorklist(kind: 'csv' | 'copy' | 'share') {
+    const rows = exportRows(Date.now(), true, storeFilter)
+    setExportMessage('')
+    setSelectableText('')
+    if (!rows.length) {
+      setExportMessage('Geen openstaande broncontroles voor deze winkelkeuze. Er is geen werkblad gemaakt.')
+      return
+    }
+    if (kind === 'csv') {
+      try {
+        const csv = privateTwoStoreCoverageCsv(rows)
+        const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+        try {
+          const link = document.createElement('a')
+          link.href = url
+          link.download = 'supa-openstaande-broncontroles-' +
+            (storeFilter === 'both' ? 'PLUS-DekaMarkt' : storeFilter) + '.csv'
+          document.body.append(link)
+          try { link.click() } finally { link.remove() }
+        } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+        setExportMessage(rows.length + ' nog te controleren ingrediënten voor ' +
+          worklistTarget + ' lokaal opgeslagen. Dit werkblad bevat geen prijzen.')
+      } catch (error) {
+        setExportMessage(error instanceof Error ? error.message : 'Werkblad downloaden mislukt.')
+      }
+      return
+    }
+    let text: string
+    try { text = privateTwoStoreCoverageText(rows) }
+    catch (error) {
+      setExportMessage(error instanceof Error ? error.message : 'Werkblad niet beschikbaar.')
+      return
+    }
+    if (kind === 'share' && typeof navigator.share === 'function') {
+      void navigator.share({ title: 'Mijn openstaande supermarktbroncontroles', text })
+        .then(() => setExportMessage(rows.length + ' openstaande broncontroles aangeboden aan het deelmenu.'))
+        .catch(error => {
+          if (error instanceof DOMException && error.name === 'AbortError') {
+            setExportMessage('Delen geannuleerd. Je originele brongegevens zijn behouden.')
+          } else {
+            setSelectableText(text)
+            setExportMessage('Delen geweigerd. Kopieer de tekst hieronder handmatig.')
+          }
+        })
+      return
+    }
+    if (!navigator.clipboard?.writeText) {
+      setSelectableText(text)
+      setExportMessage('Klembord niet beschikbaar. Selecteer de openstaande broncontroles hieronder.')
+      return
+    }
+    void navigator.clipboard.writeText(text)
+      .then(() => setExportMessage(rows.length + ' openstaande broncontroles gekopieerd zonder prijzen.'))
+      .catch(() => {
+        setSelectableText(text)
+        setExportMessage('Kopiëren niet toegestaan. Selecteer de lijst hieronder.')
+      })
+  }
   return <section className="supa-two-store-coverage" aria-labelledby="supa-coverage-heading">
     <div className="supa-two-store-coverage__heading">
       <div>
@@ -195,9 +298,12 @@ export function PlannerTwoStoreCoverage({
                 : 'Controleer ' + nextAction.need.label + ' bij ' + nextAction.store}
             </button>
           </>
-          : <p>Alle ingrediënten lijken gekoppeld, maar een betrouwbaar volledig
-            prijsverschil is nog onbekend. Controleer de bronmomenten en volledige
-            verpakkingen via Vergelijk.</p>}
+          : <p>{storeFilter !== 'both' && pending.length > 0
+            ? 'Voor ' + storeFilter + ' zijn geen openstaande ingrediëntcontroles; ' +
+              'de andere winkel heeft nog aandacht nodig. Kies Beide winkels om verder te gaan.'
+            : 'Alle ingrediënten lijken gekoppeld, maar een betrouwbaar volledig ' +
+              'prijsverschil is nog onbekend. Controleer de bronmomenten en volledige ' +
+              'verpakkingen via Vergelijk.'}</p>}
     </div>
     <div className="supa-two-store-coverage__export-actions">
       <button type="button" className="ghost-button" onClick={downloadCoverage}>
@@ -206,6 +312,27 @@ export function PlannerTwoStoreCoverage({
       <button type="button" className="ghost-button" onClick={() => void copyCoverage()}>
         Kopieer mijn twee-winkelcontrolelijst
       </button>
+    </div>
+    <div className="supa-two-store-coverage__export-actions"
+      role="group" aria-label="Alleen openstaande winkelbroncontroles meenemen">
+      <strong>{openForFilter} openstaande ingrediënten voor {worklistTarget}</strong>
+      <label>Kies winkel voor mijn werkblad
+        <select value={storeFilter}
+          onChange={event => setStoreFilter(event.currentTarget.value as 'both' | OwnStore)}>
+          <option value="both">Beide winkels</option>
+          <option value="PLUS">PLUS</option>
+          <option value="DekaMarkt">DekaMarkt</option>
+        </select>
+      </label>
+      <p>Neem uitsluitend nog te controleren originele PLUS-/DekaMarkt-ingrediënten mee.
+        Deze selectie is gebaseerd op de actuele bronstatus en niet op een zoekfilter;
+        het andere winkelresultaat blijft per ingrediënt ter context zichtbaar.</p>
+      <button type="button" className="ghost-button" disabled={openForFilter === 0}
+        onClick={() => exportWorklist('csv')}>Download openstaande controles (Excel-CSV)</button>
+      <button type="button" className="ghost-button" disabled={openForFilter === 0}
+        onClick={() => exportWorklist('copy')}>Kopieer mijn openstaande controles</button>
+      <button type="button" className="ghost-button" disabled={openForFilter === 0}
+        onClick={() => exportWorklist('share')}>Deel openstaande controles (mobiel)</button>
     </div>
     {exportMessage && <p role="status">{exportMessage}</p>}
     {selectableText && <textarea readOnly rows={10} value={selectableText}

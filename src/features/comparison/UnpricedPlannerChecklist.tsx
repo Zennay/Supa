@@ -6,6 +6,7 @@ import type { UnpricedShoppingNote } from '../shopping-list/ManualShoppingNotes.
 import { exportUnpricedProgress, importUnpricedProgress, unpricedProgressMaxBytes, unpricedProgressStorageKey } from './unpricedPlannerProgress.ts'
 import { exportPrivatePlannerWeek } from './exportPrivatePlannerWeek.ts'
 import { exportUnpricedPlannerCsv } from './unpricedPlannerCsv.ts'
+import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
 import './unpricedPlannerChecklist.css'
 
 type ChecklistProps = {
@@ -24,15 +25,21 @@ const unitLabels: Record<string, string> = {
 const itemKey = (item: DemandRow) => JSON.stringify([
   item.id, item.label, item.amount, item.unit,
 ])
-const quantity = (item: DemandRow) =>
-  (item.amount === null ? 'hoeveelheid onbekend' :
-    item.amount.toLocaleString('nl-NL') + ' ' + (unitLabels[item.unit] ?? item.unit))
+const quantity = (item: DemandRow) => {
+  const amount = readablePlannerDemandAmount(item.amount)
+  return amount === 'hoeveelheid nog controleren'
+    ? 'hoeveelheid onbekend'
+    : amount.replace('.', ',') + ' ' + (unitLabels[item.unit] ?? item.unit)
+}
 // Portable TXT must never use grouping (1.250 is ambiguous with 1.25), nor
 // silently round decimal quantities. The existing strict importer decides
 // whether every original amount is physically admissible.
-const portableQuantity = (item: DemandRow) =>
-  item.amount === null ? 'hoeveelheid nog controleren (' + item.unit + ')' :
-    String(item.amount).replace('.', ',') + ' ' + (unitLabels[item.unit] ?? item.unit)
+const portableQuantity = (item: DemandRow) => {
+  const amount = readablePlannerDemandAmount(item.amount)
+  return amount === 'hoeveelheid nog controleren'
+    ? 'hoeveelheid nog controleren (' + item.unit + ')'
+    : amount.replace('.', ',') + ' ' + (unitLabels[item.unit] ?? item.unit)
+}
 
 /**
  * The exact physical week demand, independent of either supermarket.

@@ -1,6 +1,6 @@
 # Supa: privéboodschappen uitwisselen als CSV
 
-De persoonlijke **ongeprijsde** boodschappenlijst kan als puntkomma-CSV of tab-gescheiden TSV worden gedownload en geïmporteerd. De gebruiker kan eerst een leeg invulblad ophalen. Dit staat los van de afzonderlijke import van rechtmatig verkregen supermarktprijsbladen: er wordt geen SKU, winkelprijs, productmatch of retailersource afgeleid uit een persoonlijke CSV.
+De persoonlijke **ongeprijsde** boodschappenlijst kan als puntkomma-CSV of tab-gescheiden TSV worden gedownload en geïmporteerd. De gebruiker kan eerst een leeg invulblad ophalen. Dit staat los van de afzonderlijke import van rechtmatig verkregen supermarktprijsbladen: er wordt geen SKU, winkelprijs, productmatch of retailersource afgeleid uit een persoonlijke CSV. De volledige privélijst kan bovendien zonder opslag als Excel/Calc-tabel naar het klembord worden gekopieerd.
 
 ## Werkwijze
 
@@ -10,6 +10,8 @@ De persoonlijke **ongeprijsde** boodschappenlijst kan als puntkomma-CSV of tab-g
 4. De ingelezen regels verschijnen in de bestaande tekstinvoer. Kies daarna **Bekijk artikelen vóór toevoegen** en bevestig de voorinzage. Bestaande artikelen per winkel en bestaande vinkjes blijven behouden.
 
 CSV- én TSV-uitvoer zetten potentieel uitvoerbare spreadsheetformules om naar letterlijke tekst met een apostrof, en maken ook oorspronkelijke apostrofs omkeerbaar. Download in de Lijst de **zichtbare winkelronde** of de **hele privélijst** als `.tsv`; beide blijven ongeprijsd. Dezelfde gedownloade TSV kan na lokaal bewerken via de bestaande bestandsimport terug naar Supa, steeds met expliciete voorinzage. Invoer voert nooit spreadsheetfuncties uit. De browser uploadt hierbij niets. Persoonlijke artikelen blijven buiten Planner-ingredientvraag, supermarktverificatie, mandprijzen en besparingsclaims.
+
+De knop **Kopieer alle boodschappen als Excel-tabel (4 kolommen)** kopieert de complete persoonlijke lijst onafhankelijk van zichtbare filters. Als klembordrechten ontbreken verschijnt een selecteerbare tabel.
 
 De JSON-backup blijft de volledige private gegevensbackup. TXT, kopieertekst, mobiel delen en offline HTML-print blijven onafhankelijk beschikbaar.
 
