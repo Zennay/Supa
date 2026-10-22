@@ -24,7 +24,7 @@ export function PrivatePartialProductCards({
   progress, reviewed, now, onReviewIngredient, onOpenComparison, incomingSearch,
 }: {
   progress: PrivateCaptureProgress
-  incomingSearch?: { serial: number; text: string }
+  incomingSearch?: { serial: number; text: string; store?: 'all' | OwnStore }
   reviewed: PrivateReviewedBaskets | null
   now: number
   onReviewIngredient: (store: OwnStore, ingredientId: string) => void
@@ -35,10 +35,11 @@ export function PrivatePartialProductCards({
   useEffect(() => {
     if (!incomingSearch?.serial) return
     setQuery(incomingSearch.text.slice(0, 120))
-    setStore('both')
+    setStore(incomingSearch.store === 'PLUS' || incomingSearch.store === 'DekaMarkt'
+      ? incomingSearch.store : 'both')
     setUnit('all')
     setSort('source')
-  }, [incomingSearch?.serial, incomingSearch?.text])
+  }, [incomingSearch?.serial, incomingSearch?.text, incomingSearch?.store])
   const [unit, setUnit] = useState<Unit>('all')
   const [sort, setSort] = useState<Sort>('source')
   const [message, setMessage] = useState('')
