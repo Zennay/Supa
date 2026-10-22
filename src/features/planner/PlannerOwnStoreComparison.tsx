@@ -30,6 +30,7 @@ import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureG
 import { validCustomWeekBudgetEuros } from './customWeekBudget.ts'
 import { euro as exactEuro } from '../../lib/money.ts'
 import { confirmedPartialBasket } from './confirmedPartialBasket.ts'
+import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import './plannerOwnStoreComparison.css'
 
 const stores = ['PLUS', 'DekaMarkt'] as const
@@ -497,9 +498,12 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       'Geselecteerde ingrediënten: ' + selected.length + ' van ' + paired.lines.length,
       '',
       ...selected.flatMap(line => [
-        oneLine(line.ingredientLabel),
+        oneLine(line.ingredientLabel) + ' · benodigde hoeveelheid: ' +
+          String(line.plus.requirement.amount) + ' ' + line.plus.requirement.unit,
         priceLine('PLUS', line.plus),
+        'PLUS indicatieve eenheidsprijs: ' + (privateUnitPrice(line.plus) ?? 'onbekend'),
         priceLine('DekaMarkt', line.deka),
+        'DekaMarkt indicatieve eenheidsprijs: ' + (privateUnitPrice(line.deka) ?? 'onbekend'),
         line.deltaCents === 0 ? 'Regelprijs: gelijk' :
           'Regelprijsverschil: ' + exactEuro.formatCents(Math.abs(line.deltaCents)) +
           ' lager bij ' + (line.deltaCents > 0 ? 'PLUS' : 'DekaMarkt'),
