@@ -39,6 +39,7 @@ export function createRecipeServer({ root = resolve('dist'), fetchHtml = fetchRe
       const quota = clients.get(key) ?? { start: now, count: 0 }
       if (quota.count >= 10 || active >= 4 || clients.size > 1000) return json(429, { error: 'Even wachten: probeer de import over een minuut opnieuw.' })
       quota.count++; clients.set(key, quota); active++
+      let bodyTimedOut = false
       try {
         req.setTimeout(10_000, () => req.destroy())
         const declaredLength = req.headers['content-length']
@@ -48,12 +49,22 @@ export function createRecipeServer({ root = resolve('dist'), fetchHtml = fetchRe
             return json(413, { error: 'De receptlink is te lang.' })
         }
         let body = ''
-        for await (const chunk of req) {
-          body += chunk
-          // String.length counts UTF-16 code units, not UTF-8 request bytes.
-          // Keep chunked requests under the same byte ceiling as declared ones.
-          if (Buffer.byteLength(body, 'utf8') > 4096)
-            return json(413, { error: 'De receptlink is te lang.' })
+        // req.setTimeout above is an inactivity timeout; a client sending one byte
+        // periodically could still occupy an import slot. Bound the whole body read.
+        const bodyDeadline = setTimeout(() => {
+          bodyTimedOut = true
+          req.destroy()
+        }, 10_000)
+        try {
+          for await (const chunk of req) {
+            body += chunk
+            // String.length counts UTF-16 code units, not UTF-8 request bytes.
+            // Keep chunked requests under the same byte ceiling as declared ones.
+            if (Buffer.byteLength(body, 'utf8') > 4096)
+              return json(413, { error: 'De receptlink is te lang.' })
+          }
+        } finally {
+          clearTimeout(bodyDeadline)
         }
         const payload = JSON.parse(body)
         if (!payload || typeof payload !== 'object' || Array.isArray(payload) ||
@@ -61,8 +72,11 @@ export function createRecipeServer({ root = resolve('dist'), fetchHtml = fetchRe
           return json(422, { error: 'Geef één geldige openbare receptlink op.' })
         const { html, sourceUrl } = await fetchHtml(payload.url)
         return json(200, { draft: importRecipeFromHtml(html, sourceUrl) })
-      } catch (error) { return json(422, { error: error instanceof Error && !/ENOTFOUND|ECONN|socket|certificate|JSON/i.test(error.message) ? error.message : 'Het recept kon niet worden opgehaald. Controleer de link of voer het handmatig in.' }) }
-      finally { active-- }
+      } catch (error) {
+        // The request socket has already been destroyed at the absolute body deadline.
+        if (bodyTimedOut) return
+        return json(422, { error: error instanceof Error && !/ENOTFOUND|ECONN|socket|certificate|JSON/i.test(error.message) ? error.message : 'Het recept kon niet worden opgehaald. Controleer de link of voer het handmatig in.' })
+      } finally { active-- }
     }
     if (req.method !== 'GET' && req.method !== 'HEAD') return json(405, { error: 'Niet toegestaan.' })
     try {
