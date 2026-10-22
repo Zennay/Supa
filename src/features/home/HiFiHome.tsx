@@ -39,6 +39,8 @@ const designRecipes = curatedFigmaRecipes.filter(recipe =>
 }))
 const discoveryFavoritesKey = 'supa:hifi-favorites:v1'
 const discoveryFavoriteIds = new Set([...designProducts.map(p => p.id), ...historicalRetailerProducts.map(p => p.id), ...designRecipes.map(r => r.id)])
+// Identity-only selections must never import retailer prices, recipe IDs or unknown SKUs.
+const portableProductIds = new Set([...designProducts.map(p => p.id), ...historicalRetailerProducts.map(p => p.id)])
 type DiscoveryFavoritesSnapshot = { ids: string[]; raw: string | null; writable: boolean }
 function readDiscoveryFavorites(): DiscoveryFavoritesSnapshot {
   if (typeof window === 'undefined') return { ids: [], raw: null, writable: false }
@@ -75,6 +77,9 @@ export function HiFiHome(props: Props) {
 
 function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activeDays = [] }: Props) {
   const [query, setQuery] = useState('')
+  const [portableText, setPortableText] = useState('')
+  const [portablePreview, setPortablePreview] = useState<string[] | null>(null)
+  const [portableMessage, setPortableMessage] = useState('')
   const [initialFavorites] = useState(readDiscoveryFavorites)
   const [favorites, setFavorites] = useState<string[]>(initialFavorites.ids)
   const [favoritesRaw, setFavoritesRaw] = useState(initialFavorites.raw)
@@ -149,6 +154,51 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
     if (toAdd.length === 0) return
     for (const id of toAdd) onToggleProduct(id)
     setMessage(`${toAdd.length} van ${notYetSelected.length} zichtbare producten aan je ongeprijsde lijst toegevoegd. ${toAdd.length < notYetSelected.length ? 'De lijst bevat maximaal 100 items. ' : ''}Er zijn geen winkelprijzen of matches gemaakt.`)
+  }
+  const downloadPortableSelection = () => {
+    const ids = [...new Set(addedProducts.filter(id => portableProductIds.has(id)))]
+    const backup = JSON.stringify({ kind: 'supa-unpriced-product-selection', schemaVersion: 1, ids }, null, 2)
+    if (typeof document === 'undefined') return
+    const url = URL.createObjectURL(new Blob([backup], { type: 'application/json;charset=utf-8' }))
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = 'supa-productselectie-ongeprijsd.json'
+    document.body.appendChild(anchor)
+    try { anchor.click() } finally {
+      anchor.remove()
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    }
+    setPortableMessage(`${ids.length} bekende productidentiteiten lokaal geëxporteerd, zonder prijzen. ${addedProducts.length - ids.length} oude/onbekende ID's blijven alleen op dit apparaat behouden.`)
+  }
+  const previewPortableSelection = () => {
+    setPortablePreview(null)
+    if (portableText.length > 16_384) { setPortableMessage('Bestand te groot (maximaal 16 kB).'); return }
+    try {
+      const parsed: unknown = JSON.parse(portableText)
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw Error('Ongeldig selectiebestand.')
+      const record = parsed as Record<string, unknown>
+      if (Object.keys(record).sort().join('|') !== 'ids|kind|schemaVersion' ||
+          record.kind !== 'supa-unpriced-product-selection' || record.schemaVersion !== 1 ||
+          !Array.isArray(record.ids) || record.ids.length > 100 ||
+          !record.ids.every(id => typeof id === 'string' && portableProductIds.has(id)) ||
+          new Set(record.ids).size !== record.ids.length) {
+        throw Error('Alleen een origineel identiteitsbestand van deze catalogusversie is toegestaan; retailerprijzen en onbekende velden worden geweigerd.')
+      }
+      const ids = record.ids as string[]
+      setPortablePreview(ids)
+      setPortableMessage(`${ids.length} identiteiten veilig gelezen. Controleer hieronder wat aan jouw bestaande lijst wordt toegevoegd; winkelprijzen blijven onbekend.`)
+    } catch (error) {
+      setPortableMessage(error instanceof Error ? error.message : 'Selectiebestand kon niet worden gelezen.')
+    }
+  }
+  const pendingPortableIds = portablePreview?.filter(id => !addedProducts.includes(id)) ?? []
+  const permittedPortableIds = pendingPortableIds.slice(0, Math.max(0, 100 - addedProducts.length))
+  const importPortableSelection = () => {
+    if (portablePreview === null || permittedPortableIds.length === 0) return
+    for (const id of permittedPortableIds) onToggleProduct(id)
+    setPortableMessage(`${permittedPortableIds.length} bestaande identiteiten toegevoegd als ongeprijsde selectie; ${pendingPortableIds.length - permittedPortableIds.length} passen niet binnen de limiet. Geen winkelprijs of SKU-match overgenomen.`)
+    setPortablePreview(null)
+    setPortableText('')
   }
   const toggleFavorite = (id: string) => {
     if (!discoveryFavoriteIds.has(id)) return
@@ -243,6 +293,34 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
       <button type="button" className="hifi-empty-reset" onClick={() => onNavigate('list')}>Open mijn lijst →</button>
       <small>Deze keuzes blijven apart en ongeprijsd; geen actuele supermarktprijzen of automatische productmatches.</small>
     </div>}
+    {view === 'products' && <details className="hifi-product-portable">
+      <summary>Mijn ongeprijsde productselectie overzetten</summary>
+      <p>Exporteer alleen de door jou gekozen catalogusidentiteiten. Geen recepten, winkelprijzen, bronrechten of geverifieerde SKU-matches. Import voegt pas na jouw bevestiging toe.</p>
+      <button type="button" onClick={downloadPortableSelection}>Download eigen selectie (.json)</button>
+      <label>Eigen JSON-selectiebestand openen
+        <input type="file" accept=".json,application/json" onChange={async event => {
+          setPortablePreview(null)
+          const file = event.currentTarget.files?.[0]
+          if (!file) return
+          if (file.size > 16_384) { setPortableMessage('Bestand te groot (maximaal 16 kB).'); return }
+          try {
+            setPortableText(await file.text())
+            setPortableMessage('Lokale tekst geladen. Kies Voorbeeld controleren vóór toevoegen.')
+          } catch { setPortableMessage('Kon het lokale bestand niet lezen.') }
+          event.currentTarget.value = ''
+        }} />
+      </label>
+      <label>Of plak eigen JSON
+        <textarea value={portableText} maxLength={16_384} rows={4}
+          onChange={event => { setPortableText(event.target.value); setPortablePreview(null); setPortableMessage('') }}
+          placeholder='{"kind":"supa-unpriced-product-selection","schemaVersion":1,"ids":[]}' />
+      </label>
+      <button type="button" disabled={!portableText.trim()} onClick={previewPortableSelection}>Voorbeeld controleren</button>
+      {portablePreview !== null && <p role="status">{portablePreview.length} geldig · {pendingPortableIds.length} nog niet op mijn lijst · {permittedPortableIds.length} kunnen worden toegevoegd.</p>}
+      {portablePreview !== null && <button type="button" disabled={permittedPortableIds.length === 0}
+        onClick={importPortableSelection}>Voeg {permittedPortableIds.length} ongeprijsde producten toe</button>}
+      <p role="status" aria-live="polite">{portableMessage}</p>
+    </details>}
     {view === 'products' && <section className="hifi-section" aria-label="Vergelijk met je eigen werkelijke winkelbron">
       <div className="hifi-section-heading"><h2>Vergelijk jouw eigen winkelprijzen</h2></div>
       <p className="hifi-demo-note">De historische productvoorbeelden hierboven hebben geen vrijgegeven actuele prijzen.
