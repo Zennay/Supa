@@ -3,6 +3,7 @@ import { useState } from 'react'
 import type { BasketTraceLine, OneStoreBasket } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import { privateUnitPrice } from './privateUnitPrice.ts'
+import { privateMatchedUnitPriceGap } from '../products/privateProgressProductRows.ts'
 import { samePrivatePhysicalDemand } from './samePrivatePhysicalDemand.ts'
 import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
 
@@ -199,11 +200,15 @@ export function privateComparisonHtml(
       readablePlannerDemandAmount(other.requirement.amount) + ' ' + other.requirement.unit
     const alias = required !== otherRequired &&
       samePrivatePhysicalDemand(line.requirement, other.requirement)
+    const unitGap = bothKnown && line.status === 'matched' && other.status === 'matched'
+      ? privateMatchedUnitPriceGap(line, other) : null
     return '<tr><th scope="row">' + clean(line.ingredientLabel) +
       '<small>Benodigd: ' + clean(required) +
       (alias ? ' = ' + clean(otherRequired) + ' (dezelfde fysieke hoeveelheid)' : '') +
       '</small></th><td>' + product(line) +
-      '</td><td>' + product(other) + '</td><td>' + clean(outcome) + '</td></tr>'
+      '</td><td>' + product(other) + '</td><td>' + clean(outcome) +
+      (unitGap ? '<small>Per gelijke hoeveelheid: ' + clean(unitGap) + '</small>' : '') +
+      '</td></tr>'
   }).join('\n')
   const totals = showDifference ? '<section class="totals"><div><span>PLUS</span><strong>' +
     clean(money(plus.totalCents)) + '</strong></div><div><span>DekaMarkt</span><strong>' +
