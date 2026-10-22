@@ -204,7 +204,7 @@ convertButton.addEventListener('click', () => {
       }
       const reviewed = reviewedForBasket(recipe)
       if (!reviewed || !Number.isFinite(recipe.servings) || recipe.servings === null ||
-          recipe.servings <= 0 || recipe.warnings.length || reviewed.ingredients.some(item =>
+          recipe.servings <= 0 || recipe.warnings.some(warning => warning !== missingMinutesWarning) || reviewed.ingredients.some(item =>
           item.amount === null || !units.includes(item.unit) ||
           !Number.isFinite(item.amount) || item.amount <= 0 || item.amount > 100000)) {
         throw Error('Een eigen recept vereist nog menselijke metrische controle in Mijn recepten.')
