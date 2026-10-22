@@ -238,7 +238,9 @@ backupLoadButton.addEventListener('click', async () => {
     clearRecipeSelection()
     setStatus(error instanceof Error ? error.message : 'Kan je eigen JSON-back-up niet veilig lezen.', true)
   } finally {
-    if (ticket === sourceRevision) backupLoadButton.disabled = false
+    // Changing the file during an async read cancels the old inspection,
+    // but must never leave the explicit import button permanently disabled.
+    backupLoadButton.disabled = false
   }
 })
 
