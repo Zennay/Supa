@@ -3,7 +3,8 @@ import './manualShoppingNotes.css'
 import { exportUnpricedShoppingCsv, exportUnpricedShoppingTsv, importUnpricedShoppingCsv, importUnpricedShoppingPaste } from './manualShoppingNotesCsv.ts'
 import { mergePrivateNotes, normalizePrivateNotes, serializePrivateNotes, PRIVATE_NOTES_BACKUP_MAX_BYTES } from './manualShoppingNotesBackup.ts'
 import { privateNoteDuplicateKey, privateNoteLabelIdentity } from './manualShoppingNoteIdentity.ts'
-import { makePrivateShoppingTemplate, parsePrivateShoppingTemplate, PRIVATE_SHOPPING_TEMPLATE_KEY, PRIVATE_SHOPPING_TEMPLATE_MAX_BYTES, type PrivateShoppingTemplateItem } from './manualShoppingTemplate.ts'
+import { makePrivateShoppingTemplate, parsePrivateShoppingTemplate, readPrivateShoppingTemplate, PRIVATE_SHOPPING_TEMPLATE_KEY, PRIVATE_SHOPPING_TEMPLATE_MAX_BYTES, type PrivateShoppingTemplateItem } from './manualShoppingTemplate.ts'
+import { privateRepeatRoundPrintableHtml } from './privateRepeatRoundPrintableHtml.ts'
 
 export type UnpricedShoppingNote = { id: string; label: string; store: 'Algemeen' | 'PLUS' | 'DekaMarkt'; done: boolean }
 type SetNotes = Dispatch<SetStateAction<UnpricedShoppingNote[]>>
@@ -49,6 +50,9 @@ export function ManualShoppingNotes({ notes, setNotes }: {
   const [repeatPreview, setRepeatPreview] = useState<{
     name: string; raw: string; original: string;
     additions: PrivateShoppingTemplateItem[]; skipped: number;
+    // Explicit subset of the original reviewed template. These are indices into
+    // additions, not note IDs or retailer product identifiers.
+    selectedIndices: number[];
   } | null>(null)
   const [exportVisible, setExportVisible] = useState(false)
   const [spreadsheetFallback, setSpreadsheetFallback] = useState('')
@@ -1105,19 +1109,31 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       const template = parsePrivateShoppingTemplate(repeatRaw)
       const known = new Set(notes.map(note => privateNoteDuplicateKey(note.store, note.label)))
       const additions = template.items.filter(note => !known.has(privateNoteDuplicateKey(note.store, note.label)))
-      if (notes.length + additions.length > 100) {
-        setRepeatMessage('Je eigen lijst heeft onvoldoende ruimte voor deze herhaalronde (maximaal 100 artikelen).')
-        return
-      }
+      const capacity = 100 - notes.length
+      // Export/print a complete saved selection even if the active list is
+      // full. Only the separate explicit "add to active list" action must fit
+      // its 100-line limit; do not silently truncate either operation.
+      const selectedIndices = additions.map((_, index) => index)
       setRepeatPreview({
         name: template.name, raw: repeatRaw, original: serializePrivateNotes(notes),
-        additions, skipped: template.items.length - additions.length,
+        additions, skipped: template.items.length - additions.length, selectedIndices,
       })
-      setRepeatMessage(additions.length + ' nieuwe eigen artikelen gevonden. Controleer en bevestig voordat ze worden toegevoegd.')
+      setRepeatMessage(additions.length + ' nieuwe eigen artikelen gevonden.' +
+        (additions.length > capacity
+          ? ' Voor toevoegen is plaats voor ' + capacity + ' artikelen; afdrukken en delen kan met alle gekozen artikelen.'
+          : ' Controleer de selectie en bevestig voordat ze worden toegevoegd.'))
     } catch (error) {
       setRepeatProtected(true)
       setRepeatMessage(error instanceof Error ? error.message : 'Herhaalronde is niet beschikbaar.')
     }
+  }
+  function selectRepeatTemplateStore(shop: UnpricedShoppingNote['store']) {
+    setRepeatPreview(current => current ? {
+      ...current,
+      selectedIndices: current.additions
+        .map((item, index) => item.store === shop ? index : -1)
+        .filter(index => index >= 0),
+    } : current)
   }
   function confirmRepeatTemplate() {
     const preview = repeatPreview
@@ -1127,20 +1143,139 @@ export function ManualShoppingNotes({ notes, setNotes }: {
           repeatRaw !== preview.raw || serializePrivateNotes(notes) !== preview.original)
         throw Error('Sjabloon of boodschappen zijn intussen gewijzigd. Open de voorinzage opnieuw.')
       const known = new Set(notes.map(note => privateNoteDuplicateKey(note.store, note.label)))
-      if (notes.length + preview.additions.length > 100 ||
-          preview.additions.some(note => known.has(privateNoteDuplicateKey(note.store, note.label))))
-        throw Error('De huidige lijst is veranderd; niets toegevoegd.')
-      const added = preview.additions.map(item => ({
+      const selected = new Set(preview.selectedIndices)
+      if (!selected.size || selected.size !== preview.selectedIndices.length ||
+          [...selected].some(index => !Number.isSafeInteger(index) || index < 0 || index >= preview.additions.length))
+        throw Error('Kies minstens één geldig artikel voor deze winkelronde.')
+      const chosen = preview.additions.filter((_, index) => selected.has(index))
+      if (notes.length + chosen.length > 100 ||
+          chosen.some(note => known.has(privateNoteDuplicateKey(note.store, note.label))))
+        throw Error('De gekozen artikelen passen niet meer in de huidige lijst; niets toegevoegd.')
+      const added = chosen.map(item => ({
         ...item, done: false, id: 'own-note-' + crypto.randomUUID(),
       }))
       setNotes(current => serializePrivateNotes(current) === preview.original
         ? [...current, ...added] : current)
       setLastImport({ source: 'sjabloon', added })
       setRepeatPreview(null)
-      setRepeatMessage(added.length + ' nieuwe ongeprijsde artikelen toegevoegd; bestaande vinkjes en winkels behouden.')
+      setRepeatMessage(added.length + ' gekozen ongeprijsde artikelen toegevoegd; ' +
+        (preview.additions.length - added.length) + ' niet geselecteerd. Bestaande vinkjes en winkels behouden.')
     } catch (error) {
       setRepeatPreview(null)
       setRepeatMessage(error instanceof Error ? error.message : 'Herhaalronde geweigerd.')
+    }
+  }
+  function selectedRepeatRoundItems(): { name: string; items: PrivateShoppingTemplateItem[] } {
+    const preview = repeatPreview
+    if (!preview || !preview.selectedIndices.length ||
+        preview.raw !== repeatRaw ||
+        window.localStorage.getItem(PRIVATE_SHOPPING_TEMPLATE_KEY) !== preview.raw ||
+        preview.original !== serializePrivateNotes(notes))
+      throw Error('Je lijst of opgeslagen herhaalronde is veranderd. Bekijk de selectie opnieuw.')
+    const selected = new Set(preview.selectedIndices)
+    if (selected.size !== preview.selectedIndices.length ||
+        [...selected].some(index => !Number.isSafeInteger(index) || index < 0 || index >= preview.additions.length) ||
+        selected.size > preview.additions.length)
+      throw Error('Ongeldige selectie. Kies je artikelen opnieuw.')
+    return {
+      name: preview.name,
+      items: preview.additions.filter((_, index) => selected.has(index)),
+    }
+  }
+  function selectedRepeatRoundText(): string {
+    const { name, items } = selectedRepeatRoundItems()
+    return [
+      'SUPA · PRIVÉ HERHAALRONDE · ' + name,
+      'Uitsluitend door jou gekozen eigen boodschappen; geen winkelprijzen of productmatching.', '',
+      ...items.map(item => '☐ [' + item.store + '] ' + item.label),
+      '', 'Geen supermarktbron, SKU, besparingsclaim of automatische opslag.', '',
+    ].join('\n')
+  }
+  function downloadRepeatRoundPrint(name: string, items: readonly PrivateShoppingTemplateItem[]) {
+    const html = privateRepeatRoundPrintableHtml(name, items)
+    const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
+    try {
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'supa-geselecteerde-herhaalronde-print.html'
+      document.body.append(link); link.click(); link.remove()
+    } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+    setRepeatMessage('Offline winkelblad met ' + items.length +
+      ' artikelen per winkel gedownload. De actieve lijst bleef gelijk.')
+  }
+  function downloadSelectedRepeatRoundPrint() {
+    try {
+      const { name, items } = selectedRepeatRoundItems()
+      downloadRepeatRoundPrint(name, items)
+    } catch (error) {
+      setRepeatPreview(null)
+      setRepeatMessage(error instanceof Error ? error.message : 'Het gekozen winkelblad kon niet worden gemaakt.')
+    }
+  }
+  function downloadSavedRepeatRoundPrint() {
+    if (repeatProtected || repeatRaw === null) return
+    try {
+      if (window.localStorage.getItem(PRIVATE_SHOPPING_TEMPLATE_KEY) !== repeatRaw)
+        throw Error('Je opgeslagen herhaalronde is intussen veranderd. Niets gedownload.')
+      const template = parsePrivateShoppingTemplate(repeatRaw)
+      // Include ALL original private template items, even if the current list
+      // already contains them. Never reuse last trip's paid/checkmark status.
+      downloadRepeatRoundPrint(template.name, template.items)
+    } catch (error) {
+      setRepeatMessage(error instanceof Error ? error.message : 'De volledige herhaalronde kon niet worden afgedrukt.')
+    }
+  }
+  function downloadChosenRepeatTemplateJson() {
+    try {
+      const { name, items } = selectedRepeatRoundItems()
+      const parsed = readPrivateShoppingTemplate({
+        schema: 'supa-private-shopping-template-v1', name, items,
+      })
+      const raw = JSON.stringify(parsed)
+      if (new TextEncoder().encode(raw).length > PRIVATE_SHOPPING_TEMPLATE_MAX_BYTES)
+        throw Error('De gekozen privéherhaalronde is groter dan 32 kB.')
+      const url = URL.createObjectURL(new Blob([raw + '\n'], { type: 'application/json;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-geselecteerde-herhaalronde.json'
+        document.body.append(link); link.click(); link.remove()
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setRepeatMessage(items.length + ' geselecteerde privéartikelen als overdraagbaar JSON-sjabloon gedownload; actieve lijst en bestaande opgeslagen herhaalronde onveranderd.')
+    } catch (error) {
+      setRepeatPreview(null)
+      setRepeatMessage(error instanceof Error ? error.message : 'Gekozen herhaalronde kon niet worden gedownload.')
+    }
+  }
+  function downloadSelectedRepeatRoundText() {
+    try {
+      const text = selectedRepeatRoundText()
+      const uri = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = uri
+        link.download = 'supa-geselecteerde-herhaalronde.txt'
+        document.body.append(link); link.click(); link.remove()
+      } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
+      setRepeatMessage('Je gekozen, ongeprijsde herhaalartikelen zijn als TXT gedownload. De actieve lijst bleef gelijk.')
+    } catch (error) {
+      setRepeatPreview(null)
+      setRepeatMessage(error instanceof Error ? error.message : 'De gekozen herhaalronde kon niet worden gedownload.')
+    }
+  }
+  async function shareSelectedRepeatRoundText() {
+    try {
+      const text = selectedRepeatRoundText()
+      if (typeof navigator.share !== 'function') {
+        downloadSelectedRepeatRoundText()
+        return
+      }
+      await navigator.share({ title: 'Mijn SUPA herhaalronde', text })
+      setRepeatMessage('Alleen je gekozen, ongeprijsde herhaalartikelen zijn naar het mobiele deelmenu gestuurd.')
+    } catch (error) {
+      setRepeatMessage(error instanceof DOMException && error.name === 'AbortError'
+        ? 'Mobiel delen geannuleerd; je huidige boodschappen zijn ongewijzigd.'
+        : error instanceof Error ? error.message : 'Delen niet beschikbaar. Gebruik de TXT-download.')
     }
   }
   function downloadSelectedRepeatTemplate() {
@@ -1783,6 +1918,10 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       </button>
       <button type="button" disabled={repeatProtected || repeatRaw === null}
         onClick={downloadRepeatTemplate}>Download mijn herhaalronde (JSON)</button>
+      <button type="button" disabled={repeatProtected || repeatRaw === null}
+        onClick={downloadSavedRepeatRoundPrint}>
+        Download complete bewaarde herhaalronde (print-HTML)
+      </button>
       <label>Importeer herhaalronde vanaf een ander apparaat (JSON, max. 32 kB)
         <input type="file" accept=".json,application/json"
           onChange={event => {
@@ -1809,16 +1948,63 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       </div>}
       {repeatPreview && <div role="group" aria-label="Voorinzage van persoonlijke herhaalronde">
         <strong>{repeatPreview.name} · {repeatPreview.additions.length} nieuwe artikelen</strong>
-        <p>{repeatPreview.skipped} bestaande of dubbele artikelen overgeslagen.
-          De nieuwe artikelen krijgen open vinkjes en tellen nooit mee als winkelprijs.</p>
-        <ul>{repeatPreview.additions.slice(0, 15).map((item, index) =>
-          <li key={index}>☐ [{item.store}] {item.label}</li>)}</ul>
-        {repeatPreview.additions.length > 15 &&
-          <p>En {repeatPreview.additions.length - 15} andere nieuwe artikelen.</p>}
-        <button type="button" disabled={!repeatPreview.additions.length}
+        <p>{repeatPreview.skipped} bestaande artikelen overgeslagen. Kies welke van de
+          {repeatPreview.additions.length} nieuwe artikelen je deze ronde wilt kopen.
+          Vinkjes starten open en tellen nooit mee als winkelprijs.</p>
+        <p role="status">{repeatPreview.selectedIndices.length} gekozen; maximaal {Math.max(0, 100 - notes.length)}
+          extra artikelen passen nog op je persoonlijke lijst.
+          {repeatPreview.selectedIndices.length > 100 - notes.length &&
+            ' Kies een kleinere selectie om toe te voegen; downloaden en delen kan altijd zonder lijstwijziging.'}</p>
+        <button type="button" onClick={() => setRepeatPreview(current => current ? {
+          ...current, selectedIndices: current.additions
+            .slice(0, Math.max(0, 100 - notes.length)).map((_, index) => index),
+        } : current)}>Kies eerste artikelen tot mijn lijst vol is</button>
+        <button type="button" onClick={() => setRepeatPreview(current => current ? {
+          ...current, selectedIndices: [],
+        } : current)}>Wis mijn selectie</button>
+        <div className="manual-shopping-notes__repeat-shops" role="group" aria-label="Selecteer één winkel uit herhaalronde">
+          {stores.map(shop => <button key={shop} type="button"
+            onClick={() => selectRepeatTemplateStore(shop)}>
+            Alleen {shop} ({repeatPreview.additions.filter(item => item.store === shop).length})
+          </button>)}
+        </div>
+        <ul className="manual-shopping-notes__repeat-items" aria-label="Kies artikelen voor herhaalronde">{repeatPreview.additions.map((item, index) =>
+          <li key={index}><label><input type="checkbox"
+            checked={repeatPreview.selectedIndices.includes(index)}
+            onChange={event => {
+              const checked = event.currentTarget.checked
+              setRepeatPreview(current => {
+                if (!current) return current
+                const selected = new Set(current.selectedIndices)
+                if (checked) selected.add(index)
+                else selected.delete(index)
+                return { ...current, selectedIndices: [...selected].sort((a, b) => a - b) }
+              })
+            }} /> [{item.store}] {item.label}</label></li>)}</ul>
+        <button type="button" disabled={!repeatPreview.selectedIndices.length ||
+          repeatPreview.selectedIndices.length > 100 - notes.length}
           onClick={confirmRepeatTemplate}>
-          Voeg {repeatPreview.additions.length} nieuwe artikelen toe
+          Voeg {repeatPreview.selectedIndices.length} gekozen artikelen toe
         </button>
+        <div className="manual-shopping-notes__repeat-shops" role="group"
+          aria-label="Geselecteerde privé-herhaalronde zonder toevoegen meenemen">
+          <button type="button" disabled={!repeatPreview.selectedIndices.length}
+            onClick={downloadSelectedRepeatRoundText}>
+            Download gekozen herhaalartikelen (TXT)
+          </button>
+          <button type="button" disabled={!repeatPreview.selectedIndices.length}
+            onClick={downloadChosenRepeatTemplateJson}>
+            Download gekozen artikelen als herbruikbaar JSON-sjabloon
+          </button>
+          <button type="button" disabled={!repeatPreview.selectedIndices.length}
+            onClick={downloadSelectedRepeatRoundPrint}>
+            Download afdrukbaar winkelblad (HTML, per winkel)
+          </button>
+          <button type="button" disabled={!repeatPreview.selectedIndices.length}
+            onClick={() => void shareSelectedRepeatRoundText()}>
+            Deel gekozen herhaalartikelen (mobiel)
+          </button>
+        </div>
         <button type="button" onClick={() => setRepeatPreview(null)}>Annuleer herhaalronde</button>
       </div>}
       {repeatMessage && <p role="status" aria-live="polite">{repeatMessage}</p>}
