@@ -40,7 +40,7 @@ const PlannerQuickSourcePaste = lazy(async () => {
 /** Read-only personally reviewed basket sources, never an inferred live catalog. */
 export function PrivateReviewedProductCatalog({ reviewed, progress, captureNeeds, budget, onOpenComparison, onOpenList, onOpenMixedRoute, onChooseRouteLine, onReviewIngredient, onAddMissingToOwnList, onImportSourceFiles, fileWarning, checked, onToggleChecked, onMarkCheckedBatch, incomingSearch }: {
   reviewed: PrivateReviewedBaskets | null
-  incomingSearch?: { serial: number; text: string }
+  incomingSearch?: { serial: number; text: string; store?: 'all' | OwnStore }
   progress: PrivateCaptureProgress | null
   captureNeeds: readonly PlannerCaptureGuideNeed[]
   budget: number
@@ -63,11 +63,12 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, captureNeeds
     // Only explicit Figma-to-owned-source navigation forwards text. Never
     // treat demo products as source matches or price information.
     setQuery(incomingSearch.text.slice(0, 120))
-    setStore('all')
+    setStore(incomingSearch.store === 'PLUS' || incomingSearch.store === 'DekaMarkt'
+      ? incomingSearch.store : 'all')
     setOnlyUnbought(false)
     setUnitFilter('all')
     setOrder('source')
-  }, [incomingSearch?.serial, incomingSearch?.text])
+  }, [incomingSearch?.serial, incomingSearch?.text, incomingSearch?.store])
   const [onlyUnbought, setOnlyUnbought] = useState(false)
   const [lastBulkTick, setLastBulkTick] = useState<{ shop: OwnStore; lines: readonly Matched[] } | null>(null)
   const [unitFilter, setUnitFilter] = useState<'all' | 'kg' | 'liter' | 'stuk'>('all')
