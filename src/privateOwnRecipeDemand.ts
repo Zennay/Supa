@@ -11,13 +11,14 @@ const loadButton = document.querySelector<HTMLButtonElement>('#load-own-recipes'
 const convertButton = document.querySelector<HTMLButtonElement>('#own-recipes-to-demand')!
 const status = document.querySelector<HTMLElement>('#own-recipe-status')!
 const choices = document.querySelector<HTMLElement>('#own-recipe-choices')!
+const heldRecipes = document.querySelector<HTMLElement>('#own-recipe-held')!
 const units = ['g', 'kg', 'ml', 'l', 'piece']
 // Physical fractional pieces (e.g. half an egg) need explicit human review in
 // the existing recipe/scaler workflow; never silently mark them basket-ready.
 function reviewedForBasket(recipe: SavedRecipe): RecipeWithIngredients | null {
   const reviewed = toPlannerRecipe(recipe)
   if (!reviewed || reviewed.ingredients.some(item =>
-    item.unit === 'piece' && item.amount !== null && !Number.isInteger(item.amount))) return null
+    item.unit === 'piece' && item.amount !== null && !Number.isSafeInteger(item.amount))) return null
   return reviewed
 }
 let loaded: SavedRecipe[] = []
@@ -31,6 +32,7 @@ loadButton.addEventListener('click', () => {
   loaded = []
   libraryRaw = null
   choices.replaceChildren()
+  heldRecipes.replaceChildren()
   convertButton.disabled = true
   try {
     // Access storage only on the user's explicit click; never save or mutate it.
@@ -40,6 +42,31 @@ loadButton.addEventListener('click', () => {
       recipe.warnings.length === 0 && reviewedForBasket(recipe) !== null)
     loaded = ready
     libraryRaw = snapshot.raw
+    const eligibleIds = new Set(ready.map(recipe => recipe.id))
+    const pending = snapshot.recipes.filter(recipe => !eligibleIds.has(recipe.id))
+    if (pending.length) {
+      const details = document.createElement('details')
+      details.className = 'own-recipe-held'
+      const summary = document.createElement('summary')
+      summary.textContent = pending.length + ' eigen recepten vragen eerst menselijke controle'
+      const intro = document.createElement('p')
+      intro.textContent = 'Corrigeer deze recepten eerst in Supa → Recepten. ' +
+        'Onbekende hoeveelheden of gedeeltelijke stuks worden niet stilzwijgend afgerond, ' +
+        'geprijsd of aan je mand toegevoegd.'
+      const list = document.createElement('ul')
+      for (const recipe of pending.slice(0, 100)) {
+        const li = document.createElement('li')
+        const title = document.createElement('strong')
+        title.textContent = recipe.title
+        const issue = document.createElement('span')
+        issue.textContent = ': ' + (recipe.warnings[0] ??
+          'Controleer porties, bereidingstijd, metrische hoeveelheden en volledige fysieke stuks.')
+        li.append(title, issue)
+        list.append(li)
+      }
+      details.append(summary, intro, list)
+      heldRecipes.append(details)
+    }
     for (const recipe of ready.slice(0, 100)) {
       const card = document.createElement('label')
       card.className = 'own-recipe-pick-card'
@@ -170,7 +197,8 @@ convertButton.addEventListener('click', () => {
     if (!ingredients.length || ingredients.length > 200 || ingredients.some(item =>
       !safeText(item.id, 100) || !safeText(item.label, 160) ||
       item.amount === null || !Number.isFinite(item.amount) ||
-      item.amount <= 0 || item.amount > 100000 || !units.includes(item.unit))) {
+      item.amount <= 0 || item.amount > 100000 || !units.includes(item.unit) ||
+      (item.unit === 'piece' && !Number.isSafeInteger(item.amount)))) {
       throw Error('De samengestelde fysieke vraag is ongeldig of groter dan 200 ingrediënten.')
     }
     const demand = {

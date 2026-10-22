@@ -69,6 +69,11 @@ button:disabled{background:#b6c6bc;cursor:not-allowed}.secondary{background:#e5e
 #trip select{max-width:100%;width:100%;border:1px solid #afc4b6;border-radius:9px;padding:11px;background:white;color:#183b2d}
 #trip .row-actions{display:flex;gap:12px;flex-wrap:wrap}
 /* Saved recipes become first-class physical inputs on desktop and narrow phones. */
+.own-recipe-held{padding:12px;margin:12px 0;border:1px solid #ddb980;border-radius:11px;background:#fff9ed}
+.own-recipe-held summary{cursor:pointer;font-weight:700;min-height:42px;padding:8px 0}
+.own-recipe-held ul{margin:6px 0;padding-left:1.4rem;max-height:19rem;overflow-y:auto}
+.own-recipe-held li{margin-bottom:8px;overflow-wrap:anywhere}
+.own-recipe-held p{margin:6px 0}
 .own-recipe-pick-card{min-width:0}
 .own-recipe-pick-controls{display:grid;grid-template-columns:repeat(2,minmax(75px,95px));gap:10px}
 .own-recipe-pick-controls>span{display:grid;gap:3px;min-width:0}
@@ -164,6 +169,7 @@ maaltijden, kies desgewenst herhalingen en maak dezelfde ongeprijsde fysieke
 boodschappenbehoefte als een Planner-weekmenu.</p>
 <button id="load-own-recipes" type="button" class="secondary">Laad mijn eigen recepten op dit apparaat</button>
 <div id="own-recipe-status" class="notice" role="status" aria-live="polite">Nog geen toegang tot jouw lokale recepten gevraagd.</div>
+<div id="own-recipe-held" aria-label="Eigen recepten waarvoor nog controle nodig is"></div>
 <div id="own-recipe-choices" role="group" aria-label="Kies eigen recepten" style="display:grid;gap:8px"></div>
 <button id="own-recipes-to-demand" type="button" disabled>Gebruik geselecteerde recepten als mandvraag</button>
 </div>
