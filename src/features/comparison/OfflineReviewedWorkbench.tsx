@@ -2839,6 +2839,14 @@ export function OfflineReviewedWorkbench({
                     {' '}{pairedPreviewRows.filter(row => row.plusCode && row.dekaCode).length}
                     {' '}van {pairedPreviewRows.length} ingrediënten hebben in beide winkels een voorstel
                   </summary>
+                  <p role="status">
+                    PLUS: {pairedPreviewRows.filter(row => !row.plusCode).length}
+                    {' '}nog zonder productvoorstel · DekaMarkt:
+                    {' '}{pairedPreviewRows.filter(row => !row.dekaCode).length}
+                    {' '}nog zonder productvoorstel.
+                    {' '}Openstaande fysieke ingrediënten kun je onder deze voorinzage
+                    per winkel als leeg opname-CSV of rijgids meenemen.
+                  </p>
                   <p className="disclaimer">
                     Dit is uitsluitend een vergelijking van voorgestelde productmatches
                     voor identieke Planner-hoeveelheden. Controleer beide originele SKU's,
