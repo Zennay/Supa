@@ -494,3 +494,40 @@ border-radius:10px;padding:.65rem;scroll-margin-top:1.25rem}
 .offline-manual-editor__source-conflicts p { margin:0; }
 .offline-manual-editor__source-conflicts ul { margin:0; padding-left:1.5rem; }
 .offline-manual-editor__source-conflicts li { margin:.5rem 0; }
+
+/* Mobile source-status handoff: never truncate a long personally supplied
+   ingredient name, and keep denied-clipboard text selectable. */
+.offline-price-workbench__copy-fallback {
+  display:grid;
+  gap:.55rem;
+  min-width:0;
+  max-width:100%;
+  margin:.9rem 0;
+  padding:.85rem;
+  border:1px solid #bdd2c4;
+  border-radius:.75rem;
+  background:#f6faf7;
+  font-weight:650;
+}
+.offline-price-workbench__copy-fallback textarea {
+  display:block;
+  width:100%;
+  max-width:100%;
+  box-sizing:border-box;
+  min-height:9rem;
+  padding:.65rem;
+  font:inherit;
+  font-weight:400;
+  line-height:1.45;
+  resize:vertical;
+  overflow-wrap:anywhere;
+  color:#232323;
+  background:#fff;
+  border:1px solid #8b9b90;
+  border-radius:.5rem;
+}
+.offline-price-workbench__copy-fallback textarea:focus-visible {
+  outline:3px solid #226f52;
+  outline-offset:2px;
+}
+.offline-price-workbench__copy-fallback button { min-height:44px; justify-self:start; }
