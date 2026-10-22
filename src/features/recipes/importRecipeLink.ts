@@ -14,6 +14,9 @@ export async function importRecipeLink(url: string, signal: AbortSignal): Promis
   // Never send copied OAuth/PKCE/session credentials to a recipe endpoint:
   // recipe attribution needs a public page address, not a login token.
   const publicUrl = safeRecipeSourceUrl(url)
+  if (publicUrl.length > 2048) {
+    throw new Error('Deze openbare receptlink is te lang voor de beveiligde import (maximaal 2048 tekens).')
+  }
   let response: Response
   try {
     response = await fetch('/api/recipes/import', {
