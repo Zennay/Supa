@@ -44,7 +44,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
   const [repeatMessage, setRepeatMessage] = useState('')
   const repeatFileSerial = useRef(0)
   const [repeatFilePreview, setRepeatFilePreview] = useState<{
-    raw: string; name: string; items: number; previous: string | null;
+    raw: string; name: string; items: PrivateShoppingTemplateItem[]; previous: string | null;
   } | null>(null)
   const [repeatPreview, setRepeatPreview] = useState<{
     name: string; raw: string; original: string;
@@ -1159,7 +1159,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       const current = window.localStorage.getItem(PRIVATE_SHOPPING_TEMPLATE_KEY)
       if (current !== repeatRaw || repeatProtected)
         throw Error('Opgeslagen sjabloon wijkt af of is beschermd. Niets overschreven.')
-      setRepeatFilePreview({ raw: text, name: template.name, items: template.items.length, previous: current })
+      setRepeatFilePreview({ raw: text, name: template.name, items: template.items, previous: current })
       setRepeatMessage('Controleer dit privé-sjabloon en bevestig eerst de lokale import.')
     } catch (error) {
       if (serial === repeatFileSerial.current)
@@ -1755,9 +1755,14 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       </button>
       {repeatFilePreview && <div role="group" aria-label="Privé-sjabloonimport controleren">
         <strong>Importbestand: {repeatFilePreview.name}</strong>
-        <p>{repeatFilePreview.items} persoonlijke ongeprijsde artikelen. Dit bestand bevat geen
+        <p>{repeatFilePreview.items.length} persoonlijke ongeprijsde artikelen. Dit bestand bevat geen
           afvinkingen, SKU's of bronprijzen. Alleen het lokale herhaalsjabloon wordt vervangen,
           niet de huidige boodschappenlijst. Herhalen vraagt daarna apart om bevestiging.</p>
+        <ul>{repeatFilePreview.items.slice(0, 15).map((item, index) =>
+          <li key={index}>☐ [{item.store}] {item.label}</li>)}</ul>
+        {repeatFilePreview.items.length > 15 &&
+          <p>En {repeatFilePreview.items.length - 15} andere artikelen; download en inspecteer
+            het JSON-bestand als je deze volledige lijst wilt controleren.</p>
         <button type="button" onClick={confirmRepeatTemplateFile}>Bewaar dit sjabloon op mijn apparaat</button>
         <button type="button" onClick={() => setRepeatFilePreview(null)}>Annuleer bestandimport</button>
       </div>}
