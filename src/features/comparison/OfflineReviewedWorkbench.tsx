@@ -415,6 +415,8 @@ export function OfflineReviewedWorkbench({
   const [captureSheetStore, setCaptureSheetStore] = useState<'both' | CaptureStore>('both')
   const [capturePreviewShown, setCapturePreviewShown] = useState<Record<CaptureStore, number>>({ PLUS: 20, DekaMarkt: 20 })
   const [pairedOnlyMissing, setPairedOnlyMissing] = useState(false)
+  const [pairedPriceFilter, setPairedPriceFilter] = useState<'all' | 'plus' | 'deka' | 'equal' | 'unknown'>('all')
+  const [pairedPriceSort, setPairedPriceSort] = useState<'plan' | 'difference'>('plan')
   const [capturePreviewSearch, setCapturePreviewSearch] = useState<Record<CaptureStore, string>>({ PLUS: '', DekaMarkt: '' })
   const [capturePreviewSort, setCapturePreviewSort] = useState<Record<CaptureStore, 'source' | 'name' | 'sku' | 'price' | 'unknown'>>({ PLUS: 'source', DekaMarkt: 'source' })
   const [capturePreview, setCapturePreview] = useState<{
@@ -536,11 +538,35 @@ export function OfflineReviewedWorkbench({
     }
   }, [capturePreview, captureWeek, plannerCaptureNeeds, imported, plan, recipes, activeDays])
 
+  // Filter and order only the currently visible, honest own-source preview.
+  // No change to automatic matching, user approval or canonical basket sums.
+  const pairedPreviewDisplayed = useMemo(() => {
+    const rows = (pairedPreviewRows ?? []).map(row => {
+      const comparable = pairedPreviewComparable && row.plusCode && row.dekaCode &&
+        row.plusPacks !== null && row.dekaPacks !== null &&
+        row.plusCents !== null && row.dekaCents !== null
+      const candidateDelta = comparable ? row.dekaCents! - row.plusCents! : null
+      return { ...row, deltaCents: candidateDelta !== null &&
+        Number.isSafeInteger(candidateDelta) ? candidateDelta : null }
+    }).filter(row => (!pairedOnlyMissing || !row.plusCode || !row.dekaCode) &&
+      (pairedPriceFilter === 'all' ||
+        (pairedPriceFilter === 'unknown' && row.deltaCents === null) ||
+        (pairedPriceFilter === 'plus' && row.deltaCents !== null && row.deltaCents > 0) ||
+        (pairedPriceFilter === 'deka' && row.deltaCents !== null && row.deltaCents < 0) ||
+        (pairedPriceFilter === 'equal' && row.deltaCents === 0)))
+    if (pairedPriceSort === 'difference') rows.sort((a, b) =>
+      (b.deltaCents === null ? -1 : Math.abs(b.deltaCents)) -
+      (a.deltaCents === null ? -1 : Math.abs(a.deltaCents)))
+    return rows
+  }, [pairedPreviewRows, pairedPreviewComparable, pairedOnlyMissing, pairedPriceFilter, pairedPriceSort])
+
   async function previewFilledCsv(files: File[]) {
     if (files.length === 0) return
     const version = ++importRevision.current
     setCapturePreview(null)
     setPairedOnlyMissing(false)
+    setPairedPriceFilter('all')
+    setPairedPriceSort('plan')
     setCapturePreviewShown({ PLUS: 20, DekaMarkt: 20 })
     setCapturePreviewSearch({ PLUS: '', DekaMarkt: '' })
     setCapturePreviewSort({ PLUS: 'source', DekaMarkt: 'source' })
