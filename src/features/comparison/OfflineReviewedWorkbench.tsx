@@ -953,7 +953,7 @@ export function OfflineReviewedWorkbench({
       '<p>Een deelprijs is geen totaalkost. Een compleet rekenkundig verschil blijft voorlopig totdat de originele SKU, verpakking, beschikbaarheid en prijs per winkel zijn gecontroleerd.</p>' +
       '<table><thead><tr><th>Planner-ingrediënt</th><th>Benodigd</th><th>PLUS</th><th>DekaMarkt</th><th>Verschil</th></tr></thead><tbody>' +
       rows + '</tbody></table><p class="meta">Lokaal gegenereerd door Supa. Geen externe bronnen of scripts geladen.</p>' +
-      '<p class="no-print"><button onclick="window.print()">Afdrukken / opslaan als PDF</button></p></body></html>'
+      '<p class="no-print">Gebruik het browsermenu of Ctrl+P om af te drukken of als PDF op te slaan.</p></body></html>'
     if (new TextEncoder().encode(html).length > 512000)
       throw new Error('Te veel ingrediënten voor één lokaal HTML-bestand.')
     return html
