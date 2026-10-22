@@ -2781,8 +2781,12 @@ export function OfflineReviewedWorkbench({
           unitDelta === null ? '' : String(unitDelta),
           unitDelta === null || !plusUnit ? '' : plusUnit.unit])
       }
+      const signedDeltaColumns = new Set([
+        rows[0].indexOf('Deka_minus_PLUS_cent'),
+        rows[0].indexOf('Deka_minus_PLUS_eenheidsprijs_cent'),
+      ].filter(index => index >= 0))
       const csv = '\uFEFF' + rows.map(row => row.map((cell, index) =>
-        literalCsv(cell, index === rows[0].length - 2)).join(';')).join('\r\n') + '\r\n'
+        literalCsv(cell, signedDeltaColumns.has(index))).join(';')).join('\r\n') + '\r\n'
       if (new TextEncoder().encode(csv).length > 256000) throw Error('Bestand te groot')
       const content = format === 'html'
         ? (await import('./partialReviewedPrintHtml.ts')).partialReviewedPricePrintHtml(rows)
