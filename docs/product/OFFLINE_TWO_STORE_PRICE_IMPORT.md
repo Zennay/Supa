@@ -1522,3 +1522,8 @@ Iedere bron wordt apart tegen het bestaande canonieke winkelschema gecontroleerd
 - Na invoer van twee toegestane eigen winkelopnames toont de importvoorinzage dezelfde Planner-behoefte naast de voorlopige match per winkel. De voorlopige hele-pakbedragen en het kandidaatverschil verschijnen alleen wanneer beide bronmomenten actueel zijn en binnen 24 uur van elkaar liggen.
 - De voorinzage blijft nadrukkelijk **onbevestigd**: productgelijkwaardigheid, beschikbaarheid en prijs zijn nog niet gevalideerd. Onbekende, verouderde of onveilig optelbare regels blijven onbekend; deelbedragen worden nooit als bewezen totaal of besparing gepresenteerd.
 - De bestaande volledige vergelijking blijft leidend na afzonderlijke menselijke bevestiging van ieder winkelartikel en iedere prijs. De voorinzage wijzigt geen brondata, acceptatiestatus of retailerrechten.
+
+## Per-winkel gids voor ontbrekende of verouderde bronregels (22 oktober 2026)
+
+- Na import kan per winkel een aparte tekstgids worden gekopieerd of gedownload. De gids bevat alleen de Planner-behoefte, eigen bronmoment, status en eventueel het voorgestelde bronartikel; geen prijsbedragen of bewijs van retailerrechten.
+- Ontbrekende, verouderde of niet binnen 24 uur vergelijkbare bronmomenten worden expliciet als onbekend/heropnemen gemarkeerd. De gids leest de actuele bronstatus op het moment van genereren en weigert niet-beschikbare of gewijzigde gegevens als actuele vergelijking te presenteren.
