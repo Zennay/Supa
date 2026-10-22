@@ -14,6 +14,7 @@ import { PlannerSourceMatchPreview } from './PlannerSourceMatchPreview.tsx'
 import { replaceOwnStoreCapture, type CaptureRefreshChanges } from './combineOwnSourceCapture.ts'
 import { privateSourceChangeCsv } from './privateSourceChangeCsv.ts'
 import { readOwnSourceTextFile } from '../comparison/readLocalCaptureDraftFiles.ts'
+import { combineTwoOwnShopCaptures, splitOwnStorePastedSheets } from '../comparison/combineOwnStoreCaptures.ts'
 import './plannerQuickSourcePaste.css'
 
 type Preview = { raw: string; normalized: string; data: OfflinePriceSnapshots; needScope: string }
@@ -22,18 +23,24 @@ const dateText = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeSty
 
 
 async function normalizedOwnSource(raw: string): Promise<string> {
-  // Spreadsheet/desktop copy can include a single UTF-8 BOM even when the
-  // rest of the supplied input is JSON. JSON.parse refuses that marker,
-  // while the existing CSV converter already handles the CSV BOM itself.
+  // JSON from the original own-source schema may already contain BOTH shops.
+  // Do not rewrite its captured instants, pack sizes or monetary cells.
   const jsonInput = raw.startsWith('\uFEFF') ? raw.slice(1) : raw
   if (/^\s*\{/u.test(jsonInput)) return jsonInput
+
+  // One pasted text block may be two genuine Excel/CSV shop sheets, with a
+  // standalone --- row between their individual original nine-column headers.
+  // This is the SAME canonical single-shop and combined admission as Vergelijk.
+  const sheets = splitOwnStorePastedSheets(raw)
   const moduleUrl = import.meta.env.BASE_URL + 'offline-two-store-csv.mjs'
   const converter: unknown = await import(/* @vite-ignore */ moduleUrl)
   if (!converter || typeof converter !== 'object' ||
       !('convertOwnStoreCsv' in converter) ||
       typeof converter.convertOwnStoreCsv !== 'function')
     throw new Error('De bestaande lokale CSV-converter ontbreekt.')
-  return (converter.convertOwnStoreCsv as (input: string) => string)(raw)
+  const convert = converter.convertOwnStoreCsv as (input: string) => string
+  const normalized = sheets.map(sheet => convert(sheet))
+  return normalized.length === 1 ? normalized[0] : combineTwoOwnShopCaptures(normalized)
 }
 
 /** Local preview using the same converter and source contract as Vergelijk. */
@@ -103,7 +110,9 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
     setBusy(true)
     try {
       const normalized = await normalizedOwnSource(raw)
-      if (ticket !== revision.current) return
+      if (ticket !== revision.current || needScope !== liveNeedScope.current) return
+      if (new TextEncoder().encode(normalized).length > limit)
+        throw Error('De genormaliseerde winkelopnames zijn groter dan 256 kB.')
       const data = parseOfflinePriceSnapshots(normalized, Date.now())
       setPreview({ raw, normalized, data, needScope })
       setMessage('Structuur lokaal herkend. Controleer de bronmomenten en prijsdekking.')
@@ -500,8 +509,11 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
     <summary>Plak winkelprijzen vanuit spreadsheet of JSON</summary>
     {open && <>
       <p>Gebruik alleen zelf rechtmatig verkregen PLUS/Deka-productdata. Plak de negen
-        Supa-kolommen als CSV, puntkomma-CSV of tabgescheiden spreadsheet, of
-        eigen JSON met één of beide winkels. Alles wordt lokaal gecontroleerd:
+        Supa-kolommen als CSV, puntkomma-CSV of tabgescheiden spreadsheet. Heb je
+        twee aparte winkelbladen? Zet één losse regel <code>---</code> tussen de
+        twee volledige negenkolomsbladen, met ieder de eigen PLUS/DekaMarkt-ID
+        en originele bronmomenten. Ook eigen JSON met één of beide winkels kan.
+        Alles wordt lokaal gecontroleerd:
         een geldige import bewijst geen bronrechten of actuele winkelprijzen.</p>
       <div className={'supa-planner-source-paste__drop' + (dropActive ? ' is-dragging' : '')}
         onDragOver={event => {
@@ -555,8 +567,8 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
       <button type="button" className="ghost-button" onClick={() => void pasteClipboard()}>
         Plak uit mijn klembord
       </button>
-      <label>Originele winkelregels
-        <textarea rows={7} value={draft} spellCheck={false} maxLength={256000}
+      <label>Originele winkelregels of twee volledige winkelbladen gescheiden met ---
+        <textarea rows={9} value={draft} spellCheck={false} maxLength={256000}
           placeholder="retailer,observedAt,id,name,packAmount,packUnit,packCount,priceCents,available"
           onChange={event => changeDraft(event.currentTarget.value)} />
       </label>
