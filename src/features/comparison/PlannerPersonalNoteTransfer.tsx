@@ -111,8 +111,8 @@ export function PlannerPersonalNoteTransfer({ items, checked, openOnly, planKey,
         krijgen nieuwe regels. Bevestig zelf, zonder productmatch of prijs.</p>
       <p role="status">Controleer per winkel: {Object.entries(storeCounts).map(([store, count]) =>
         `${store}: ${count} ${count === 1 ? 'regel' : 'regels'}`).join(' · ')}.</p>
-      <ul>{pending.incoming.slice(0, showAll ? undefined : 15).map((item, index) =>
-        <li key={index}>{item.done ? '☑' : '☐'} [{item.store}] {item.label}</li>)}</ul>
+      <ul>{pending.incoming.slice(0, showAll ? undefined : 15).map(item =>
+        <li key={JSON.stringify([item.store, item.label])}>{item.done ? '☑' : '☐'} [{item.store}] {item.label}</li>)}</ul>
       {pending.incoming.length > 15 && !showAll && <button type="button" onClick={() => setShowAll(true)}>
         Bekijk alle {pending.incoming.length} regels vóór bevestiging
       </button>}
