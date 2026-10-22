@@ -1124,6 +1124,24 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       setRepeatMessage(error instanceof Error ? error.message : 'Herhaalronde geweigerd.')
     }
   }
+  function downloadSelectedRepeatTemplate() {
+    if (!selectedVisible.length) return
+    try {
+      // A portable copy is available without granting permanent storage.
+      // The user's explicit file download is the sole persistence action.
+      const raw = makePrivateShoppingTemplate(repeatName, selectedVisible)
+      const url = URL.createObjectURL(new Blob([raw + '\n'], { type: 'application/json;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-geselecteerde-herhaalronde.json'
+        document.body.append(link); link.click(); link.remove()
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setRepeatMessage(selectedVisible.length + ' eigen geselecteerde artikelen als herbruikbare JSON opgeslagen, ook zonder apparaatopslag.')
+    } catch (error) {
+      setRepeatMessage(error instanceof Error ? error.message : 'Geselecteerde herhaalronde kon niet worden gedownload.')
+    }
+  }
   function downloadRepeatTemplate() {
     if (repeatProtected || !repeatRaw) return
     try {
@@ -1740,6 +1758,10 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       </button>
       <button type="button" disabled={repeatProtected || repeatRaw === null}
         onClick={prepareRepeatTemplate}>Bekijk mijn bewaarde herhaalronde</button>
+      <button type="button" disabled={!selectedVisible.length}
+        onClick={downloadSelectedRepeatTemplate}>
+        Download selectie als herhaalronde (JSON, zonder apparaatopslag)
+      </button>
       <button type="button" disabled={repeatProtected || repeatRaw === null}
         onClick={downloadRepeatTemplate}>Download mijn herhaalronde (JSON)</button>
       <label>Importeer herhaalronde vanaf een ander apparaat (JSON, max. 32 kB)
