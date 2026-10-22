@@ -1247,7 +1247,9 @@ export function ImportedRecipeGroceriesPanel({
                 <td>{row.sources.length > 0
                   ? <details>
                       <summary>{row.sources.length} oorspronkelijke ingrediëntregel(len)</summary>
-                      <ul>{row.sources.map((source, index) => <li key={source.recipeId + ':' + index}>
+                      <ul>{row.sources.map(source => <li key={JSON.stringify([
+                        source.recipeId, source.original, source.amount, source.unit, source.cookingDay,
+                      ])}>
                         <strong>{source.recipeTitle}</strong>
                         {source.cookingDay && <> · {source.cookingDay}</>}: {source.amount === null
                           ? 'hoeveelheid controleren'
