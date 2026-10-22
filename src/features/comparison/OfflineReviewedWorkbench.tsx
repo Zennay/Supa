@@ -432,6 +432,12 @@ export function OfflineReviewedWorkbench({
   const [tripExportMessage, setTripExportMessage] = useState('')
   const [tripProgressMessage, setTripProgressMessage] = useState('')
   const [coverageMessage, setCoverageMessage] = useState('')
+  const [readableCopyMessage, setReadableCopyMessage] = useState('')
+  const [coverageCopyText, setCoverageCopyText] = useState<string | null>(null)
+  useEffect(() => {
+    setCoverageCopyText(null)
+    setReadableCopyMessage('')
+  }, [text, planKey])
   const [coverageScope, setCoverageScope] = useState<'all' | 'open' | 'PLUS' | 'DekaMarkt'>('open')
   const [coverageSearch, setCoverageSearch] = useState('')
   // Prevent stale imports from appearing comparable after an open browser tab
@@ -2548,6 +2554,99 @@ export function OfflineReviewedWorkbench({
     }
   }
 
+  function buildCoverageChecklist(onlyOpen: boolean): { content: string; count: number } | null {
+    if (!imported || coverageRows.length === 0) return null
+    // Refresh source age at the moment the field list is downloaded rather
+    // than reusing the 60-second screen clock. The list is a work aid, never
+    // authoritative evidence of a current shop price.
+    const nowNs = BigInt(Date.now()) * 1_000_000n
+    const rows = coverageRows.map(row => ({
+      ...row,
+      ...Object.fromEntries(stores.map(store => {
+        const captured = imported.captures[store]
+        const fresh = !!captured &&
+          nowNs >= captured.observedNs - 300_000_000_000n &&
+          nowNs - captured.observedNs <= 604_800_000_000_000n
+        const item = row[store]
+        return [store, !fresh && item.status === 'Persoonlijk bevestigd'
+          ? { ...item, status: 'Eigen opname verouderd of toekomstig; opnieuw opnemen' }
+          : olderPairCapture === store && item.status === 'Persoonlijk bevestigd'
+            ? { ...item, status: 'Ouder bronmoment; neem binnen 24 uur van de andere winkel opnieuw op' }
+            : item]
+      })),
+    })) as typeof coverageRows
+    const selected = onlyOpen ? rows.filter(row =>
+      stores.some(store => row[store].status !== 'Persoonlijk bevestigd')) : rows
+    if (!selected.length) {
+      setCoverageMessage('Geen open productcontroles. Alle beschikbare eigen bronartikelen zijn afzonderlijk bevestigd.')
+      return null
+    }
+    const content = [
+      onlyOpen ? 'SUPA · uitsluitend OPEN winkelproductcontroles uit jouw Planner' :
+        'SUPA · privé veld- en productcontrole voor exact dezelfde Planner-vraag',
+      'Geen prijs- of bronrechtenbewijs. Ontbrekend/verlopen is onbekend, niet EUR 0.',
+      ...stores.map(store => store + ' · eigen waarneming: ' +
+        (imported.captures[store]?.observedAt ?? 'ONTBREEKT')),
+      '',
+      ...selected.flatMap(row => [
+        row.label.replace(/[\r\n\u0000-\u001f\u007f-\u009f]/gu, ' ') +
+          ' · ' + (row.amount ?? '?') + ' ' + row.unit,
+        '  PLUS: ' + row.PLUS.status + (row.PLUS.product ? ' · voorgesteld bronartikel ' + row.PLUS.product.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ') : ''),
+        '  DekaMarkt: ' + row.DekaMarkt.status + (row.DekaMarkt.product ? ' · voorgesteld bronartikel ' + row.DekaMarkt.product.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ') : ''),
+      ]),
+      'Controleer iedere SKU, verpakking en prijs tegen je eigen bron. Geen publieke besparingsclaim.',
+    ].join('\n')
+    return { content, count: selected.length }
+  }
+
+
+  async function copyCoverageChecklist(onlyOpen = false) {
+    const snapshot = buildCoverageChecklist(onlyOpen)
+    if (!snapshot) return
+    const source = currentActiveSource.current
+    const week = captureWeekRef.current
+    const revision = importRevision.current
+    setCoverageCopyText(null)
+    try {
+      if (!navigator.clipboard?.writeText)
+        throw new Error('Geen klembordtoegang')
+      await navigator.clipboard.writeText(snapshot.content)
+      if (source !== currentActiveSource.current || week !== captureWeekRef.current ||
+          revision !== importRevision.current) {
+        setCoverageMessage('De winkelbron of Planner-week veranderde tijdens het kopiëren. Kopieer de huidige lijst opnieuw.')
+        return
+      }
+      setCoverageMessage(snapshot.count + ' eigen winkelcontroles gekopieerd. Plak deze alleen waar je jouw privébrongegevens wilt bewaren; dit zijn geen gevalideerde winkelprijzen.')
+    } catch {
+      if (source !== currentActiveSource.current || week !== captureWeekRef.current ||
+          revision !== importRevision.current) {
+        setCoverageMessage('De bron is ondertussen gewijzigd. Open de huidige lijst en probeer opnieuw.')
+        return
+      }
+      setCoverageCopyText(snapshot.content)
+      setCoverageMessage('Klembord niet beschikbaar. Selecteer de onderstaande privécontroletekst om zelf te kopiëren.')
+    }
+  }
+
+
+  function downloadCoverageChecklist(onlyOpen = false) {
+    const snapshot = buildCoverageChecklist(onlyOpen)
+    if (!snapshot) return
+    const url = URL.createObjectURL(new Blob([snapshot.content], { type: 'text/plain;charset=utf-8' }))
+    try {
+      const link = document.createElement('a')
+      link.href = url
+      link.download = onlyOpen ? 'supa-alleen-open-winkelcontroles.txt' :
+        'supa-prive-dekking-en-ontbrekende-producten.txt'
+      document.body.append(link)
+      try { link.click() } finally { link.remove() }
+      setCoverageMessage((onlyOpen ? 'Alleen de ' + snapshot.count + ' nog open Planner-regels' :
+        'Alle ' + snapshot.count + ' Planner-regels') +
+        ' lokaal bewaard met bronstatus per winkel. Geen prijzen of bronrechten toegevoegd.')
+    } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+  }
+
+
   const readableReport = canShowDifference && basketPair?.plus && basketPair.deka &&
     basketPair.comparison && basketPair.comparison.deltaCents !== null &&
     imported?.captures.PLUS && imported.captures.DekaMarkt &&
@@ -2557,6 +2656,34 @@ export function OfflineReviewedWorkbench({
         { PLUS: imported.captures.PLUS.observedAt, DekaMarkt: imported.captures.DekaMarkt.observedAt },
         basketPair.comparison.deltaCents!, fullDifferenceRows)
     : null
+
+  async function copyReadableReport() {
+    if (!readableReport || !eligibleComparisonRightNow()) {
+      setReadableCopyMessage('Dit oorspronkelijke bronpaar is niet meer volledig actueel of bevestigd. Geen prijsverschil gekopieerd.')
+      return
+    }
+    const source = currentActiveSource.current
+    const week = captureWeekRef.current
+    const revision = importRevision.current
+    setReadableCopyMessage('')
+    try {
+      if (!navigator.clipboard?.writeText) throw Error('Geen klembord')
+      await navigator.clipboard.writeText(readableReport)
+      setReadableCopyMessage(
+        source === currentActiveSource.current && week === captureWeekRef.current &&
+        revision === importRevision.current && eligibleComparisonRightNow()
+          ? 'Jouw persoonlijk gecontroleerde prijsverschil gekopieerd; dit is geen onafhankelijke winkelprijs.'
+          : 'De bron veranderde tijdens het kopiëren. Gebruik de tekst niet als actuele vergelijking; maak deze opnieuw.')
+    } catch {
+      if (source !== currentActiveSource.current || week !== captureWeekRef.current ||
+          revision !== importRevision.current || !eligibleComparisonRightNow()) {
+        setReadableCopyMessage('De bron veranderde tijdens het kopiëren. Maak de vergelijking opnieuw.')
+        return
+      }
+      setReadableCopyMessage('Klembordtoegang niet beschikbaar. Selecteer de leesbare privétekst hieronder handmatig.')
+    }
+  }
+
 
   function downloadReadableReport() {
     if (!readableReport || !eligibleComparisonRightNow()) {
@@ -3546,6 +3673,36 @@ export function OfflineReviewedWorkbench({
                     identieke ingrediëntbehoefte bij tijdsvergelijkbare eigen winkelopnames,
                     nooit als totale besparing of bewijs van retailerprijzen.</p>
                   {coverageMessage && <p role="status" aria-live="polite">{coverageMessage}</p>}
+                  {coverageCopyText !== null && <label className="offline-price-workbench__copy-fallback">
+                    Handmatig kopiëren (persoonlijke bronstatus, zonder prijzen)
+                    <textarea readOnly rows={8} value={coverageCopyText}
+                      onFocus={event => event.currentTarget.select()}
+                      aria-label="Selecteerbare privéwinkelcontroles" />
+                    <button type="button" className="ghost-button"
+                      onClick={() => setCoverageCopyText(null)}>Sluit kopieertekst</button>
+                  </label>}
+                  <div className="offline-price-workbench__actions">
+                    <button className="ghost-button" type="button"
+                      disabled={openCoverageRows.length === 0}
+                      onClick={() => void copyCoverageChecklist(true)}>
+                      Kopieer open controles
+                    </button>
+                    <button className="ghost-button" type="button"
+                      disabled={!imported || coverageRows.length === 0}
+                      onClick={() => void copyCoverageChecklist(false)}>
+                      Kopieer volledige winkeldekking
+                    </button>
+                    <button className="ghost-button" type="button"
+                      disabled={openCoverageRows.length === 0}
+                      onClick={() => downloadCoverageChecklist(true)}>
+                      Download uitsluitend open controles (TXT)
+                    </button>
+                    <button className="ghost-button" type="button"
+                      disabled={!imported || coverageRows.length === 0}
+                      onClick={() => downloadCoverageChecklist(false)}>
+                      Download complete winkeldekking (TXT)
+                    </button>
+                  </div>
                   <div className="offline-price-workbench__coverage-filters" role="group"
                     aria-label="Filter de winkeldekking van jouw mandje">
                     <label>Toon ingrediënten
@@ -3739,10 +3896,22 @@ export function OfflineReviewedWorkbench({
                   <button type="button" className="ghost-button" onClick={downloadReadableReport}>
                     Download leesbare vergelijking (TXT)
                   </button>
+                  <button type="button" className="ghost-button"
+                    disabled={!eligibleComparisonRightNow()}
+                    onClick={() => void copyReadableReport()}>
+                    Kopieer volledig bevestigd prijsverschil
+                  </button>
+                  {readableCopyMessage && <p role="status" aria-live="polite">{readableCopyMessage}</p>}
                   <label>Zelf kopiëren, zonder klembordtoestemming
                     <textarea readOnly rows={12} spellCheck={false}
                       aria-label="Leesbare privévergelijking"
-                      value={readableReport} onFocus={event => event.currentTarget.select()} />
+                      value={readableReport} onFocus={event => {
+                        if (eligibleComparisonRightNow()) event.currentTarget.select()
+                        else {
+                          event.currentTarget.blur()
+                          setReadableCopyMessage('Deze bron is verlopen of herzien. Maak eerst een nieuwe bevestigde vergelijking.')
+                        }
+                      }} />
                   </label>
                 </details>
               )}
