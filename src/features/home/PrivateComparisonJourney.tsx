@@ -63,6 +63,8 @@ export function PrivateComparisonJourney({
   const [showPasteSource, setShowPasteSource] = useState(false)
   const [captureMessage, setCaptureMessage] = useState('')
   const [partialQuery, setPartialQuery] = useState('')
+  const [partialStoreFilter, setPartialStoreFilter] = useState<'all' | 'plus' | 'deka' | 'equal'>('all')
+  const [partialSort, setPartialSort] = useState<'impact' | 'name' | 'plus-price' | 'deka-price'>('impact')
   // Search is presentation-only; source admission and basket totals are unchanged.
   const [completeQuery, setCompleteQuery] = useState('')
   const [showAllComplete, setShowAllComplete] = useState(false)
@@ -237,11 +239,18 @@ export function PrivateComparisonJourney({
       productFacts('PLUS', row.plusProduct, row.plusObservedAt),
       productFacts('DekaMarkt', row.dekaProduct, row.dekaObservedAt),
     ].join(' '))
+    if (partialStoreFilter === 'plus' && row.plusCents >= row.dekaCents) return false
+    if (partialStoreFilter === 'deka' && row.dekaCents >= row.plusCents) return false
+    if (partialStoreFilter === 'equal' && row.plusCents !== row.dekaCents) return false
     return partialWords.every(word => searchable.includes(word))
   })
-  const orderedPartialPairs = [...filteredPartialPairs].sort((a, b) =>
-    Math.abs(b.dekaCents - b.plusCents) - Math.abs(a.dekaCents - a.plusCents) ||
-    a.name.localeCompare(b.name, 'nl-NL'))
+  const orderedPartialPairs = [...filteredPartialPairs].sort((a, b) => {
+    if (partialSort === 'name') return a.name.localeCompare(b.name, 'nl-NL')
+    if (partialSort === 'plus-price') return b.plusCents - a.plusCents
+    if (partialSort === 'deka-price') return b.dekaCents - a.dekaCents
+    return Math.abs(b.dekaCents - b.plusCents) - Math.abs(a.dekaCents - a.plusCents) ||
+      a.name.localeCompare(b.name, 'nl-NL')
+  })
   const shownPartialPairs = showAllPartial ? orderedPartialPairs
     : orderedPartialPairs.slice(0, 3)
 
@@ -1001,13 +1010,45 @@ export function PrivateComparisonJourney({
         <span>Zoek in de vergelijkbare originele productregels</span>
         <input type="search" value={partialQuery}
           onChange={event => { setPartialQuery(event.target.value); setShowAllPartial(true) }}
-          placeholder="Ingrediënt, PLUS/Deka productnaam of SKU" />
+          placeholder="Bijvoorbeeld rijst PLUS 1 kg" />
       </label>
+      <div className="private-comparison-journey__partial-search">
+        <label>Toon mijn losse prijsregels
+          <select value={partialStoreFilter} onChange={event => {
+            setPartialStoreFilter(event.currentTarget.value as typeof partialStoreFilter)
+            setShowAllPartial(true)
+          }}>
+            <option value="all">Alle afzonderlijk gecontroleerde bronparen</option>
+            <option value="plus">PLUS heeft lagere hele-pakkosten</option>
+            <option value="deka">DekaMarkt heeft lagere hele-pakkosten</option>
+            <option value="equal">Beide winkelregels even duur</option>
+          </select>
+        </label>
+        <label>Volgorde
+          <select value={partialSort} onChange={event =>
+            setPartialSort(event.currentTarget.value as typeof partialSort)}>
+            <option value="impact">Grootste hele-pakverschil eerst</option>
+            <option value="name">Ingrediënt A–Z</option>
+            <option value="plus-price">Hoogste PLUS-regelbedrag eerst</option>
+            <option value="deka-price">Hoogste Deka-regelbedrag eerst</option>
+          </select>
+        </label>
+      </div>
+      {(partialWords.length > 0 || partialStoreFilter !== 'all' || partialSort !== 'impact') &&
+        <button type="button" onClick={() => {
+          setPartialQuery('')
+          setPartialStoreFilter('all')
+          setPartialSort('impact')
+          setShowAllPartial(false)
+        }}>
+          Wis zoekterm en filters · alle eigen prijsregels
+        </button>}
       <small role="status">{filteredPartialPairs.length} van {partialPairs.length}
         {' '}persoonlijk vergelijkbare ingrediëntregels · grootste hele-pakverschil eerst.
         Geen optelling tot weektotaal.</small>
-      {shownPartialPairs.length === 0 && <p>Geen prijsregels gevonden. Wis de zoekterm
-        om alle bekende oorspronkelijke winkelproducten te zien.</p>}
+      {shownPartialPairs.length === 0 && <p>Geen afzonderlijk vergelijkbare regels gevonden.
+        Wis de zoekterm en filters om alle bekende oorspronkelijke winkelproducten te zien.
+        Het complete mandtotaal blijft onbekend.</p>}
       <ul>{shownPartialPairs.map(item =>
         <li key={item.id}>
           <strong>{item.name} · {readablePlannerDemandAmount(item.amount)} {item.unit}</strong>
