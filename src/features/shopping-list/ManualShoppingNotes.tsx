@@ -49,6 +49,9 @@ export function ManualShoppingNotes({ notes, setNotes }: {
   const [repeatPreview, setRepeatPreview] = useState<{
     name: string; raw: string; original: string;
     additions: PrivateShoppingTemplateItem[]; skipped: number;
+    // Explicit subset of the original reviewed template. These are indices into
+    // additions, not note IDs or retailer product identifiers.
+    selectedIndices: number[];
   } | null>(null)
   const [exportVisible, setExportVisible] = useState(false)
   const [message, setMessage] = useState('')
@@ -1086,19 +1089,32 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       const template = parsePrivateShoppingTemplate(repeatRaw)
       const known = new Set(notes.map(note => privateNoteDuplicateKey(note.store, note.label)))
       const additions = template.items.filter(note => !known.has(privateNoteDuplicateKey(note.store, note.label)))
-      if (notes.length + additions.length > 100) {
-        setRepeatMessage('Je eigen lijst heeft onvoldoende ruimte voor deze herhaalronde (maximaal 100 artikelen).')
-        return
-      }
+      const capacity = 100 - notes.length
+      // Never silently truncate a saved template. When space is limited the
+      // shopper chooses which articles to bring into this shopping round.
+      const selectedIndices = additions.length <= capacity
+        ? additions.map((_, index) => index) : []
       setRepeatPreview({
         name: template.name, raw: repeatRaw, original: serializePrivateNotes(notes),
-        additions, skipped: template.items.length - additions.length,
+        additions, skipped: template.items.length - additions.length, selectedIndices,
       })
-      setRepeatMessage(additions.length + ' nieuwe eigen artikelen gevonden. Controleer en bevestig voordat ze worden toegevoegd.')
+      setRepeatMessage(additions.length + ' nieuwe eigen artikelen gevonden.' +
+        (additions.length > capacity
+          ? ' Er is ruimte voor ' + capacity + ' artikelen; kies zelf een selectie.'
+          : ' Controleer de selectie en bevestig voordat ze worden toegevoegd.'))
     } catch (error) {
       setRepeatProtected(true)
       setRepeatMessage(error instanceof Error ? error.message : 'Herhaalronde is niet beschikbaar.')
     }
+  }
+  function selectRepeatTemplateStore(shop: UnpricedShoppingNote['store']) {
+    setRepeatPreview(current => current ? {
+      ...current,
+      selectedIndices: current.additions
+        .map((item, index) => item.store === shop ? index : -1)
+        .filter(index => index >= 0)
+        .slice(0, Math.max(0, 100 - notes.length)),
+    } : current)
   }
   function confirmRepeatTemplate() {
     const preview = repeatPreview
@@ -1108,17 +1124,23 @@ export function ManualShoppingNotes({ notes, setNotes }: {
           repeatRaw !== preview.raw || serializePrivateNotes(notes) !== preview.original)
         throw Error('Sjabloon of boodschappen zijn intussen gewijzigd. Open de voorinzage opnieuw.')
       const known = new Set(notes.map(note => privateNoteDuplicateKey(note.store, note.label)))
-      if (notes.length + preview.additions.length > 100 ||
-          preview.additions.some(note => known.has(privateNoteDuplicateKey(note.store, note.label))))
-        throw Error('De huidige lijst is veranderd; niets toegevoegd.')
-      const added = preview.additions.map(item => ({
+      const selected = new Set(preview.selectedIndices)
+      if (!selected.size || selected.size !== preview.selectedIndices.length ||
+          [...selected].some(index => !Number.isSafeInteger(index) || index < 0 || index >= preview.additions.length))
+        throw Error('Kies minstens één geldig artikel voor deze winkelronde.')
+      const chosen = preview.additions.filter((_, index) => selected.has(index))
+      if (notes.length + chosen.length > 100 ||
+          chosen.some(note => known.has(privateNoteDuplicateKey(note.store, note.label))))
+        throw Error('De gekozen artikelen passen niet meer in de huidige lijst; niets toegevoegd.')
+      const added = chosen.map(item => ({
         ...item, done: false, id: 'own-note-' + crypto.randomUUID(),
       }))
       setNotes(current => serializePrivateNotes(current) === preview.original
         ? [...current, ...added] : current)
       setLastImport({ source: 'sjabloon', added })
       setRepeatPreview(null)
-      setRepeatMessage(added.length + ' nieuwe ongeprijsde artikelen toegevoegd; bestaande vinkjes en winkels behouden.')
+      setRepeatMessage(added.length + ' gekozen ongeprijsde artikelen toegevoegd; ' +
+        (preview.additions.length - added.length) + ' niet geselecteerd. Bestaande vinkjes en winkels behouden.')
     } catch (error) {
       setRepeatPreview(null)
       setRepeatMessage(error instanceof Error ? error.message : 'Herhaalronde geweigerd.')
@@ -1784,21 +1806,48 @@ export function ManualShoppingNotes({ notes, setNotes }: {
           <li key={index}>☐ [{item.store}] {item.label}</li>)}</ul>
         {repeatFilePreview.items.length > 15 &&
           <p>En {repeatFilePreview.items.length - 15} andere artikelen; download en inspecteer
-            het JSON-bestand als je deze volledige lijst wilt controleren.</p>
+            het JSON-bestand als je deze volledige lijst wilt controleren.</p>}
         <button type="button" onClick={confirmRepeatTemplateFile}>Bewaar dit sjabloon op mijn apparaat</button>
         <button type="button" onClick={() => setRepeatFilePreview(null)}>Annuleer bestandimport</button>
       </div>}
       {repeatPreview && <div role="group" aria-label="Voorinzage van persoonlijke herhaalronde">
         <strong>{repeatPreview.name} · {repeatPreview.additions.length} nieuwe artikelen</strong>
-        <p>{repeatPreview.skipped} bestaande of dubbele artikelen overgeslagen.
-          De nieuwe artikelen krijgen open vinkjes en tellen nooit mee als winkelprijs.</p>
-        <ul>{repeatPreview.additions.slice(0, 15).map((item, index) =>
-          <li key={index}>☐ [{item.store}] {item.label}</li>)}</ul>
-        {repeatPreview.additions.length > 15 &&
-          <p>En {repeatPreview.additions.length - 15} andere nieuwe artikelen.</p>}
-        <button type="button" disabled={!repeatPreview.additions.length}
+        <p>{repeatPreview.skipped} bestaande artikelen overgeslagen. Kies welke van de
+          {repeatPreview.additions.length} nieuwe artikelen je deze ronde wilt kopen.
+          Vinkjes starten open en tellen nooit mee als winkelprijs.</p>
+        <p role="status">{repeatPreview.selectedIndices.length} gekozen; maximaal {Math.max(0, 100 - notes.length)}
+          extra artikelen passen nog op je persoonlijke lijst.</p>
+        <button type="button" onClick={() => setRepeatPreview(current => current ? {
+          ...current, selectedIndices: current.additions
+            .slice(0, Math.max(0, 100 - notes.length)).map((_, index) => index),
+        } : current)}>Kies eerste artikelen tot mijn lijst vol is</button>
+        <button type="button" onClick={() => setRepeatPreview(current => current ? {
+          ...current, selectedIndices: [],
+        } : current)}>Wis mijn selectie</button>
+        <div className="manual-shopping-notes__repeat-shops" role="group" aria-label="Selecteer één winkel uit herhaalronde">
+          {stores.map(shop => <button key={shop} type="button"
+            onClick={() => selectRepeatTemplateStore(shop)}>
+            Alleen {shop} ({repeatPreview.additions.filter(item => item.store === shop).length})
+          </button>)}
+        </div>
+        <ul className="manual-shopping-notes__repeat-items" aria-label="Kies artikelen voor herhaalronde">{repeatPreview.additions.map((item, index) =>
+          <li key={index}><label><input type="checkbox"
+            checked={repeatPreview.selectedIndices.includes(index)}
+            onChange={event => {
+              const checked = event.currentTarget.checked
+              setRepeatPreview(current => {
+                if (!current) return current
+                const selected = new Set(current.selectedIndices)
+                if (checked && selected.size >= Math.max(0, 100 - notes.length)) return current
+                if (checked) selected.add(index)
+                else selected.delete(index)
+                return { ...current, selectedIndices: [...selected].sort((a, b) => a - b) }
+              })
+            }} /> [{item.store}] {item.label}</label></li>)}</ul>
+        <button type="button" disabled={!repeatPreview.selectedIndices.length ||
+          repeatPreview.selectedIndices.length > 100 - notes.length}
           onClick={confirmRepeatTemplate}>
-          Voeg {repeatPreview.additions.length} nieuwe artikelen toe
+          Voeg {repeatPreview.selectedIndices.length} gekozen artikelen toe
         </button>
         <button type="button" onClick={() => setRepeatPreview(null)}>Annuleer herhaalronde</button>
       </div>}

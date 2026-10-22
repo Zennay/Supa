@@ -102,3 +102,13 @@
 .manual-shopping-notes__double-buy ul { display:flex; flex-wrap:wrap; gap:.5rem; padding:0;
   margin:0; list-style:none; }
 .manual-shopping-notes__double-buy button { min-height:44px; white-space:normal; text-align:left; }
+
+/* Keep full 100-item private repeat-round selection reachable on narrow phones. */
+.manual-shopping-notes__repeat-shops { display:flex; flex-wrap:wrap; gap:.5rem; }
+.manual-shopping-notes__repeat-items { max-height:22rem; overflow-y:auto; overscroll-behavior:contain;
+  padding:0 .6rem; margin:.6rem 0; border:1px solid #ceddd1; border-radius:10px; }
+.manual-shopping-notes__repeat-items li { list-style:none; border-bottom:1px solid #e4ece5; }
+.manual-shopping-notes__repeat-items li:last-child { border-bottom:0; }
+.manual-shopping-notes__repeat-items label { display:flex; align-items:center; gap:.7rem;
+  min-height:44px; padding:.45rem .3rem; overflow-wrap:anywhere; }
+.manual-shopping-notes__repeat-items input { width:20px; height:20px; flex-shrink:0; }
