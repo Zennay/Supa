@@ -998,13 +998,19 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       '. De originele vinkjes blijven behouden; winkelprijzen en SKU’s zijn niet gewijzigd.')
   }
   const routeItems = grouped.flatMap(group => group.items)
-  const exportText = [
-    'SUPA · EIGEN ONGEPRIJSDE BOODSCHAPPEN · ' + filterStore,
-    'Los van Planner, bronopnames, weekbudget en winkelmandtotalen.', '',
-    ...(onlyOpen ? ['Alleen nog open artikelen:'] : []),
-    ...routeItems.map(note => (note.done ? '☑ ' : '☐ ') + `[${note.store}] ${safeLabel(note.label)} · prijs onbekend`),
-    '', 'Geen winkelprijs, bronrecht of besparingsclaim.',
-  ].join('\n') + '\n'
+  const selectedVisible = routeItems.filter(note => selectedMoveIds.includes(note.id))
+  function formatOwnList(items: UnpricedShoppingNote[], selectedOnly = false) {
+    return [
+      'SUPA · EIGEN ONGEPRIJSDE BOODSCHAPPEN · ' + filterStore,
+      'Los van Planner, bronopnames, weekbudget en winkelmandtotalen.', '',
+      ...(onlyOpen ? ['Alleen nog open artikelen:'] : []),
+      ...items.map(note => (note.done ? '☑ ' : '☐ ') +
+        `[${note.store}] ${safeLabel(note.label)} · prijs onbekend`),
+      '', 'Geen winkelprijs, bronrecht of besparingsclaim.',
+    ].join('\n') + '\n'
+  }
+  const exportText = formatOwnList(routeItems)
+  const selectedExportText = formatOwnList(selectedVisible)
   async function sharePersonalShoppingList() {
     if (!visible.length) return
     // Only the currently visible personal notes are shared, after an explicit
@@ -1075,6 +1081,18 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       document.body.append(link); link.click(); link.remove()
       setMessage('De zichtbare ongeprijsde boodschappen zijn als offline printbestand bewaard.')
     } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+  }
+  function downloadSelected() {
+    if (!selectedVisible.length) return
+    // Only selected and currently visible self-entered notes; no price inputs.
+    const uri = URL.createObjectURL(new Blob([selectedExportText], { type: 'text/plain;charset=utf-8' }))
+    try {
+      const link = document.createElement('a')
+      link.href = uri
+      link.download = 'supa-geselecteerde-ongeprijsde-boodschappen.txt'
+      document.body.append(link); link.click(); link.remove()
+      setMessage(selectedVisible.length + ' geselecteerde eigen boodschappen als TXT opgeslagen zonder prijzen.')
+    } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
   }
   function download() {
     const uri = URL.createObjectURL(new Blob([exportText], { type: 'text/plain;charset=utf-8' }))
@@ -1340,6 +1358,9 @@ export function ManualShoppingNotes({ notes, setNotes }: {
     <p className="manual-shopping-notes__order-hint">Orden je eigen artikelen binnen een winkel met ↑ en ↓. Zet zoeken en 'Alleen open' uit om de hele volgorde te bewerken; kopie, TXT en print nemen jouw volgorde over. Selecteer losse regels om alleen die naar een andere winkel te verplaatsen.</p>
     {selectedMoveIds.length > 0 && <p role="status" aria-live="polite">
       {selectedMoveIds.length} artikelen geselecteerd voor een mogelijke winkelwissel.
+      <button type="button" disabled={!selectedVisible.length} onClick={downloadSelected}>
+        Download zichtbare selectie als TXT
+      </button>
       <button type="button" onClick={() => setSelectedMoveIds([])}>Wis mijn selectie</button>
     </p>}
     {lastGroupMove && <div className="manual-shopping-notes__undo-move">
