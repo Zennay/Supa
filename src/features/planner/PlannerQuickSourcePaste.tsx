@@ -156,8 +156,7 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
     const ticket = ++revision.current
     setPreview(null); setUndoSnapshot(null); setRefreshSummary(null); setMessage(''); setBusy(true)
     try {
-      const captures: unknown[] = []
-      const seen = new Set<string>()
+      const originals: string[] = []
       for (const file of files) {
         if (file.size === 0 || file.size > limit)
           throw new Error('Elk bestand moet gevuld en maximaal 256 kB zijn.')
@@ -165,19 +164,11 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
         if (ticket !== revision.current) return
         const normalized = await normalizedOwnSource(raw)
         if (ticket !== revision.current) return
-        const source = parseOfflinePriceSnapshots(normalized, Date.now())
-        const names = Object.keys(source.captures)
-        if (names.length !== 1)
-          throw new Error('Twee bestanden moeten elk precies één winkel bevatten.')
-        if (seen.has(names[0]))
-          throw new Error('Beide bestanden zijn dezelfde winkel. Kies PLUS én DekaMarkt.')
-        seen.add(names[0])
-        const input = JSON.parse(normalized) as { captures: unknown[] }
-        if (!Array.isArray(input.captures) || input.captures.length !== 1)
-          throw new Error('Originele winkelopname niet herkenbaar.')
-        captures.push(input.captures[0])
+        originals.push(normalized)
       }
-      const combined = JSON.stringify({ schema: 'supa-offline-prices-v1', captures })
+      // File picker, typed spreadsheet tabs and dual-sheet paste now all use
+      // exactly the same canonical two-retailer combine/read boundary.
+      const combined = combineTwoOwnShopCaptures(originals)
       if (new TextEncoder().encode(combined).length > limit)
         throw new Error('Gecombineerde winkelbestanden zijn groter dan 256 kB.')
       const data = parseOfflinePriceSnapshots(combined, Date.now())
@@ -290,8 +281,7 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
       const provided = (['PLUS', 'DekaMarkt'] as const)
         .filter(store => separateDrafts[store].trim().length > 0)
       if (!provided.length) throw new Error('Plak eerst PLUS en/of DekaMarkt-bronregels.')
-      const captures: unknown[] = []
-      let singleNormalized = ''
+      const sources: string[] = []
       for (const store of provided) {
         const raw = separateDrafts[store]
         if (new TextEncoder().encode(raw).length > limit)
@@ -301,14 +291,10 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
         const checked = parseOfflinePriceSnapshots(normalized, Date.now())
         if (Object.keys(checked.captures).length !== 1 || !checked.captures[store])
           throw new Error(store + ': bron bevat niet precies deze winkel. Controleer de originele retailer-ID.')
-        const original = JSON.parse(normalized) as { captures?: unknown[] }
-        if (!Array.isArray(original.captures) || original.captures.length !== 1)
-          throw new Error(store + ': originele opname niet herkenbaar.')
-        captures.push(original.captures[0])
-        singleNormalized = normalized
+        sources.push(normalized)
       }
-      const normalized = provided.length === 1 ? singleNormalized
-        : JSON.stringify({ schema: 'supa-offline-prices-v1', captures })
+      const normalized = provided.length === 1 ? sources[0]
+        : combineTwoOwnShopCaptures(sources)
       if (new TextEncoder().encode(normalized).length > limit)
         throw new Error('Gecombineerde winkelbronnen zijn groter dan 256 kB.')
       const data = parseOfflinePriceSnapshots(normalized, Date.now())
