@@ -245,8 +245,12 @@ function sourceOptions(products: OfflineStoreProduct[],
       String(product.packAmount) + ' ' + product.packUnit
     const multipack = product.packCount === null || product.packCount === undefined ? '' :
       String(product.packCount) + 'x ' + pack
+    const compactMultipack = product.packAmount === null ||
+      product.packCount === null || product.packCount === undefined ? '' :
+      String(product.packCount) + 'x' + product.packAmount + product.packUnit
     const searchable = searchableSourceText([
       product.name, product.id, pack, product.packUnit, multipack,
+      compactMultipack,
     ].join(' '))
     return queryTerms.every(term => searchable.includes(term))
   }
@@ -2700,8 +2704,11 @@ export function OfflineReviewedWorkbench({
                   const amount = product.packAmount === null ? '' : String(product.packAmount)
                   const pack = amount ? amount + product.packUnit : ''
                   const count = product.packCount === null ? '' : String(product.packCount) + 'x'
+                  const compactMultipack = amount && count
+                    ? count + amount + product.packUnit : ''
                   const searchable = searchableSourceText([
                     product.name, product.id, amount, product.packUnit, pack, count,
+                    compactMultipack,
                   ].join(' '))
                   return queryTerms.every(term => searchable.includes(term))
                 })
