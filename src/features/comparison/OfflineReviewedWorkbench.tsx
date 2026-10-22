@@ -235,10 +235,21 @@ function sourceOptions(products: OfflineStoreProduct[],
   unit: BasketTraceLine['requirement']['unit'], text: string, keepId: string,
   ingredient: string, requestedAmount: number | null, sort: SourceSort,
   cheaperThanCents: number | null = null) {
-  const query = searchableSourceText(text)
-  const matchesQuery = (product: import('../../domain/basket.ts').StoreProduct) =>
-    !query || searchableSourceText(product.name).includes(query) ||
-    searchableSourceText(product.id).includes(query)
+  // Search is discovery over ORIGINAL self-supplied product metadata, not
+  // an automatic match or a new source for packaging/price assertions. Each
+  // word may occur in a different field (e.g. "yoghurt 500 g" or "sku 2x").
+  const queryTerms = searchableSourceText(text).split(/\\s+/u).filter(Boolean)
+  const matchesQuery = (product: import('../../domain/basket.ts').StoreProduct) => {
+    if (!queryTerms.length) return true
+    const pack = product.packAmount === null ? '' :
+      String(product.packAmount) + ' ' + product.packUnit
+    const multipack = product.packCount === null || product.packCount === undefined ? '' :
+      String(product.packCount) + 'x ' + pack
+    const searchable = searchableSourceText([
+      product.name, product.id, pack, product.packUnit, multipack,
+    ].join(' '))
+    return queryTerms.every(term => searchable.includes(term))
+  }
   const physicallyCompatible = products.filter(p => compatibleSourceUnit(unit, p.packUnit))
   const available = physicallyCompatible.filter(p => p.available && p.packAmount !== null)
   const filtered = rankOwnSourceSuggestions(
@@ -3534,9 +3545,9 @@ export function OfflineReviewedWorkbench({
                             {(choices.availableCount > 0 || choices.unpricedCount > 0) && (
                               <div className="offline-price-workbench__source-choices">
                                 <label>Zoek eigen bronartikel voor dit ingrediënt
-                                  <span>Zoek op originele productnaam of artikelcode; ook zonder accent.</span>
+                                  <span>Zoek met meerdere woorden door originele productnaam, artikelcode, verpakking en multipack; ook zonder accent.</span>
                                   <input type="search" value={skuFilter[searchKey] ?? ''}
-                                    maxLength={120} placeholder="Zoek product of artikelcode"
+                                    maxLength={120} placeholder="Bijv. yoghurt 500 g of broncode"
                                     onChange={event => setSkuFilter(current =>
                                       ({ ...current, [searchKey]: event.currentTarget.value }))} />
                                   <small>{choices.total} prijsklare en {choices.unpricedTotal} niet-prijsklare bronartikelen in deze zoekopdracht.</small>
