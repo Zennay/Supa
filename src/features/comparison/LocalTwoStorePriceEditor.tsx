@@ -195,6 +195,7 @@ const captureStatusNames: Record<CaptureStatus, string> = {
 }
 
 const privateDraftStorageKey = 'supa:local-two-store-price-draft:v1'
+const privateDeviceDraftKey = 'supa:local-two-store-price-device-draft:v1'
 
 type StoredDraft = {
   saved: boolean
@@ -259,6 +260,7 @@ type Props = {
   activeDays: string[]
   onGenerated: (json: string) => void
   onEdit: () => void
+  onPreviewSourceFiles: (files: File[]) => void
   reviewedRecaptureSeeds?: Record<string, ReviewedRecaptureSeed>
 }
 /**
@@ -266,10 +268,12 @@ type Props = {
  * licensed catalog, attestation, retailer permission, or independent evidence.
  */
 export function LocalTwoStorePriceEditor({
-  plan, recipes, activeDays, onGenerated, onEdit, reviewedRecaptureSeeds = {},
+  plan, recipes, activeDays, onGenerated, onEdit, onPreviewSourceFiles, reviewedRecaptureSeeds = {},
 }: Props) {
   const [open, setOpen] = useState(false)
   const [onlyOpenRows, setOnlyOpenRows] = useState(false)
+  const [pairSearch, setPairSearch] = useState('')
+  const [pairView, setPairView] = useState<'all' | 'attention' | 'paired'>('all')
   const [preparedOpenCaptureCopy, setPreparedOpenCaptureCopy] = useState<{ identity: string; text: string } | null>(null)
   const [pricePreviewNow, setPricePreviewNow] = useState(() => Date.now())
   const [sourceSelection, setSourceSelection] = useState<'both' | OfflineRetailer>('both')
@@ -280,7 +284,7 @@ export function LocalTwoStorePriceEditor({
   // Do not leave a provisional pair visible forever in a long-running tab.
   // This only updates advisory UI, never revives or admits source evidence.
   useEffect(() => {
-    if (!open || sourceSelection !== 'both') return
+    if (!open) return
     const refresh = () => setPricePreviewNow(Date.now())
     refresh()
     const timer = window.setInterval(refresh, 60_000)
@@ -289,7 +293,7 @@ export function LocalTwoStorePriceEditor({
       window.clearInterval(timer)
       document.removeEventListener('visibilitychange', refresh)
     }
-  }, [open, sourceSelection])
+  }, [open])
 
   const [rows, setRows] = useState<Record<string, ProductDraft>>({})
   const [capturedAt, setCapturedAt] = useState<Record<OfflineRetailer, string>>({ PLUS: '', DekaMarkt: '' })
@@ -330,15 +334,85 @@ export function LocalTwoStorePriceEditor({
     // Re-observe the older source, never merely give it a newer timestamp.
     recaptureStores.add(plusObserved < dekaObserved ? 'PLUS' : 'DekaMarkt')
   }
+  // A completed product draft is not a complete fieldwork plan when its real
+  // observation time is missing, impossible, future-dated or incompatible.
+  // These are *instructions to the user*, never substitute source evidence.
+  const pendingCaptureTimes = selectedStores.flatMap(store => {
+    const local = capturedAt[store]
+    const original = timestampWithOffset(local)
+    if (!original) return [{ store, instruction: local
+      ? 'Controleer het onmogelijke of dubbelzinnige Nederlandse bronmoment.'
+      : 'Noteer het echte lokale winkelmoment, zonder een tijd te verzinnen.' }]
+    if (pricePreviewNow - Date.parse(original) < -300_000) return [{
+      store, instruction: 'Opname ligt in de toekomst; corrigeer alleen aan de hand van de echte bron.',
+    }]
+    if (recaptureStores.has(store)) return [{
+      store, instruction: 'Oude of ongepaarde opname: bezoek de winkel opnieuw en verifieer originele prijs en voorraad.',
+    }]
+    return []
+  })
   const activeNeeds = needs.filter(item => item.label.trim() && item.query.trim())
+  // Two distinct draft product definitions must not claim the same original
+  // store SKU. The canonical source generator already refuses this conflict;
+  // surface it BEFORE it can imply a plausible two-store difference.
+  const conflictingCodes = selectedStores.flatMap(store => {
+    const byCode = new Map<string, { signature: string; index: number; label: string }[]>()
+    activeNeeds.forEach((need, index) => {
+      const row = rows[key(store, need.id)] ?? emptyDraft(need.unit)
+      if (!isEnteredOwnCapture(row)) return
+      const code = row.sourceId ?? ''
+      const signature = JSON.stringify([
+        row.name, row.packAmount ? amountOrNull(row.packAmount.trim()) : null,
+        row.packUnit, Number(row.packCount), row.available,
+        row.available ? eurosToCents(row.priceEuros.trim()) : null,
+      ])
+      const group = byCode.get(code) ?? []
+      group.push({ signature, index, label: need.label })
+      byCode.set(code, group)
+    })
+    return [...byCode].flatMap(([sourceId, group]) => {
+      if (group.length < 2 || group.every(item =>
+        item.signature === group[0].signature)) return []
+      return [{ store, sourceId, indices: group.map(item => item.index),
+        labels: group.map(item => item.label) }]
+    })
+  })
+  const conflictingNeedIndices = new Set(conflictingCodes.flatMap(item => item.indices))
   // Count the SAME physical ingredient needs with two complete provisional
   // price entries. No partial total or store winner may be inferred from this.
-  const readyPairedDraftIds = new Set(activeNeeds.filter(need =>
+  const readyPairedDraftIds = new Set(activeNeeds.filter((need, index) =>
+    !conflictingNeedIndices.has(index) &&
     currentDraftPackMath(rows[key('PLUS', need.id)] ?? emptyDraft(need.unit), need) &&
     currentDraftPackMath(rows[key('DekaMarkt', need.id)] ?? emptyDraft(need.unit), need),
   ).map(need => need.id))
+  // Rank only calculations for identical physical Planner demand. These
+  // shopper-typed candidate SKUs have not passed the actual source matcher or
+  // human product-equivalence review, so the result is never a basket winner.
+  const provisionalDifferences = sameTimePair ? activeNeeds.flatMap((need, index) => {
+    if (conflictingNeedIndices.has(index)) return []
+    const plus = currentDraftPackMath(rows[key('PLUS', need.id)] ?? emptyDraft(need.unit), need)
+    const deka = currentDraftPackMath(rows[key('DekaMarkt', need.id)] ?? emptyDraft(need.unit), need)
+    if (!plus || !deka) return []
+    const differenceCents = deka.lineTotalCents - plus.lineTotalCents
+    if (!Number.isSafeInteger(differenceCents)) return []
+    return [{ need, index, plus, deka, differenceCents }]
+  }).sort((a, b) => Math.abs(b.differenceCents) - Math.abs(a.differenceCents) ||
+    a.index - b.index) : []
   const nextIncompletePairIndex = activeNeeds.findIndex(need =>
     !readyPairedDraftIds.has(need.id) || recaptureStores.size > 0)
+  const visiblePairRows = activeNeeds.flatMap((need, index) => {
+    const query = pairSearch.trim().toLocaleLowerCase('nl')
+    const sourceWords = stores.flatMap(store => {
+      const row = rows[key(store, need.id)]
+      return row ? [row.sourceId ?? '', row.name] : []
+    })
+    if (query && ![need.label, need.query, ...sourceWords].some(value =>
+      value.toLocaleLowerCase('nl').includes(query))) return []
+    const paired = readyPairedDraftIds.has(need.id)
+    if (pairView === 'paired' && !paired) return []
+    if (pairView === 'attention' && paired && sameTimePair) return []
+    return [{ need, index }]
+  })
   const openCaptureTasks = selectedStores.flatMap(store => activeNeeds.flatMap(need => {
     const row = rows[key(store, need.id)] ?? emptyDraft(need.unit)
     const status = ownCaptureStatus(row, need)
@@ -358,7 +432,8 @@ export function LocalTwoStorePriceEditor({
   ])
   const openCaptureIdentity = JSON.stringify([selectedPlanFingerprint, sourceSelection,
     openCaptureTasks.map(task => [task.store, task.need.id, task.need.label,
-      task.need.amount, task.need.unit, task.status, task.needsFreshObservation])])
+      task.need.amount, task.need.unit, task.status, task.needsFreshObservation]),
+    pendingCaptureTimes.map(task => [task.store, task.instruction])])
   const latestOpenCaptureIdentity = useRef(openCaptureIdentity)
   latestOpenCaptureIdentity.current = openCaptureIdentity
   const selectableOpenCaptureText = preparedOpenCaptureCopy?.identity === openCaptureIdentity
@@ -366,6 +441,11 @@ export function LocalTwoStorePriceEditor({
   // Avoid importing a draft into a different plan if it changed during File.text().
   const currentPlanFingerprint = useRef(selectedPlanFingerprint)
   currentPlanFingerprint.current = selectedPlanFingerprint
+  // A lazy HTML exporter must never download a snapshot after the shopper
+  // switched weeks, edited a draft SKU or changed a store capture time.
+  const draftReviewIdentity = JSON.stringify([selectedPlanFingerprint, sourceSelection, capturedAt, rows])
+  const currentDraftReviewIdentity = useRef(draftReviewIdentity)
+  currentDraftReviewIdentity.current = draftReviewIdentity
   // A camera stream belongs only to the selected physical Planner week.
   useEffect(() => setScanTarget(null), [selectedPlanFingerprint])
   const [preparedFor, setPreparedFor] = useState('')
@@ -374,21 +454,45 @@ export function LocalTwoStorePriceEditor({
   const [draftFingerprint, setDraftFingerprint] = useState('')
   const [draftProtected, setDraftProtected] = useState(false)
   const [draftStatus, setDraftStatus] = useState('')
+  const [deviceDraftOptIn, setDeviceDraftOptIn] = useState(false)
+  const [deviceDraftRaw, setDeviceDraftRaw] = useState<string | null>(null)
+  const [deviceDraftProtected, setDeviceDraftProtected] = useState(false)
+  const [deviceDraftStatus, setDeviceDraftStatus] = useState('')
 
-  // Explicitly opt-in to *session-only* recovery. A different planner or
-  // unknown/future record can never silently be reinterpreted or replaced.
+  // Restore only snapshots explicitly saved earlier, never promote their
+  // self-entered prices to reviewed source evidence. Two divergent copies
+  // are not resolved by precedence: both original bytes remain protected.
   useEffect(() => {
-    const old = readPrivateDraft(selectedPlanFingerprint, allowedDraftRows)
-    setRows(old.rows)
-    setSourceSelection(old.sourceSelection)
-    setCapturedAt(old.capturedAt)
-    setDraftOptIn(old.saved)
+    const tab = readPrivateDraft(selectedPlanFingerprint, allowedDraftRows)
+    let deviceRaw: string | null = null
+    let deviceUnavailable = false
+    try { deviceRaw = window.localStorage.getItem(privateDeviceDraftKey) }
+    catch { deviceUnavailable = true }
+    const device = deviceRaw === null ? null
+      : readPrivateDraft(selectedPlanFingerprint, allowedDraftRows, deviceRaw)
+    const diverged = Boolean(tab.saved && device?.saved && JSON.stringify([
+      tab.rows, tab.capturedAt, tab.sourceSelection,
+    ]) !== JSON.stringify([
+      device.rows, device.capturedAt, device.sourceSelection,
+    ]))
+    const chosen = diverged ? null : tab.saved ? tab : device?.saved ? device : null
+    setRows(chosen?.rows ?? {})
+    setSourceSelection(chosen?.sourceSelection ?? 'both')
+    setCapturedAt(chosen?.capturedAt ?? { PLUS: '', DekaMarkt: '' })
+    setDraftOptIn(tab.saved && !diverged)
     setDraftFingerprint(selectedPlanFingerprint)
-    setDraftProtected(old.protected)
-    setSavedDraftRaw(old.raw)
-    if (old.saved) setDraftStatus('Je vorige privéconcept voor deze week is hersteld in deze browsertab.')
-    else if (old.protected) setDraftStatus('Een eerder concept voor een andere week of versie is beschermd tegen overschrijven.')
-    else setDraftStatus('')
+    setDraftProtected(tab.protected || diverged)
+    setSavedDraftRaw(tab.raw)
+    setDeviceDraftOptIn(Boolean(device?.saved && !diverged))
+    setDeviceDraftProtected(deviceUnavailable || Boolean(device?.protected) || diverged)
+    setDeviceDraftRaw(deviceRaw)
+    setDraftStatus(diverged ? 'Tab- en apparaatkopie verschillen. Beide zijn beschermd; open je eigen JSON-backup voordat je een versie wist.'
+      : tab.saved ? 'Je eerdere tabconcept is hersteld, nog NIET als prijsbron bevestigd.'
+        : tab.protected ? 'Een opgeslagen tabconcept voor een andere week of versie blijft beschermd.' : '')
+    setDeviceDraftStatus(diverged ? 'Conflicterende apparaatkopie blijft onaangeroerd.'
+      : device?.saved ? 'Je eigen prijsconcept is vanaf dit apparaat hersteld. Bronmomenten en prijzen moeten opnieuw worden gecontroleerd.'
+        : deviceUnavailable ? 'Apparaatopslag niet beschikbaar.'
+          : device?.protected ? 'Oude apparaatkopie hoort niet veilig bij deze Planner-week.' : '')
   }, [selectedPlanFingerprint])
 
   useEffect(() => {
@@ -411,6 +515,81 @@ export function LocalTwoStorePriceEditor({
       setDraftStatus('Kon dit privéconcept niet bewaren. Gebruik desgewenst de lokale JSON-download.')
     }
   }, [draftOptIn, draftProtected, draftFingerprint, rows, capturedAt, sourceSelection, selectedPlanFingerprint])
+
+  // Persistent local copy is completely separate from the existing temporary
+  // tab snapshot. Both use the SAME strict selected-week draft admission.
+  useEffect(() => {
+    if (!deviceDraftOptIn || deviceDraftProtected ||
+        draftFingerprint !== selectedPlanFingerprint) return
+    try {
+      const actual = window.localStorage.getItem(privateDeviceDraftKey)
+      if (actual !== deviceDraftRaw) {
+        setDeviceDraftOptIn(false)
+        setDeviceDraftProtected(true)
+        setDeviceDraftStatus('De apparaatkopie is elders veranderd; er is niets overschreven.')
+        return
+      }
+      const next = JSON.stringify({
+        schemaVersion: 1, fingerprint: selectedPlanFingerprint,
+        rows, capturedAt, sourceSelection,
+      })
+      if (new TextEncoder().encode(next).length > 256000) throw Error('oversized')
+      if (next !== actual) window.localStorage.setItem(privateDeviceDraftKey, next)
+      if (deviceDraftRaw !== next) setDeviceDraftRaw(next)
+    } catch {
+      setDeviceDraftOptIn(false)
+      setDeviceDraftProtected(true)
+      setDeviceDraftStatus('Apparaatopslag geweigerd of vol; download je privéconcept als JSON.')
+    }
+  }, [deviceDraftOptIn, deviceDraftProtected, deviceDraftRaw, draftFingerprint,
+    selectedPlanFingerprint, rows, capturedAt, sourceSelection])
+
+  useEffect(() => {
+    const changedExternally = (event: StorageEvent) => {
+      if (!deviceDraftOptIn || deviceDraftProtected ||
+          (event.key !== privateDeviceDraftKey && event.key !== null)) return
+      if (event.newValue !== deviceDraftRaw) {
+        setDeviceDraftOptIn(false)
+        setDeviceDraftProtected(true)
+        setDeviceDraftStatus('Andere tab wijzigde de opgeslagen prijsinvoer; controleer de JSON-backup.')
+      }
+    }
+    window.addEventListener('storage', changedExternally)
+    return () => window.removeEventListener('storage', changedExternally)
+  }, [deviceDraftOptIn, deviceDraftProtected, deviceDraftRaw])
+
+  function setDeviceDraftConsent(checked: boolean) {
+    if (deviceDraftProtected) return
+    try {
+      const current = window.localStorage.getItem(privateDeviceDraftKey)
+      if (current !== deviceDraftRaw) {
+        setDeviceDraftOptIn(false)
+        setDeviceDraftProtected(true)
+        setDeviceDraftStatus('Er is een andere apparaatkopie: geen overschrijving toegestaan.')
+        return
+      }
+      if (checked) {
+        const next = JSON.stringify({
+          schemaVersion: 1, fingerprint: selectedPlanFingerprint,
+          rows, capturedAt, sourceSelection,
+        })
+        if (new TextEncoder().encode(next).length > 256000) throw Error('oversized')
+        window.localStorage.setItem(privateDeviceDraftKey, next)
+        setDeviceDraftRaw(next)
+      } else {
+        window.localStorage.removeItem(privateDeviceDraftKey)
+        setDeviceDraftRaw(null)
+      }
+      setDeviceDraftOptIn(checked)
+      setDeviceDraftStatus(checked
+        ? 'Onvoltooid prijsconcept privé bewaard op dit apparaat. Alleen oorspronkelijke bronreview mag prijzen later bevestigen.'
+        : 'Alleen de apparaatkopie gewist; dit invulscherm en tabkopie blijven behouden.')
+    } catch {
+      setDeviceDraftOptIn(false)
+      setDeviceDraftProtected(true)
+      setDeviceDraftStatus('Opslaan op dit apparaat niet toegestaan. Download je JSON-concept.')
+    }
+  }
 
   function clearDraft() {
     if (typeof window !== 'undefined') {
@@ -448,6 +627,58 @@ export function LocalTwoStorePriceEditor({
     }
   }
 
+  // Deliberate recovery from an old or conflicting local snapshot. Never
+  // delete the tab version, visible editor, or other stored private records.
+  // A stale/future-week record can be the user's only copy. Provide an
+  // explicit byte-preserving local rescue before offering deletion; never
+  // parse, trust, publish or apply these bytes as source price evidence.
+  function downloadProtectedDraftCopy(kind: 'tab' | 'device') {
+    const stored = kind === 'device' ? deviceDraftRaw : savedDraftRaw
+    const storageKey = kind === 'device' ? privateDeviceDraftKey : privateDraftStorageKey
+    if (stored === null) return
+    try {
+      const storage = kind === 'device' ? window.localStorage : window.sessionStorage
+      if (storage.getItem(storageKey) !== stored) {
+        setDraftStatus('De beschermde kopie is intussen veranderd. Download de huidige versie pas na opnieuw openen.')
+        return
+      }
+      // Raw files remain private, unvalidated copies; a user may inspect or
+      // manually salvage them, never pass them directly to a price comparator.
+      if (new TextEncoder().encode(stored).length > 512000) throw Error('oversized')
+      const url = URL.createObjectURL(new Blob([stored], { type: 'application/json;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-beschermd-' + (kind === 'device' ? 'apparaat' : 'tab') + '-prijsconcept.json'
+        document.body.append(link)
+        link.click()
+        link.remove()
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setDraftStatus('Beschermde originele ' + (kind === 'device' ? 'apparaat' : 'tab') +
+        'kopie lokaal gedownload, zonder te importeren of prijzen goed te keuren.')
+    } catch {
+      setDraftStatus('Deze beschermde kopie kan niet veilig worden gedownload. Er is niets verwijderd.')
+    }
+  }
+  function discardProtectedDeviceDraft() {
+    if (!deviceDraftProtected || !window.confirm(
+      'Wis uitsluitend de oude, beschermde prijsconceptkopie op dit apparaat? Download eerst je eigen JSON-backup als je die oude week nodig hebt. De geopende invoer blijft behouden.')) return
+    try {
+      const current = window.localStorage.getItem(privateDeviceDraftKey)
+      if (current !== deviceDraftRaw) {
+        setDeviceDraftRaw(current)
+        setDeviceDraftStatus('De opgeslagen apparaatkopie is veranderd. Annuleer en controleer de actuele gegevens.')
+        return
+      }
+      window.localStorage.removeItem(privateDeviceDraftKey)
+      setDeviceDraftRaw(null)
+      setDeviceDraftOptIn(false)
+      setDeviceDraftProtected(false)
+      setDeviceDraftStatus('Beschermde apparaatkopie na je toestemming verwijderd. Bewaren kan nu opnieuw worden ingeschakeld.')
+    } catch {
+      setDeviceDraftStatus('Verwijderen geweigerd. De oude apparaatkopie blijft behouden.')
+    }
+  }
   function prefillReviewedSources() {
     const seeds = Object.entries(reviewedRecaptureSeeds)
     if (!seeds.length || !window.confirm(
@@ -547,10 +778,11 @@ export function LocalTwoStorePriceEditor({
     const printable = (value: string) =>
       value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim().slice(0, 180)
     const rows = [
-        'Supa · nog te verzamelen eigen winkelproducten voor dit exacte Planner-weekmenu',
+        'Supa · openstaande persoonlijke winkelcontroles voor dit exacte Planner-weekmenu',
         'Dit is een ongeprijsde werklijst, geen winkelbron, voorraadbevestiging of prijsbewijs.',
         'Gebruik uitsluitend eigen rechtmatig verkregen producten, echte opnamemomenten en echte pakprijzen.',
         '',
+        ...pendingCaptureTimes.map(task => '[ ] ' + task.store + ': BRONMOMENT — ' + task.instruction),
         ...openCaptureTasks.map(item => [
           '[ ] ' + item.store + ': ' + printable(item.need.label) +
             ' · nodig ' + (item.need.amount === null ? 'hoeveelheid controleren' :
@@ -572,7 +804,7 @@ export function LocalTwoStorePriceEditor({
   }
 
   function downloadOpenCaptureTasks() {
-    if (!openCaptureTasks.length) return
+    if (!openCaptureTasks.length && !pendingCaptureTimes.length) return
     try {
       const output = openCaptureTasksText()
       const url = URL.createObjectURL(new Blob([output], {
@@ -592,7 +824,7 @@ export function LocalTwoStorePriceEditor({
   }
 
   async function copyOpenCaptureTasks() {
-    if (!openCaptureTasks.length) return
+    if (!openCaptureTasks.length && !pendingCaptureTimes.length) return
     const identity = openCaptureIdentity
     try {
       const output = openCaptureTasksText()
@@ -651,6 +883,94 @@ export function LocalTwoStorePriceEditor({
     setCapturedAt(prev => ({ ...prev, [store]: value }))
     setOutput(''); setError(''); setPreparedFor(''); onEdit()
   }
+  async function downloadProvisionalReview() {
+    const identity = draftReviewIdentity
+    try {
+      // Revalidate at the instant of the action, even if this tab stayed open
+      // long enough for a previously plausible pair to become stale.
+      const instants = stores.map(store => {
+        const original = timestampWithOffset(capturedAt[store])
+        return original === null ? Number.NaN : Date.parse(original)
+      })
+      const now = Date.now()
+      const pairEligibleNow = sourceSelection === 'both' &&
+        instants.every(time => Number.isFinite(time) &&
+          now - time >= -300000 && now - time <= 604800000) &&
+        Math.abs(instants[0] - instants[1]) <= 86400000
+      if (!selectedStores.some(store => activeNeeds.some(need =>
+        isEnteredOwnCapture(rows[key(store, need.id)] ?? emptyDraft(need.unit))))) {
+        throw Error('Vul eerst een eigen werkelijk gecontroleerd product of voorraadstatus in; leeg winkelblad is al beschikbaar.')
+      }
+      // Missing / aged store moments can still produce an OFFLINE personal
+      // collection report, but never an inter-store numeric difference.
+      const comparableDrafts = pairEligibleNow ? provisionalDifferences : []
+      const records = comparableDrafts.map(item => {
+        const plus = rows[key('PLUS', item.need.id)]!
+        const deka = rows[key('DekaMarkt', item.need.id)]!
+        return {
+          ingredient: item.need.label,
+          demand: String(item.need.amount) + ' ' + item.need.unit,
+          plus: { code: plus.sourceId ?? '', product: plus.name,
+            packs: item.plus.packagesNeeded, packCents: item.plus.pricePerPackCents,
+            totalCents: item.plus.lineTotalCents, unitRate: item.plus.unitRate },
+          deka: { code: deka.sourceId ?? '', product: deka.name,
+            packs: item.deka.packagesNeeded, packCents: item.deka.pricePerPackCents,
+            totalCents: item.deka.lineTotalCents, unitRate: item.deka.unitRate },
+        }
+      })
+      const alreadyPaired = new Set(comparableDrafts.map(item => item.need.id))
+      const unpaired = activeNeeds.flatMap((need, index) => {
+        if (alreadyPaired.has(need.id)) return []
+        const conflicted = (store: OfflineRetailer) => conflictingCodes.some(conflict =>
+          conflict.store === store && conflict.indices.includes(index))
+        const status = (store: OfflineRetailer) => !selectedStores.includes(store)
+          ? 'Geen huidige bron geselecteerd; prijs onbekend'
+          : conflicted(store)
+            ? 'Oorspronkelijke productcode conflicteert met andere winkelregel'
+            : captureStatusNames[ownCaptureStatus(
+              rows[key(store, need.id)] ?? emptyDraft(need.unit), need)]
+        const priced = (store: OfflineRetailer) => {
+          if (!selectedStores.includes(store) || conflicted(store)) return undefined
+          const row = rows[key(store, need.id)] ?? emptyDraft(need.unit)
+          const math = currentDraftPackMath(row, need)
+          if (!math) return undefined
+          return { code: row.sourceId ?? '', product: row.name,
+            packs: math.packagesNeeded, packCents: math.pricePerPackCents,
+            totalCents: math.lineTotalCents, unitRate: math.unitRate }
+        }
+        return [{
+          ingredient: need.label, demand: String(need.amount ?? 'onbekend') + ' ' + need.unit,
+          plusStatus: status('PLUS'), dekaStatus: status('DekaMarkt'),
+          plus: priced('PLUS'), deka: priced('DekaMarkt'),
+        }]
+      })
+      const { privateDraftReviewHtml } = await import('./privateDraftReviewHtml.ts')
+      if (identity !== currentDraftReviewIdentity.current ||
+          (pairEligibleNow && instants.some(time =>
+            Date.now() - time > 604800000))) {
+        throw Error('Je winkel- of Planner-invoer is ondertussen gewijzigd of verouderd. Open het overzicht opnieuw.')
+      }
+      const reportCapturedAt = {
+        PLUS: selectedStores.includes('PLUS') ? capturedAt.PLUS : '',
+        DekaMarkt: selectedStores.includes('DekaMarkt') ? capturedAt.DekaMarkt : '',
+      }
+      const html = privateDraftReviewHtml(
+        records, reportCapturedAt, activeNeeds.length, unpaired, pairEligibleNow)
+      const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-twee-winkels-prive-conceptcontrole.html'
+        document.body.append(link); link.click(); link.remove()
+        setDraftStatus(records.length + ' voorlopige prijsregels en ' +
+          unpaired.length + ' nog niet vergelijkbare Planner-regels lokaal afgedrukt. ' +
+          'De status is persoonlijk en niet onafhankelijk geverifieerd; geen volledig mandtotaal.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+    } catch (cause) {
+      setDraftStatus(cause instanceof Error ? cause.message : 'Privé-controleblad niet opgeslagen.')
+    }
+  }
+
   function createSourceFile() {
     setError(''); setOutput('')
     try {
@@ -842,6 +1162,58 @@ export function LocalTwoStorePriceEditor({
     }
   }
 
+  // The exact selected Planner demand can be taken into a shop without
+  // granting any retailer-source identity to an unobserved ingredient.
+  // Reuse the established capture-sheet and inert HTML format, rather than
+  // creating another import protocol or storing provisional prices.
+  async function downloadPersonalCaptureKit(kind: 'csv' | 'paper') {
+    const fingerprint = selectedPlanFingerprint
+    const chosenStores = [...selectedStores]
+    const selectedNeeds = activeNeeds.map(need => ({
+      id: need.id, label: need.label, amount: need.amount,
+      unit: need.unit, query: need.query,
+    }))
+    try {
+      if (selectedNeeds.length === 0 || selectedNeeds.length > 200) {
+        throw new Error('Kies een weekmenu met maximaal 200 verschillende ingrediënten.')
+      }
+      const content = kind === 'csv'
+        ? (await import('./plannerPriceCaptureSheet.ts'))
+            .makeBlankPlannerCaptureCsv(selectedNeeds, chosenStores, ';')
+        : (await import('./plannerPriceCapturePrint.ts'))
+            .makePrintablePlannerCaptureHtml(selectedNeeds, chosenStores)
+      if (currentPlanFingerprint.current !== fingerprint) {
+        setDraftStatus('Het weekmenu veranderde. Download het actuele invulblad opnieuw.')
+        return
+      }
+      if (new TextEncoder().encode(content).length > 800000) {
+        throw new Error('Het persoonlijke formulier is te groot. Kies minder ingrediënten.')
+      }
+      const url = URL.createObjectURL(new Blob([content], {
+        type: kind === 'csv' ? 'text/csv;charset=utf-8' : 'text/html;charset=utf-8',
+      }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = kind === 'csv'
+          ? 'supa-eigen-plus-deka-leeg-prijsopnameblad.csv'
+          : 'supa-eigen-plus-deka-printbaar-veldformulier.html'
+        link.style.display = 'none'
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        setDraftStatus(kind === 'csv'
+          ? 'Leeg persoonlijk winkel-CSV gedownload. Originele productcodes, bronmomenten en prijzen moet je zelf werkelijk vastleggen.'
+          : 'Printbaar persoonlijk veldformulier gedownload. Open dit lokaal en druk af; het is geen winkelprijsbron.')
+      } finally {
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+      }
+    } catch (error) {
+      setDraftStatus(error instanceof Error ? error.message
+        : 'Kon het persoonlijke invulblad niet lokaal maken.')
+    }
+  }
+
   // Portable *unfinished form*, not an admitted retailer price snapshot.
   // The two formats intentionally cannot be mistaken for one another.
   function downloadUnfinishedDraft() {
@@ -976,13 +1348,76 @@ export function LocalTwoStorePriceEditor({
           Onvoltooide invoer bewaren in deze browsertab (optioneel, niet naar een server)
         </label>
         <span role="status">{draftStatus}</span>
+        <label><input type="checkbox" checked={deviceDraftOptIn} disabled={deviceDraftProtected}
+          onChange={event => setDeviceDraftConsent(event.currentTarget.checked)} />
+          Bewaar mijn onvoltooide PLUS/Deka-prijsinvoer op dit apparaat (ook na sluiten van de tab)
+        </label>
+        <small>Standaard uit. Alleen dit browserprofiel, zonder server of cloud.
+          Op een gedeeld apparaat kunnen anderen in jouw profiel de ingevoerde bedragen zien.
+          Bewaren maakt een prijs, winkelcode, bronmoment of productmatch niet officieel,
+          actueel of goedgekeurd. Een andere Planner-week wordt nooit stilzwijgend overgenomen.
+          Wis je browsergegevens pas na het downloaden van je eigen JSON-concept.</small>
+        {deviceDraftStatus && <span role="status">{deviceDraftStatus}</span>}
+        {deviceDraftProtected && deviceDraftRaw !== null &&
+          <button type="button" className="ghost-button"
+            onClick={() => downloadProtectedDraftCopy('device')}>
+            Download beschermde apparaatkopie vóór verwijderen
+          </button>}
+        {deviceDraftProtected && <button type="button" className="ghost-button"
+          onClick={discardProtectedDeviceDraft}>
+          Wis alleen oude beschermde apparaatkopie na bevestiging
+        </button>}
         <div className="offline-manual-editor__progress-actions">
           <button type="button" className="ghost-button" onClick={downloadMissingCaptureList}>
             Download open winkelwaarnemingen (TXT)
           </button>
+          <button type="button" className="ghost-button"
+            disabled={!selectedStores.some(store => activeNeeds.some(need =>
+              isEnteredOwnCapture(rows[key(store, need.id)] ?? emptyDraft(need.unit))))}
+            onClick={() => void downloadProvisionalReview()}>
+            Download mijn privéprijs- en winkelstatus (offline HTML)
+          </button>
+          <small>Ook voor een gedeeltelijk ingevulde winkel: toont alleen eigen
+            bronconcepten, de overige onbekende regels en eventuele oude bronmomenten.
+            Een twee-winkelprijsverschil verschijnt uitsluitend bij voorlopig
+            passende originele tijden en twee rekenbare, niet-conflicterende producten.</small>
           <button type="button" className="ghost-button" onClick={downloadUnfinishedDraft}>
             Download onvoltooid invulconcept (JSON)
           </button>
+          <button type="button" className="ghost-button" disabled={!activeNeeds.length}
+            onClick={() => void downloadPersonalCaptureKit('csv')}>
+            Download leeg winkelprijsblad (CSV)
+          </button>
+          <button type="button" className="ghost-button" disabled={!activeNeeds.length}
+            onClick={() => void downloadPersonalCaptureKit('paper')}>
+            Download printbaar PLUS/Deka-veldformulier (HTML)
+          </button>
+          <label>Gevuld PLUS/Deka-prijsblad veilig controleren en importeren
+            <input type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" multiple
+              disabled={!activeNeeds.length}
+              onChange={event => {
+                const files = Array.from(event.currentTarget.files ?? [])
+                event.currentTarget.value = ''
+                if (!files.length) return
+                if (files.length > 2 || files.some(file => !file.size || file.size > 256000)) {
+                  setDraftStatus('Kies maximaal twee niet-lege eigen CSV-bestanden van elk maximaal 256 kB.')
+                  return
+                }
+                // The existing parent workbench has a full source preview,
+                // exact physical matcher and an explicit user acceptance step.
+                // Never bypass it by converting the sheet straight into draft prices.
+                setDraftStatus('Bekijk eerst de eigen bronregels en voorlopige matches in de controle boven dit formulier. Nog niets is overgenomen.')
+                onPreviewSourceFiles(files)
+              }} />
+            <small>Na downloaden en invullen: dezelfde week, echte broncodes, verpakkingen,
+              beschikbaarheid, prijzen en tijdstippen. SUPA toont eerst de bestaande
+              bron- en matchvoorinzage; je beslist daarna pas of je importeert.
+              Ook één ingevulde winkel is toegestaan.</small>
+          </label>
+          {sourceSelection !== 'both' && activeNeeds.length > 0 && pendingCaptureTimes.length > 0 &&
+            <button type="button" className="ghost-button" onClick={downloadOpenCaptureTasks}>
+              Download ontbrekende {sourceSelection}-bronmomentcontrole (TXT)
+            </button>}
           <label>Herstel een eigen onvoltooid invulconcept
             <input type="file" accept=".json,application/json"
               onChange={event => {
@@ -996,8 +1431,13 @@ export function LocalTwoStorePriceEditor({
           Alleen een exact gelijk weekmenu wordt geaccepteerd; import activeert
           nooit automatisch prijsvergelijking of opslag.</small>
         {draftOptIn && <button type="button" className="ghost-button" onClick={clearDraft}>
-          Stop automatisch bewaren en wis concept
+          Stop tabopslag en wis alleen tijdelijke tabkopie
         </button>}
+        {draftProtected && savedDraftRaw !== null &&
+          <button type="button" className="ghost-button"
+            onClick={() => downloadProtectedDraftCopy('tab')}>
+            Download beschermde tabkopie vóór verwijderen
+          </button>}
         {draftProtected && <button type="button" className="ghost-button"
           onClick={discardProtectedDraft}>
           Verwijder beschermd concept na bevestiging
@@ -1015,6 +1455,29 @@ export function LocalTwoStorePriceEditor({
         </select>
       </label>
       <p className="disclaimer">Voer alleen winkels in die je werkelijk hebt waargenomen. De andere winkel blijft onbekend; je kunt zijn aparte bronopname later toevoegen.</p>
+      {conflictingCodes.length > 0 && <section className="offline-manual-editor__source-conflicts"
+        role="alert" aria-label="Tegenstrijdige originele winkelcodes">
+        <strong>{conflictingCodes.length} tegenstrijdige winkelcode(s) gevonden</strong>
+        <p>Dezelfde code is bij dezelfde winkel met verschillende productnamen,
+          verpakkingen, prijzen of voorraad ingevoerd. Deze regels krijgen
+          geen voorlopig twee-winkelprijsverschil en kunnen niet samen als
+          één echte broncode worden geïmporteerd. Corrigeer aan de hand van de
+          originele winkelwaarneming, niet door codes te verzinnen.</p>
+        <ul>{conflictingCodes.map(conflict => <li key={key(conflict.store, conflict.sourceId)}>
+          <strong>{conflict.store}: {conflict.sourceId}</strong>
+          <div className="offline-manual-editor__review-actions">
+            {conflict.indices.map((index, position) => <button type="button"
+              key={index} className="ghost-button" onClick={() => {
+                setOnlyOpenRows(false)
+                window.requestAnimationFrame(() => {
+                  const field = document.getElementById('own-price-' + conflict.store + '-' + index)
+                  field?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                  field?.querySelector('input')?.focus({ preventScroll: true })
+                })
+              }}>Controleer {conflict.labels[position]}</button>)}
+          </div>
+        </li>)}</ul>
+      </section>}
       {sourceSelection === 'both' && activeNeeds.length > 0 && (
         <section className="offline-manual-editor__pair-matrix" aria-label="PLUS en DekaMarkt per ingrediënt">
           <h4>Hetzelfde weekmandje · voortgang per winkel</h4>
@@ -1033,18 +1496,27 @@ export function LocalTwoStorePriceEditor({
               Vernieuw de originele bron voor {Array.from(recaptureStores).join(' en ')}:
               {' '}eerder ingevoerde pakprijzen mogen niet onder een nieuw bronmoment worden hergebruikt.
             </small>}
-            {openCaptureTasks.length > 0 && <button type="button" className="ghost-button"
+            {pendingCaptureTimes.length > 0 && <div role="alert">
+              <small>Ook nog te controleren: {pendingCaptureTimes.map(task => task.store).join(' en ')}-bronmoment.
+                Een volledig ingevulde productregel vervangt geen geldige winkelopname.</small>
+              <button type="button" className="ghost-button" onClick={() => {
+                const target = document.getElementById(`own-captured-at-${pendingCaptureTimes[0].store}`)
+                target?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                target?.focus({ preventScroll: true })
+              }}>Controleer eerst het ontbrekende winkelmoment</button>
+            </div>}
+            {openCaptureTasks.length + pendingCaptureTimes.length > 0 && <button type="button" className="ghost-button"
               onClick={downloadOpenCaptureTasks}>
-              Download {openCaptureTasks.length} openstaande winkelcontroles (zonder prijzen)
+              Download {openCaptureTasks.length + pendingCaptureTimes.length} openstaande winkelcontroles (zonder prijzen)
             </button>}
-            {openCaptureTasks.length > 0 && <button type="button" className="ghost-button"
+            {openCaptureTasks.length + pendingCaptureTimes.length > 0 && <button type="button" className="ghost-button"
               onClick={() => void copyOpenCaptureTasks()}>
               Kopieer mijn openstaande winkelcontroles (mobiel)
             </button>}
             {selectableOpenCaptureText !== null && <label>
               Selecteer mijn privéwerklijst voor de winkel
               <textarea readOnly value={selectableOpenCaptureText}
-                rows={Math.min(openCaptureTasks.length * 2 + 5, 12)}
+                rows={Math.min((openCaptureTasks.length + pendingCaptureTimes.length) * 2 + 5, 12)}
                 onFocus={event => event.currentTarget.select()}
                 aria-label="Kopieer openstaande persoonlijke winkelcontroles zonder prijzen" />
             </label>}
@@ -1069,7 +1541,72 @@ export function LocalTwoStorePriceEditor({
               <small>Alle conceptregels zijn ingevuld, maar kijk eerst de echte
                 opnamemomenten na; anders zijn de winkelprijzen niet vergelijkbaar.</small>}
           </div>
-          {activeNeeds.map((need, index) => <div key={need.id}
+          {provisionalDifferences.length > 0 && <section
+            className="offline-manual-editor__review-priority"
+            aria-label="Nog te controleren bronproducten met het grootste voorlopige prijsverschil">
+            <h5>Welke bronproducten eerst controleren?</h5>
+            <p>Deze lijst sorteert uitsluitend rekenverschillen uit jouw eigen,
+              nog niet bevestigde PLUS/Deka-concepten. Beide hoeveelheden zijn exact
+              dezelfde Planner-behoefte, maar de producten kunnen verschillend zijn.
+              Dit is geen goedkoper-winkeladvies, mandtotaal of besparing.</p>
+            <ol>{provisionalDifferences.slice(0, 5).map(item => <li key={item.need.id}>
+              <strong>{item.need.label}</strong>
+              <span>PLUS: {item.plus.packagesNeeded} pak(ken) ·
+                {' '}{exactEuro.formatCents(item.plus.lineTotalCents)}<br />
+                DekaMarkt: {item.deka.packagesNeeded} pak(ken) ·
+                {' '}{exactEuro.formatCents(item.deka.lineTotalCents)}</span>
+              <span>{item.differenceCents === 0 ? 'Zelfde voorlopige regelprijs' :
+                exactEuro.formatCents(Math.abs(item.differenceCents)) +
+                ' voorlopig rekenverschil; productidentiteit nog controleren'}</span>
+              <div className="offline-manual-editor__review-actions">
+                {stores.map(store => <button type="button" className="ghost-button"
+                  key={store} onClick={() => {
+                    setOnlyOpenRows(false)
+                    window.requestAnimationFrame(() => {
+                      const field = document.getElementById('own-price-' + store + '-' + item.index)
+                      field?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                      field?.querySelector('input')?.focus({ preventScroll: true })
+                    })
+                  }}>Controleer {store}-code en verpakking</button>)}
+              </div>
+            </li>)}</ol>
+            {provisionalDifferences.length > 5 && <small>
+              Nog {provisionalDifferences.length - 5} andere rekenbare conceptregels
+              staan hieronder in de volledige twee-winkelmatrix.</small>}
+            <button type="button" className="ghost-button"
+              onClick={() => void downloadProvisionalReview()}>
+              Download alle eigen prijs- en winkelstatusregels (offline HTML)
+            </button>
+            <small>Scriptvrij lokaal werkblad met jouw oorspronkelijke productcodes,
+              bronmomenten, hele pakken, eenheidsprijzen en rekenverschillen.
+              Geen mandtotaal, bevestigd vergelijkbaar product of besparingsclaim.
+              Bij gewijzigde of verouderde invoer wordt downloaden geweigerd.</small>
+          </section>}
+          <div className="offline-manual-editor__pair-filters" aria-label="Zoek en filter winkelproducten">
+            <label>Zoek op ingrediënt of eigen broncode/productnaam
+              <input type="search" value={pairSearch}
+                placeholder="Bijv. rijst of productcode"
+                onChange={event => setPairSearch(event.currentTarget.value)} />
+            </label>
+            <label>Welke regels wil je bekijken?
+              <select value={pairView} onChange={event =>
+                setPairView(event.currentTarget.value as 'all' | 'attention' | 'paired')}>
+                <option value="all">Alle Planner-producten</option>
+                <option value="attention">Open of opnieuw te controleren</option>
+                <option value="paired">Twee rekenbare prijsconcepten</option>
+              </select>
+            </label>
+            <small role="status">{visiblePairRows.length} van {activeNeeds.length} fysieke
+              behoeften zichtbaar. Filters veranderen je oorspronkelijke Planner,
+              bronbestanden en het lokale controleblad niet.</small>
+          </div>
+          {visiblePairRows.length === 0 && <p role="status">
+            Geen winkelregels bij deze zoekopdracht of selectie.
+            <button type="button" className="ghost-button" onClick={() => {
+              setPairSearch(''); setPairView('all')
+            }}>Toon alle winkelregels</button>
+          </p>}
+          {visiblePairRows.map(({ need, index }) => <div key={need.id}
             className="offline-manual-editor__pair-row">
             <strong>{need.label} <small>· {need.amount ?? '?'} {need.unit}</small></strong>
             <div className="offline-manual-editor__pair-stores">
@@ -1089,6 +1626,29 @@ export function LocalTwoStorePriceEditor({
                 </button>
               })}
             </div>
+            {(!sameTimePair || !readyPairedDraftIds.has(need.id)) && (() => {
+              const available = stores.flatMap(store => {
+                const math = currentDraftPackMath(
+                  rows[key(store, need.id)] ?? emptyDraft(need.unit), need)
+                return math ? [{ store, math }] : []
+              })
+              if (!available.length) return null
+              return <div className="offline-manual-editor__pair-unpaired" role="note">
+                <strong>Alleen persoonlijke pakberekening — niet vergelijkbaar</strong>
+                {available.map(({ store, math }) => <span key={store}>
+                  {store}: {math.packagesNeeded} hele pak(ken) ·
+                  {' '}{exactEuro.formatCents(math.lineTotalCents)} ·
+                  {' '}{math.unitRate ?? 'eenheidsprijs onbekend'}
+                </span>)}
+                {available.length < 2 && <small>De prijs van de andere winkel is
+                  onbekend of niet fysiek geschikt; nooit als nul tellen.</small>}
+                {!sameTimePair && <small>De oorspronkelijke twee winkelmomenten
+                  zijn nog niet als actueel en onderling vergelijkbaar beoordeeld.
+                  Geen prijsverschil of goedkoopste winkel uit deze gegevens.</small>}
+                <small>Eigen concept, niet goedgekeurd. Controleer eerst de
+                  originele codes, verpakkingen en menselijke bronreview.</small>
+              </div>
+            })()}
             {sameTimePair && (() => {
               const plus = currentDraftPackMath(
                 rows[key('PLUS', need.id)] ?? emptyDraft(need.unit), need)
@@ -1149,7 +1709,8 @@ export function LocalTwoStorePriceEditor({
             ))}
           </datalist>
           <label className="offline-manual-editor__time">Wanneer zijn deze producten echt waargenomen? (Nederlandse tijd)
-            <input type="datetime-local" value={capturedAt[store]} onChange={e => changeTimestamp(store, e.target.value)} />
+            <input id={`own-captured-at-${store}`} type="datetime-local" value={capturedAt[store]}
+              onChange={e => changeTimestamp(store, e.target.value)} />
             <small role="status">{captureTimeAdvice(capturedAt[store])}</small>
             <small>Pas je een eerder ingevuld bronmoment aan, dan worden de
               oude prijs en beschikbaarheidsbevestiging van alleen deze winkel

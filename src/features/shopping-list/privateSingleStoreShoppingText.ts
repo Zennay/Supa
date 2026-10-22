@@ -10,23 +10,36 @@ const literal = (value: string | number) => String(value)
  * The canonical CSV ledger first certifies the entire physical basket.
  * No second shop, checkout proof or independently verified price is inferred.
  */
-export function privateSingleStoreShoppingText({ basket, observedAt }: {
+export function privateSingleStoreShoppingText({ basket, observedAt, done = new Set<string>(), onlyOpen = false }: {
   basket: OneStoreBasket
   observedAt: string
+  done?: ReadonlySet<string>
+  onlyOpen?: boolean
 }): string {
-  privateSingleStoreShoppingCsv({ basket, observedAt, done: new Set<string>() })
+  privateSingleStoreShoppingCsv({ basket, observedAt, done })
   const rows = [
     'SUPA · mijn eigen ' + literal(basket.store.id) + '-weekmand',
     'Bronmoment: ' + literal(observedAt),
     'Complete pakprijzen: ' + exactEuro.formatCents(basket.totalCents),
     'Privégegevens, niet onafhankelijk geverifieerd. Geen kassagarantie of actuele beschikbaarheid.',
-    'Ontbrekende andere winkel = onbekende vergelijking, nooit € 0,00.',
+    'Dit rapport bevat één winkel: voor het echte prijsverschil open de volledige vergelijking.',
     '',
   ]
+  if (onlyOpen) {
+    const open = basket.lines.filter(line => !done.has(line.id))
+    const remaining = open.reduce((sum, line) => sum +
+      (line.status === 'matched' ? line.lineTotalCents : 0), 0)
+    rows.push('ALLEEN NOG TE KOPEN · oorspronkelijke volledige mand blijft ' +
+      exactEuro.formatCents(basket.totalCents),
+      'Oorspronkelijke pakprijzen op mijn open lijst: ' +
+      exactEuro.formatCents(remaining) + ' (geen kassabedrag).', '')
+    if (!open.length) rows.push('Alle artikelen zijn afgevinkt; niets meer op je lijst.', '')
+  }
   for (const line of basket.lines) {
     if (line.status !== 'matched') throw new Error('Niet alle producten zijn gecontroleerd.')
+    if (onlyOpen && done.has(line.id)) continue
     rows.push(
-      '☐ ' + literal(line.ingredientLabel) + ' · ' + literal(line.requirement.amount) +
+      (done.has(line.id) ? '☑ ' : '☐ ') + literal(line.ingredientLabel) + ' · ' + literal(line.requirement.amount) +
         ' ' + literal(line.requirement.unit),
       '  ' + line.packs + ' × ' + literal(line.productName) +
         ' (SKU ' + literal(line.productId) + ')',
