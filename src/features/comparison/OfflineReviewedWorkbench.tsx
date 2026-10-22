@@ -1553,6 +1553,7 @@ export function OfflineReviewedWorkbench({
    * source admission and require every original SKU/price to be reviewed. */
   async function importPastedSource() {
     const raw = pasteDraft
+    const pastePlan = currentlySelectedPlan.current
     const version = ++importRevision.current
     if (!raw.trim()) {
       setMessage('Plak eerst eigen CSV- of JSON-brongegevens.')
@@ -1579,6 +1580,10 @@ export function OfflineReviewedWorkbench({
       const convert = module.convertOwnStoreCsv as (input: string) => string
       const sources = sheets.map(sheet => convert(sheet))
       if (version !== importRevision.current) return
+      if (pastePlan !== currentlySelectedPlan.current) {
+        setMessage('Je Planner-week is tijdens het lezen gewijzigd. Plak de originele bronnen opnieuw voor dit weekmenu.')
+        return
+      }
       if (sources.length === 2) {
         const combined = combineTwoOwnShopCaptures(sources)
         if (version !== importRevision.current) return
