@@ -740,11 +740,16 @@ export function OfflineReviewedWorkbench({
 
   async function downloadBlankPlannerCaptureCsv() {
     try {
+      const selectedWeek = captureWeekRef.current
       const target = captureSheetStore
       const storesToCapture: readonly CaptureStore[] = target === 'both'
         ? stores : [target]
       const { makeBlankPlannerCaptureCsv } = await import('./plannerPriceCaptureSheet.ts')
       const csv = makeBlankPlannerCaptureCsv(plannerCaptureNeeds, storesToCapture)
+      if (selectedWeek !== captureWeekRef.current) {
+        setWeekExportMessage('Het fysieke Planner-weekmenu is gewijzigd. Download het invulblad opnieuw voor de huidige ingrediënten.')
+        return
+      }
       const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
       try {
         const link = document.createElement('a')
@@ -763,11 +768,16 @@ export function OfflineReviewedWorkbench({
 
   async function downloadPlannerCaptureGuide() {
     try {
+      const selectedWeek = captureWeekRef.current
       const target = captureSheetStore
       const selected: readonly CaptureStore[] = target === 'both'
         ? stores : [target]
       const { makePlannerCaptureGuide } = await import('./plannerPriceCaptureGuide.ts')
       const guide = makePlannerCaptureGuide(plannerCaptureNeeds, selected)
+      if (selectedWeek !== captureWeekRef.current) {
+        setWeekExportMessage('Het fysieke Planner-weekmenu is gewijzigd. Download het invulblad opnieuw voor de huidige ingrediënten.')
+        return
+      }
       const url = URL.createObjectURL(new Blob([guide], { type: 'text/plain;charset=utf-8' }))
       try {
         const link = document.createElement('a')
@@ -786,11 +796,16 @@ export function OfflineReviewedWorkbench({
 
   async function downloadPrintablePlannerCapture() {
     try {
+      const selectedWeek = captureWeekRef.current
       const target = captureSheetStore
       const selected: readonly CaptureStore[] = target === 'both'
         ? stores : [target]
       const { makePrintablePlannerCaptureHtml } = await import('./plannerPriceCapturePrint.ts')
       const html = makePrintablePlannerCaptureHtml(plannerCaptureNeeds, selected)
+      if (selectedWeek !== captureWeekRef.current) {
+        setWeekExportMessage('Het fysieke Planner-weekmenu is gewijzigd. Download het invulblad opnieuw voor de huidige ingrediënten.')
+        return
+      }
       const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
       try {
         const link = document.createElement('a')
