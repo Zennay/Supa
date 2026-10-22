@@ -82,7 +82,10 @@ export function importPlainTextRecipe(raw: string): UserRecipeDraft {
       const sourceLine = /^(?:bron(?:link|url)?|source(?:\s+url)?)\s*:\s*(.+)$/iu.exec(headingText(original))
       if (sourceLine) {
         if (sourceUrl !== null) throw new Error('Gebruik maximaal één Bron:-regel per recept.')
-        const rawSource = sourceLine[1].trim()
+        const candidate = sourceLine[1].trim()
+        const markdownLink = /^\[[^\]\r\n]{1,180}\]\((https:\/\/[^()\s]+)\)$/iu.exec(candidate)
+        const autolink = /^<([^<>\s]+)>$/u.exec(candidate)
+        const rawSource = markdownLink?.[1] ?? autolink?.[1] ?? candidate
         sourceUrl = safeRecipeSourceUrl(rawSource)
         if (sourceUrl !== rawSource) sourceWarnings.push(
           'De bronlink is veilig opgeschoond; controleer de openbare bronvermelding.')
