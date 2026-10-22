@@ -63,8 +63,10 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, captureNeeds
     // Only explicit Figma-to-owned-source navigation forwards text. Never
     // treat demo products as source matches or price information.
     setQuery(incomingSearch.text.slice(0, 120))
-    setStore(incomingSearch.store === 'PLUS' || incomingSearch.store === 'DekaMarkt'
-      ? incomingSearch.store : 'all')
+    // A historical card is a search hint, never a new retailer price or SKU.
+    // Preserve its explicit shop to avoid showing a different shop's similarly
+    // named item as the intended one. General search still covers both.
+    setStore(incomingSearch.store ?? 'all')
     setOnlyUnbought(false)
     setUnitFilter('all')
     setOrder('source')
@@ -296,6 +298,16 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, captureNeeds
     <h2>Mijn echte bronartikelen voor dit weekmenu</h2>
     <p>Alleen jouw zelf gecontroleerde productregels, geen actuele winkelcatalogus of kassagarantie.
       Historische ontwerpvoorbeelden elders op de pagina tellen niet mee.</p>
+    {incomingSearch && incomingSearch.serial > 0 && incomingSearch.store &&
+      incomingSearch.store !== 'all' && <div role="status"
+        className="private-reviewed-products__historical-handoff">
+        <strong>Zoeken in jouw eigen {incomingSearch.store}-bron</strong>
+        <p>Je kwam via een historische productkaart voor {incomingSearch.text}.
+          Alleen de naam en de winkel worden gebruikt om je <em>eigen</em> bron te doorzoeken.
+          Een historische kaart is geen actuele prijs, geen SKU-match en geen bewijs van beschikbaarheid.
+          Zonder eigen gecontroleerde opname blijft de prijs onbekend.</p>
+        <button type="button" onClick={onOpenComparison}>Open Vergelijk om echte bronproducten te controleren</button>
+      </div>}
     <label className="private-reviewed-products__own-upload">
       <strong>Eigen PLUS/DekaMarkt-productbron openen</strong>
       <span>1–2 rechtmatig verkregen CSV-, TSV-, TXT- of Supa JSON-bestanden.
@@ -572,7 +584,19 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, captureNeeds
             'Vink dit artikel af op mijn ' + shop + '-lijst'}
         </button>
       </article>)}</div>
-      {!visible.length && <p>Geen producten gevonden voor deze selectie.</p>}
+      {!visible.length && <div className="private-reviewed-products__no-match" role="status">
+        <p>Geen eigen bronproduct voor deze zoekterm en filters. Een historische naam
+          hoeft niet gelijk te zijn aan de productnaam in jouw originele winkelopname.
+          Dit is geen afwijzing of automatische SKU-match.</p>
+        <button type="button" onClick={() => {
+          setQuery(''); setUnitFilter('all'); setOnlyUnbought(false); setOrder('source')
+        }}>Toon alle eigen {store === 'all' ? 'winkelproducten' : store + '-producten'}</button>
+        {store !== 'all' && <button type="button" onClick={() => {
+          setQuery(''); setStore('all'); setUnitFilter('all')
+          setOnlyUnbought(false); setOrder('source')
+        }}>Zoek bij beide winkels</button>}
+        <button type="button" onClick={onOpenComparison}>Controleer of vul de echte bron aan</button>
+      </div>}
       <button type="button" onClick={openCurrentCheckedList}>
         {store !== 'all' ? `Open mijn ${store}-boodschappenlijst`
           : paired.status === 'comparable' && paired.cheapest
