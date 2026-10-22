@@ -66,7 +66,10 @@ export function previewPrivateRecipeShoppingNeeds(
   // When a legacy/alternate draft nevertheless contains repeated identical
   // oversized rows, aggregate that exact physical demand before emitting
   // review rows so the total cannot split into multiple plausible quantities.
-  // Never coalesce rows carrying source-review or portion-scaling warnings.
+  // Never coalesce source-reviewed rows or substantive scaling warnings
+  // (fractional pieces, rounded quantities, invalid measures, etc.). The
+  // editor's own max-amount validation is the one exception: it is exactly
+  // why this preflight needs to check the combined physical demand.
   const editorMaxAmountReview = 'Vul een geldige hoeveelheid in (maximaal 1.000.000).'
   const overflowByIndex = new Map<number, {
     key: string; label: string; query: string; unit: EditorUnit
@@ -87,7 +90,8 @@ export function previewPrivateRecipeShoppingNeeds(
           !unit || !['g', 'ml', 'piece'].includes(unit) ||
           ingredient.reviewReason !== editorMaxAmountReview ||
           (typeof sourceReviewReason === 'string' && sourceReviewReason.length > 0) ||
-          (byIngredient.get(index)?.length ?? 0) > 0 || !label || !query) return
+          (byIngredient.get(index) ?? []).some(warning => warning.code !== 'prior_review_required') ||
+          !label || !query) return
       const key = JSON.stringify([
         label.toLocaleLowerCase('nl-NL'), query.toLocaleLowerCase('nl-NL'), unit,
       ])
