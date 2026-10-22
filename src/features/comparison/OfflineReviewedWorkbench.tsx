@@ -941,7 +941,7 @@ export function OfflineReviewedWorkbench({
           h(exactEuro.formatCents(pairedPreviewSummary.deka.cents))) +
         ' (' + pairedPreviewSummary.deka.priced + '/' + pairedPreviewSummary.rows +
         ' geprijsde regels; ' + pairedPreviewSummary.deka.missing + ' onbekend).</p>' +
-        '<p><strong>Compleet mandverschil:</strong> ' + (total === null
+        '<p><strong>Compleet mandverschil:</strong> ' + (total === null || total === undefined
           ? 'onbekend — niet alle hele-pakprijzen zijn bruikbaar.'
           : (total > 0 ? '+' : total < 0 ? '−' : '') +
             h(exactEuro.formatCents(Math.abs(total))) + ' (DekaMarkt minus PLUS).') + '</p>'
