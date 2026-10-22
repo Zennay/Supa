@@ -69,6 +69,8 @@ type Props = {
   onAddRecipeGroceries?: (labels: readonly string[]) => string | null
   /** Jump to the actual own-source importer; Figma/historical cards are demo. */
   onOpenOwnSources?: (query: string, store?: 'PLUS' | 'DekaMarkt') => void
+  /** Jump to the authorized private source importer instead of the demo basket. */
+  onOpenOwnPriceImport?: () => void
   activeDays?: readonly string[]
 }
 
@@ -83,7 +85,7 @@ export function HiFiHome(props: Props) {
 }
 
 function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct,
-  onOpenOwnSources, activeDays = [] }: Props) {
+  onOpenOwnSources, onOpenOwnPriceImport, activeDays = [] }: Props) {
   const [query, setQuery] = useState('')
   const [portableText, setPortableText] = useState('')
   const [portablePreview, setPortablePreview] = useState<string[] | null>(null)
@@ -290,7 +292,7 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct,
       <h2>Jouw recepten, jouw winkelmand</h2>
       <p className="hifi-demo-note">Gebruik de actuele Planner-ingrediënten met je eigen PLUS/DekaMarkt-bronbestand.
         De berekening is privé en geeft ontbrekende winkelprijzen eerlijk als onbekend weer.</p>
-      <button type="button" className="hifi-plan-button" onClick={() => onNavigate('basket')}>
+      <button type="button" className="hifi-plan-button" onClick={() => onOpenOwnPriceImport ? onOpenOwnPriceImport() : onNavigate('basket')}>
         Vergelijk mijn winkelmand
       </button>
     </section>}
@@ -343,7 +345,7 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct,
         Met jouw eigen rechtmatig verkregen PLUS- of DekaMarkt-opname koppelt Supa echte
         bronartikelen aan het geselecteerde weekmenu. Zonder volledige broncontrole wordt er
         geen winkelprijs of besparing verzonnen.</p>
-      <button type="button" className="hifi-plan-button" onClick={() => onNavigate('basket')}>
+      <button type="button" className="hifi-plan-button" onClick={() => onOpenOwnPriceImport ? onOpenOwnPriceImport() : onNavigate('basket')}>
         Open Vergelijk · eigen prijzen invoeren
       </button>
     </section>}
