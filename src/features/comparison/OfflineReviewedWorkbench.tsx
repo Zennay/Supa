@@ -421,6 +421,7 @@ export function OfflineReviewedWorkbench({
   const [capturePreviewShown, setCapturePreviewShown] = useState<Record<CaptureStore, number>>({ PLUS: 20, DekaMarkt: 20 })
   const [capturePreviewSearch, setCapturePreviewSearch] = useState<Record<CaptureStore, string>>({ PLUS: '', DekaMarkt: '' })
   const [capturePreviewSort, setCapturePreviewSort] = useState<Record<CaptureStore, 'source' | 'name' | 'sku' | 'price' | 'unknown'>>({ PLUS: 'source', DekaMarkt: 'source' })
+  const [capturePreviewPriceFilter, setCapturePreviewPriceFilter] = useState<Record<CaptureStore, 'all' | 'unknown' | 'priced'>>({ PLUS: 'all', DekaMarkt: 'all' })
   const [capturePreview, setCapturePreview] = useState<{
     files: File[]; week: string
     stores: CapturePreviewStore[]
@@ -534,6 +535,7 @@ export function OfflineReviewedWorkbench({
     setCapturePreviewShown({ PLUS: 20, DekaMarkt: 20 })
     setCapturePreviewSearch({ PLUS: '', DekaMarkt: '' })
     setCapturePreviewSort({ PLUS: 'source', DekaMarkt: 'source' })
+    setCapturePreviewPriceFilter({ PLUS: 'all', DekaMarkt: 'all' })
     setBusy(true)
     try {
       if (files.length > 2) throw Error('Kies maximaal twee eigen CSV-bestanden.')
@@ -2734,8 +2736,13 @@ export function OfflineReviewedWorkbench({
                   ].join(' '))
                   return terms.every(term => searchable.includes(term))
                 })
+                const priceFilter = capturePreviewPriceFilter[store.retailer]
+                const priceFilteredProducts = filteredProducts.filter(product =>
+                  priceFilter === 'all' ||
+                  (priceFilter === 'priced' ? product.available && product.priceCents !== null
+                    : !product.available || product.priceCents === null))
                 const sort = capturePreviewSort[store.retailer]
-                const visibleProducts = [...filteredProducts].sort((a, b) => {
+                const visibleProducts = [...priceFilteredProducts].sort((a, b) => {
                   if (sort === 'source') return 0
                   if (sort === 'name') return a.name.localeCompare(b.name, 'nl-NL')
                   if (sort === 'sku') return a.id.localeCompare(b.id, 'nl-NL')
@@ -2766,6 +2773,18 @@ export function OfflineReviewedWorkbench({
                         setCapturePreviewShown(current => ({ ...current, [store.retailer]: 20 }))
                       }} />
                   </label>
+                  <label>Prijsdekking van deze eigen bron
+                    <select value={capturePreviewPriceFilter[store.retailer]}
+                      onChange={event => {
+                        const value = event.currentTarget.value as 'all' | 'unknown' | 'priced'
+                        setCapturePreviewPriceFilter(current => ({ ...current, [store.retailer]: value }))
+                        setCapturePreviewShown(current => ({ ...current, [store.retailer]: 20 }))
+                      }}>
+                      <option value="all">Alle originele artikelen</option>
+                      <option value="unknown">Alleen zonder bruikbare pakprijs</option>
+                      <option value="priced">Alleen met opgegeven pakprijs</option>
+                    </select>
+                  </label>
                   <label>Sorteer originele bronartikelen
                     <select value={capturePreviewSort[store.retailer]}
                       onChange={event => {
@@ -2780,8 +2799,16 @@ export function OfflineReviewedWorkbench({
                       <option value="unknown">Onbekende pakprijs eerst</option>
                     </select>
                   </label>
-                  <p role="status">{visibleProducts.length} van {store.previewProducts.length} originele artikelen gevonden.
-                    {' '}Zoekwoorden mogen in verschillende velden staan; zoeken verandert bronprijzen of productmatches niet.</p>
+                  <p role="status">{visibleProducts.length} van {store.previewProducts.length} originele artikelen in deze weergave.
+                    {' '}De filters veranderen geen oorspronkelijke bronprijzen, productmatches of mandtotalen.</p>
+                  {(capturePreviewSearch[store.retailer] || capturePreviewPriceFilter[store.retailer] !== 'all' ||
+                    capturePreviewSort[store.retailer] !== 'source') &&
+                    <button type="button" className="ghost-button" onClick={() => {
+                      setCapturePreviewSearch(current => ({ ...current, [store.retailer]: '' }))
+                      setCapturePreviewPriceFilter(current => ({ ...current, [store.retailer]: 'all' }))
+                      setCapturePreviewSort(current => ({ ...current, [store.retailer]: 'source' }))
+                      setCapturePreviewShown(current => ({ ...current, [store.retailer]: 20 }))
+                    }}>Toon alle originele {store.retailer}-artikelen</button>}
                   <ul>
                     {shownProducts.map(product => {
                       const rate = privatePackUnitRate({
@@ -2799,7 +2826,7 @@ export function OfflineReviewedWorkbench({
                         {rate && <> · {exactEuro.formatCents(rate.roundedCentsPerUnit)} / {rate.unit}</>}
                       </li>
                     })}
-                    {visibleProducts.length === 0 && <li>Geen origineel bronartikel gevonden. Wis je zoekterm om alles te bekijken.</li>}
+                    {visibleProducts.length === 0 && <li>Geen bronartikelen voldoen aan je filters. Toon alle originele artikelen om alles weer te bekijken.</li>}
                   </ul>
                   {shownProducts.length < visibleProducts.length && (
                     <button type="button" className="ghost-button" disabled={busy}
