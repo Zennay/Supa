@@ -1552,7 +1552,7 @@ In **Planner → hetzelfde weekmandje → productprijzen, verpakkingen en regelv
 
 - **Privé-TXT:** leesbare tekst met oorspronkelijke fysieke behoefte, SKU, pakinhoud, multipack, hele verpakkingen, bronpakprijs, regelbedrag, indicatieve eenheidsprijs en regelprijsverschil.
 - **Kopiëren:** dezelfde privétekst voor mobiel delen; als klembordtoegang ontbreekt, verschijnt een selecteerbaar tekstvak zolang de bronnen geldig blijven.
-- **Spreadsheet-CSV:** UTF-8 met BOM, Nederlandse puntkommascheiding en afzonderlijke kolommen voor oorspronkelijke SKU, pak-/eenheidsprijs, hele-pakregelprijs, bronmomenten en DekaMarkt-minus-PLUS-regelverschil. De bestaande literalCsv-beveiliging behandelt onbetrouwbare productnamen veilig voor spreadsheetimport.
+- **Spreadsheet-CSV:** UTF-8 met BOM, Nederlandse puntkommascheiding en afzonderlijke kolommen voor oorspronkelijke SKU, pak-/eenheidsprijs, hele-pakregelprijs, bronmomenten, canoniek indicatief eenheidsprijsverschil (alleen bij vergelijkbare kg/liter/stuk) en DekaMarkt-minus-PLUS-regelverschil. De bestaande literalCsv-beveiliging behandelt onbetrouwbare productnamen veilig voor spreadsheetimport.
 
 Deze acties gebruiken uitsluitend de reeds toegelaten, persoonlijk gecontroleerde, volledige fysieke twee-winkelvergelijking uit freshReviewedBaskets en ownStoreWeekComparison. Na asynchroon laden van de CSV-bundel controleert de app opnieuw het daadwerkelijk laatst gerenderde bronpaar en opnieuw vóór de bestandsaanmaak. Ontbrekend, verlopen of vervangen bronmateriaal leidt niet tot een nieuwe prijs-export.
 
