@@ -111,8 +111,8 @@ export function incompleteCaptureFields(
           missing.push('geldig multipack-aantal')
         const cents = Number(row.cents.trim())
         if (!/^\d+$/u.test(row.cents.trim()) || !Number.isSafeInteger(cents) ||
-            cents < 0 || cents > 1000000)
-          missing.push('geldige geobserveerde prijs in centen')
+            cents <= 0 || cents > 1000000)
+          missing.push('geldige geobserveerde positieve prijs in centen')
       }
     }
     return missing.length ? [{ index, need, missing }] : []
