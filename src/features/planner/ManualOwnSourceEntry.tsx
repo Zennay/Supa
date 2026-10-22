@@ -2,6 +2,7 @@ import { lazy, Suspense, useRef, useState } from 'react'
 import { exportManualOwnSourceDraft, importManualOwnSourceDraft, MANUAL_DRAFT_MAX_BYTES, type ManualEntry, type ManualSources } from './manualOwnSourceDraft.ts'
 import type { OfflinePriceSnapshots } from '../../domain/offlineReviewedImport.ts'
 import { readablePlannerDemandAmount, type PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
+import { privatePackUnitRate, formatPrivateUnitRate } from '../comparison/privateUnitPrice.ts'
 import './manualOwnSourceEntry.css'
 // Reuse the existing device-only camera reader. Camera is opt-in and no
 // retailer identifier, offer or price is inferred by the barcode detector.
@@ -25,6 +26,22 @@ const emptyEntry = (): Entry => ({
   priceCents: '', available: '',
 })
 const initialSource = (): Source => ({ observedAt: '', products: [emptyEntry()] })
+function enteredUnitPrice(row: Entry): string | null {
+  if (row.available !== 'true' ||
+      !/^(?:0|[1-9]\d*)(?:[.,]\d{1,6})?$/.test(row.packAmount) ||
+      !/^[1-9]\d*$/.test(row.packCount) ||
+      !/^(?:0|[1-9]\d*)$/.test(row.priceCents)) return null
+  const amount = Number(row.packAmount.replace(',', '.'))
+  const count = Number(row.packCount)
+  const priceCents = Number(row.priceCents)
+  if (!Number.isFinite(amount) || amount <= 0 || amount > 100000 ||
+      !Number.isSafeInteger(count) || count > 1000 ||
+      !Number.isSafeInteger(priceCents) || priceCents > 1000000 ||
+      (row.packUnit === 'piece' && !Number.isSafeInteger(amount))) return null
+  const rate = privatePackUnitRate({ amount, unit: row.packUnit, count, priceCents })
+  return rate ? formatPrivateUnitRate(rate) : null
+}
+
 const csvCell = (value: string) =>
   /[",\r\n]/.test(value) ? '"' + value.replace(/"/g, '""') + '"' : value
 
@@ -54,8 +71,9 @@ function serializeManualCapture(sources: Record<Store, Source>): string {
 
 /** Manual entry is an alternative to preparing a spreadsheet, not an
  * alternative to source rights, original identifiers or user review. */
-export function ManualOwnSourceEntry({ onPreview, busy, template, needs }: {
+export function ManualOwnSourceEntry({ onPreview, onOpenReview, busy, template, needs }: {
   onPreview: (raw: string, report: (message: string, admitted: boolean) => void) => void
+  onOpenReview: (raw: string) => void
   busy: boolean
   template: OfflinePriceSnapshots | null
   needs: readonly PlannerCaptureGuideNeed[]
@@ -71,7 +89,7 @@ export function ManualOwnSourceEntry({ onPreview, busy, template, needs }: {
     PLUS: initialSource(), DekaMarkt: initialSource(),
   })
   const [error, setError] = useState('')
-  const [admissionFeedback, setAdmissionFeedback] = useState<{message: string; admitted: boolean} | null>(null)
+  const [admissionFeedback, setAdmissionFeedback] = useState<{message: string; admitted: boolean; raw: string} | null>(null)
   const [acknowledged, setAcknowledged] = useState(false)
   const [backupMessage, setBackupMessage] = useState('')
   const [pendingDraft, setPendingDraft] = useState<ManualSources | null>(null)
@@ -126,6 +144,32 @@ export function ManualOwnSourceEntry({ onPreview, busy, template, needs }: {
       },
     }))
     invalidateRestore()
+  }
+  function labelSourceForNeed(store: Store, index: number, needId: string) {
+    const need = needs.find(item => item.id === needId)
+    if (needId && !need) {
+      setGuideMessage('Dit ingrediënt staat niet meer in de huidige Planner-week.')
+      return
+    }
+    if (need && sources[store].products.some((row, i) =>
+      i !== index && row.needHint?.id === needId)) {
+      setGuideMessage(store + ': dit ingrediënt heeft al een invulregel.')
+      return
+    }
+    setSources(previous => ({
+      ...previous,
+      [store]: { ...previous[store],
+        products: previous[store].products.map((row, i) => i !== index ? row : {
+          ...row,
+          needHint: need ? {
+            id: need.id, label: need.label,
+            quantity: readablePlannerDemandAmount(need.amount) + ' ' + need.unit,
+          } : undefined,
+        }),
+      },
+    }))
+    invalidateRestore()
+    setGuideMessage('Planner-geheugensteun gekoppeld, zonder originele SKU of prijs te wijzigen. Productreview in Vergelijk blijft verplicht.')
   }
   function addProduct(store: Store) {
     setSources(previous => ({
@@ -309,7 +353,7 @@ export function ManualOwnSourceEntry({ onPreview, busy, template, needs }: {
       const ticket = ++readTicket.current
       onPreview(raw, (message, admitted) => {
         if (ticket === readTicket.current)
-          setAdmissionFeedback({ message, admitted })
+          setAdmissionFeedback({ message, admitted, raw })
       })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'De handmatige bron kon niet worden voorbereid.')
@@ -419,6 +463,22 @@ export function ManualOwnSourceEntry({ onPreview, busy, template, needs }: {
                   Verwijder regel
                 </button>
               </div>
+              {needs.length > 0 && <label className="supa-manual-source__need-link">
+                Planner-ingrediënt voor deze bronregel (alleen geheugensteun)
+                <select value={product.needHint?.id ?? ''}
+                  onChange={event => labelSourceForNeed(store, index, event.target.value)}>
+                  <option value="">Nog niet aan een Planner-ingrediënt gekoppeld</option>
+                  {product.needHint && !needs.some(need => need.id === product.needHint?.id) &&
+                    <option value={product.needHint.id}>
+                      Oude week: {product.needHint.label} — kies een actuele vraag
+                    </option>}
+                  {needs.map(need => <option key={need.id} value={need.id}>
+                    {need.label} · {readablePlannerDemandAmount(need.amount)} {need.unit}
+                  </option>)}
+                </select>
+                <small>Dit verandert je originele artikel of prijs niet
+                  en is geen bevestigde productmatch. Controleer de echte SKU in Vergelijk.</small>
+              </label>}
               <div className="supa-manual-source__fields">
                 <label>Originele SKU / artikelcode
                   <input type="text" maxLength={100} value={product.id}
@@ -494,6 +554,19 @@ export function ManualOwnSourceEntry({ onPreview, busy, template, needs }: {
                   </select>
                 </label>
               </div>
+              {product.id && source.products.some((other, otherIndex) =>
+                otherIndex !== index && other.id === product.id) &&
+                <p role="alert" className="supa-manual-source__duplicate">
+                  Dubbele artikelcode {product.id} binnen {store}. De bestaande
+                  bronimport weigert dezelfde SKU tweemaal bij één winkel.
+                </p>}
+              {enteredUnitPrice(product) && <p className="supa-manual-source__unit-rate">
+                <strong>{enteredUnitPrice(product)}</strong> op basis van uitsluitend
+                de door jou ingevulde pakinhoud en pakprijs.
+                <small>Indicatieve eenheidsprijs van je eigen invoer;
+                  geen geverifieerde winkelprijs, mandtotaal of besparing.
+                  Eerst originele bron en artikelmatch bevestigen in Vergelijk.</small>
+              </p>}
               <small>Voor een beschikbaar artikel zijn een echte pakinhoud, multipack en
                 prijs vereist. Is het artikel daadwerkelijk niet beschikbaar, dan
                 mogen die velden leeg blijven. Een onbekend bedrag is nooit € 0.</small>
@@ -568,6 +641,10 @@ export function ManualOwnSourceEntry({ onPreview, busy, template, needs }: {
         <strong>{admissionFeedback.admitted ? 'Bronpreview geopend:' : 'Corrigeer je invoer:'}</strong>
         {' '}{admissionFeedback.message}
       </p>}
+      {admissionFeedback?.admitted && <button type="button"
+        onClick={() => onOpenReview(admissionFeedback.raw)}>
+        Controleer mijn geaccepteerde bron in Vergelijk en koppel de producten
+      </button>}
     </>}
   </details>
 }

@@ -509,10 +509,21 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
         en originele bronmomenten. Ook eigen JSON met één of beide winkels kan.
         Alles wordt lokaal gecontroleerd:
         een geldige import bewijst geen bronrechten of actuele winkelprijzen.</p>
-      <ManualOwnSourceEntry busy={busy} template={currentPreview?.data ?? null} needs={needs} onPreview={(raw, report) => {
-        changeDraft(raw)
-        void inspectSource(raw, report)
-      }} />
+      <ManualOwnSourceEntry busy={busy} template={currentPreview?.data ?? null} needs={needs}
+        onPreview={(raw, report) => {
+          changeDraft(raw)
+          void inspectSource(raw, report)
+        }}
+        onOpenReview={raw => {
+          // The manual draft must still be the exact source admitted for the
+          // currently selected physical week; no stale alternate preview.
+          if (!currentPreview || currentPreview.raw !== raw ||
+              currentPreview.needScope !== liveNeedScope.current) {
+            setMessage('Je winkelinvoer of geselecteerde week is veranderd. Controleer de bron opnieuw.')
+            return
+          }
+          handoff()
+        }} />
       <div className={'supa-planner-source-paste__drop' + (dropActive ? ' is-dragging' : '')}
         onDragOver={event => {
           if (!Array.from(event.dataTransfer.types).includes('Files')) return

@@ -134,3 +134,23 @@
   flex: 0 0 auto;
   margin: .3rem .2rem 0 0;
 }
+.supa-manual-source__unit-rate {
+  border-left: 4px solid #446f4c;
+  padding: .75rem;
+  background: #edf5ed;
+  line-height: 1.5;
+}
+.supa-manual-source__duplicate {
+  padding: .75rem;
+  border: 1px solid #9d362e;
+  border-radius: .5rem;
+  background: #fff1ec;
+  color: #7e2922;
+}
+.supa-manual-source__need-link {
+  margin-bottom: .85rem;
+  max-width: 100%;
+}
+.supa-manual-source__need-link small {
+  font-size: .84rem;
+}
