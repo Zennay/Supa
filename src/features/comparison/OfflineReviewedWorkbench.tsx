@@ -5,6 +5,7 @@ import { compareFullBaskets, samePhysicalDemand } from '../../domain/basketCompa
 import { calculateDecimalPackCount } from '../../domain/decimalPackArithmetic.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots, type OfflineStoreProduct } from '../../domain/offlineReviewedImport.ts'
+import { combineTwoOwnShopCaptures, splitOwnStorePastedSheets } from './combineOwnStoreCaptures.ts'
 import { LocalTwoStorePriceEditor, type ReviewedRecaptureSeed } from './LocalTwoStorePriceEditor.tsx'
 import { ownPriceCapturesToCsv } from './ownPriceCsvExport.ts'
 import { exportPrivatePlannerWeek } from './exportPrivatePlannerWeek.ts'
@@ -70,30 +71,6 @@ function isPrivateCaptureCsv(file: File, source: string): boolean {
     line === privateSourceColumns.join(separator) ||
     line === privateSourceColumns.map(column => '"' + column + '"').join(separator))
 }
-/** Reuse canonical admission for both locally supplied shop snapshots. */
-function combineTwoOwnShopCaptures(inputs: readonly string[]): string {
-  if (inputs.length !== 2) throw Error('Geef twee afzonderlijke winkelopnames.')
-  const captures: unknown[] = []
-  const shops = new Set<string>()
-  for (const source of inputs) {
-    const parsed = parseOfflinePriceSnapshots(source, Date.now())
-    const names = Object.keys(parsed.captures)
-    if (names.length !== 1) throw Error('Per blad precies één waargenomen winkel.')
-    if (shops.has(names[0])) throw Error('Dubbele winkel: kies PLUS en DekaMarkt.')
-    shops.add(names[0])
-    const original: unknown = JSON.parse(source)
-    if (!original || typeof original !== 'object' ||
-        !('captures' in original) || !Array.isArray(original.captures) ||
-        original.captures.length !== 1) throw Error('Originele opname ongeldig.')
-    captures.push(original.captures[0])
-  }
-  const combined = JSON.stringify({ schema: 'supa-offline-prices-v1', captures })
-  const accepted = parseOfflinePriceSnapshots(combined, Date.now())
-  if (!accepted.captures.PLUS || !accepted.captures.DekaMarkt)
-    throw Error('PLUS of DekaMarkt ontbreekt.')
-  return combined
-}
-
 const privateTabCheckpointKey = 'supa:private-basket-tab-checkpoint:v1'
 function exactPlanCheckpointKey(planKey: string): string {
   let hash = 2166136261
@@ -1588,11 +1565,7 @@ export function OfflineReviewedWorkbench({
           typeof module.convertOwnStoreCsv !== 'function') {
         throw new Error('De bestaande lokale CSV-converter is niet beschikbaar.')
       }
-      const sheets = raw.split(/(?:\r\n|\n|\r)---(?:\r\n|\n|\r)/u)
-      if (sheets.length > 2)
-        throw Error('Gebruik één losse --- regel tussen twee winkelbladen.')
-      if (sheets.some(sheet => !sheet.trim()))
-        throw Error('Beide winkelbladen moeten productgegevens bevatten.')
+      const sheets = splitOwnStorePastedSheets(raw)
       const convert = module.convertOwnStoreCsv as (input: string) => string
       const sources = sheets.map(sheet => convert(sheet))
       if (version !== importRevision.current) return
