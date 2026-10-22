@@ -901,6 +901,13 @@ export function OfflineReviewedWorkbench({
         row.dekaCents !== null && Number.isSafeInteger(row.dekaCents) && row.dekaCents >= 0
       const rawDelta = plusKnown && dekaKnown ? row.dekaCents! - row.plusCents! : null
       const delta = rawDelta !== null && Number.isSafeInteger(rawDelta) ? rawDelta : null
+      const rawUnitDelta = plusKnown && dekaKnown &&
+        row.plusUnitFamily !== null && row.plusUnitFamily === row.dekaUnitFamily &&
+        row.plusUnitCents !== null && Number.isSafeInteger(row.plusUnitCents) && row.plusUnitCents >= 0 &&
+        row.dekaUnitCents !== null && Number.isSafeInteger(row.dekaUnitCents) && row.dekaUnitCents >= 0
+        ? row.dekaUnitCents - row.plusUnitCents : null
+      const unitDelta = rawUnitDelta !== null && Number.isSafeInteger(rawUnitDelta)
+        ? rawUnitDelta : null
       const plusPrice = plusKnown
         ? h(row.plusCode!) + ' · ' + row.plusPacks + ' hele pakken · ' +
           h(exactEuro.formatCents(row.plusCents!)) +
@@ -913,7 +920,10 @@ export function OfflineReviewedWorkbench({
         : (row.dekaCode ? 'SKU ' + h(row.dekaCode) + ' · prijs onbekend' : 'geen bruikbare match')
       const difference = delta === null ? 'Onbekend; geen betrouwbaar paar.'
         : (delta > 0 ? '+' : delta < 0 ? '−' : '') +
-          h(exactEuro.formatCents(Math.abs(delta))) + ' (DekaMarkt minus PLUS)'
+          h(exactEuro.formatCents(Math.abs(delta))) + ' (DekaMarkt minus PLUS)' +
+          (unitDelta === null ? '' : ' · per ' + h(row.plusUnitFamily ?? '') + ': ' +
+            (unitDelta > 0 ? '+' : unitDelta < 0 ? '−' : '') +
+            h(exactEuro.formatCents(Math.abs(unitDelta))))
       return '<tr><th scope="row">' + h(row.label) + '</th><td>' +
         h((row.amount === null ? 'hoeveelheid onbekend' : String(row.amount)) + ' ' + row.unit) +
         '</td><td>' + plusPrice + '</td><td>' + dekaPrice + '</td><td>' +
