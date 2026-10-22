@@ -3,6 +3,8 @@ import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../doma
 import { groupShoppingByRecipe } from '../shopping-list/shoppingRecipeGroups.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 import type { UnpricedShoppingNote } from '../shopping-list/ManualShoppingNotes.tsx'
+import type { PersonalNoteDraft } from './plannerPersonalNotes.ts'
+import { PlannerPersonalNoteTransfer } from './PlannerPersonalNoteTransfer.tsx'
 import { exportUnpricedProgress, importUnpricedProgress, unpricedProgressMaxBytes, unpricedProgressStorageKey } from './unpricedPlannerProgress.ts'
 import { exportPrivatePlannerWeek } from './exportPrivatePlannerWeek.ts'
 import { exportUnpricedPlannerCsv } from './unpricedPlannerCsv.ts'
@@ -17,6 +19,7 @@ type ChecklistProps = {
   onToggleManualNote?: (id: string) => void
   onOpenPriceImport?: () => void
   onOpenRecipes?: () => void
+  onAddPersonalNotes?: (items: readonly PersonalNoteDraft[], expected: string) => string
 }
 type DemandRow = ReturnType<typeof aggregatePlanIngredients>[number]
 const unitLabels: Record<string, string> = {
@@ -45,7 +48,7 @@ const portableQuantity = (item: DemandRow) => {
  * The exact physical week demand, independent of either supermarket.
  * No sample product, inferred SKU, price, license or retailer observation.
  */
-export function UnpricedPlannerChecklist({ plan, recipes, activeDays, manualNotes = [], onToggleManualNote, onOpenPriceImport, onOpenRecipes }: ChecklistProps) {
+export function UnpricedPlannerChecklist({ plan, recipes, activeDays, manualNotes = [], onToggleManualNote, onOpenPriceImport, onOpenRecipes, onAddPersonalNotes }: ChecklistProps) {
   const [progress, setProgress] = useState<{ identity: string; checked: Record<string, boolean> }>({ identity: '', checked: {} })
   const [backupMessage, setBackupMessage] = useState('')
   const currentDemand = useRef('')
@@ -343,6 +346,9 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, manualNote
             {onOpenPriceImport && <button type="button" className="ghost-button"
               onClick={onOpenPriceImport}>Vergelijk met eigen PLUS/Deka-prijzen</button>}
           </div>
+          {onAddPersonalNotes && <PlannerPersonalNoteTransfer
+            items={items} checked={checked} openOnly={openOnly} planKey={demandIdentity}
+            notes={manualNotes} onImport={onAddPersonalNotes} />}
           <details className="unpriced-planner-checklist__advanced">
             <summary>Deel, exporteer of herstel mijn lijst</summary>
             <div className="unpriced-planner-checklist__actions">

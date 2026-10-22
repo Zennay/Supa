@@ -28,6 +28,8 @@ const ShoppingListView = lazy(async () => {
   return { default: module.ShoppingListView }
 })
 import type { UnpricedShoppingNote } from './features/shopping-list/ManualShoppingNotes.tsx'
+import { applyPlannerPersonalNotes } from './features/comparison/applyPlannerPersonalNotes.ts'
+import { serializePrivateNotes } from './features/shopping-list/manualShoppingNotesBackup.ts'
 const ManualShoppingNotes = lazy(async () => {
   const module = await import('./features/shopping-list/ManualShoppingNotes.tsx')
   return { default: module.ManualShoppingNotes }
@@ -1209,7 +1211,22 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
                 manualNotes={manualShoppingNotes}
                 onToggleManualNote={id => setManualShoppingNotes(previous => previous.map(note =>
                   note.id === id ? { ...note, done: !note.done } : note))}
-                onOpenPriceImport={openOwnPriceImport} onOpenRecipes={() => navigate('recipes')} />
+                onOpenPriceImport={openOwnPriceImport} onOpenRecipes={() => navigate('recipes')}
+                onAddPersonalNotes={(incoming, expected) => {
+                  if (serializePrivateNotes(manualShoppingNotes) !== expected) {
+                    throw Error('De persoonlijke lijst is intussen veranderd. Er is niets toegevoegd.')
+                  }
+                  const proposed = applyPlannerPersonalNotes(manualShoppingNotes, incoming, expected)
+                  setManualShoppingNotes(current => {
+                    // Recheck the exact snapshot during React's actual state update.
+                    // Never replace concurrent edits or another tab's new list.
+                    try {
+                      return serializePrivateNotes(current) === expected ? proposed.notes : current
+                    } catch { return current }
+                  })
+                  return proposed.added + ' Planner-ingrediënten toegevoegd aan mijn eigen ongeprijsde lijst. ' +
+                    'Geen winkelprijs of SKU gekoppeld.'
+                }} />
               </Suspense>
               {tab === 'list' && (designProductIds.length > 0
                 ? <section aria-label="Mijn expliciet toegevoegde producten">
