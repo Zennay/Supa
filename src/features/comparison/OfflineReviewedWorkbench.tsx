@@ -665,7 +665,7 @@ export function OfflineReviewedWorkbench({
       const candidateDelta = comparable ? row.dekaCents! - row.plusCents! : null
       return { ...row, deltaCents: candidateDelta !== null &&
         Number.isSafeInteger(candidateDelta) ? candidateDelta : null }
-    }).filter(row => (!pairedOnlyMissing || !row.plusCode || !row.dekaCode) &&
+    }).filter(row => (!pairedOnlyMissing || row.deltaCents === null) &&
       (effectiveFilter === 'all' ||
         (effectiveFilter === 'unknown' && row.deltaCents === null) ||
         (effectiveFilter === 'plus' && row.deltaCents !== null && row.deltaCents > 0) ||
@@ -3121,6 +3121,134 @@ export function OfflineReviewedWorkbench({
                       )}
                     </section>
                   )}
+                  <section className="offline-price-workbench__paired-summary"
+                    aria-label="Voorlopige prijsregels per winkel uit eigen bronnen">
+                    <h4>Hetzelfde fysieke mandje · voorlopige PLUS/Deka-prijsregels</h4>
+                    <p className="disclaimer">
+                      Dit zijn uitsluitend jouw eigen nog niet goedgekeurde
+                      bron- en productvoorstellen. Een prijsverschil is alleen
+                      zichtbaar bij twee verse opnames binnen 24 uur en twee
+                      bruikbare hele-verpakkingberekeningen voor dezelfde
+                      Planner-vraag. Het is geen bevestigde besparing.
+                    </p>
+                    <div className="offline-price-workbench__matching-controls">
+                      <label>
+                        <input type="checkbox" checked={pairedOnlyMissing}
+                          onChange={event => setPairedOnlyMissing(event.currentTarget.checked)} />
+                        {' '}Alleen regels zonder volledig vergelijkbaar prijsverschil
+                      </label>
+                      <label>Voorlopig prijsverschil
+                        <select value={pairedPriceFilter} onChange={event =>
+                          setPairedPriceFilter(event.currentTarget.value as
+                            'all' | 'plus' | 'deka' | 'equal' | 'unknown')}>
+                          <option value="all">Alle prijsregels</option>
+                          <option value="unknown">Onbekend / niet vergelijkbaar</option>
+                          <option value="plus" disabled={!pairedPreviewComparable}>
+                            PLUS voorlopig goedkoper</option>
+                          <option value="deka" disabled={!pairedPreviewComparable}>
+                            DekaMarkt voorlopig goedkoper</option>
+                          <option value="equal" disabled={!pairedPreviewComparable}>
+                            Zelfde voorlopige pakbedrag</option>
+                        </select>
+                      </label>
+                      <label>Sorteer prijsregels
+                        <select value={pairedPriceSort}
+                          disabled={!pairedPreviewComparable}
+                          onChange={event =>
+                            setPairedPriceSort(event.currentTarget.value as 'plan' | 'difference')}>
+                          <option value="plan">Oorspronkelijke Planner-volgorde</option>
+                          <option value="difference">Grootste voorlopige prijsverschil eerst</option>
+                        </select>
+                      </label>
+                      {(pairedOnlyMissing || pairedPriceFilter !== 'all' ||
+                        pairedPriceSort !== 'plan') &&
+                        <button type="button" className="ghost-button" onClick={() => {
+                          setPairedOnlyMissing(false)
+                          setPairedPriceFilter('all')
+                          setPairedPriceSort('plan')
+                        }}>Alle prijsfilters wissen</button>}
+                    </div>
+                    <p role="status" aria-live="polite">
+                      {pairedPreviewDisplayed.length} van {pairedPreviewRows.length}
+                      {' '}fysieke Planner-regels zichtbaar; filters veranderen geen originele
+                      winkelbron, productmatch, prijs of mandtotalen.
+                    </p>
+                    <div className="offline-price-workbench__breakdown-scroll">
+                      <table>
+                        <caption>Onbevestigde eigen winkelbronvoorstellen voor dezelfde
+                          Planner-vraag. Onbekende bedragen zijn nooit nul euro.</caption>
+                        <thead><tr>
+                          <th scope="col">Fysieke Planner-vraag</th>
+                          <th scope="col">PLUS · eigen bron</th>
+                          <th scope="col">DekaMarkt · eigen bron</th>
+                          <th scope="col">Voorlopig pakverschil</th>
+                        </tr></thead>
+                        <tbody>
+                          {pairedPreviewDisplayed.map(row => {
+                            const showPlus = pairedPreviewComparable && !!row.plusCode &&
+                              row.plusPacks !== null && Number.isSafeInteger(row.plusPacks) &&
+                              row.plusPacks > 0 && row.plusCents !== null &&
+                              Number.isSafeInteger(row.plusCents) && row.plusCents >= 0
+                            const showDeka = pairedPreviewComparable && !!row.dekaCode &&
+                              row.dekaPacks !== null && Number.isSafeInteger(row.dekaPacks) &&
+                              row.dekaPacks > 0 && row.dekaCents !== null &&
+                              Number.isSafeInteger(row.dekaCents) && row.dekaCents >= 0
+                            const sameRate = row.plusUnitFamily !== null &&
+                              row.plusUnitFamily === row.dekaUnitFamily &&
+                              row.plusUnitCents !== null && row.dekaUnitCents !== null
+                            const gap = showPlus && showDeka && sameRate
+                              ? row.dekaUnitCents! - row.plusUnitCents! : null
+                            const safeGap = gap !== null && Number.isSafeInteger(gap)
+                              ? gap : null
+                            return <tr key={row.id}>
+                              <th scope="row">{row.label}
+                                <small style={{display:'block'}}>
+                                  {readablePlannerDemandAmount(row.amount)} {row.unit}
+                                </small>
+                              </th>
+                              <td>{showPlus ? <>
+                                <strong>{exactEuro.formatCents(row.plusCents!)}</strong>
+                                {' '}voor {row.plusPacks} hele verpakking(en)
+                                <small style={{display:'block'}}>Eigen SKU: {row.plusCode}</small>
+                                <small style={{display:'block'}}>
+                                  {row.plusUnitRate ?? 'Eenheidsprijs onbekend'}
+                                </small>
+                              </> : <strong>Prijs onbekend · bron/match controleren</strong>}</td>
+                              <td>{showDeka ? <>
+                                <strong>{exactEuro.formatCents(row.dekaCents!)}</strong>
+                                {' '}voor {row.dekaPacks} hele verpakking(en)
+                                <small style={{display:'block'}}>Eigen SKU: {row.dekaCode}</small>
+                                <small style={{display:'block'}}>
+                                  {row.dekaUnitRate ?? 'Eenheidsprijs onbekend'}
+                                </small>
+                              </> : <strong>Prijs onbekend · bron/match controleren</strong>}</td>
+                              <td>{row.deltaCents !== null ? <>
+                                <strong>{row.deltaCents === 0 ? 'Gelijk' :
+                                  row.deltaCents > 0 ? 'PLUS voorlopig goedkoper' :
+                                  'DekaMarkt voorlopig goedkoper'}</strong>
+                                <span style={{display:'block'}}>
+                                  DekaMarkt − PLUS:{' '}
+                                  {row.deltaCents > 0 ? '+' : row.deltaCents < 0 ? '−' : ''}
+                                  {exactEuro.formatCents(Math.abs(row.deltaCents))}
+                                </span>
+                                <small style={{display:'block'}}>
+                                  {safeGap !== null
+                                    ? 'Eenheidsprijsverschil Deka − PLUS: ' +
+                                      (safeGap > 0 ? '+' : safeGap < 0 ? '−' : '') +
+                                      exactEuro.formatCents(Math.abs(safeGap)) +
+                                      ' / ' + row.plusUnitFamily
+                                    : 'Eenheidsprijsverschil onbekend of onvergelijkbaar'}
+                                </small>
+                              </> : <strong>Geen volledig vergelijkbare prijs</strong>}</td>
+                            </tr>
+                          })}
+                          {pairedPreviewDisplayed.length === 0 &&
+                            <tr><td colSpan={4}>Geen regels bij deze filters.
+                              Wis de filters om alle fysieke Planner-regels terug te zien.</td></tr>}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
                 </details>
               )}
               {currentPreview.retainedOther && (
