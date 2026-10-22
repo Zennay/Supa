@@ -58,7 +58,7 @@ Onder het afzonderlijke per-winkel vervolgformulier voor ontbrekende of verlopen
 
 In **Vergelijk → Plak eigen winkelopname(s)** kun je ook twee originele
 negenkoloms-CSV-bladen direct achter elkaar plakken. Zet uitsluitend een
-losse regel met `---` tussen de volledige PLUS- en DekaMarkt-bladen.
+losse regel met `---` tussen de volledige PLUS- en DekaMarkt-bladen. De lokale Planner/Vergelijk-invoer accepteert nu ook spaties rond die ene scheidingsregel en lege regels aan de buitenranden van de twee geplakte bladen. Alle negen originele kolommen, productcodes, bronmomenten en prijzen worden daarna nog steeds ongewijzigd door de bestaande strikte bronconverter gecontroleerd; de extra witruimte vormt geen bewijs of toestemming.
 Ieder blad houdt de eigen kop, oorspronkelijke SKU's, prijs in centen,
 beschikbaarheid en echte waarnemingstijd. Dit werkt met komma-, puntkomma-
 en tabgescheiden Supa-CSV. De bestaande converter en bronparser toetsen
