@@ -41,9 +41,25 @@ export function createRecipeServer({ root = resolve('dist'), fetchHtml = fetchRe
       quota.count++; clients.set(key, quota); active++
       try {
         req.setTimeout(10_000, () => req.destroy())
-        let body = ''; for await (const chunk of req) { body += chunk; if (body.length > 4096) return json(413, { error: 'De receptlink is te lang.' }) }
-        const { url } = JSON.parse(body)
-        const { html, sourceUrl } = await fetchHtml(url)
+        const declaredLength = req.headers['content-length']
+        if (declaredLength !== undefined) {
+          const bytes = Number(declaredLength)
+          if (!Number.isSafeInteger(bytes) || bytes < 0 || bytes > 4096)
+            return json(413, { error: 'De receptlink is te lang.' })
+        }
+        let body = ''
+        for await (const chunk of req) {
+          body += chunk
+          // String.length counts UTF-16 code units, not UTF-8 request bytes.
+          // Keep chunked requests under the same byte ceiling as declared ones.
+          if (Buffer.byteLength(body, 'utf8') > 4096)
+            return json(413, { error: 'De receptlink is te lang.' })
+        }
+        const payload = JSON.parse(body)
+        if (!payload || typeof payload !== 'object' || Array.isArray(payload) ||
+            typeof payload.url !== 'string' || payload.url.length > 2048)
+          return json(422, { error: 'Geef één geldige openbare receptlink op.' })
+        const { html, sourceUrl } = await fetchHtml(payload.url)
         return json(200, { draft: importRecipeFromHtml(html, sourceUrl) })
       } catch (error) { return json(422, { error: error instanceof Error && !/ENOTFOUND|ECONN|socket|certificate|JSON/i.test(error.message) ? error.message : 'Het recept kon niet worden opgehaald. Controleer de link of voer het handmatig in.' }) }
       finally { active-- }
