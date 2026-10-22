@@ -3819,8 +3819,8 @@ export function OfflineReviewedWorkbench({
                 {pendingReplacement.preview.priceExamples.length > 0 && (
                   <div>
                     <strong>Prijs- of beschikbaarheidswijzigingen (maximaal 8)</strong>
-                    <ul>{pendingReplacement.preview.priceExamples.map((item, index) => (
-                      <li key={index}>{item.name} · broncode {item.sourceId}:
+                    <ul>{pendingReplacement.preview.priceExamples.map(item => (
+                      <li key={item.sourceId + ':' + item.name}>{item.name} · broncode {item.sourceId}:
                         {' '}{item.before} → {item.after}</li>
                     ))}</ul>
                   </div>
@@ -4400,8 +4400,8 @@ export function OfflineReviewedWorkbench({
                                 <summary>Waarom is dit {line.status === 'matched' ? 'bronartikel voorgesteld' : 'ingrediënt nog niet gekoppeld'}?</summary>
                                 <p>De productmatch is een rekenvoorstel, geen bewijs dat het oorspronkelijke
                                   artikel bij je ingrediënt hoort. Controleer de originele code, hoeveelheid en prijs.</p>
-                                <ul>{line.reasons.map((reason, index) => (
-                                  <li key={index}>{humanMatchReason(reason)}</li>
+                                <ul>{line.reasons.map(reason => (
+                                  <li key={line.id + ':' + reason}>{humanMatchReason(reason)}</li>
                                 ))}</ul>
                                 {line.matchScore !== null && <small>Interne zoekrangschikking: {line.matchScore} punten.
                                   Dit is geen kans op correctheid of externe productvalidatie.</small>}
