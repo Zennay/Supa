@@ -382,6 +382,16 @@ border-radius:10px;padding:.65rem;scroll-margin-top:1.25rem}
   border-radius: 6px; font-weight: 650; overflow-wrap: anywhere;
 }
 
+.offline-price-workbench__paired-summary {
+  display: grid; gap: .35rem; min-width: 0;
+  margin: .8rem 0; padding: clamp(.8rem, 2.5vw, 1.1rem);
+  border: 1px solid #c8d8cd; border-radius: 12px; background: #f7fbf8;
+}
+.offline-price-workbench__paired-summary h4 { margin: 0; }
+.offline-price-workbench__paired-summary p { margin: .15rem 0; overflow-wrap: anywhere; }
+.offline-price-workbench__paired-summary .capture-alert { margin-top: .4rem; }
+
+
 .mixed-store-route__extras { margin-top:1rem; padding:1rem; border:1px solid #bdd3bd; border-radius:.7rem; background:#f9fcf8; }
 .mixed-store-route__extras ul { padding:0; list-style:none; margin:.7rem 0; }
 .mixed-store-route__extras li { border-top:1px solid #e1eae0; padding:.75rem 0; }
