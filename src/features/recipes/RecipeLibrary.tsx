@@ -1015,7 +1015,7 @@ export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
         </select>
       </label>
       <p>{collectionFormat === 'plain'
-        ? 'Scheid meerdere recepten met een eigen regel ---. Gebruik titel, Ingrediënten: en Bereiding:.'
+        ? 'Scheid meerdere recepten met een eigen regel ---. Gebruik titel, optioneel Porties:, Tijd: en Bron: https://…, gevolgd door Ingrediënten: en Bereiding:. Bron is alleen attributie, geen prijsbewijs.'
         : collectionFormat === 'html'
           ? 'Lees schema.org/Recipe uit opgeslagen HTML-webpagina’s, zonder scripts uit te voeren of iets op internet te openen.'
           : collectionFormat === 'links'
@@ -1041,7 +1041,7 @@ export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
         : 'JSON-LD receptverzameling'}
         <textarea rows={8} maxLength={collectionFormat === 'links' ? 32_000 : 500_000} value={collectionText}
           placeholder={collectionFormat === 'plain'
-            ? 'Tomatensoep\nIngrediënten:\n500 g tomaten\nBereiding:\nKook tomaten\n---\nPasta\nIngrediënten:\n200 g pasta\nBereiding:\nKook pasta'
+            ? 'Tomatensoep\nPorties: 2\nBron: https://voorbeeld.nl/recept/soep\nIngrediënten:\n500 g tomaten\nBereiding:\nKook tomaten\n---\nPasta\nIngrediënten:\n200 g pasta\nBereiding:\nKook pasta'
             : collectionFormat === 'html'
               ? '<script type="application/ld+json">{"@type":"Recipe","name":"...","recipeIngredient":["250 g ..."]}</script>'
               : collectionFormat === 'links' ? '# Mijn recepten\n\n- [Tomatensoep](https://voorbeeld.nl/recept/soep)\n- https://voorbeeld.nl/recept/pasta'
@@ -1054,8 +1054,9 @@ export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
       </label>
       {collectionFormat === 'links' && <small>{collectionText.length.toLocaleString('nl-NL')} / 32.000 tekens · maximaal acht unieke HTTPS-receptlinks. Koppen en scheidingslijnen tellen niet mee.</small>}
       <p role="status">{markdownExportable.length} gecontroleerde recepten beschikbaar voor Markdown;
-        {' '}{library.recipes.length - markdownExportable.length} recept(en) met bronvermelding,
-        waarschuwingen of ongeldig exportformaat blijven uitsluitend in de volledige JSON-back-up.</p>
+        {' '}{library.recipes.length - markdownExportable.length} recept(en) met openstaande waarschuwingen
+        of ongeldig exportformaat blijven uitsluitend in de volledige JSON-back-up.
+        Veilige openbare Bron:-links worden in Markdown behouden; prijs- en bronrechtenstatus niet.</p>
       {markdownExportable.length > 15 &&
         <label className="recipe-collection-label">Kies welke 15 recepten je als Markdown meeneemt
           <select value={Math.min(collectionExportBatch, Math.ceil(markdownExportable.length / 15) - 1)}
