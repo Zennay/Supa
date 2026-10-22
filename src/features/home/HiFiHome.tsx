@@ -143,10 +143,12 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
   // Archived identities and design examples never feed the price calculator.
   const visibleProductIds = (productSource === 'history' ? historical : products).map(item => item.id)
   const notYetSelected = visibleProductIds.filter(id => !addedProducts.includes(id))
+  const freeSlots = Math.max(0, 100 - addedProducts.length)
+  const toAdd = notYetSelected.slice(0, freeSlots)
   const addVisibleToUnpricedList = () => {
-    if (notYetSelected.length === 0) return
-    for (const id of notYetSelected) onToggleProduct(id)
-    setMessage(`${notYetSelected.length} zichtbare producten aan je eigen ongeprijsde lijst toegevoegd. Er zijn geen winkelprijzen of matches gemaakt.`)
+    if (toAdd.length === 0) return
+    for (const id of toAdd) onToggleProduct(id)
+    setMessage(`${toAdd.length} van ${notYetSelected.length} zichtbare producten aan je ongeprijsde lijst toegevoegd. ${toAdd.length < notYetSelected.length ? 'De lijst bevat maximaal 100 items. ' : ''}Er zijn geen winkelprijzen of matches gemaakt.`)
   }
   const toggleFavorite = (id: string) => {
     if (!discoveryFavoriteIds.has(id)) return
@@ -236,8 +238,8 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
       <p role="status" aria-live="polite">{addedProducts.length} gekozen voor mijn lijst · {visibleProductIds.length} zichtbaar uit {productSource === 'history' ? 'historisch brononderzoek' : 'Figma-voorbeelden'}</p>
       <button type="button" className="hifi-empty-reset" aria-pressed={selectedOnly}
         onClick={() => setSelectedOnly(!selectedOnly)}>{selectedOnly ? 'Toon ook niet-gekozen producten' : 'Toon alleen mijn selectie'}</button>
-      <button type="button" className="hifi-empty-reset" disabled={notYetSelected.length === 0}
-        onClick={addVisibleToUnpricedList}>Voeg {notYetSelected.length} zichtbare producten toe</button>
+      <button type="button" className="hifi-empty-reset" disabled={toAdd.length === 0}
+        onClick={addVisibleToUnpricedList}>{freeSlots === 0 ? 'Lijst vol (maximaal 100)' : `Voeg ${toAdd.length} van ${notYetSelected.length} zichtbare producten toe`}</button>
       <button type="button" className="hifi-empty-reset" onClick={() => onNavigate('list')}>Open mijn lijst →</button>
       <small>Deze keuzes blijven apart en ongeprijsd; geen actuele supermarktprijzen of automatische productmatches.</small>
     </div>}
@@ -256,7 +258,7 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
       <p className="hifi-demo-note hifi-historical-warning">Alleen historische bronwaarnemingen van 4 oktober 2026. Niet actueel, nog niet gelicentieerd voor productie. Geen prijzen, aanbiedingen, besparingen of beschikbaarheidsclaims.</p>
       <div className="hifi-product-grid">{historical.map(item => <article className="hifi-product-card" key={item.id} data-product-source="historical"><div className="hifi-product-image"><span className="hifi-source-image" aria-hidden="true">{item.name.slice(0, 1)}</span><span className="hifi-store-logo hifi-store-text">{item.store === 'PLUS' ? 'PLUS' : 'Deka'}</span></div><div className="hifi-product-copy"><h3>{item.name}</h3><div className="hifi-product-price"><span>{item.pack}</span></div><span className="hifi-no-price">Prijs niet vrijgegeven</span><small>Bron: {item.store} · {new Date(item.capturedAt).toLocaleDateString('nl-NL')}</small></div><div className="hifi-product-actions"><button className="hifi-product-favorite" aria-label={`Favoriet: ${item.name} bij ${item.store}`} aria-pressed={favorites.includes(item.id)} onClick={() => toggleFavorite(item.id)}><FigmaImage asset={a.imgHeartButton} alt="" /></button><button type="button" className="hifi-history-add" aria-pressed={addedProducts.includes(item.id)}
   aria-label={`${addedProducts.includes(item.id) ? 'Verwijder uit lijst' : 'Voeg toe aan lijst'}: ${item.name} bij ${item.store}`}
-  onClick={() => { onToggleProduct(item.id); setMessage(addedProducts.includes(item.id)
+  onClick={() => { if (!addedProducts.includes(item.id) && addedProducts.length >= 100) { setMessage('Je lijst is vol (maximaal 100 producten). Verwijder eerst een keuze via Lijst.'); return } onToggleProduct(item.id); setMessage(addedProducts.includes(item.id)
     ? `${item.name} verwijderd uit je eigen lijst.`
     : `${item.name} toegevoegd zonder prijsclaim. Open Lijst om je keuze te bekijken.`) }}>
   {addedProducts.includes(item.id) ? '✓ In lijst' : '+ Lijst'}
@@ -270,7 +272,7 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
       <div className="hifi-product-grid" data-figma-node={view === 'products' ? '3064:3342' : undefined}>{products.map(product => <article className="hifi-product-card" key={product.id}>
         <div className="hifi-product-image"><FigmaImage className="hifi-product-photo" asset={product.image} alt={product.name} />{product.logo && <span className={`hifi-store-logo ${product.crop}`}><FigmaImage asset={product.logo} alt={product.store} /></span>}{product.unitPrice && <span className="hifi-unit-price">{product.unitPrice}</span>}</div>
         <div className="hifi-product-copy"><h3>{product.name}</h3><div className="hifi-product-price"><span>{product.unit}</span>{product.old && <del>{product.old}</del>}{product.price ? <strong>{product.price}</strong> : <small className="hifi-unpriced">Prijsvoorbeeld ontbreekt</small>}</div></div>
-        <div className="hifi-product-actions"><button className="hifi-product-favorite" aria-label={`Favoriet: ${product.name}`} aria-pressed={favorites.includes(product.id)} onClick={() => toggleFavorite(product.id)}><FigmaImage asset={a.imgHeartButton} alt="" /></button><button aria-label={`${addedProducts.includes(product.id) ? 'Verwijder' : 'Voeg toe'}: ${product.name}`} aria-pressed={addedProducts.includes(product.id)} onClick={() => { onToggleProduct(product.id); setMessage(addedProducts.includes(product.id) ? `${product.name} verwijderd uit je demolijst.` : `${product.name} toegevoegd aan je demolijst.`) }}>{addedProducts.includes(product.id) ? <span className="hifi-added">✓</span> : <FigmaImage asset={a.imgFrame7121} alt="" />}</button></div>
+        <div className="hifi-product-actions"><button className="hifi-product-favorite" aria-label={`Favoriet: ${product.name}`} aria-pressed={favorites.includes(product.id)} onClick={() => toggleFavorite(product.id)}><FigmaImage asset={a.imgHeartButton} alt="" /></button><button aria-label={`${addedProducts.includes(product.id) ? 'Verwijder' : 'Voeg toe'}: ${product.name}`} aria-pressed={addedProducts.includes(product.id)} onClick={() => { if (!addedProducts.includes(product.id) && addedProducts.length >= 100) { setMessage('Je lijst is vol (maximaal 100 producten). Verwijder eerst een keuze via Lijst.'); return } onToggleProduct(product.id); setMessage(addedProducts.includes(product.id) ? `${product.name} verwijderd uit je demolijst.` : `${product.name} toegevoegd aan je demolijst.`) }}>{addedProducts.includes(product.id) ? <span className="hifi-added">✓</span> : <FigmaImage asset={a.imgFrame7121} alt="" />}</button></div>
       </article>)}</div>
       {products.length === 0 && <div className="hifi-empty-state" role="status"><p className="hifi-empty">Geen producten gevonden. Pas je zoekopdracht aan of wis je filters.</p><button type="button" className="hifi-empty-reset" onClick={clearSearchAndFilters}>Wis zoekopdracht en filters</button></div>}
     </section>}
