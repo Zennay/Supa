@@ -530,7 +530,9 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
             event.currentTarget.value = ''
             if (files.length) void previewFiles(files)
           }} />
-        <small>Eén bestand mag beide winkels bevatten; twee aparte bestanden moeten ieder precies één verschillende winkel bevatten.</small>
+        <small>Eén bestand mag beide winkels bevatten; twee aparte bestanden moeten ieder precies één verschillende winkel bevatten.
+          Excel/Calc Unicode Text (.txt of .tsv met UTF-16-BOM) wordt lokaal gelezen;
+          CSV en JSON blijven UTF-8. Een bestand blijft onbevestigd tot de bestaande bron- en SKU-controle.</small>
       </label>
       </div>
       <div className="supa-planner-source-paste__separate">
