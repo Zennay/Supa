@@ -385,8 +385,8 @@ export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: 
     ...selectedUnknown.map(id => `☐ Product niet beschikbaar · oude product-ID ${id} · prijs onbekend`)]
   const downloadSelection = () => {
     if (typeof document === 'undefined' || !selectedLines.length) return
-    const note = 'SUPA · eigen productselectie (ongeprijsd)\\n' +
-      'Niet meegerekend in Planner, geverifieerde winkelmand of besparing.\\n\\n' + selectedLines.join('\\n') + '\\n'
+    const note = 'SUPA · eigen productselectie (ongeprijsd)\n' +
+      'Niet meegerekend in Planner, geverifieerde winkelmand of besparing.\n\n' + selectedLines.join('\n') + '\n'
     const url = URL.createObjectURL(new Blob([note], { type: 'text/plain;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url; anchor.download = 'supa-eigen-productselectie-ongeprijsd.txt'
@@ -435,7 +435,7 @@ export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: 
     <label className="hifi-picked-copy-label">Kopieer je gekozen productnamen
       <textarea readOnly rows={Math.min(ids.length + 2, 12)}
         onFocus={event => event.currentTarget.select()}
-        value={selectedLines.join('\\n')}
+        value={selectedLines.join('\n')}
         aria-label="Kopieerbare gekozen producten, zonder winkelprijzen" />
     </label>
   </section>
