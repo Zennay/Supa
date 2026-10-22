@@ -11,9 +11,12 @@ const allowedSourceFilename = /\.(?:csv|tsv|txt|json)$/iu
  * Read a user-owned source file without guessing its retailer, price or clock.
  * Excel's "Unicode Text" TSV may carry an explicit UTF-16 LE/BE BOM; other
  * formats remain strictly UTF-8. Never guess a legacy encoding from content.
- * The active source importer strips the codec BOM, matching its previous UTF-8\n * behavior. Raw draft-file recovery may request the original BOM separately.
+ * The active source importer strips the codec BOM, matching its previous UTF-8
+ * behavior. Raw draft-file recovery may request the original BOM separately.
  */
-export async function readOwnSourceTextFile(\n  file: File, { preserveBom = false }: { preserveBom?: boolean } = {},\n): Promise<string> {
+export async function readOwnSourceTextFile(
+  file: File, { preserveBom = false }: { preserveBom?: boolean } = {},
+): Promise<string> {
   if (!allowedSourceFilename.test(file.name) || !file.size || file.size > maxDraftBytes) {
     throw Error('Kies een niet-leeg CSV-, TSV-, TXT- of JSON-bronbestand tot 256 kB.')
   }
