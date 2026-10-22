@@ -123,6 +123,13 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
   const normalizeCatalogSearch = (value: string) =>
     productSearchText(value)
       .replace(/(\d),(?=\d)/gu, '$1.')
+      // Normalize written-out metric units only for matching, not for display.
+      .replace(/\bmilliliter(?:s)?\b|\bmillilitre(?:s)?\b/gu, 'ml')
+      .replace(/\bcentiliter(?:s)?\b|\bcentilitre(?:s)?\b/gu, 'cl')
+      .replace(/\bdeciliter(?:s)?\b|\bdecilitre(?:s)?\b/gu, 'dl')
+      .replace(/\bliter(?:s)?\b|\blitre(?:s)?\b/gu, 'l')
+      .replace(/\bkilogram(?:men|s)?\b/gu, 'kg')
+      .replace(/\bgram(?:men|s)?\b/gu, 'g')
       // Treat common multipack spellings as the same search-only form:
       // “6 × 330 ml”, “6x330ml” and “6 x 330 ml”. Captured data stays intact.
       .replace(/(\d)\s*[×✕✖x]\s*(?=\d)/gu, '$1x')
