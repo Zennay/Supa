@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { aggregatePlanIngredients } from '../../domain/basket.ts'
 import type { UnpricedShoppingNote } from '../shopping-list/ManualShoppingNotes.tsx'
 import { serializePrivateNotes } from '../shopping-list/manualShoppingNotesBackup.ts'
-import { preparePlannerPersonalNotes, type PersonalNoteDraft } from './plannerPersonalNotes.ts'
+import { preparePlannerPersonalNotes, type PersonalNoteDraft, type PersonalNoteDestination } from './plannerPersonalNotes.ts'
 
 type Demand = ReturnType<typeof aggregatePlanIngredients>[number]
 type Pending = { fingerprint: string; planKey: string; original: string;
@@ -22,7 +22,7 @@ export function PlannerPersonalNoteTransfer({ items, checked, openOnly, planKey,
 }) {
   const [pending, setPending] = useState<Pending | null>(null)
   const [message, setMessage] = useState('')
-  const [destination, setDestination] = useState<UnpricedShoppingNote['store']>('Algemeen')
+  const [destination, setDestination] = useState<PersonalNoteDestination>('Algemeen')
   const fingerprint = JSON.stringify([planKey, checked, openOnly, destination])
   function prepare() {
     try {
@@ -61,13 +61,14 @@ export function PlannerPersonalNoteTransfer({ items, checked, openOnly, planKey,
   return <div className="unpriced-planner-checklist__personal-transfer">
     <label>Mijn eigen ongeprijsde winkellijst
       <select value={destination} onChange={event => {
-        setDestination(event.currentTarget.value as UnpricedShoppingNote['store'])
+        setDestination(event.currentTarget.value as PersonalNoteDestination)
         setPending(null)
         setMessage('Winkelkeuze gewijzigd; maak een nieuwe voorinzage.')
       }}>
         <option value="Algemeen">Algemeen · winkel nog zelf kiezen</option>
         <option value="PLUS">PLUS · zelf gekozen, niet gematcht</option>
         <option value="DekaMarkt">DekaMarkt · zelf gekozen, niet gematcht</option>
+        <option value="Beide winkels">PLUS en DekaMarkt · twee aparte ongeprijsde controlelijsten</option>
       </select>
     </label>
     <button type="button" className="ghost-button" onClick={prepare}>
@@ -76,7 +77,8 @@ export function PlannerPersonalNoteTransfer({ items, checked, openOnly, planKey,
     </button>
     <p className="disclaimer">De winkel is uitsluitend jouw persoonlijke keuze,
       geen automatische artikelmatch. Zonder winkelprijzen, SKU’s of bronclaims;
-      je originele Planner-planning en bestaande vinkjes blijven behouden.</p>
+      je originele Planner-planning en bestaande vinkjes blijven behouden.
+      Beide winkels betekent twee parallelle controlelijsten, niet twee aankopen.</p>
     {message && <p role="status" className="unpriced-planner-checklist__note">{message}</p>}
     {pending && current && <section role="group"
       aria-label="Controleer Planner-ingrediënten voor de persoonlijke lijst"

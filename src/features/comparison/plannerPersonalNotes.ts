@@ -7,6 +7,7 @@ import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
 
 type Demand = ReturnType<typeof aggregatePlanIngredients>[number]
 export type PersonalNoteDraft = Pick<UnpricedShoppingNote, 'label' | 'store' | 'done'>
+export type PersonalNoteDestination = UnpricedShoppingNote['store'] | 'Beide winkels'
 const key = (line: Demand) => JSON.stringify([line.id, line.label, line.amount, line.unit])
 
 /** A lossless, intentionally UNPRICED private transfer proposal from the
@@ -18,18 +19,23 @@ export function preparePlannerPersonalNotes(
   checked: Readonly<Record<string, boolean>>,
   openOnly: boolean,
   current: readonly UnpricedShoppingNote[],
-  destination: UnpricedShoppingNote['store'] = 'Algemeen',
+  destination: PersonalNoteDestination = 'Algemeen',
 ): { incoming: PersonalNoteDraft[]; skipped: number; before: string } {
   if (!Array.isArray(lines) || !Array.isArray(current) || lines.length < 1 ||
       lines.length > 2000 || !checked || typeof checked !== 'object') {
     throw Error('Geen geldige actuele Planner-week.')
   }
-  if (!['Algemeen', 'PLUS', 'DekaMarkt'].includes(destination)) throw Error('Kies een geldige persoonlijke winkellijst.')
+  if (!['Algemeen', 'PLUS', 'DekaMarkt', 'Beide winkels'].includes(destination)) throw Error('Kies een geldige persoonlijke winkellijst.')
   const before = serializePrivateNotes([...current])
   const selection = openOnly ? lines.filter(line => checked[key(line)] !== true) : lines
   if (!selection.length) throw Error('Alle geselecteerde ingrediënten zijn al afgevinkt.')
   if (selection.length > 100) throw Error('Meer dan 100 ingrediënten. Exporteer je week als CSV.')
-  const source: PersonalNoteDraft[] = selection.map(line => {
+  const destinations: UnpricedShoppingNote['store'][] = destination === 'Beide winkels'
+    ? ['PLUS', 'DekaMarkt'] : [destination]
+  if (selection.length * destinations.length > 100) {
+    throw Error('Beide winkeloverzichten samen passen niet binnen 100 regels. Kies minder ingrediënten.')
+  }
+  const source: PersonalNoteDraft[] = selection.flatMap(line => {
     if (typeof line.label !== 'string' || !line.label.trim() ||
         !['g', 'kg', 'ml', 'l', 'piece', 'unknown'].includes(line.unit)) {
       throw Error('Een recept bevat een onbekend ingrediënt. Controleer het recept.')
@@ -38,8 +44,8 @@ export function preparePlannerPersonalNotes(
     const quantity = amount === 'hoeveelheid nog controleren'
       ? 'hoeveelheid controleren (' + line.unit + ')'
       : amount.replace('.', ',') + ' ' + (line.unit === 'piece' ? 'stuks' : line.unit)
-    return { store: destination, label: line.label + ' · ' + quantity,
-      done: checked[key(line)] === true }
+    return destinations.map(store => ({ store, label: line.label + ' · ' + quantity,
+      done: checked[key(line)] === true }))
   })
   // Existing strict personal note importer is the single schema and
   // spreadsheet-safe boundary. Nothing is saved or downloaded here.
