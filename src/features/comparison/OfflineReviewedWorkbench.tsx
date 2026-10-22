@@ -98,7 +98,8 @@ type CapturePreviewStore = {
     lines: { id: string; label: string; status: 'matched' | 'unresolved'
       amount: number | null; unit: string
       product: string | null; originalSku: string | null
-      packs: number | null; reasons: string[] }[]
+      packs: number | null; lineTotalCents: number | null
+      unitRate: string | null; reasons: string[] }[]
   }
   observedAt: string; observedNs?: bigint; unavailableProducts: number
   previewProducts: {
@@ -599,6 +600,8 @@ export function OfflineReviewedWorkbench({
             product: line.status === 'matched' ? line.productName : null,
             originalSku: line.status === 'matched' ? line.productId : null,
             packs: line.status === 'matched' ? line.packs : null,
+            lineTotalCents: line.status === 'matched' ? line.lineTotalCents : null,
+            unitRate: line.status === 'matched' ? privateUnitPrice(line) : null,
             reasons: line.reasons,
           })),
         }
