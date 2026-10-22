@@ -557,6 +557,50 @@ export function OfflineReviewedWorkbench({
     }
   }, [capturePreview, captureWeek, plannerCaptureNeeds, imported, plan, recipes, activeDays])
 
+  // A provisional subtotal is useful before every SKU is reviewed, but
+  // it must never masquerade as a complete basket total. Only fresh paired
+  // sources and actual matched whole-pack amounts are eligible.
+  const pairedPreviewSummary = useMemo(() => {
+    if (!pairedPreviewRows) return null
+    const summarize = (store: 'PLUS' | 'DekaMarkt') => {
+      let cents = 0
+      let priced = 0
+      let safe = true
+      for (const row of pairedPreviewRows) {
+        const sku = store === 'PLUS' ? row.plusCode : row.dekaCode
+        const packs = store === 'PLUS' ? row.plusPacks : row.dekaPacks
+        const lineCents = store === 'PLUS' ? row.plusCents : row.dekaCents
+        if (!pairedPreviewComparable || !sku || packs === null ||
+            !Number.isSafeInteger(packs) || packs < 1 ||
+            lineCents === null || !Number.isSafeInteger(lineCents) || lineCents < 0)
+          continue
+        const next = cents + lineCents
+        if (!Number.isSafeInteger(next)) {
+          safe = false
+          break
+        }
+        cents = next
+        priced++
+      }
+      return {
+        priced,
+        missing: pairedPreviewRows.length - priced,
+        cents: safe && priced > 0 ? cents : null,
+        complete: safe && pairedPreviewRows.length > 0 && priced === pairedPreviewRows.length,
+      }
+    }
+    const plus = summarize('PLUS')
+    const deka = summarize('DekaMarkt')
+    const candidateDelta = plus.complete && deka.complete &&
+      plus.cents !== null && deka.cents !== null ? deka.cents - plus.cents : null
+    return {
+      rows: pairedPreviewRows.length,
+      plus, deka,
+      completeDifferenceCents: candidateDelta !== null &&
+        Number.isSafeInteger(candidateDelta) ? candidateDelta : null,
+    }
+  }, [pairedPreviewRows, pairedPreviewComparable])
+
   // Filter and order only the currently visible, honest own-source preview.
   // No change to automatic matching, user approval or canonical basket sums.
   const pairedPreviewDisplayed = useMemo(() => {
@@ -578,9 +622,13 @@ export function OfflineReviewedWorkbench({
         (effectiveFilter === 'plus' && row.deltaCents !== null && row.deltaCents > 0) ||
         (effectiveFilter === 'deka' && row.deltaCents !== null && row.deltaCents < 0) ||
         (effectiveFilter === 'equal' && row.deltaCents === 0)))
-    if (effectiveSort === 'difference') rows.sort((a, b) =>
-      (b.deltaCents === null ? -1 : Math.abs(b.deltaCents)) -
-      (a.deltaCents === null ? -1 : Math.abs(a.deltaCents)))
+    if (effectiveSort === 'difference') rows.sort((a, b) => {
+      // Known differences first (largest absolute gap); unknown rows last.
+      if (a.deltaCents === null && b.deltaCents !== null) return 1
+      if (a.deltaCents !== null && b.deltaCents === null) return -1
+      if (a.deltaCents === null || b.deltaCents === null) return 0
+      return Math.abs(b.deltaCents) - Math.abs(a.deltaCents)
+    })
     return rows
   }, [pairedPreviewRows, pairedPreviewComparable, pairedOnlyMissing, pairedPriceFilter, pairedPriceSort])
 
@@ -3074,6 +3122,43 @@ export function OfflineReviewedWorkbench({
                       ? 'Bronmomenten zijn binnen zeven dagen en binnen 24 uur van elkaar. Onderstaande hele-pakbedragen zijn alleen rekenkundige voorbeelden uit jouw eigen ingevoerde, nog niet goedgekeurde bronproducten. Productgelijkwaardigheid en besparing zijn NIET vastgesteld.'
                       : 'Een of beide bronmomenten zijn verouderd, niet vergelijkbaar binnen 24 uur of onvoldoende bekend. Daarom blijven voorlopige regelprijzen en prijsverschillen hier onbekend.'}
                   </p>
+                  {pairedPreviewSummary && (
+                    <section className="offline-price-workbench__paired-summary"
+                      aria-label="Voorlopige prijsdekking van hetzelfde fysieke mandje">
+                      <h4>Voorlopige hele-pakbedragen voor dezelfde Planner-week</h4>
+                      <p>
+                        PLUS: {pairedPreviewSummary.plus.cents !== null
+                          ? exactEuro.formatCents(pairedPreviewSummary.plus.cents)
+                          : 'deelbedrag onbekend'}
+                        {' '}({pairedPreviewSummary.plus.priced}/{pairedPreviewSummary.rows}
+                        {' '}regels met bruikbare prijzen; {pairedPreviewSummary.plus.missing} onbekend).
+                      </p>
+                      <p>
+                        DekaMarkt: {pairedPreviewSummary.deka.cents !== null
+                          ? exactEuro.formatCents(pairedPreviewSummary.deka.cents)
+                          : 'deelbedrag onbekend'}
+                        {' '}({pairedPreviewSummary.deka.priced}/{pairedPreviewSummary.rows}
+                        {' '}regels met bruikbare prijzen; {pairedPreviewSummary.deka.missing} onbekend).
+                      </p>
+                      {pairedPreviewSummary.completeDifferenceCents !== null ? (
+                        <p role="status" className="disclaimer">
+                          Voorlopig verschil voor alle {pairedPreviewSummary.rows} fysieke regels
+                          (DekaMarkt minus PLUS):{' '}
+                          {pairedPreviewSummary.completeDifferenceCents > 0 ? '+' :
+                            pairedPreviewSummary.completeDifferenceCents < 0 ? '−' : ''}
+                          {exactEuro.formatCents(Math.abs(pairedPreviewSummary.completeDifferenceCents))}.
+                          Dit is geen bevestigde besparing: productgelijkwaardigheid,
+                          beschikbaarheid en originele prijzen moeten nog worden gecontroleerd.
+                        </p>
+                      ) : (
+                        <p role="status" className="offline-price-workbench__capture-alert">
+                          Geen volledig mandverschil: minstens één hele-pakprijs per winkel
+                          ontbreekt, is verouderd of kan niet veilig worden opgeteld.
+                          Deelbedragen zijn geen totaalkosten; onbekend is niet €0.
+                        </p>
+                      )}
+                    </section>
+                  )}
                   {currentPreview.retainedOther && (
                     <p className="disclaimer" role="status">
                       {currentPreview.retainedOther.retailer} is de werkelijk eerder
