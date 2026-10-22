@@ -706,11 +706,12 @@ export function PrivateComparisonJourney({
       <strong>Van weekmenu naar twee gecontroleerde winkelmandjes</strong>
       <p>Volg per ingrediënt welke originele SKU en verpakking bij beide winkels
         zijn gekoppeld, en welke prijs of broncontrole nog ontbreekt.
+        Download de openstaande PLUS-/Deka-controles per winkel als werkblad voor onderweg.
         Deze status maakt een onvolledig mandje niet alsnog geprijsd.</p>
       <button type="button" aria-expanded={showTwoStoreCoverage}
         onClick={() => setShowTwoStoreCoverage(value => !value)}>
         {showTwoStoreCoverage ? 'Verberg de complete twee-winkelcontrole'
-          : 'Bekijk alle ' + captureNeeds.length + ' ingrediënten bij beide winkels'}
+          : 'Bekijk ' + captureNeeds.length + ' ingrediënten en mijn openstaande winkelcontroles'}
       </button>
       {showTwoStoreCoverage && <Suspense fallback={
         <p role="status">Twee-winkelcontrolelijst openen…</p>
