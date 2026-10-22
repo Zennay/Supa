@@ -725,8 +725,11 @@ export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
             })
           : importPlainTextRecipeCollection(collectionText)
       if (revision !== collectionReadVersion.current || controller.signal.aborted) return
+      // Attribution is meaningful recipe metadata. Identical ingredient
+      // text from two different public sources must not silently collapse
+      // into one imported recipe; source links remain sanitized at admission.
       const identity = (item: UserRecipeDraft) => JSON.stringify([
-        item.title, item.servings, item.minutes,
+        item.title, item.source, item.sourceUrl, item.servings, item.minutes,
         item.ingredients.map(part => part.original), item.steps,
       ])
       const known = new Set(library.recipes.map(identity))
