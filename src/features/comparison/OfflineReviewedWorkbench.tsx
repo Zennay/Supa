@@ -888,6 +888,27 @@ export function OfflineReviewedWorkbench({
     }
   }
 
+  // In a paired field capture, a too-old original shop moment must be
+  // re-observed in full EVEN when every old SKU still happens to match.
+  // For a >24h gap prefer re-observing the older source only; never
+  // silently refresh or relabel the newer source's physical timestamp.
+  function needsFullPreviewRecapture(store: CaptureStore): boolean {
+    if (!currentPreview) return false
+    const newSource = currentPreview.stores.find(item => item.retailer === store)
+    const kept = currentPreview.retainedOther?.retailer === store
+      ? currentPreview.retainedOther : null
+    const instant = newSource?.observedNs ?? kept?.observedNs
+    if (instant === undefined) return false // genuinely missing other shop
+    if (!freshPreviewInstant(instant)) return true
+    const otherNew = currentPreview.stores.find(item => item.retailer !== store)
+    const otherKept = currentPreview.retainedOther?.retailer !== store
+      ? currentPreview.retainedOther : null
+    const otherInstant = otherNew?.observedNs ?? otherKept?.observedNs
+    if (otherInstant === undefined) return false
+    const gap = instant > otherInstant ? instant - otherInstant : otherInstant - instant
+    return gap > 86_400_000_000_000n && instant < otherInstant
+  }
+
   // Use physical Planner needs only; a match hint never becomes a retailer SKU.
   function missingPreviewCaptureNeeds(store: CaptureStore) {
     if (!currentPreview) return []
