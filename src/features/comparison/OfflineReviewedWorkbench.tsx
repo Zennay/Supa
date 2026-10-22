@@ -793,11 +793,15 @@ export function OfflineReviewedWorkbench({
       ...(pairedPreviewSummary ? [
         'DEKKING EN VOORLOPIGE HELE-PAK-SOM (alleen verse gepaarde bronmomenten):',
         'PLUS: ' + (pairedPreviewSummary.plus.cents === null
-          ? 'deelbedrag onbekend' : exactEuro.formatCents(pairedPreviewSummary.plus.cents)) +
+          ? 'bedrag onbekend' : (pairedPreviewSummary.plus.complete
+            ? 'voorlopige kandidaat-som ' : 'bekende deelprijs ') +
+            exactEuro.formatCents(pairedPreviewSummary.plus.cents)) +
           ' · ' + pairedPreviewSummary.plus.priced + '/' + pairedPreviewSummary.rows +
           ' geprijsde regels · ' + pairedPreviewSummary.plus.missing + ' onbekend.',
         'DekaMarkt: ' + (pairedPreviewSummary.deka.cents === null
-          ? 'deelbedrag onbekend' : exactEuro.formatCents(pairedPreviewSummary.deka.cents)) +
+          ? 'bedrag onbekend' : (pairedPreviewSummary.deka.complete
+            ? 'voorlopige kandidaat-som ' : 'bekende deelprijs ') +
+            exactEuro.formatCents(pairedPreviewSummary.deka.cents)) +
           ' · ' + pairedPreviewSummary.deka.priced + '/' + pairedPreviewSummary.rows +
           ' geprijsde regels · ' + pairedPreviewSummary.deka.missing + ' onbekend.',
         'Compleet mandverschil (DekaMarkt minus PLUS): ' +
@@ -3157,19 +3161,24 @@ export function OfflineReviewedWorkbench({
                   </p>
                   {pairedPreviewSummary && (
                     <section className="offline-price-workbench__paired-summary"
-                      aria-label="Voorlopige prijsdekking van hetzelfde fysieke mandje">
+                      aria-label="Voorlopige prijsdekking van hetzelfde fysieke mandje"
+                      aria-live="polite" aria-atomic="true">
                       <h4>Voorlopige hele-pakbedragen voor dezelfde Planner-week</h4>
                       <p>
                         PLUS: {pairedPreviewSummary.plus.cents !== null
-                          ? exactEuro.formatCents(pairedPreviewSummary.plus.cents)
-                          : 'deelbedrag onbekend'}
+                          ? (pairedPreviewSummary.plus.complete
+                            ? 'voorlopige kandidaat-som ' : 'bekende deelprijs ') +
+                            exactEuro.formatCents(pairedPreviewSummary.plus.cents)
+                          : 'bedrag onbekend'}
                         {' '}({pairedPreviewSummary.plus.priced}/{pairedPreviewSummary.rows}
                         {' '}regels met bruikbare prijzen; {pairedPreviewSummary.plus.missing} onbekend).
                       </p>
                       <p>
                         DekaMarkt: {pairedPreviewSummary.deka.cents !== null
-                          ? exactEuro.formatCents(pairedPreviewSummary.deka.cents)
-                          : 'deelbedrag onbekend'}
+                          ? (pairedPreviewSummary.deka.complete
+                            ? 'voorlopige kandidaat-som ' : 'bekende deelprijs ') +
+                            exactEuro.formatCents(pairedPreviewSummary.deka.cents)
+                          : 'bedrag onbekend'}
                         {' '}({pairedPreviewSummary.deka.priced}/{pairedPreviewSummary.rows}
                         {' '}regels met bruikbare prijzen; {pairedPreviewSummary.deka.missing} onbekend).
                       </p>
