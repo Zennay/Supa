@@ -636,6 +636,52 @@ export function OfflineReviewedWorkbench({
     } finally { if (version === importRevision.current) setBusy(false) }
   }
 
+  /** Offline field checklist of ORIGINAL suggested SKUs only. Never
+   * exports unconfirmed line totals as current shop prices or savings. */
+  function downloadPairedMatchReview() {
+    if (!currentPreview || !pairedPreviewRows || busy) return
+    try {
+      const plain = (value: string) =>
+        value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim().slice(0, 180)
+      const captureInstant = (store: CaptureStore) =>
+        currentPreview.stores.find(entry => entry.retailer === store)?.observedAt ??
+        imported?.captures[store]?.observedAt ?? 'geen bronmoment'
+      const lines = [
+        'SUPA · privé controlelijst · hetzelfde fysieke mandje in twee winkels',
+        'Dit zijn onbevestigde matches. Geen actuele winkelprijzen, bronrechten of besparingsbewijs.',
+        'Controleer originele SKU, verpakking en winkelmoment afzonderlijk bij beide winkels.',
+        'PLUS origineel bronmoment: ' + plain(captureInstant('PLUS')),
+        'DekaMarkt origineel bronmoment: ' + plain(captureInstant('DekaMarkt')),
+        '',
+        ...pairedPreviewRows.flatMap((row, index) => [
+          String(index + 1) + '. ' + plain(row.label) +
+            ' · benodigd ' + (row.amount === null ? 'onbekend' : String(row.amount)) +
+            ' ' + plain(row.unit),
+          '  PLUS: ' + (row.plusCode ? plain(row.plusCode) + ' · nog te controleren' :
+            'geen bruikbaar bronartikel · opnieuw zoeken of zelf opnemen'),
+          '  DekaMarkt: ' + (row.dekaCode ? plain(row.dekaCode) + ' · nog te controleren' :
+            'geen bruikbaar bronartikel · opnieuw zoeken of zelf opnemen'),
+          '',
+        ]),
+        'Geen onzichtbare aanvulling van ontbrekende prijzen of producten.',
+      ]
+      const output = lines.join('\n') + '\n'
+      if (new TextEncoder().encode(output).length > 256000)
+        throw new Error('Te veel ingrediënten om in één lokaal bestand te tonen.')
+      const url = URL.createObjectURL(new Blob([output], { type: 'text/plain;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-prive-plus-deka-sku-controlelijst.txt'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setWeekExportMessage('De voorlopige fysieke twee-winkel-SKU-controlelijst is lokaal opgeslagen; geen match of prijs is goedgekeurd.')
+    } catch {
+      setWeekExportMessage('De twee-winkel-controlelijst kon niet lokaal worden opgeslagen; eerdere winkeldata bleven behouden.')
+    }
+  }
+
   function downloadMissingFromPreview() {
     if (!currentPreview || busy) return
     try {
@@ -2859,6 +2905,10 @@ export function OfflineReviewedWorkbench({
                       blijven ongewijzigd; zie de versheidswaarschuwing hierboven.
                     </p>
                   )}
+                  <button type="button" className="ghost-button"
+                    disabled={busy} onClick={downloadPairedMatchReview}>
+                    Download beide winkels als offline SKU-controlelijst (TXT)
+                  </button>
                   <label>
                     <input type="checkbox" checked={pairedOnlyMissing}
                       onChange={event => setPairedOnlyMissing(event.currentTarget.checked)} />
