@@ -204,8 +204,8 @@ export function PlannerOwnProductDeltas({ lines, onChooseLine, onExportSelection
               <th scope="col">DekaMarkt</th><th scope="col">Verschil</th></tr></thead>
             <tbody>{visibleLines.map(item => <tr key={item.id}>
               <th scope="row">{item.ingredientLabel}</th>
-              {([item.plus, item.deka] as const).map((line, index) =>
-                <td key={index}><PriceEvidence line={line} /></td>)}
+              {([{ store: 'PLUS', line: item.plus }, { store: 'DekaMarkt', line: item.deka }] as const)
+                .map(({ store, line }) => <td key={store}><PriceEvidence line={line} /></td>)}
               <td><strong>{item.deltaCents === 0 ? 'Gelijk' : exactEuro.formatCents(Math.abs(item.deltaCents))}</strong>
                 <small>{item.deltaCents > 0 ? 'PLUS lager' : item.deltaCents < 0 ? 'DekaMarkt lager' : 'Geen verschil'}</small>
                 <UnitPriceGap item={item} />
