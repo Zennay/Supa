@@ -861,6 +861,10 @@ export function PrivateComparisonJourney({
                   {' '}· {line.pack.amount} {line.pack.unit} × {line.pack.count}</small>
                 <span>{euro.formatCents(line.lineTotalCents)} voor deze hoeveelheid</span>
                 <small>{privateUnitPrice(line) ?? 'Eenheidsprijs onbekend'}</small>
+                <button type="button" className="private-comparison-journey__link"
+                  onClick={() => onReview(shop, row.id)}>
+                  Controleer originele {shop}-SKU, verpakking en bronprijs
+                </button>
               </div>
             })}
           </div>
