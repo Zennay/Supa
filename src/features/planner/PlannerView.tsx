@@ -197,13 +197,13 @@ export function PlannerView({
                   {recipes.some(option => !option.tags?.includes('Eigen recept')) &&
                     <optgroup label="Voorbeeldrecepten">
                       {recipes.filter(option => !option.tags?.includes('Eigen recept')).map(option => (
-                        <option key={option.id} value={option.id}>{option.title}</option>
+                        <option key={option.id} value={option.id}>Voorbeeld · {option.title}</option>
                       ))}
                     </optgroup>}
                   {recipes.some(option => option.tags?.includes('Eigen recept')) &&
                     <optgroup label="Mijn eigen recepten">
                       {recipes.filter(option => option.tags?.includes('Eigen recept')).map(option => (
-                        <option key={option.id} value={option.id}>{option.title}</option>
+                        <option key={option.id} value={option.id}>Eigen recept · {option.title}</option>
                       ))}
                     </optgroup>}
                 </select>
