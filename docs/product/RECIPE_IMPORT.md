@@ -12,7 +12,7 @@ Supa kan eigen recepten lokaal bewaren en omzetten naar het interne receptformaa
 
 ## Welke bronformaten werken?
 
-- **schema.org/Recipe JSON-LD** in een lokaal opgeslagen HTML-bestand.
+- **schema.org/Recipe JSON-LD** in een lokaal opgeslagen HTML-bestand, inclusief `script type="application/ld+json; charset=utf-8"` waar de pagina de UTF-8-parameter expliciet toevoegt. Alleen ingesloten tekst wordt gelezen; er wordt niets uitgevoerd of opgehaald.
 - **schema.org Recipe-microdata** (itemscope/itemprop) wanneer de HTML geen JSON-LD-scriptblokken bevat.
 - Losse JSON/JSON-LD-bestanden, arrays, @graph en schema.org ItemList → ListItem → item-wrappers met Recipe-objecten, plus gewone tekst en Markdown via de bijbehorende importkeuze.
 - Bij een deployment met de beveiligde link-API: plak één tot acht openbare HTTPS-receptlinks per regel of upload een `.txt`-/`.md`-linklijst (maximaal acht bestanden, samen 32 kB). Deze lokale tekst-/linkbestanden accepteren UTF-8 en expliciet met BOM gemarkeerd UTF-16 LE/BE; HTML en JSON-LD blijven strikt UTF-8. Rechtstreekse URL's, Markdown-koppen/scheidingslijnen, bullets/genummerde lijsten, `<https://…>`-autolinks en `[receptnaam](https://…)` werken. Iedere niet-lege regel moet precies één link bevatten; de bestaande URL-validatie en SSRF-beveiligde serverroute blijven verplicht. Alle herkende recepten blijven concepten tot je ze controleert en zelf bewaart.
