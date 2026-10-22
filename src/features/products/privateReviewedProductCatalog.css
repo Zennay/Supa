@@ -270,3 +270,9 @@ background:#e7f4eb!important}
   border:1px solid #b8d1c2; border-radius:12px; background:#f6faf7; overflow-wrap:anywhere; }
 .private-reviewed-products__historical-handoff p { margin:0; }
 .private-reviewed-products__historical-handoff button { justify-self:start; min-height:44px; }
+
+.private-reviewed-products__no-match { display:flex; flex-wrap:wrap; gap:.6rem;
+  align-items:center; padding:.85rem 1rem; border:1px solid #b8d1c2;
+  border-radius:12px; background:#f8fbf9; }
+.private-reviewed-products__no-match p { flex-basis:100%; margin:0; }
+.private-reviewed-products__no-match button { min-height:44px; }

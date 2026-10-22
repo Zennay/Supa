@@ -584,7 +584,19 @@ export function PrivateReviewedProductCatalog({ reviewed, progress, captureNeeds
             'Vink dit artikel af op mijn ' + shop + '-lijst'}
         </button>
       </article>)}</div>
-      {!visible.length && <p>Geen producten gevonden voor deze selectie.</p>}
+      {!visible.length && <div className="private-reviewed-products__no-match" role="status">
+        <p>Geen eigen bronproduct voor deze zoekterm en filters. Een historische naam
+          hoeft niet gelijk te zijn aan de productnaam in jouw originele winkelopname.
+          Dit is geen afwijzing of automatische SKU-match.</p>
+        <button type="button" onClick={() => {
+          setQuery(''); setUnitFilter('all'); setOnlyUnbought(false); setOrder('source')
+        }}>Toon alle eigen {store === 'all' ? 'winkelproducten' : store + '-producten'}</button>
+        {store !== 'all' && <button type="button" onClick={() => {
+          setQuery(''); setStore('all'); setUnitFilter('all')
+          setOnlyUnbought(false); setOrder('source')
+        }}>Zoek bij beide winkels</button>}
+        <button type="button" onClick={onOpenComparison}>Controleer of vul de echte bron aan</button>
+      </div>}
       <button type="button" onClick={openCurrentCheckedList}>
         {store !== 'all' ? `Open mijn ${store}-boodschappenlijst`
           : paired.status === 'comparable' && paired.cheapest
