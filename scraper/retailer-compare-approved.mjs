@@ -195,7 +195,7 @@ export async function compareApprovedLocalCatalog(options = {}) {
   for (const [, group] of matched) {
     write('--- Handmatig te verifiëren productmatch; identieke fysieke verpakking vereist ---')
     for (const row of group.rows.sort((a,b) => a.supermarket.localeCompare(b.supermarket))) {
-      write(printable(row.supermarket) + ': ' + row.name + ' [' + physicalPackLabel(row) + '] ' + money(row.priceCents) +
+      write(printable(row.supermarket) + ': ' + row.name + ' ' + money(row.priceCents) + ' [' + physicalPackLabel(row) + ']' +
         (row.offer ? ' (actie, normaal ' + money(row.regularPriceCents) + ')' : '') +
         ' · archief ' + printable(row.observedAt))
     }
