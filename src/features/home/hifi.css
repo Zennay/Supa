@@ -492,3 +492,31 @@ body { background: #e9eeec; }
 @media(max-width:520px) {
   .hifi-demo-list .hifi-picked-edit { grid-template-columns:minmax(0,1fr); }
 }
+
+
+/* Personal local-only JSON backup and explicit preview in Lijst. */
+.hifi-demo-list .hifi-picked-portable {
+  display:grid; gap:.65rem; min-width:0; padding:1rem;
+  background:#f6faf7; border:1px solid #c4d7c4; border-radius:12px;
+}
+.hifi-demo-list .hifi-picked-portable summary {
+  font-size:1rem; font-weight:750; cursor:pointer; line-height:1.45;
+}
+.hifi-demo-list .hifi-picked-portable label {
+  display:grid; gap:.35rem; min-width:0; font-weight:650;
+}
+.hifi-demo-list .hifi-picked-portable :is(input, textarea) {
+  width:100%; max-width:100%; box-sizing:border-box;
+  border:1px solid #9ba99e; border-radius:8px; padding:.6rem;
+  background:#fff; color:#1e2a20; font:inherit;
+}
+.hifi-demo-list .hifi-picked-portable input[type=file] { min-height:44px; }
+.hifi-demo-list .hifi-picked-portable textarea { resize:vertical; overflow-wrap:anywhere; }
+.hifi-demo-list .hifi-picked-portable button { min-height:44px; }
+.hifi-demo-list .hifi-picked-portable :is(input, textarea, button):focus-visible {
+  outline:3px solid #276e55; outline-offset:2px;
+}
+@media(max-width:520px) {
+  .hifi-demo-list .hifi-picked-portable { padding:.75rem; }
+  .hifi-demo-list .hifi-picked-portable button { width:100%; }
+}
