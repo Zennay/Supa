@@ -147,7 +147,10 @@ export function PrivateCapturePastePreview({
       tab-gescheiden tabel uit Excel/Calc. De labels hieronder bewijzen géén
       winkelidentiteit: Supa bepaalt die uitsluitend uit de bronkolommen.
       Je kunt de afzonderlijke winkels of allebei vooraf bekijken.
-      Er worden geen prijzen automatisch geaccepteerd. Klembordtoegang gebeurt uitsluitend na klikken en browsertoestemming.</p>
+      Excel/Calc <strong>Unicode Text</strong> wordt ook gelezen als een lokaal
+      <code>.txt</code>- of <code>.tsv</code>-bestand met een expliciete UTF-16 LE/BE-BOM;
+      gewone CSV blijft UTF-8. Er worden geen prijzen automatisch geaccepteerd.
+      Klembordtoegang gebeurt uitsluitend na klikken en browsertoestemming.</p>
     <label>Open beide lokale winkelbestanden tegelijk (CSV, TSV of TXT)
       {filePicker('both')}
     </label>
