@@ -11,15 +11,79 @@ const loadButton = document.querySelector<HTMLButtonElement>('#load-own-recipes'
 const convertButton = document.querySelector<HTMLButtonElement>('#own-recipes-to-demand')!
 const status = document.querySelector<HTMLElement>('#own-recipe-status')!
 const choices = document.querySelector<HTMLElement>('#own-recipe-choices')!
+const reviewNeeded = document.querySelector<HTMLElement>('#own-recipe-review-needed')!
 const units = ['g', 'kg', 'ml', 'l', 'piece']
+const missingMinutesWarning = 'Bereidingstijd ontbreekt of is onduidelijk'
 // Physical fractional pieces (e.g. half an egg) need explicit human review in
 // the existing recipe/scaler workflow; never silently mark them basket-ready.
 function reviewedForBasket(recipe: SavedRecipe): RecipeWithIngredients | null {
-  const reviewed = toPlannerRecipe(recipe)
+  // Shopping demand needs verified portions and ingredients, not a prep-time estimate.
+  // The dedicated unpriced-demand mode preserves an unknown duration without inventing it.
+  const reviewed = toPlannerRecipe(recipe, { usage: 'unpriced-demand' })
   if (!reviewed || reviewed.ingredients.some(item =>
     item.unit === 'piece' && item.amount !== null && !Number.isInteger(item.amount))) return null
   return reviewed
 }
+function reviewReasons(recipe: SavedRecipe): string[] {
+  const reasons = new Set<string>()
+  for (const warning of recipe.warnings) {
+    if (warning !== missingMinutesWarning) reasons.add(warning)
+  }
+  if (!Number.isFinite(recipe.servings) || recipe.servings === null ||
+      recipe.servings <= 0 || recipe.servings > 1000) {
+    reasons.add('Voer een geldig positief aantal porties in.')
+  }
+  for (const ingredient of recipe.ingredients) {
+    const name = (ingredient.label || ingredient.original || 'Ingrediënt').slice(0, 160)
+    if (ingredient.reviewReason) {
+      reasons.add(name + ': ' + ingredient.reviewReason)
+    } else if (ingredient.amount === null || !Number.isFinite(ingredient.amount) ||
+        ingredient.amount <= 0 || !units.includes(ingredient.unit ?? '')) {
+      reasons.add(name + ': voer een geldige metrische hoeveelheid in.')
+    } else if (ingredient.unit === 'piece' && !Number.isSafeInteger(ingredient.amount)) {
+      reasons.add(name + ': ' + ingredient.amount + ' stuks is geen heel aantal; corrigeer dit in Mijn recepten.')
+    }
+  }
+  if (toPlannerRecipe(recipe, { usage: 'unpriced-demand' }) === null && reasons.size === 0) {
+    reasons.add('Controleer de receptgegevens en eventuele openstaande bronwaarschuwingen in Mijn recepten.')
+  }
+  return Array.from(reasons).slice(0, 8)
+}
+
+function renderReviewNeeded(recipes: SavedRecipe[]) {
+  reviewNeeded.replaceChildren()
+  reviewNeeded.hidden = recipes.length === 0
+  if (!recipes.length) return
+  const heading = document.createElement('h4')
+  heading.textContent = 'Recepten die nog controle nodig hebben (' + recipes.length + ')'
+  const intro = document.createElement('p')
+  intro.textContent = 'Deze recepten worden niet naar een boodschappenmand omgezet totdat de aangegeven hoeveelheden, porties of reviewpunten zijn opgelost. Open Supa → Recepten, corrigeer het recept en laad deze lijst opnieuw.'
+  const list = document.createElement('div')
+  list.style.display = 'grid'
+  list.style.gap = '8px'
+  for (const recipe of recipes.slice(0, 100)) {
+    const details = document.createElement('details')
+    details.style.border = '1px solid #e2d1b2'
+    details.style.borderRadius = '9px'
+    details.style.padding = '9px 12px'
+    const summary = document.createElement('summary')
+    summary.style.cursor = 'pointer'
+    summary.style.fontWeight = '650'
+    const reasons = reviewReasons(recipe)
+    summary.textContent = recipe.title + ' · ' + reasons.length + ' controlepunt(en)'
+    const list = document.createElement('ul')
+    list.style.paddingLeft = '22px'
+    for (const reason of reasons) {
+      const item = document.createElement('li')
+      item.textContent = reason
+      list.append(item)
+    }
+    details.append(summary, list)
+    list.append(details)
+  }
+  reviewNeeded.append(heading, intro, list)
+}
+
 let loaded: SavedRecipe[] = []
 let libraryRaw: string | null = null
 const setStatus = (message: string, warning = false) => {
@@ -31,13 +95,20 @@ loadButton.addEventListener('click', () => {
   loaded = []
   libraryRaw = null
   choices.replaceChildren()
+  reviewNeeded.replaceChildren()
+  reviewNeeded.hidden = true
   convertButton.disabled = true
   try {
     // Access storage only on the user's explicit click; never save or mutate it.
     const snapshot = readRecipeLibrary(window.localStorage)
     if (snapshot.error) throw Error('Jouw receptbibliotheek kan niet veilig worden gelezen. Herstel die eerst in Mijn recepten.')
+    // A missing preparation duration is irrelevant to the physical grocery demand.
+    // Keep it unknown; all ingredient/portion/source review warnings still hold the recipe.
     const ready = snapshot.recipes.filter(recipe =>
-      recipe.warnings.length === 0 && reviewedForBasket(recipe) !== null)
+      recipe.warnings.every(warning => warning === missingMinutesWarning) &&
+      reviewedForBasket(recipe) !== null)
+    const held = snapshot.recipes.filter(recipe => !ready.includes(recipe))
+    renderReviewNeeded(held)
     loaded = ready
     libraryRaw = snapshot.raw
     for (const recipe of ready.slice(0, 100)) {
@@ -93,10 +164,12 @@ loadButton.addEventListener('click', () => {
       choices.append(card)
     }
     convertButton.disabled = ready.length === 0
-    setStatus(ready.length + ' eigen recepten met volledig beoordeelde metrische ingrediënten beschikbaar. ' +
-      (snapshot.recipes.length - ready.length) + ' recepten vereisen nog metrische hoeveelheden, hele fysieke stuks, porties of menselijke review. ' +
+    const missingMinutes = ready.filter(recipe => recipe.warnings.includes(missingMinutesWarning)).length
+    setStatus(ready.length + ' eigen recepten met gecontroleerde fysieke ingrediënten beschikbaar voor de ongeprijsde boodschappenmand. ' +
+      held.length + ' recepten blijven apart staan met concrete controlepunten hieronder. ' +
+      (missingMinutes ? missingMinutes + ' bruikbare recepten hebben geen betrouwbare bereidingstijd; die blijft onbekend en blokkeert alleen de maaltijdplanning. ' : '') +
       'Vink maximaal zeven bereidingen aan. De eerste invoer per recept is het aantal bereidingen, de tweede het gewenste aantal porties per bereiding. ' +
-      'Porties worden voor de bronmatching opnieuw uit de bevestigde metrische ingrediënten berekend.',
+      'Porties worden voor de bronmatching opnieuw uit de bevestigde metrische ingrediënten berekend. Geen winkel-SKU of prijs wordt afgeleid.',
     ready.length === 0)
   } catch (error) {
     setStatus(error instanceof Error ? error.message : 'Kan lokale eigen recepten niet lezen.', true)
