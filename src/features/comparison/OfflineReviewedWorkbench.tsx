@@ -472,25 +472,40 @@ export function OfflineReviewedWorkbench({
   // Matching proposals are not accepted product identities or priced savings.
   const pairedPreviewRows = useMemo(() => {
     const preview = capturePreview?.week === captureWeek ? capturePreview : null
-    if (!preview || preview.stores.length !== 2 || preview.stores.some(shop => !shop.matching))
-      return null
-    const forStore = (retailer: CaptureStore) => new Map(
-      preview.stores.find(shop => shop.retailer === retailer)?.matching?.lines
-        .map(line => [line.id, line] as const) ?? [],
-    )
-    const plus = forStore('PLUS')
-    const deka = forStore('DekaMarkt')
-    return plannerCaptureNeeds.map(need => {
-      const plusLine = plus.get(need.id)
-      const dekaLine = deka.get(need.id)
-      return {
+    if (!preview) return null
+    // A user can bring one new shop sheet and retain the OTHER original
+    // shop capture from an earlier explicit import. Never invent a second
+    // store: evaluate its actual stored SKUs against exactly today's plan.
+    const forStore = (retailer: CaptureStore): Map<string, string | null> | null => {
+      const newShop = preview.stores.find(shop => shop.retailer === retailer)
+      if (newShop?.matching) return new Map(newShop.matching.lines.map(line =>
+        [line.id, line.status === 'matched' ? line.originalSku : null] as const))
+      if (preview.retainedOther?.retailer !== retailer) return null
+      const retained = imported?.captures[retailer]
+      if (!retained) return null
+      const basket = buildOneStoreBasket({
+        store: { id: retailer, name: retailer }, plan, recipes, activeDays,
+        products: retained.products,
+      })
+      return new Map(basket.lines.map(line =>
+        [line.id, line.status === 'matched' ? line.productId : null] as const))
+    }
+    try {
+      const plus = forStore('PLUS')
+      const deka = forStore('DekaMarkt')
+      if (!plus || !deka) return null
+      return plannerCaptureNeeds.map(need => ({
         id: need.id, label: need.label,
         amount: need.amount, unit: need.unit,
-        plusCode: plusLine?.status === 'matched' ? plusLine.originalSku : null,
-        dekaCode: dekaLine?.status === 'matched' ? dekaLine.originalSku : null,
-      }
-    })
-  }, [capturePreview, captureWeek, plannerCaptureNeeds])
+        plusCode: plus.get(need.id) ?? null,
+        dekaCode: deka.get(need.id) ?? null,
+      }))
+    } catch {
+      // Incompatible historical source or physical units never produce
+      // invented match coverage.
+      return null
+    }
+  }, [capturePreview, captureWeek, plannerCaptureNeeds, imported, plan, recipes, activeDays])
 
   async function previewFilledCsv(files: File[]) {
     if (files.length === 0) return
@@ -2816,6 +2831,13 @@ export function OfflineReviewedWorkbench({
                     voor identieke Planner-hoeveelheden. Controleer beide originele SKU's,
                     verpakkingen en opnametijden zelf. Geen prijsverschil of besparing is bevestigd.
                   </p>
+                  {currentPreview.retainedOther && (
+                    <p className="disclaimer" role="status">
+                      {currentPreview.retainedOther.retailer} is de werkelijk eerder
+                      bewaarde winkelopname. De originele brongegevens en opnametijd
+                      blijven ongewijzigd; zie de versheidswaarschuwing hierboven.
+                    </p>
+                  )}
                   <label>
                     <input type="checkbox" checked={pairedOnlyMissing}
                       onChange={event => setPairedOnlyMissing(event.currentTarget.checked)} />
