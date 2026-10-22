@@ -1052,14 +1052,30 @@ export function PrivateComparisonJourney({
       <ul>{shownPartialPairs.map(item =>
         <li key={item.id}>
           <strong>{item.name} · {readablePlannerDemandAmount(item.amount)} {item.unit}</strong>
-          {item.plusProduct && <small>
-            PLUS · {item.plusProduct.productName} · SKU {item.plusProduct.productId} ·
-            {' '}{item.plusProduct.unitRate ?? 'eenheidsprijs onbekend'}
-          </small>}
-          {item.dekaProduct && <small>
-            DekaMarkt · {item.dekaProduct.productName} · SKU {item.dekaProduct.productId} ·
-            {' '}{item.dekaProduct.unitRate ?? 'eenheidsprijs onbekend'}
-          </small>}
+          {item.plusProduct && <div className="private-comparison-journey__partial-product">
+            <strong>PLUS · {item.plusProduct.productName}</strong>
+            <small>Originele SKU {item.plusProduct.productId} ·
+              {' '}per verpakking {item.plusProduct.packAmount} {item.plusProduct.packUnit}
+              {' '}× {item.plusProduct.packCount} ·
+              {' '}pakprijs {euro.formatCents(item.plusProduct.pricePerPackCents)}</small>
+            <small>Indicatief {item.plusProduct.unitRate ?? 'eenheidsprijs onbekend'}</small>
+            <button type="button" className="private-comparison-journey__link"
+              onClick={() => onReview('PLUS', item.id)}>
+              Controleer originele PLUS-verpakking
+            </button>
+          </div>}
+          {item.dekaProduct && <div className="private-comparison-journey__partial-product">
+            <strong>DekaMarkt · {item.dekaProduct.productName}</strong>
+            <small>Originele SKU {item.dekaProduct.productId} ·
+              {' '}per verpakking {item.dekaProduct.packAmount} {item.dekaProduct.packUnit}
+              {' '}× {item.dekaProduct.packCount} ·
+              {' '}pakprijs {euro.formatCents(item.dekaProduct.pricePerPackCents)}</small>
+            <small>Indicatief {item.dekaProduct.unitRate ?? 'eenheidsprijs onbekend'}</small>
+            <button type="button" className="private-comparison-journey__link"
+              onClick={() => onReview('DekaMarkt', item.id)}>
+              Controleer originele Deka-verpakking
+            </button>
+          </div>}
           <span>PLUS {item.plusPacks} hele pakken: {euro.formatCents(item.plusCents)}</span>
           <span>DekaMarkt {item.dekaPacks} hele pakken: {euro.formatCents(item.dekaCents)}</span>
           <small>Alleen dit ingrediënt: {item.plusCents === item.dekaCents
@@ -1068,6 +1084,9 @@ export function PrivateComparisonJourney({
               ' heeft ' + euro.formatCents(Math.abs(item.plusCents - item.dekaCents)) +
               ' lagere hele-pakkosten'}.</small>
           {item.unitGap !== undefined && <small>{formatKnownUnitGap(item.unitGap)}</small>}
+          <small>Dit is het bedrag voor de benodigde <strong>hele verpakkingen</strong>.
+            Een lagere prijs per kg, liter of stuk betekent niet vanzelf lagere
+            kosten voor deze hoeveelheid; incomplete mandjes hebben geen totaalwinnaar.</small>
           {(item.plusObservedAt || item.dekaObservedAt) && <small>
             Originele opnametijden: PLUS {item.plusObservedAt ?? 'onbekend'} ·
             {' '}DekaMarkt {item.dekaObservedAt ?? 'onbekend'}.
