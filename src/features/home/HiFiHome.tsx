@@ -513,12 +513,14 @@ export function HiFiDemoList({ ids, onRemove, onAdd }: { ids: string[]; onRemove
     if (!openSelectionText) return
     const key = currentIdsRef.current
     const previousRaw = progress.raw
+    const previousDetails = details.raw
     setCopyOnlyOpen(true)
     try {
       if (!navigator.clipboard?.writeText) throw Error('Geen klembord')
       await navigator.clipboard.writeText('SUPA · nog te kopen · ongeprijsd\n' + openSelectionText)
       setCopyMessage(key === currentIdsRef.current &&
-        previousRaw === readUnpricedShoppingProgress().raw
+        previousRaw === readUnpricedShoppingProgress().raw &&
+        previousDetails === readUnpricedShoppingDetails().raw
         ? 'Alleen jouw nog te kopen producten gekopieerd, zonder winkelprijzen.'
         : 'De lijst wijzigde tijdens het kopiëren. Bekijk en kopieer de actuele lijst opnieuw.')
     } catch {
