@@ -1358,6 +1358,19 @@ export function ManualShoppingNotes({ notes, setNotes }: {
               onClick={() => markGroup(group.store, true)}>Vink deze winkel af</button>
             <button type="button" disabled={!group.items.some(item => item.done)}
               onClick={() => markGroup(group.store, false)}>Heropen deze winkel</button>
+            <button type="button" disabled={group.items.every(item => selectedMoveIds.includes(item.id))}
+              onClick={() => setSelectedMoveIds(current => Array.from(new Set([
+                ...current, ...group.items.map(item => item.id),
+              ])))}>
+              Selecteer zichtbare {group.store}-artikelen
+            </button>
+            <button type="button" disabled={!group.items.some(item => selectedMoveIds.includes(item.id))}
+              onClick={() => {
+                const groupIds = new Set(group.items.map(item => item.id))
+                setSelectedMoveIds(current => current.filter(id => !groupIds.has(id)))
+              }}>
+              Wis {group.store}-selectie
+            </button>
           </div>
           <div className="manual-shopping-notes__assign">
             <label>Verplaats mijn zichtbare {group.store}-artikelen naar
