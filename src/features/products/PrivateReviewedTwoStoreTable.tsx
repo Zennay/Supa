@@ -838,30 +838,50 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
             ' ingrediënten zijn niet aan beide kanten geprijsd.'}
           {' '}Geen totale besparing, winkelwinnaar of kassagarantie.</p>
         <div className="private-reviewed-products__paired-rows">
-          {partialShown.map(({ plus: first, deka: second }) => <article key={first.id}>
-            <h4>{first.ingredientLabel} · benodigd: PLUS {' '}
-          {readablePlannerDemandAmount(first.requirement.amount)} {first.requirement.unit}
-          {' '}= DekaMarkt {' '}
-          {readablePlannerDemandAmount(second.requirement.amount)} {second.requirement.unit}</h4>
-            <div className="private-reviewed-products__paired-options">
-              {([['PLUS', first], ['DekaMarkt', second]] as const).map(([shop, line]) =>
-                <div className="private-reviewed-products__paired-option" key={shop}>
-                  <strong>{shop}: {line.productName}</strong>
-                  <small>Originele SKU: {line.productId}</small>
-                  <span>{line.packs} hele verpakking(en) van {line.pack.count} ×
-                    {' '}{line.pack.amount} {line.pack.unit}</span>
-                  <small>{money.format(line.pricePerPackCents / 100)} per pak ·
-                    {' '}{privateUnitPrice(line) ?? 'eenheidsprijs onbekend'}</small>
-                  <strong>{money.format(line.lineTotalCents / 100)} voor dit ingrediënt</strong>
-                </div>)}
-            </div>
-            <p>{first.lineTotalCents === second.lineTotalCents
-              ? 'Zelfde hele-pakprijs voor deze regel.'
-              : (first.lineTotalCents < second.lineTotalCents ? 'PLUS' : 'DekaMarkt') +
-                ' kost op deze ene fysieke vraagregel ' +
-                money.format(Math.abs(first.lineTotalCents - second.lineTotalCents) / 100) +
-                ' minder aan hele verpakkingen, niet aan het volledige mandje.'}</p>
-          </article>)}
+          {partialShown.map(({ plus: first, deka: second }) => {
+            const plusUnit = privatePackUnitRate({
+              amount: first.pack.amount, unit: first.pack.unit,
+              count: first.pack.count, priceCents: first.pricePerPackCents,
+            })
+            const dekaUnit = privatePackUnitRate({
+              amount: second.pack.amount, unit: second.pack.unit,
+              count: second.pack.count, priceCents: second.pricePerPackCents,
+            })
+            const rawUnitDelta = plusUnit && dekaUnit && plusUnit.unit === dekaUnit.unit
+              ? dekaUnit.roundedCentsPerUnit - plusUnit.roundedCentsPerUnit : null
+            const unitDelta = rawUnitDelta !== null && Number.isSafeInteger(rawUnitDelta)
+              ? rawUnitDelta : null
+            return <article key={first.id}>
+              <h4>{first.ingredientLabel} · benodigd: PLUS {' '}
+            {readablePlannerDemandAmount(first.requirement.amount)} {first.requirement.unit}
+            {' '}= DekaMarkt {' '}
+            {readablePlannerDemandAmount(second.requirement.amount)} {second.requirement.unit}</h4>
+              <div className="private-reviewed-products__paired-options">
+                {([['PLUS', first], ['DekaMarkt', second]] as const).map(([shop, line]) =>
+                  <div className="private-reviewed-products__paired-option" key={shop}>
+                    <strong>{shop}: {line.productName}</strong>
+                    <small>Originele SKU: {line.productId}</small>
+                    <span>{line.packs} hele verpakking(en) van {line.pack.count} ×
+                      {' '}{line.pack.amount} {line.pack.unit}</span>
+                    <small>{money.format(line.pricePerPackCents / 100)} per pak ·
+                      {' '}{privateUnitPrice(line) ?? 'eenheidsprijs onbekend'}</small>
+                    <strong>{money.format(line.lineTotalCents / 100)} voor dit ingrediënt</strong>
+                  </div>)}
+              </div>
+              <p>{first.lineTotalCents === second.lineTotalCents
+                ? 'Zelfde hele-pakprijs voor deze regel.'
+                : (first.lineTotalCents < second.lineTotalCents ? 'PLUS' : 'DekaMarkt') +
+                  ' kost op deze ene fysieke vraagregel ' +
+                  money.format(Math.abs(first.lineTotalCents - second.lineTotalCents) / 100) +
+                  ' minder aan hele verpakkingen, niet aan het volledige mandje.'}</p>
+              {unitDelta !== null && plusUnit && <p role="note">
+                <strong>Eenheidsprijsverschil (DekaMarkt min PLUS, afgerond): </strong>
+                {unitDelta > 0 ? '+' : unitDelta < 0 ? '−' : ''}
+                {money.format(Math.abs(unitDelta) / 100)} per {plusUnit.unit}.
+                {' '}Dit vergelijkt alleen de eenheidsprijs; hele verpakkingen bepalen de kosten.
+              </p>}
+            </article>
+          })}
         </div>
       </details>}
       {(partialPairs.length > 0 || unresolvedByStore.length > 0) &&
