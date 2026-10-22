@@ -60,8 +60,7 @@ function sameProductObservation(left, right) {
 }
 
 function physicalPackLabel(row) {
-  return String(row.packAmount) + ' ' + String(row.packUnit) +
-    (row.packCount > 1 ? ' × ' + String(row.packCount) : '')
+  return String(row.packAmount) + ' ' + String(row.packUnit) + ' × ' + String(row.packCount)
 }
 
 // Snapshot an inert, fixed options record BEFORE JavaScript destructuring can
