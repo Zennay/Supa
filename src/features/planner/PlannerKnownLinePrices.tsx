@@ -30,8 +30,9 @@ export function PlannerKnownLinePrices({ progress, reviewed, now, onReviewIngred
   function download(kind: 'csv' | 'html') {
     try {
       // Export EXACTLY the currently visible, personally reviewed lines.
-      // The exporter re-checks their original source identity at click time.
-      const selection = visible.map(pair => pair.ingredientId)
+      // The exporter compares every original SKU, pack, physical need, captured
+      // instant and exact line price against the last rendered snapshot.
+      const selection = [...visible]
       if (!selection.length) throw Error('Geen zichtbare prijsregels om te bewaren.')
       if (kind === 'csv') {
         const count = downloadPrivateKnownLinePriceCsv(progress, reviewed, selection)
