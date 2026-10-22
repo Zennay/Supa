@@ -2773,6 +2773,7 @@ export function OfflineReviewedWorkbench({
                     a.name.localeCompare(b.name, 'nl-NL')
                 })
                 const shownProducts = visibleProducts.slice(0, capturePreviewShown[store.retailer])
+                const pendingPlannerNeeds = missingPreviewCaptureNeeds(store.retailer).length
                 const unitRateUnknown = store.previewProducts.filter(product =>
                   !privatePackUnitRate({
                     amount: product.packAmount, unit: product.packUnit,
@@ -2836,6 +2837,11 @@ export function OfflineReviewedWorkbench({
                       setCapturePreviewSort(current => ({ ...current, [store.retailer]: 'source' }))
                       setCapturePreviewShown(current => ({ ...current, [store.retailer]: 20 }))
                     }}>Toon alle originele {store.retailer}-artikelen</button>}
+                  {pendingPlannerNeeds > 0 && <button type="button" className="ghost-button"
+                    disabled={busy} onClick={() => { void downloadPreviewMissingCapture(store.retailer, 'csv') }}>
+                    Download leeg {store.retailer}-opnameblad voor {pendingPlannerNeeds}
+                    {' '}nog openstaande Planner-regels (zonder SKU, tijdstip of prijs)
+                  </button>}
                   <ul>
                     {shownProducts.map(product => {
                       const rate = privatePackUnitRate({
