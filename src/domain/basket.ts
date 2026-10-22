@@ -323,7 +323,7 @@ export function buildOneStoreBasket({
       !pack ||
       required.family !== pack.family ||
       !Number.isSafeInteger(product.priceCents) ||
-      product.priceCents < 0
+      product.priceCents <= 0
     ) {
       return {
         id: ingredient.id,

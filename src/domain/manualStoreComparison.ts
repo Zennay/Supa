@@ -60,7 +60,7 @@ export function manualPriceCents(raw: string): number | null {
   if (typeof raw !== 'string' || !/^(?:0|[1-9]\d{0,3})(?:[.,]\d{1,2})?$/.test(raw.trim())) return null
   const [euro, fraction = ''] = raw.trim().replace(',', '.').split('.')
   const cents = Number(euro) * 100 + Number(fraction.padEnd(2, '0'))
-  return Number.isSafeInteger(cents) && cents >= 0 && cents <= 999999 ? cents : null
+  return Number.isSafeInteger(cents) && cents > 0 && cents <= 999999 ? cents : null
 }
 
 /** Exact half-up cent rate for an entered physical multipack, without binary float rounding.
@@ -71,7 +71,7 @@ function exactManualUnitPriceCents(
   const [whole, fraction = ''] = rawAmount.trim().replace(',', '.').split('.')
   if (!/^(?:0|[1-9]\d{0,5})$/.test(whole) || !/^\d{0,6}$/.test(fraction) ||
       !Number.isSafeInteger(count) || count < 1 ||
-      !Number.isSafeInteger(cents) || cents < 0) return null
+      !Number.isSafeInteger(cents) || cents <= 0) return null
   const quantity = BigInt(whole + fraction)
   const baseFactor = unit === 'kg' || unit === 'l' ? 1000n : 1n
   const rateFactor = unit === 'piece' ? 1n : 1000n
@@ -117,7 +117,7 @@ function evaluatedQuote(need: ManualNeed, quote: ManualQuote | undefined) {
     state: 'complete' as const,
     packs,
     lineCents: packs * cents,
-    unitPriceCents: unitPriceCents !== null && Number.isSafeInteger(unitPriceCents) && unitPriceCents >= 0
+    unitPriceCents: unitPriceCents !== null && Number.isSafeInteger(unitPriceCents) && unitPriceCents > 0
       ? unitPriceCents : null,
   }
 }
