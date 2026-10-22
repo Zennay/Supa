@@ -77,6 +77,15 @@ export function PrivateComparisonJourney({
   const liveCaptureKey = useRef(captureKey)
   liveCaptureKey.current = captureKey
 
+  // New original source capture or another selected physical week must not
+  // inherit a hidden old search/filter and make valid paired products disappear.
+  useEffect(() => {
+    setCompleteQuery('')
+    setCompleteStoreFilter('all')
+    setCompleteSort('impact')
+    setShowAllComplete(false)
+  }, [captureKey, reviewed])
+
   useEffect(() => {
     const refresh = () => setNowMs(Date.now())
     const timer = window.setInterval(refresh, 60_000)
@@ -875,6 +884,13 @@ export function PrivateComparisonJourney({
       </div>
       <small role="status">{filteredFullLinePairs.length} van {fullLinePairs.length}
         {' '}fysieke ingrediënten zichtbaar · filters veranderen nooit het volledige mandbedrag.</small>
+      {(completeWords.length > 0 || completeStoreFilter !== 'all' || completeSort !== 'impact') &&
+        <button type="button" onClick={() => {
+          setCompleteQuery(''); setCompleteStoreFilter('all')
+          setCompleteSort('impact'); setShowAllComplete(false)
+        }}>
+          Wis zoekterm en filters · grootste echte prijsverschillen
+        </button>}
       {visibleFullLinePairs.length === 0 && <div role="status">
         <p>Geen gecontroleerde productregels gevonden met deze zoekterm of dit filter.</p>
         <button type="button" onClick={() => {
