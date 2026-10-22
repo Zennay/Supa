@@ -143,6 +143,38 @@ export function ManualOwnSourceEntry({ onPreview, busy, template, needs }: {
     invalidateRestore()
     setGuideMessage(store + ': ' + appended.length + ' ongevulde invulregels uit de Planner toegevoegd. Vul zelf de echte winkelproducten en actuele waarnemingen in.')
   }
+  function addSameWeekToBothStores() {
+    if (needs.some(need => need.id.length > 140 || need.label.length > 180)) {
+      setGuideMessage('Een Planner-ingrediënthint is te lang. Gebruik het bestaande weekinvulblad.')
+      return
+    }
+    const staged = {} as ManualSources
+    let added = 0
+    for (const store of STORES) {
+      const source = sources[store]
+      const preserved = source.products.filter(row =>
+        FIELDS.some(field => !!row[field].trim()) || !!row.needHint)
+      const existingIds = new Set(preserved.map(row => row.needHint?.id))
+      const missing = needs.filter(need => !existingIds.has(need.id))
+      if (preserved.length + missing.length > 30) {
+        setGuideMessage(store + ': niet genoeg ruimte voor dezelfde complete week (maximaal 30 regels). Geen van beide winkels is gewijzigd.')
+        return
+      }
+      const products = missing.map(need => ({ ...emptyEntry(), needHint: {
+        id: need.id, label: need.label,
+        quantity: readablePlannerDemandAmount(need.amount) + ' ' + need.unit,
+      } }))
+      added += products.length
+      staged[store] = { ...source, products: [...preserved, ...products] }
+    }
+    if (!added) {
+      setGuideMessage('De huidige week is al voorbereid bij beide winkels.')
+      return
+    }
+    setSources(staged)
+    invalidateRestore()
+    setGuideMessage('Voor beide winkels ' + added + ' lege weekregels aangemaakt. Bestaande originele productvelden blijven staan; er zijn geen SKU’s of prijzen verzonnen.')
+  }
   function statusForNeed(store: Store, id: string) {
     const index = sources[store].products.findIndex(row => row.needHint?.id === id)
     if (index < 0) return { index: -1, complete: false }
@@ -278,6 +310,9 @@ export function ManualOwnSourceEntry({ onPreview, busy, template, needs }: {
         <button type="button" className="ghost-button" onClick={() =>
           addPlannerNeeds(guideStore, guideNeedId || undefined)}>
           + Maak lege {guideStore}-invulregels vanuit de Planner
+        </button>
+        <button type="button" className="ghost-button" onClick={addSameWeekToBothStores}>
+          + Bereid hetzelfde volledige weekmandje bij BEIDE winkels voor
         </button>
         {guideMessage && <p role="status">{guideMessage}</p>}
         <details className="supa-manual-source__coverage">
