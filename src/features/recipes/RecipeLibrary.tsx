@@ -1142,7 +1142,13 @@ export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
             <button type="button" onClick={() => setCollectionSelected([])}>Deselecteer alles</button>
           </div>
           <div className="recipe-collection-preview">{collectionPreview.recipes.map((recipe, index) =>
-            <div key={index} className="recipe-collection-preview__item">
+            <div key={JSON.stringify([
+              recipe.sourceUrl, recipe.title,
+              recipe.ingredients.map(ingredient => [
+                ingredient.query, ingredient.label, ingredient.amount, ingredient.unit,
+              ]),
+              recipe.steps,
+            ])} className="recipe-collection-preview__item">
               <label className="recipe-collection-preview__select">
                 <input type="checkbox" checked={collectionSelected.includes(index)}
                   onChange={event => {
