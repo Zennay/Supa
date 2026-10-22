@@ -15,6 +15,55 @@ const printable = value => String(value).replace(
   /[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, ' '
 ).slice(0, 200)
 
+const gcd = (left, right) => {
+  while (right !== 0n) {
+    const next = left % right
+    left = right
+    right = next
+  }
+  return left
+}
+
+// A canonical ID alone does not prove equal physical pack contents.
+// Normalize mass/volume exactly and keep multipack count in the identity.
+function physicalPackKey(row) {
+  const unit = typeof row.packUnit === 'string' ? row.packUnit.trim().toLowerCase() : ''
+  const family = ({ g: 'mass', kg: 'mass', ml: 'volume', l: 'volume', piece: 'piece' })[unit]
+  const amount = row.packAmount
+  const count = row.packCount
+  if (!family || typeof amount !== 'number' || !Number.isFinite(amount) ||
+      amount <= 0 || amount > 1000000 || !Number.isSafeInteger(count) ||
+      count < 1 || count > 1000) return null
+  if (unit === 'piece' && !Number.isSafeInteger(amount)) return null
+  const match = /^(\d{1,6})(?:\.(\d{1,6}))?$/.exec(String(amount))
+  if (!match) return null
+  const fraction = match[2] ?? ''
+  let numerator = BigInt(match[1] + fraction)
+  let denominator = 10n ** BigInt(fraction.length)
+  const factor = unit === 'kg' || unit === 'l' ? 1000n : 1n
+  numerator *= factor * BigInt(count)
+  const divisor = gcd(numerator, denominator)
+  numerator /= divisor
+  denominator /= divisor
+  return \`\${family}:\${numerator}/\${denominator}:count:\${count}\`
+}
+
+function sameProductObservation(left, right) {
+  return left.supermarket === right.supermarket &&
+    left.name === right.name &&
+    left.sourceUrl === right.sourceUrl &&
+    left.observedAt === right.observedAt &&
+    left.priceCents === right.priceCents &&
+    left.regularPriceCents === right.regularPriceCents &&
+    left.offer === right.offer &&
+    left.packKey === right.packKey
+}
+
+function physicalPackLabel(row) {
+  return String(row.packAmount) + ' ' + String(row.packUnit) +
+    (row.packCount > 1 ? ' × ' + String(row.packCount) : '')
+}
+
 // Snapshot an inert, fixed options record BEFORE JavaScript destructuring can
 // run caller getters, Proxy traps or inherited field hooks. Never read fields
 // from an untrusted options object directly.
@@ -96,18 +145,43 @@ export async function compareApprovedLocalCatalog(options = {}) {
       if (matches.length !== 1 ||
           !Number.isSafeInteger(matches[0].canonical_id)) continue
       const key = matches[0].canonical_id
-      if (!groups.has(key)) groups.set(key, [])
-      const rows = groups.get(key)
-      if (!rows.some(previous => previous.supermarket === row.supermarket)) {
-        rows.push({
-          supermarket: row.supermarket,
-          name: printable(row.name),
-          priceCents: row.priceCents,
-          regularPriceCents: row.regularPriceCents,
-          offer: row.offer,
-          observedAt: row.observedAt,
-        })
+      const packKey = physicalPackKey(row)
+      const group = groups.get(key) ?? { packKey, rows: [], invalid: false }
+      if (!packKey) {
+        group.invalid = true
+        groups.set(key, group)
+        continue
       }
+      if (group.invalid) {
+        groups.set(key, group)
+        continue
+      }
+      if (group.packKey !== packKey) {
+        group.invalid = true
+        groups.set(key, group)
+        continue
+      }
+      const candidate = {
+        supermarket: row.supermarket,
+        name: printable(row.name),
+        sourceUrl: row.sourceUrl,
+        observedAt: row.observedAt,
+        priceCents: row.priceCents,
+        regularPriceCents: row.regularPriceCents,
+        offer: row.offer,
+        packKey,
+        packAmount: row.packAmount,
+        packUnit: row.packUnit,
+        packCount: row.packCount,
+      }
+      const previous = group.rows.find(item => item.supermarket === row.supermarket)
+      if (previous) {
+        if (!sameProductObservation(previous, candidate)) group.invalid = true
+        groups.set(key, group)
+        continue
+      }
+      group.rows.push(candidate)
+      groups.set(key, group)
     }
   } catch {
     fail()
@@ -116,13 +190,13 @@ export async function compareApprovedLocalCatalog(options = {}) {
   }
 
   const matched = [...groups.entries()]
-    .filter(([, rows]) => new Set(rows.map(row => row.supermarket)).size >= 2)
+    .filter(([, group]) => !group.invalid && new Set(group.rows.map(row => row.supermarket)).size >= 2)
     .sort((a,b) => a[0] - b[0])
   write('SUPA PRIVÉ: goedgekeurde, recente online bronobservaties; GEEN veldmand of bewezen besparing.')
-  for (const [, rows] of matched) {
-    write('--- Handmatig te verifiëren productmatch ---')
-    for (const row of rows.sort((a,b) => a.supermarket.localeCompare(b.supermarket))) {
-      write(printable(row.supermarket) + ': ' + row.name + ' ' + money(row.priceCents) +
+  for (const [, group] of matched) {
+    write('--- Handmatig te verifiëren productmatch; identieke fysieke verpakking vereist ---')
+    for (const row of group.rows.sort((a,b) => a.supermarket.localeCompare(b.supermarket))) {
+      write(printable(row.supermarket) + ': ' + row.name + ' [' + physicalPackLabel(row) + '] ' + money(row.priceCents) +
         (row.offer ? ' (actie, normaal ' + money(row.regularPriceCents) + ')' : '') +
         ' · archief ' + printable(row.observedAt))
     }
@@ -131,7 +205,7 @@ export async function compareApprovedLocalCatalog(options = {}) {
   return {
     approvedSourceCount: approved.length,
     matchedGroups: matched.length,
-    displayedRows: matched.reduce((count, [, rows]) => count + rows.length, 0),
+    displayedRows: matched.reduce((count, [, group]) => count + group.rows.length, 0),
     historicalFieldSavingsProven: false,
     publicPriceClaimsAllowed: false,
   }
