@@ -12,6 +12,7 @@ import { curatedFigmaRecipes } from '../recipes/curatedFigmaRecipes'
 import { historicalRetailerProducts, filterHistoricalProducts } from '../products/historicalRetailerProducts'
 import { filterDemoProductsByUnit, orderDemoProductsByUnitPrice, type DemoUnitFilter } from '../products/productUnitPrice'
 import { productSearchText } from '../products/productSearchText'
+import { readUnpricedShoppingDetails, saveUnpricedShoppingDetails, unpricedShoppingDetailsKey, type ShoppingPick } from './unpricedShoppingDetails'
 import { readUnpricedShoppingProgress, saveUnpricedShoppingProgress, unpricedShoppingProgressKey } from './unpricedShoppingProgress'
 
 export type HiFiTab = 'home' | 'recipes' | 'products'
@@ -393,6 +394,17 @@ export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: 
   // The standalone user-picked product collection is distinct from the meal-plan
   // ingredient checklist and never participates in the price comparator.
   const [progress, setProgress] = useState(readUnpricedShoppingProgress)
+  const [details, setDetails] = useState(readUnpricedShoppingDetails)
+  const [detailsMessage, setDetailsMessage] = useState('')
+  useEffect(() => {
+    const sync = (event: StorageEvent) => {
+      if (event.key !== null && event.key !== unpricedShoppingDetailsKey) return
+      setDetails(readUnpricedShoppingDetails())
+      setDetailsMessage('Aantallen en notities uit een andere tab bijgewerkt.')
+    }
+    window.addEventListener('storage', sync)
+    return () => window.removeEventListener('storage', sync)
+  }, [])
   const [progressMessage, setProgressMessage] = useState('')
   const [openOnly, setOpenOnly] = useState(false)
   const [copyOnlyOpen, setCopyOnlyOpen] = useState(false)
@@ -406,6 +418,47 @@ export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: 
     window.addEventListener('storage', sync)
     return () => window.removeEventListener('storage', sync)
   }, [])
+  const pick = (id: string): ShoppingPick =>
+    details.entries.find(item => item.id === id) ?? { id, count: 1, note: '' }
+  function updatePick(id: string, changes: Partial<Pick<ShoppingPick, 'count' | 'note'>>) {
+    if (!ids.includes(id) || !details.writable) return
+    const next = { ...pick(id), ...changes }
+    if (!Number.isSafeInteger(next.count) || next.count < 1 || next.count > 99 ||
+      next.note.length > 120 || /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(next.note)) {
+      setDetailsMessage('Gebruik 1–99 aantallen en maximaal 120 gewone notitietekens.')
+      return
+    }
+    const entries = details.entries.filter(item => item.id !== id)
+    if (next.count !== 1 || next.note) entries.push(next)
+    const saved = saveUnpricedShoppingDetails(details, entries)
+    if (!saved) {
+      setDetails(readUnpricedShoppingDetails())
+      setDetailsMessage('Niet opgeslagen: andere tab gewijzigd of browseropslag beschermd.')
+      return
+    }
+    setDetails(saved)
+    setDetailsMessage('')
+  }
+  const detailControls = (id: string, label: string) => {
+    const item = pick(id)
+    return <div className="hifi-picked-edit" role="group" aria-label={'Aantal en notitie voor ' + label}>
+      <label>Aantal (eigen keuze)
+        <input type="number" min={1} max={99} step={1} inputMode="numeric"
+          disabled={!details.writable} aria-label={'Aantal voor ' + label}
+          value={item.count} onChange={event => {
+            const count = event.currentTarget.valueAsNumber
+            if (Number.isSafeInteger(count) && count >= 1 && count <= 99)
+              updatePick(id, { count })
+          }} />
+      </label>
+      <label>Mijn notitie
+        <input type="text" maxLength={120} disabled={!details.writable}
+          aria-label={'Notitie voor ' + label} value={item.note}
+          placeholder="Bijvoorbeeld smaak of formaat"
+          onChange={event => updatePick(id, { note: event.currentTarget.value })} />
+      </label>
+    </div>
+  }
   const completed = (id: string) => progress.doneIds.includes(id)
   const completedCount = ids.filter(completed).length
   function saveDone(next: readonly string[], success: string) {
