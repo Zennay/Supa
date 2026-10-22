@@ -420,6 +420,7 @@ export function OfflineReviewedWorkbench({
   const [tripProgressMessage, setTripProgressMessage] = useState('')
   const [coverageMessage, setCoverageMessage] = useState('')
   const [coverageCopyText, setCoverageCopyText] = useState<string | null>(null)
+  useEffect(() => setCoverageCopyText(null), [text, planKey])
   const [coverageScope, setCoverageScope] = useState<'all' | 'open' | 'PLUS' | 'DekaMarkt'>('open')
   const [coverageSearch, setCoverageSearch] = useState('')
   // Prevent stale imports from appearing comparable after an open browser tab
@@ -2237,6 +2238,49 @@ export function OfflineReviewedWorkbench({
     return { content, count: selected.length }
   }
 
+  async function copyMissingCaptureGuide(store: (typeof stores)[number]) {
+    const source = currentActiveSource.current
+    const week = captureWeekRef.current
+    const revision = importRevision.current
+    const capture = imported?.captures[store]
+    const now = BigInt(Date.now()) * 1_000_000n
+    const fresh = !!capture && now >= capture.observedNs - 300_000_000_000n &&
+      now - capture.observedNs <= 604_800_000_000_000n
+    const needs = !fresh || olderPairCapture === store
+      ? plannerCaptureNeeds : missingPriceCaptureNeeds[store]
+    if (!needs.length) {
+      setCoverageMessage(store + ': geen nieuwe bronregels nodig.')
+      return
+    }
+    try {
+      const { makePlannerCaptureGuide } = await import('./plannerPriceCaptureGuide.ts')
+      const unchanged = () => source === currentActiveSource.current &&
+        week === captureWeekRef.current && revision === importRevision.current
+      if (!unchanged()) {
+        setCoverageMessage('Je week of originele winkelopname veranderde. Open de gids opnieuw.')
+        return
+      }
+      const guide = makePlannerCaptureGuide(needs, [store])
+      setCoverageCopyText(null)
+      try {
+        if (!navigator.clipboard?.writeText) throw Error('Geen klembord')
+        await navigator.clipboard.writeText(guide)
+        setCoverageMessage(unchanged()
+          ? store + ': ' + needs.length + ' lege opname-instructies gekopieerd; vul uitsluitend echte gegevens in.'
+          : 'De bron veranderde tijdens het kopiëren. Maak de opnamegids opnieuw.')
+      } catch {
+        if (!unchanged()) {
+          setCoverageMessage('De bron veranderde. Maak de gids opnieuw.')
+          return
+        }
+        setCoverageCopyText(guide)
+        setCoverageMessage(store + ': selecteer de opnamegids hieronder om handmatig te kopiëren.')
+      }
+    } catch {
+      setCoverageMessage('De lege opnamegids kan niet worden opgebouwd. Oude brondata blijven behouden.')
+    }
+  }
+
   // Explicit mobile hand-off: local source identity/status only, no inferred price.
   // If the browser denies clipboard access, present selectable text instead.
   async function copyCoverageChecklist(onlyOpen = false) {
@@ -3132,6 +3176,11 @@ export function OfflineReviewedWorkbench({
                           disabled={missingPriceCaptureNeeds[store].length === 0}
                           onClick={() => void downloadMissingPriceCapture(store, 'guide')}>
                           {store}-regelnummergids (TXT)
+                        </button>
+                        <button className="ghost-button" type="button"
+                          disabled={missingPriceCaptureNeeds[store].length === 0}
+                          onClick={() => void copyMissingCaptureGuide(store)}>
+                          Kopieer {store}-opnamegids
                         </button>
                       </div>
                     </div>)}
