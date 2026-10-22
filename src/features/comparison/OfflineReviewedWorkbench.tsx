@@ -1585,6 +1585,7 @@ export function OfflineReviewedWorkbench({
   async function appendSameCapture(store: typeof stores[number], file?: File) {
     if (!file || !imported?.captures[store]) return
     const version = ++importRevision.current
+    const selectedWeek = captureWeekRef.current
     setBusy(true)
     setPendingReplacement(null)
     try {
@@ -1602,6 +1603,8 @@ export function OfflineReviewedWorkbench({
         source = (module.convertOwnStoreCsv as (input: string) => string)(raw)
       }
       if (version !== importRevision.current) return
+      if (selectedWeek !== captureWeekRef.current)
+        throw new Error('De fysieke Planner-week veranderde tijdens het lezen van de aanvulling.')
       const candidate = appendPrivateCaptureProducts(text, source, store, Date.now())
       if (!window.confirm(
         store + ': voeg ' + candidate.added + ' nieuw geobserveerde bronartikelen toe ' +
@@ -1612,6 +1615,8 @@ export function OfflineReviewedWorkbench({
         return
       }
       if (version !== importRevision.current) return
+      if (selectedWeek !== captureWeekRef.current)
+        throw new Error('De Planner-ingrediënten zijn veranderd. Herkies de oorspronkelijke winkelopname.')
       const admitted = parseOfflinePriceSnapshots(candidate.source, Date.now())
       setText(candidate.source)
       setImported(admitted)
@@ -1635,6 +1640,7 @@ export function OfflineReviewedWorkbench({
     if (!file || !imported?.captures[store]) return
     setPendingReplacement(null)
     const version = ++importRevision.current
+    const selectedWeek = captureWeekRef.current
     setBusy(true)
     try {
       if (!file.size || file.size > 256000)
@@ -1653,12 +1659,16 @@ export function OfflineReviewedWorkbench({
       if (version !== importRevision.current) return
       // Stage ONLY: do not touch admitted source or previous checkmarks.
       // The original-price-null-sensitive comparison is purely informational.
+      if (selectedWeek !== captureWeekRef.current)
+        throw new Error('De fysieke Planner-week veranderde tijdens het lezen van de vervanging.')
       const preview = describePrivateStoreCaptureChange(text, json, store, Date.now())
       if (version !== importRevision.current) return
       if (isSameSingleStoreCapture(preview)) {
         setMessage(store + ': deze oorspronkelijke opname is identiek. Je producten en afvinkingen blijven staan.')
         return
       }
+      if (selectedWeek !== captureWeekRef.current)
+        throw new Error('De Planner-ingrediënten zijn veranderd. Bekijk de bronvervanging opnieuw.')
       setPendingReplacement({ sourceText: text, newText: json, store, version, preview })
       setMessage(store + ': nieuw bronbestand geldig gelezen. Bekijk eerst welke originele producten en prijzen wijzigen. De twee bestaande winkelopnames zijn nog niet vervangen.')
     } catch (error) {
