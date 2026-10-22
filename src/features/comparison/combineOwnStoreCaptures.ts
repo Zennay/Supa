@@ -2,7 +2,14 @@ import { parseOfflinePriceSnapshots } from '../../domain/offlineReviewedImport.t
 
 /** A standalone spreadsheet separator, never part of a sourced SKU or price. */
 export function splitOwnStorePastedSheets(raw: string): string[] {
-  const sheets = raw.split(/(?:\r\n|\n|\r)---(?:\r\n|\n|\r)/u)
+  // Clipboard/spreadsheet exports often leave an empty boundary line or
+  // horizontal spaces around the visible --- separator. Strip only boundary
+  // line breaks; keep every original CSV field/space for strict admission.
+  const removeOuterLineBreaks = (value: string) =>
+    value.replace(/^(?:\r\n|\n|\r)+|(?:\r\n|\n|\r)+$/gu, '')
+  const sheets = removeOuterLineBreaks(raw)
+    .split(/(?:\r\n|\n|\r)[ \t]*---[ \t]*(?:\r\n|\n|\r)/u)
+    .map(removeOuterLineBreaks)
   if (sheets.length > 2) throw Error('Gebruik precies één losse --- regel tussen twee winkelbladen.')
   if (sheets.some(sheet => !sheet.trim())) throw Error('Beide originele winkelbladen moeten productgegevens bevatten.')
   return sheets
