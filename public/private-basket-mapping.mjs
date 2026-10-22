@@ -631,8 +631,8 @@ function readableSourceImportFailure(cause) {
   if (message.includes('het originele bestand') || message.includes('het originele bestand.'))
     return 'Het bestandsvak komt niet overeen met de originele winkelcode. ' +
       'Plaats PLUS uitsluitend bij PLUS en DekaMarkt uitsluitend bij DekaMarkt.'
-  return 'Het bestand voldoet niet aan het toegestane originele CSV-/JSON-formaat. ' +
-    'Controleer de echte brongegevens en gebruik de originele negenkoloms CSV.'
+  return 'Het bestand voldoet niet aan het toegestane originele CSV-/TSV-/TXT-/JSON-formaat. ' +
+    'Controleer de echte brongegevens en gebruik de originele negenkoloms bronkop.'
 }
 
 async function loadSources() {
