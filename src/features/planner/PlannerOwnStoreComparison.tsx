@@ -65,6 +65,12 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
   } | null>(null)
   const [directImportMessage, setDirectImportMessage] = useState('')
   const [directDropActive, setDirectDropActive] = useState(false)
+  const [filteredCopy, setFilteredCopy] = useState<{
+    planKey: string
+    plus: NonNullable<PrivateReviewedBaskets['stores']['PLUS']>
+    deka: NonNullable<PrivateReviewedBaskets['stores']['DekaMarkt']>
+    text: string
+  } | null>(null)
   function takeOwnSourceFiles(files: File[]) {
     // Early UX-only guards: these never verify the store, its rights or SKU.
     // All original bytes still pass the canonical import in Vergelijk.
@@ -456,7 +462,7 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
     }
   }
 
-  function downloadSelectedProductPrices(ids: string[]) {
+  async function downloadSelectedProductPrices(ids: string[], action: 'download' | 'copy') {
     // Export the actual current reviewed pair, never stale rows held by a
     // filtered child view. A filtered selection is NOT a full basket total.
     const current = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
@@ -502,6 +508,35 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       'Voor een betrouwbaar HEEL-MANDTOTAAL gebruik je de volledige vergelijking, niet deze selectie.',
       '',
     ].join('\n')
+    if (action === 'copy') {
+      const originalPlus = current.stores.PLUS
+      const originalDeka = current.stores.DekaMarkt
+      const sameSources = () => {
+        const latest = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
+        return latest?.stores.PLUS === originalPlus && latest.stores.DekaMarkt === originalDeka &&
+          ownStoreWeekComparison(latest).status === 'comparable'
+      }
+      try {
+        if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable')
+        await navigator.clipboard.writeText(content)
+        if (!sameSources()) {
+          setDownloadMessage('De winkelopnames zijn intussen verlopen of veranderd. Kopieer opnieuw na herziening.')
+          setFilteredCopy(null)
+          return
+        }
+        setFilteredCopy(null)
+        setDownloadMessage(selected.length + ' gefilterde eigen prijsregels gekopieerd. Dit is geen volledig mandtotaal.')
+      } catch {
+        if (!sameSources()) {
+          setFilteredCopy(null)
+          setDownloadMessage('De bron is veranderd tijdens het kopiëren. Herzie de gegevens.')
+          return
+        }
+        setFilteredCopy({ planKey: current.planKey, plus: originalPlus, deka: originalDeka, text: content })
+        setDownloadMessage('Klembordtoegang ontbreekt. Selecteer de gefilterde privétekst hieronder om handmatig te kopiëren.')
+      }
+      return
+    }
     const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }))
     try {
       const link = document.createElement('a')
@@ -970,6 +1005,19 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
             </button>
           </div>}
           <Suspense fallback={<p role="status">Winkelprijsregels laden…</p>}><PlannerOwnProductDeltas lines={summary.lines} onChooseLine={chooseConfirmedLine} onExportSelection={downloadSelectedProductPrices} /></Suspense>
+          {filteredCopy && filteredCopy.planKey === currentSources?.planKey &&
+            filteredCopy.plus === currentSources?.stores.PLUS &&
+            filteredCopy.deka === currentSources?.stores.DekaMarkt &&
+            <label className="own-store-planner__copy-fallback">
+              Alleen eerder geselecteerde eigen productprijsregels. Selecteer tekst om handmatig te kopiëren.
+              <textarea readOnly rows={10} value={filteredCopy.text}
+                onFocus={() => {
+                  const latest = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
+                  if (latest?.stores.PLUS !== filteredCopy.plus ||
+                      latest?.stores.DekaMarkt !== filteredCopy.deka)
+                    setFilteredCopy(null)
+                }} />
+            </label>}
         </div>
       : summary.available.length > 0 ? <div className="own-store-planner__result" role="status">
           <strong>Geen betrouwbaar twee-winkelprijsverschil</strong>
