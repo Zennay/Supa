@@ -1,6 +1,6 @@
 # Supa: privéboodschappen uitwisselen als CSV
 
-De persoonlijke **ongeprijsde** boodschappenlijst kan als puntkomma-CSV worden gedownload en geïmporteerd. De gebruiker kan eerst een leeg invulblad ophalen. Dit staat los van de afzonderlijke import van rechtmatig verkregen supermarktprijsbladen: er wordt geen SKU, winkelprijs, productmatch of retailersource afgeleid uit een persoonlijke CSV.
+De persoonlijke **ongeprijsde** boodschappenlijst kan als puntkomma-CSV of tab-gescheiden TSV worden gedownload en geïmporteerd. De gebruiker kan eerst een leeg invulblad ophalen. Dit staat los van de afzonderlijke import van rechtmatig verkregen supermarktprijsbladen: er wordt geen SKU, winkelprijs, productmatch of retailersource afgeleid uit een persoonlijke CSV.
 
 ## Werkwijze
 
@@ -9,7 +9,7 @@ De persoonlijke **ongeprijsde** boodschappenlijst kan als puntkomma-CSV worden g
 3. Gebruik **Importeer eigen ongeprijsde CSV of Excel/Calc-TSV** om een lokaal `.csv`- of `.tsv`-bestand direct te kiezen. Of plak vier gekopieerde Supa-kolommen als tab-gescheiden Excel/Calc-tabel, of de complete eigen Supa-CSV-tekst, in het uitklapbare spreadsheet-invoerveld en klik **Zet mijn spreadsheet klaar voor controle**. Een `.tsv`-bestand mag de originele vier Supa-kolommen bevatten of een eenvoudige tabel met `artikel`/`winkel` en optioneel `afgevinkt`, in dezelfde strikte vorm als het plakveld. De lezer accepteert 1–100 artikelen en hoogstens 32 kB geldige UTF-8. Andere bestanden, prijs-/SKU-kolommen, dubbele artikelen, vreemde winkels, onbekende vinkjes, afwijkende kolommen en onveilige regelinhoud worden geweigerd.
 4. De ingelezen regels verschijnen in de bestaande tekstinvoer. Kies daarna **Bekijk artikelen vóór toevoegen** en bevestig de voorinzage. Bestaande artikelen per winkel en bestaande vinkjes blijven behouden.
 
-CSV-uitvoer zet potentieel uitvoerbare spreadsheetformules om naar letterlijke tekst met een apostrof, en maakt ook oorspronkelijke apostrofs omkeerbaar. Invoer voert nooit spreadsheetfuncties uit. De browser uploadt hierbij niets. Persoonlijke artikelen blijven buiten Planner-ingredientvraag, supermarktverificatie, mandprijzen en besparingsclaims.
+CSV- én TSV-uitvoer zetten potentieel uitvoerbare spreadsheetformules om naar letterlijke tekst met een apostrof, en maken ook oorspronkelijke apostrofs omkeerbaar. Download in de Lijst de **zichtbare winkelronde** of de **hele privélijst** als `.tsv`; beide blijven ongeprijsd. Dezelfde gedownloade TSV kan na lokaal bewerken via de bestaande bestandsimport terug naar Supa, steeds met expliciete voorinzage. Invoer voert nooit spreadsheetfuncties uit. De browser uploadt hierbij niets. Persoonlijke artikelen blijven buiten Planner-ingredientvraag, supermarktverificatie, mandprijzen en besparingsclaims.
 
 De JSON-backup blijft de volledige private gegevensbackup. TXT, kopieertekst, mobiel delen en offline HTML-print blijven onafhankelijk beschikbaar.
 
