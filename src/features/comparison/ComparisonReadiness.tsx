@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { OneStoreBasket } from '../../domain/basket.ts'
 import type { OfflineCapture } from '../../domain/offlineReviewedImport.ts'
+import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
 
 type StoreId = 'PLUS' | 'DekaMarkt'
 type PendingSourceReview = { id: string; ingredientLabel: string; productId: string; productName: string }
@@ -87,7 +88,7 @@ export function ComparisonReadiness({
       const unresolved = basket.lines.filter(line => line.status === 'unresolved')
       return [
         '', `${store} · ${unresolved.length} nog niet gekoppelde ingrediënten`,
-        ...unresolved.map(line => `☐ ${singleLine(line.ingredientLabel)} · ${singleLine(line.id)} · prijs en match onbekend`),
+        ...unresolved.map(line => `☐ ${singleLine(line.ingredientLabel)} · ${readablePlannerDemandAmount(line.requirement.amount)} ${line.requirement.unit} · ${singleLine(line.id)} · prijs en match onbekend`),
         ...(pendingReviewByStore?.[store].length
           ? [`${pendingReviewByStore[store].length} voorgestelde bronartikelregels wachten op jouw controle:`,
               ...pendingReviewByStore[store].map(item =>
