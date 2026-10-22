@@ -1,6 +1,7 @@
 import type { ComparedOwnLine } from './ownStoreBudgetComparison.ts'
 import { literalCsv } from '../../privateBasketComparisonCsv.ts'
 import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
+import { privateMatchedUnitPriceGap } from '../products/privateProgressProductRows.ts'
 
 /**
  * Spreadsheet hand-off for only the explicitly visible, personally reviewed
@@ -34,7 +35,8 @@ export function selectedOwnPriceCsv(input: {
     'DekaMarkt_pak_hoeveelheid', 'DekaMarkt_pak_eenheid', 'DekaMarkt_multipack',
     'DekaMarkt_hele_pakken', 'DekaMarkt_prijs_per_pak_cent',
     'DekaMarkt_regelprijs_cent', 'DekaMarkt_indicatieve_eenheidsprijs',
-    'regelverschil_cent_Deka_minus_PLUS', 'goedkoper_bij', 'opmerking',
+    'indicatief_verschil_per_eenheid', 'regelverschil_cent_Deka_minus_PLUS',
+    'goedkoper_bij', 'opmerking',
   ]
   const ids = new Set<string>()
   const cells = lines.map(line => {
@@ -58,6 +60,7 @@ export function selectedOwnPriceCsv(input: {
       line.plus.requirement.amount ?? '', line.plus.requirement.unit,
       ...store(line.plus, plusObservedAt),
       ...store(line.deka, dekaObservedAt),
+      privateMatchedUnitPriceGap(line.plus, line.deka),
       line.deltaCents, line.deltaCents > 0 ? 'PLUS' :
         line.deltaCents < 0 ? 'DekaMarkt' : 'gelijk',
       'Alleen productregel; geen compleet mandtotaal of onafhankelijk bewijs',
