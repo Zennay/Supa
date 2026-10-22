@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
+import { exportManualOwnSourceDraft, importManualOwnSourceDraft, MANUAL_DRAFT_MAX_BYTES, type ManualSources } from './manualOwnSourceDraft.ts'
 import './manualOwnSourceEntry.css'
 
 type Store = 'PLUS' | 'DekaMarkt'
@@ -56,10 +57,19 @@ export function ManualOwnSourceEntry({ onPreview, busy }: {
   })
   const [error, setError] = useState('')
   const [acknowledged, setAcknowledged] = useState(false)
+  const [backupMessage, setBackupMessage] = useState('')
+  const [pendingDraft, setPendingDraft] = useState<ManualSources | null>(null)
+  const readTicket = useRef(0)
+  function invalidateRestore() {
+    ++readTicket.current
+    setPendingDraft(null)
+    setBackupMessage('')
+    setAcknowledged(false); setError('')
+  }
 
   function updateSource(store: Store, observedAt: string) {
     setSources(previous => ({ ...previous, [store]: { ...previous[store], observedAt } }))
-    setAcknowledged(false); setError('')
+    invalidateRestore()
   }
   function updateProduct(store: Store, index: number, field: Field, value: string) {
     setSources(previous => ({
@@ -70,7 +80,7 @@ export function ManualOwnSourceEntry({ onPreview, busy }: {
           i === index ? { ...entry, [field]: value } : entry),
       },
     }))
-    setAcknowledged(false); setError('')
+    invalidateRestore()
   }
   function addProduct(store: Store) {
     setSources(previous => ({
@@ -80,7 +90,7 @@ export function ManualOwnSourceEntry({ onPreview, busy }: {
         products: [...previous[store].products, emptyEntry()],
       },
     }))
-    setAcknowledged(false); setError('')
+    invalidateRestore()
   }
   function removeProduct(store: Store, index: number) {
     setSources(previous => ({
@@ -90,7 +100,53 @@ export function ManualOwnSourceEntry({ onPreview, busy }: {
         products: previous[store].products.filter((_, i) => i !== index),
       },
     }))
-    setAcknowledged(false); setError('')
+    invalidateRestore()
+  }
+  function downloadDraft() {
+    setBackupMessage('')
+    try {
+      const content = exportManualOwnSourceDraft(sources)
+      const url = URL.createObjectURL(new Blob([content], { type: 'application/json' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-eigen-winkelbron-invulconcept.json'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setBackupMessage('Concept lokaal bewaard, inclusief nog onvolledige velden. Geen geverifieerde prijsbron.')
+    } catch (cause) {
+      setBackupMessage(cause instanceof Error ? cause.message : 'Concept kon niet worden bewaard.')
+    }
+  }
+  async function readDraft(file: File | undefined) {
+    if (!file) return
+    const ticket = ++readTicket.current
+    setPendingDraft(null); setBackupMessage('')
+    if (file.size > MANUAL_DRAFT_MAX_BYTES || file.size === 0) {
+      setBackupMessage('Kies een ingevuld Supa-invulconcept van maximaal 64 kB.')
+      return
+    }
+    try {
+      const raw = await file.text()
+      if (ticket !== readTicket.current) return
+      const parsed = importManualOwnSourceDraft(raw)
+      if (ticket !== readTicket.current) return
+      setPendingDraft(parsed)
+      setBackupMessage('Concept gelezen maar nog niet overgenomen. Bestaande invoer blijft staan tot bevestiging.')
+    } catch (cause) {
+      if (ticket === readTicket.current)
+        setBackupMessage(cause instanceof Error ? cause.message : 'Conceptbestand ongeldig.')
+    }
+  }
+  function applyDraft() {
+    if (!pendingDraft) return
+    ++readTicket.current
+    setSources(pendingDraft)
+    setPendingDraft(null)
+    setAcknowledged(false)
+    setError('')
+    setBackupMessage('Concept hersteld als onbevestigde invoer. Controleer alle bronmomenten en prijzen opnieuw.')
   }
   function preview() {
     setError('')
@@ -186,6 +242,34 @@ export function ManualOwnSourceEntry({ onPreview, busy }: {
             bestanden kun je bovenaan CSV of TSV importeren.</small>
         </fieldset>
       })}
+      <details className="supa-manual-source__backup">
+        <summary>Invulconcept bewaren of openen (ook als het nog niet af is)</summary>
+        <p>Het invulconcept bevat uitsluitend jouw ingevoerde gegevens. Het wordt
+          lokaal gedownload en niet naar Supa verstuurd. Terugzetten maakt
+          geen winkelprijzen of bronrechten geldig.</p>
+        <button type="button" className="ghost-button" onClick={downloadDraft}>
+          Download mijn huidige invulconcept
+        </button>
+        <label>Open een eerder Supa-invulconcept (.json)
+          <input type="file" accept=".json,application/json"
+            onChange={event => {
+              const file = event.currentTarget.files?.[0]
+              event.currentTarget.value = ''
+              void readDraft(file)
+            }} />
+        </label>
+        {pendingDraft && <div role="status" className="supa-manual-source__pending">
+          <p>Concept klaar voor herstel: PLUS {pendingDraft.PLUS.products.length}
+            {' '}regels; DekaMarkt {pendingDraft.DekaMarkt.products.length} regels.
+            Je huidige invoer wordt alleen na je bevestiging vervangen.</p>
+          <button type="button" onClick={applyDraft}>Vervang mijn invoer door dit concept</button>
+          <button type="button" className="ghost-button" onClick={() => {
+            ++readTicket.current; setPendingDraft(null)
+            setBackupMessage('Herstel geannuleerd. Huidige invoer ongewijzigd.')
+          }}>Annuleren</button>
+        </div>}
+        {backupMessage && <p role="status">{backupMessage}</p>}
+      </details>
       <label className="supa-manual-source__confirmation">
         <input type="checkbox" checked={acknowledged}
           onChange={event => { setAcknowledged(event.currentTarget.checked); setError('') }} />
