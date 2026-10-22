@@ -746,6 +746,14 @@ export function OfflineReviewedWorkbench({
           row.plusCents !== null && row.dekaCents !== null
         const delta = comparable ? row.dekaCents! - row.plusCents! : null
         const priceKnown = delta !== null && Number.isSafeInteger(delta)
+        const unitCandidate = priceKnown &&
+          row.plusUnitFamily !== null && row.plusUnitFamily === row.dekaUnitFamily &&
+          row.plusUnitCents !== null && row.dekaUnitCents !== null
+          ? row.dekaUnitCents - row.plusUnitCents : null
+        const unitDelta = unitCandidate !== null &&
+          Number.isSafeInteger(unitCandidate) ? unitCandidate : null
+        const differentWinner = priceKnown && unitDelta !== null && delta !== 0 &&
+          unitDelta !== 0 && Math.sign(delta!) !== Math.sign(unitDelta)
         return [
           String(index + 1) + '. ' + plain(row.label) +
             ' · benodigd ' + (row.amount === null ? 'onbekend' : String(row.amount)) +
@@ -767,6 +775,13 @@ export function OfflineReviewedWorkbench({
               exactEuro.formatCents(Math.abs(delta!)) +
               ' · géén productgelijkwaardigheids- of besparingsbewijs'
             : 'onbekend; ontbrekende of verouderde bronprijs is NIET €0'),
+          '  Voorlopig verschil per ' + (row.plusUnitFamily ?? 'onbekende eenheid') +
+            ' (DekaMarkt minus PLUS): ' + (unitDelta === null ? 'onbekend' :
+              (unitDelta > 0 ? '+' : unitDelta < 0 ? '−' : '') +
+              exactEuro.formatCents(Math.abs(unitDelta))),
+          ...(differentWinner
+            ? ['  LET OP: eenheidsprijs en benodigde hele pakken wijzen op verschillende laagste winkels; controleer de originele productgelijkwaardigheid.']
+            : []),
           '',
         ]
       }),
