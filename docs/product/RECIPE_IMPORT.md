@@ -30,3 +30,8 @@ De aparte privévergelijker kan gecontroleerde eigen recepten gebruiken als fysi
 - Originele receptregels blijven ter controle zichtbaar. Onzekere hoeveelheden, stuks en niet-metrische eenheden worden niet stilzwijgend omgezet in bevestigde fysieke boodschappen.
 - HTML-import is begrensd tot 500 kB en maximaal 15 herkende recepten. Iedere import blijft een concept dat je vóór het bewaren controleert.
 
+## Direct een receptenback-up als winkelmandvraag gebruiken (22 oktober 2026)
+
+Open **Vergelijk → Hetzelfde mandje bij twee winkels samenstellen → Eigen Supa-recepten**. Kies **Of: open je eigen Supa-receptenback-up van een ander apparaat (JSON)** en klik **Controleer mijn recepten-back-up**. Dit gebruikt de bestaande strikt gecontroleerde `supa-owned-recipes-backup-v1`-import (maximaal 2 MB en 100 recepten) **uitsluitend in het geopende browsertabblad**, zonder eerdere recepten te vervangen of iets te uploaden. Selecteer de fysiek bevestigde recepten, aantallen bereidingen en porties en klik pas daarna op **Gebruik geselecteerde recepten als mandvraag**.
+
+Een ontbrekende bereidingstijd wordt niet verzonnen en blokkeert een verder correct, ongeprijsd boodschappenmandje niet; de gewone maaltijdplanner houdt zijn strengere eisen. Andere reviewpunten, ongeldige hoeveelheden en fractionele fysieke stuks blijven uitgesloten en worden met originele ingrediënttekst getoond. Tijdens import en omzetting wordt opnieuw gecontroleerd dat de geselecteerde bestandsversie en eventuele lokale bibliotheek niet veranderd zijn. De bestaande fysieke winkelmand wordt alleen na expliciete bevestiging vervangen; SKU's en prijzen worden nooit uit recepten afgeleid.
