@@ -5,7 +5,6 @@
  */
 const maxDraftBytes = 256_000
 const allowedDraftFilename = /\.(?:csv|tsv|txt)$/iu
-const allowedSourceFilename = /\.(?:csv|tsv|txt|json)$/iu
 
 /**
  * Read a user-owned source file without guessing its retailer, price or clock.
@@ -17,8 +16,10 @@ const allowedSourceFilename = /\.(?:csv|tsv|txt|json)$/iu
 export async function readOwnSourceTextFile(
   file: File, { preserveBom = false }: { preserveBom?: boolean } = {},
 ): Promise<string> {
-  if (!allowedSourceFilename.test(file.name) || !file.size || file.size > maxDraftBytes) {
-    throw Error('Kies een niet-leeg CSV-, TSV-, TXT- of JSON-bronbestand tot 256 kB.')
+  // Keep the previous UTF-8 file acceptance: original source admission,
+  // not a filename suffix, is authoritative. Only UTF-16 is extension-gated.
+  if (!file.size || file.size > maxDraftBytes) {
+    throw Error('Kies een niet-leeg eigen bronbestand tot 256 kB.')
   }
   const bytes = new Uint8Array(await file.arrayBuffer())
   if (!bytes.byteLength || bytes.byteLength > maxDraftBytes)
