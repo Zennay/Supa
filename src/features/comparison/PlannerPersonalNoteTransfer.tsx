@@ -22,9 +22,11 @@ export function PlannerPersonalNoteTransfer({ items, checked, openOnly, planKey,
 }) {
   const [pending, setPending] = useState<Pending | null>(null)
   const [message, setMessage] = useState('')
+  const [showAll, setShowAll] = useState(false)
   const [destination, setDestination] = useState<PersonalNoteDestination>('Algemeen')
   const fingerprint = JSON.stringify([planKey, checked, openOnly, destination])
   function prepare() {
+    setShowAll(false)
     try {
       const proposal = preparePlannerPersonalNotes(items, checked, openOnly, notes, destination)
       if (!proposal.incoming.length) {
@@ -43,6 +45,9 @@ export function PlannerPersonalNoteTransfer({ items, checked, openOnly, planKey,
   function confirm() {
     if (!pending) return
     try {
+      if (pending.incoming.length > 15 && !showAll) {
+        throw Error('Bekijk eerst alle winkelregels voordat je ze toevoegt.')
+      }
       if (pending.fingerprint !== fingerprint || pending.planKey !== planKey ||
           serializePrivateNotes([...notes]) !== pending.original) {
         throw Error('De Planner-week, afvinkingen of persoonlijke lijst is gewijzigd. Bekijk de overdracht opnieuw.')
@@ -55,6 +60,10 @@ export function PlannerPersonalNoteTransfer({ items, checked, openOnly, planKey,
       setMessage(cause instanceof Error ? cause.message : 'Overdracht geweigerd.')
     }
   }
+  const storeCounts = pending?.incoming.reduce<Record<string, number>>((counts, note) => {
+    counts[note.store] = (counts[note.store] ?? 0) + 1
+    return counts
+  }, {}) ?? {}
   const current = pending?.fingerprint === fingerprint &&
     pending?.planKey === planKey &&
     (() => { try { return serializePrivateNotes([...notes]) === pending.original } catch { return false } })()
@@ -86,10 +95,16 @@ export function PlannerPersonalNoteTransfer({ items, checked, openOnly, planKey,
       <strong>{pending.incoming.length} nieuwe ongeprijsde ingrediënten</strong>
       <p>{pending.skipped} bestaande artikelen overgeslagen; alleen eigen notities
         krijgen nieuwe regels. Bevestig zelf, zonder productmatch of prijs.</p>
-      <ul>{pending.incoming.slice(0, 15).map((item, index) =>
+      <p role="status">Controleer per winkel: {Object.entries(storeCounts).map(([store, count]) =>
+        `${store}: ${count} ${count === 1 ? 'regel' : 'regels'}`).join(' · ')}.</p>
+      <ul>{pending.incoming.slice(0, showAll ? undefined : 15).map((item, index) =>
         <li key={index}>{item.done ? '☑' : '☐'} [{item.store}] {item.label}</li>)}</ul>
-      {pending.incoming.length > 15 && <p>Plus {pending.incoming.length - 15} andere ingrediënten.</p>}
-      <button type="button" onClick={confirm}>Bevestig toevoegen aan mijn eigen lijst</button>
+      {pending.incoming.length > 15 && !showAll && <button type="button" onClick={() => setShowAll(true)}>
+        Bekijk alle {pending.incoming.length} regels vóór bevestiging
+      </button>}
+      <button type="button" disabled={pending.incoming.length > 15 && !showAll} onClick={confirm}>
+        Bevestig {pending.incoming.length} ongeprijsde regels voor mijn eigen lijst
+      </button>
       <button type="button" onClick={() => { setPending(null); setMessage('Overdracht geannuleerd.') }}>
         Annuleer</button>
     </section>}
