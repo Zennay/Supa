@@ -999,7 +999,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
   }
   const routeItems = grouped.flatMap(group => group.items)
   const selectedVisible = routeItems.filter(note => selectedMoveIds.includes(note.id))
-  function formatOwnList(items: UnpricedShoppingNote[], selectedOnly = false) {
+  function formatOwnList(items: UnpricedShoppingNote[]) {
     return [
       'SUPA · EIGEN ONGEPRIJSDE BOODSCHAPPEN · ' + filterStore,
       'Los van Planner, bronopnames, weekbudget en winkelmandtotalen.', '',
