@@ -1473,3 +1473,9 @@ DekaMarkt; echte pakinhoud, naam, beschikbaarheid, prijs en het
 waarnemingsmoment moeten nog steeds persoonlijk worden ingevuld. De
 bestaande bronimport, controle op unieke SKU en menselijke matching blijven
 vereist. Handmatige code-invoer blijft mogelijk zonder camera.
+
+## Bronartikelcontrole per winkel: zoeken, prijsdekking en opnieuw beginnen
+
+Na het inlezen van eigen originele PLUS-/DekaMarkt-bronbladen blijft de bronvoorinzage uitdrukkelijk **onbevestigd**. Per winkel kun je in de originele artikelnaam, artikelcode en verpakkingsgegevens zoeken. Accentverschillen worden alleen voor zoeken genegeerd: `creme` vindt bijvoorbeeld `crème`. Meerdere zoekwoorden mogen over verschillende velden verspreid staan, zoals een naam en een SKU. De oorspronkelijke bronwaarde wordt nooit gewijzigd.
+
+Het extra **Prijsdekking van deze eigen bron**-filter toont naar keuze alle artikelen, alleen regels zonder bruikbare pakprijs/beschikbaarheid, of alleen regels met een opgegeven pakprijs. Sorteren op prijs of broncode, het aantal zichtbare artikelen en **Toon alle originele artikelen** zijn uitsluitend weergave-acties. Ze veranderen geen productmatch, bronmoment, hele-pakberekening of winkelwinnaar. Een onbekende prijs blijft onbekend; het bestaande aparte Planner-invulblad voor ontbrekende waarnemingen blijft de enige weg naar nieuwe werkelijk gemeten waarden.
