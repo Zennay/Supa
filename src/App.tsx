@@ -227,6 +227,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [designProductIds, setDesignProductIds] = useState<string[]>(() => initialProductSelection.ids)
   const [savedProductRaw, setSavedProductRaw] = useState(initialProductSelection.raw)
   const [productSelectionTouched, setProductSelectionTouched] = useState(false)
+  const [productSelectionWritable, setProductSelectionWritable] = useState(initialProductSelection.writable)
   const [productSelectionWarning, setProductSelectionWarning] = useState<'protected' | 'unavailable' | null>(
     () => initialProductSelection.writable ? null : (typeof window === 'undefined' ? null : 'protected'),
   )
@@ -251,12 +252,12 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
     return () => window.cancelAnimationFrame(frame)
   }, [tab, ownPriceImportSignal])
   const toggleDesignProduct = (id: string) => {
-    setDesignProductIds(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id])
+    setDesignProductIds(current => current.includes(id) ? current.filter(item => item !== id) : current.length < 100 ? [...current, id] : current)
     setProductSelectionTouched(true)
   }
   useEffect(() => {
     if (!productSelectionTouched || typeof window === 'undefined') return
-    if (!initialProductSelection.writable) {
+    if (!productSelectionWritable) {
       setProductSelectionWarning('protected')
       return
     }
@@ -270,9 +271,43 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       const next = JSON.stringify({ schemaVersion: 1, ids: designProductIds })
       if (actual !== next) window.localStorage.setItem(chosenProductsStorageKey, next)
       setSavedProductRaw(next)
+      setProductSelectionTouched(false)
       setProductSelectionWarning(null)
     } catch { setProductSelectionWarning('unavailable') }
-  }, [designProductIds, productSelectionTouched, savedProductRaw])
+  }, [designProductIds, productSelectionTouched, savedProductRaw, productSelectionWritable])
+  // Adopt changes from another tab only when this tab has no unsaved edits.
+  // Unknown/future records remain untouched, preserving the owner's bytes.
+  useEffect(() => {
+    const syncChosenProducts = (event: StorageEvent) => {
+      if (event.key !== null && event.key !== chosenProductsStorageKey) return
+      let clean = !productSelectionTouched
+      if (productSelectionTouched) {
+        try {
+          const savedIds = savedProductRaw === null ? [] :
+            (JSON.parse(savedProductRaw) as { ids?: unknown }).ids
+          clean = Array.isArray(savedIds) && savedIds.length === designProductIds.length &&
+            savedIds.every((id, index) => id === designProductIds[index])
+        } catch { clean = false }
+      }
+      if (!clean) {
+        setProductSelectionWarning('protected')
+        return
+      }
+      const next = readChosenProducts()
+      if (!next.writable) {
+        setProductSelectionWritable(false)
+        setProductSelectionWarning('protected')
+        return
+      }
+      setDesignProductIds(next.ids)
+      setSavedProductRaw(next.raw)
+      setProductSelectionTouched(false)
+      setProductSelectionWritable(true)
+      setProductSelectionWarning(null)
+    }
+    window.addEventListener('storage', syncChosenProducts)
+    return () => window.removeEventListener('storage', syncChosenProducts)
+  }, [designProductIds, savedProductRaw, productSelectionTouched])
   const [recipes, setRecipes] = useState(availableRecipes)
   const validRecipeIds = recipes.map(recipe => recipe.id)
   useEffect(() => {
