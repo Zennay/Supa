@@ -706,21 +706,42 @@ export function OfflineReviewedWorkbench({
         imported?.captures[store]?.observedAt ?? 'geen bronmoment'
       const lines = [
         'SUPA · privé controlelijst · hetzelfde fysieke mandje in twee winkels',
-        'Dit zijn onbevestigde matches. Geen actuele winkelprijzen, bronrechten of besparingsbewijs.',
+        'Dit zijn onbevestigde matches. Geen onafhankelijk geverifieerde winkelprijzen, bronrechten of besparingsbewijs.',
+        'Alle eventuele kosten zijn slechts voorlopige hele-pak-berekeningen op eigen invoer; geen mandtotaal.',
         'Controleer originele SKU, verpakking en winkelmoment afzonderlijk bij beide winkels.',
         'PLUS origineel bronmoment: ' + plain(captureInstant('PLUS')),
         'DekaMarkt origineel bronmoment: ' + plain(captureInstant('DekaMarkt')),
         '',
-        ...pairedPreviewRows.flatMap((row, index) => [
-          String(index + 1) + '. ' + plain(row.label) +
-            ' · benodigd ' + (row.amount === null ? 'onbekend' : String(row.amount)) +
-            ' ' + plain(row.unit),
-          '  PLUS: ' + (row.plusCode ? plain(row.plusCode) + ' · nog te controleren' :
-            'geen bruikbaar bronartikel · opnieuw zoeken of zelf opnemen'),
-          '  DekaMarkt: ' + (row.dekaCode ? plain(row.dekaCode) + ' · nog te controleren' :
-            'geen bruikbaar bronartikel · opnieuw zoeken of zelf opnemen'),
-          '',
-        ]),
+        ...pairedPreviewRows.flatMap((row, index) => {
+          const comparable = pairedPreviewComparable && row.plusCode && row.dekaCode &&
+            row.plusPacks !== null && row.dekaPacks !== null &&
+            row.plusCents !== null && row.dekaCents !== null
+          const delta = comparable ? row.dekaCents! - row.plusCents! : null
+          const priceKnown = delta !== null && Number.isSafeInteger(delta)
+          return [
+            String(index + 1) + '. ' + plain(row.label) +
+              ' · benodigd ' + (row.amount === null ? 'onbekend' : String(row.amount)) +
+              ' ' + plain(row.unit),
+            '  PLUS: ' + (row.plusCode ? plain(row.plusCode) + ' · nog te controleren' :
+              'geen bruikbaar bronartikel · opnieuw zoeken of zelf opnemen') +
+              (priceKnown ? ' · ' + row.plusPacks + ' hele pakken · voorlopig ' +
+                exactEuro.formatCents(row.plusCents!) +
+                (row.plusUnitRate ? ' · ' + row.plusUnitRate : '') :
+                ' · voorlopige regelprijs onbekend'),
+            '  DekaMarkt: ' + (row.dekaCode ? plain(row.dekaCode) + ' · nog te controleren' :
+              'geen bruikbaar bronartikel · opnieuw zoeken of zelf opnemen') +
+              (priceKnown ? ' · ' + row.dekaPacks + ' hele pakken · voorlopig ' +
+                exactEuro.formatCents(row.dekaCents!) +
+                (row.dekaUnitRate ? ' · ' + row.dekaUnitRate : '') :
+                ' · voorlopige regelprijs onbekend'),
+            '  Voorlopig verschil (DekaMarkt minus PLUS): ' + (priceKnown
+              ? (delta! > 0 ? '+' : delta! < 0 ? '−' : '') +
+                exactEuro.formatCents(Math.abs(delta!)) +
+                ' · géén productgelijkwaardigheids- of besparingsbewijs'
+              : 'onbekend; ontbrekende of verouderde bronprijs is NIET €0'),
+            '',
+          ]
+        }),
         'Geen onzichtbare aanvulling van ontbrekende prijzen of producten.',
       ]
       const output = lines.join('\n') + '\n'
@@ -2971,7 +2992,7 @@ export function OfflineReviewedWorkbench({
                   )}
                   <button type="button" className="ghost-button"
                     disabled={busy} onClick={downloadPairedMatchReview}>
-                    Download beide winkels als offline SKU-controlelijst (TXT)
+                    Download offline SKU- en voorlopige prijscontrole (TXT)
                   </button>
                   <label>
                     <input type="checkbox" checked={pairedOnlyMissing}
