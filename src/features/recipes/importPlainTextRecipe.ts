@@ -49,6 +49,9 @@ export function importPlainTextRecipe(raw: string): UserRecipeDraft {
 
   let title = ''
   let sourceUrl: string | null = null
+  // Keep a separate flag: an invalid optional attribution must not allow a
+  // second Bron: line to silently replace the user's first source identity.
+  let sawSourceLine = false
   const sourceWarnings: string[] = []
   let servings: number | null = null
   let minutes: number | null = null
@@ -81,19 +84,28 @@ export function importPlainTextRecipe(raw: string): UserRecipeDraft {
       // or turns the recipe into a verified retailer product or price.
       const sourceLine = /^(?:bron(?:link|url)?|source(?:\s+url)?)\s*:\s*(.+)$/iu.exec(headingText(original))
       if (sourceLine) {
-        if (sourceUrl !== null) throw new Error('Gebruik maximaal één Bron:-regel per recept.')
+        if (sawSourceLine) throw new Error('Gebruik maximaal één Bron:-regel per recept.')
+        sawSourceLine = true
         const candidate = sourceLine[1].trim()
         const markdownLink = /^\[[^\]\r\n]{1,180}\]\((https:\/\/[^()\s]+)\)$/iu.exec(candidate)
         const autolink = /^<([^<>\s]+)>$/u.exec(candidate)
         const rawSource = markdownLink?.[1] ?? autolink?.[1] ?? candidate
-        sourceUrl = safeRecipeSourceUrl(rawSource)
-        const canonicalOriginal = new URL(rawSource)
-        canonicalOriginal.hash = ''
-        // URL canonicalization (for example adding a trailing slash) is not
-        // itself a warning. Only a change beyond normal URL serialization
-        // means sensitive query parameters were removed.
-        if (sourceUrl !== canonicalOriginal.toString()) sourceWarnings.push(
-          'De bronlink is veilig opgeschoond; controleer de openbare bronvermelding.')
+        // Attribution is optional. Discard unsafe/broken links with an
+        // explicit review warning instead of losing an otherwise usable
+        // recipe; never persist the rejected URL or attempt to fetch it.
+        try {
+          sourceUrl = safeRecipeSourceUrl(rawSource)
+          const canonicalOriginal = new URL(rawSource)
+          canonicalOriginal.hash = ''
+          // Harmless URL serialization is not a warning. Removing sensitive
+          // query parameters is, so the shopper can review attribution.
+          if (sourceUrl !== canonicalOriginal.toString()) sourceWarnings.push(
+            'De bronlink is veilig opgeschoond; controleer de openbare bronvermelding.')
+        } catch {
+          sourceUrl = null
+          sourceWarnings.push(
+            'De optionele Bron:-link was ongeldig of niet openbaar HTTPS en is niet bewaard; controleer de bronvermelding.')
+        }
         continue
       }
       const named = /^(?:recept|recipe|titel|title|naam)\s*:\s*(.+)$/iu.exec(headingText(original))
