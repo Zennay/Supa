@@ -117,9 +117,12 @@
   border: 0;
   background: transparent;
   color: var(--ink);
-  padding: 0;
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 8px 0;
   font: inherit;
-  font-size: 15px;
+  font-size: 16px;
+  line-height: 1.25;
   font-weight: 800;
 }
 
