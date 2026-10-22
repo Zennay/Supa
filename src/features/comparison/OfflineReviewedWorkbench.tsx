@@ -2217,7 +2217,7 @@ export function OfflineReviewedWorkbench({
       stores.some(store => row[store].status !== 'Persoonlijk bevestigd')) : rows
     if (!selected.length) {
       setCoverageMessage('Geen open productcontroles. Alle beschikbare eigen bronartikelen zijn afzonderlijk bevestigd.')
-      return
+      return null
     }
     const content = [
       onlyOpen ? 'SUPA · uitsluitend OPEN winkelproductcontroles uit jouw Planner' :
