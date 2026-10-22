@@ -380,6 +380,8 @@ export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: 
   const [progress, setProgress] = useState(readUnpricedShoppingProgress)
   const [progressMessage, setProgressMessage] = useState('')
   const [openOnly, setOpenOnly] = useState(false)
+  const [copyOnlyOpen, setCopyOnlyOpen] = useState(false)
+  const [copyMessage, setCopyMessage] = useState('')
   useEffect(() => {
     const sync = (event: StorageEvent) => {
       if (event.key !== null && event.key !== unpricedShoppingProgressKey) return
@@ -425,6 +427,24 @@ export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: 
     ...selectedUnknown.map(id => `${completed(id) ? '☒' : '☐'} Product niet beschikbaar · oude product-ID ${id} · prijs onbekend`)]
   const selectionText = selectedLines.join('\n')
   const openSelectionText = selectedLines.filter(line => line.startsWith('☐ ')).join('\n')
+  const currentIdsRef = useRef(JSON.stringify(ids))
+  currentIdsRef.current = JSON.stringify(ids)
+  async function copyOpenShoppingList() {
+    if (!openSelectionText) return
+    const key = currentIdsRef.current
+    const previousRaw = progress.raw
+    setCopyOnlyOpen(true)
+    try {
+      if (!navigator.clipboard?.writeText) throw Error('Geen klembord')
+      await navigator.clipboard.writeText('SUPA · nog te kopen · ongeprijsd\n' + openSelectionText)
+      setCopyMessage(key === currentIdsRef.current &&
+        previousRaw === readUnpricedShoppingProgress().raw
+        ? 'Alleen jouw nog te kopen producten gekopieerd, zonder winkelprijzen.'
+        : 'De lijst wijzigde tijdens het kopiëren. Bekijk en kopieer de actuele lijst opnieuw.')
+    } catch {
+      setCopyMessage('Klembord geweigerd. De tekst hieronder bevat uitsluitend nog te kopen producten; selecteer om handmatig te kopiëren.')
+    }
+  }
   const visibleHistorical = openOnly ? selectedHistorical.filter(item => !completed(item.id)) : selectedHistorical
   const visibleExamples = openOnly ? selectedExamples.filter(item => !completed(item.id)) : selectedExamples
   const visibleUnknown = openOnly ? selectedUnknown.filter(id => !completed(id)) : selectedUnknown
@@ -520,11 +540,22 @@ export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: 
       onClick={() => downloadSelection(true)}>
       Download alleen nog te kopen (.txt)
     </button>
-    <label className="hifi-picked-copy-label">Kopieer je gekozen productnamen
+    <button type="button" className="hifi-history-add"
+      disabled={!openSelectionText} onClick={() => void copyOpenShoppingList()}>
+      Kopieer alleen nog te kopen
+    </button>
+    <p role="status" aria-live="polite">{copyMessage}</p>
+    <label className="hifi-picked-copy-label">
+      {copyOnlyOpen ? 'Kopieerbare nog-te-kopen lijst (ongeprijsd)' : 'Kopieer je complete ongeprijsde productselectie'}
+      <button type="button" className="ghost-button"
+        disabled={completedCount === 0}
+        onClick={() => setCopyOnlyOpen(!copyOnlyOpen)}>
+        {copyOnlyOpen ? 'Toon volledige kopieertekst' : 'Toon alleen open kopieertekst'}
+      </button>
       <textarea readOnly rows={Math.min(ids.length + 2, 12)}
         onFocus={event => event.currentTarget.select()}
-        value={selectionText}
-        aria-label="Kopieerbare gekozen producten, zonder winkelprijzen" />
+        value={copyOnlyOpen ? openSelectionText : selectionText}
+        aria-label="Kopieerbare eigen ongeprijsde productselectie" />
     </label>
   </section>
 }
