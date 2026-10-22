@@ -737,6 +737,21 @@ export function HiFiDemoList({ ids, onRemove, onAdd }: { ids: string[]; onRemove
         {portableShoppingPreview.length} bekende artikelen in back-up; {missingPortableItems.length}
         {' '}nog niet op mijn lijst. Al gekozen artikelen worden niet overschreven.
       </p>}
+      {portableShoppingPreview !== null && <details className="hifi-picked-portable-preview">
+        <summary>Bekijk de {missingPortableItems.length} nieuwe artikelen vóór toevoegen</summary>
+        {missingPortableItems.length === 0
+          ? <p>Er zijn geen nieuwe artikelen: de bestaande lijst wordt niet overschreven.</p>
+          : <ol>{missingPortableItems.map(item => {
+            const known = historicalRetailerProducts.find(product => product.id === item.id)
+              ?? designProducts.find(product => product.id === item.id)
+            return <li key={item.id}>
+              <strong>{known?.name ?? 'Bekend product'}</strong> · aantal {item.count}
+              {' · '}{item.done ? 'Door jou afgevinkt' : 'Nog te kopen'}
+              {item.note && <small> · eigen notitie: {item.note}</small>}
+              <small> · Alleen jouw ongeprijsde keuze, geen actuele winkelprijs.</small>
+            </li>
+          })}</ol>}
+      </details>}
       {portableShoppingPreview !== null && <button type="button" className="ghost-button"
         disabled={!onAdd || missingPortableItems.length === 0 ||
           ids.length + missingPortableItems.length > 100 ||
