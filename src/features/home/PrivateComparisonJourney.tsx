@@ -226,6 +226,22 @@ export function PrivateComparisonJourney({
       id: one.id, name: one.ingredientLabel, amount: one.requirement.amount,
       unit: one.requirement.unit, plusPacks: one.packs, dekaPacks: other.packs,
       plusCents: one.lineTotalCents, dekaCents: other.lineTotalCents,
+      // Restoring a complete but not claimable comparison must not discard
+      // original captured SKU/pack evidence merely because an older partial
+      // progress snapshot is missing. Use only the already-admitted matched
+      // line facts; never re-match, invent or promote a basket price.
+      plusProduct: {
+        productId: one.productId, productName: one.productName,
+        packAmount: one.pack.amount, packUnit: one.pack.unit,
+        packCount: one.pack.count, pricePerPackCents: one.pricePerPackCents,
+        unitRate: privateUnitPrice(one),
+      },
+      dekaProduct: {
+        productId: other.productId, productName: other.productName,
+        packAmount: other.pack.amount, packUnit: other.pack.unit,
+        packCount: other.pack.count, pricePerPackCents: other.pricePerPackCents,
+        unitRate: privateUnitPrice(other),
+      },
       plusObservedAt: plus?.observedAt, dekaObservedAt: deka?.observedAt,
     })))
   }
