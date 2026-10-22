@@ -290,7 +290,25 @@ export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: 
   const selectedExamples = designProducts.filter(item => ids.includes(item.id))
   const recognizedIds = new Set([...selectedHistorical.map(item => item.id), ...selectedExamples.map(item => item.id)])
   const selectedUnknown = ids.filter(id => !recognizedIds.has(id))
-  if (!selectedHistorical.length && !selectedExamples.length && !selectedUnknown.length) return null
+  const selectedLines = [...selectedHistorical.map(item => `☐ ${item.name} · ${item.store} · ${item.pack} · prijs onbekend (historisch)`),
+    ...selectedExamples.map(item => `☐ ${item.name} · Figma-demo, geen actuele prijs`),
+    ...selectedUnknown.map(id => `☐ Product niet beschikbaar · oude product-ID ${id} · prijs onbekend`)]
+  const selectionText = selectedLines.join('\n')
+  const downloadSelection = () => {
+    if (typeof document === 'undefined' || !selectedLines.length) return
+    const note = 'SUPA · eigen productselectie (ongeprijsd)\n' +
+      'Niet meegerekend in Planner, geverifieerde winkelmand of besparing.\n\n' + selectionText + '\n'
+    const url = URL.createObjectURL(new Blob([note], { type: 'text/plain;charset=utf-8' }))
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = 'supa-eigen-productselectie-ongeprijsd.txt'
+    document.body.appendChild(anchor)
+    try { anchor.click() } finally {
+      anchor.remove()
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    }
+  }
+  if (!selectedLines.length) return null
 
   return <section className="hifi-demo-list" aria-label="Zelf gekozen producten">
     <h3>Jouw gekozen producten</h3>
@@ -328,12 +346,13 @@ export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: 
           aria-label={`Verwijder: ${p.name}`}>Verwijder</button>
       </div>)}
     </div>}
+    <button type="button" className="hifi-history-add" onClick={downloadSelection}>
+      Download mijn ongeprijsde selectie (.txt)
+    </button>
     <label className="hifi-picked-copy-label">Kopieer je gekozen productnamen
       <textarea readOnly rows={Math.min(ids.length + 2, 12)}
         onFocus={event => event.currentTarget.select()}
-        value={[...selectedHistorical.map(item => `☐ ${item.name} · ${item.store} · ${item.pack} · prijs onbekend (historisch)`),
-          ...selectedExamples.map(item => `☐ ${item.name} · Figma-demo, geen actuele prijs`),
-          ...selectedUnknown.map(id => `☐ Product niet beschikbaar · oude product-ID ${id} · prijs onbekend`)].join('\n')}
+        value={selectionText}
         aria-label="Kopieerbare gekozen producten, zonder winkelprijzen" />
     </label>
   </section>
