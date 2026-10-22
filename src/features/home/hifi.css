@@ -418,3 +418,14 @@ body { background: #e9eeec; }
   font-size: 11px;
   overflow-wrap: anywhere;
 }
+
+.hifi-products button.hifi-product-pack-equivalent {
+  font: inherit;
+  font-size: 11px;
+  text-align: left;
+  text-decoration: underline;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
