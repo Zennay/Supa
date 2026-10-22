@@ -1530,6 +1530,6 @@ Iedere bron wordt apart tegen het bestaande canonieke winkelschema gecontroleerd
 
 ## Per-eenheidsprijsverschil in privé-export (22 oktober 2026)
 
-- Het in-app paneel met twee bevestigde deelprijzen, de bestaande privé-CSV en de offline HTML-afdruk tonen naast het verschil in hele-pakkosten ook het afgeronde eenheidsprijsverschil per kg, liter of stuk.
+- Zowel de in-app tabel voor een volledig bevestigd twee-winkelmandje als het paneel met twee bevestigde deelprijzen, de privé-CSV en de offline HTML-afdruk tonen naast het verschil in hele-pakkosten ook het afgeronde eenheidsprijsverschil per kg, liter of stuk.
 - Dit veld blijft leeg tenzij beide oorspronkelijke regels persoonlijk bevestigd en actueel zijn, de twee bronmomenten binnen 24 uur vallen, dezelfde fysieke behoefte vergelijken en de eenheidsprijsfamilie overeenkomt. Een ontbrekende of onvergelijkbare eenheidsprijs wordt niet als nul weergegeven.
 - Het verschil per eenheid is alleen een hulpmiddel per ingrediëntregel; het vervangt het betaalbare verschil in hele verpakkingen niet en vormt geen compleet mandtotaal, bronrecht of onafhankelijke besparingsclaim.
