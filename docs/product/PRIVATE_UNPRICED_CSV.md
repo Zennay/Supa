@@ -53,6 +53,8 @@ Afwasmiddel	Algemeen	nee
 Havermout	PLUS	ja
 ```
 
+Ook als Excel op Windows de eigen tabgescheiden lijst als **Unicode Text** met een expliciete UTF-16 LE/BE-bytevolgordemarkering bewaart, kan Supa dit na keuze van een `.tsv`-bestand lokaal lezen. Zonder zo'n markering blijft het bestand verplicht UTF-8. De originele `.csv`-import accepteert uitsluitend UTF-8 en wordt niet ruimer gemaakt; bestanden zonder geldig formaat of met prijs-/SKU-kolommen blijven geweigerd.
+
 De bestaande begrensde Supa-CSV-parser controleert vervolgens nogmaals de
 artikelnamen, dubbele regels en groepscodes. Het resultaat moet altijd door
 de gewone expliciete persoonlijke importvoorinzage voordat de lijst wijzigt.
