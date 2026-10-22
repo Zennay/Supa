@@ -924,7 +924,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
           />
         </Suspense>}
         {(tab === 'home' || tab === 'recipes') && <HiFiHome view={tab}
-          onNavigate={navigate} activeDays={activeDays}
+          onNavigate={navigate} onOpenOwnPriceImport={openOwnPriceImport} activeDays={activeDays}
           addedProducts={designProductIds} onToggleProduct={toggleDesignProduct}
           onAddRecipeGroceries={labels => {
             // Only transient private, unpriced notes. The parent never transfers
@@ -970,7 +970,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               <summary>Oude Figma-voorbeelden bekijken · prijzen zijn demo</summary>
               <p>Deze ontwerpen zijn geen actuele winkelprijzen of geautoriseerde aanbiedingen.
                 Alleen jouw hierboven persoonlijk bevestigde bronregels tellen mee.</p>
-              <HiFiHome view="products" onNavigate={navigate} activeDays={activeDays}
+              <HiFiHome view="products" onNavigate={navigate} onOpenOwnPriceImport={openOwnPriceImport} activeDays={activeDays}
                 onOpenOwnSources={(term, store) => {
                   setOwnCatalogSearchIntent(previous => ({
                     serial: previous.serial + 1, text: term.slice(0, 120),
@@ -989,7 +989,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
                 Supa-productontwerp verkennen, zoeken, sorteren en artikelen ongeprijsd
                 aan Lijst toevoegen. Voor actuele prijzen gebruik je de bronimport hierboven.
                 Alle getoonde voorbeeldprijzen en aanbiedingen zijn demo, geen live data.</p>
-              <HiFiHome view="products" onNavigate={navigate} activeDays={activeDays}
+              <HiFiHome view="products" onNavigate={navigate} onOpenOwnPriceImport={openOwnPriceImport} activeDays={activeDays}
                 onOpenOwnSources={(term, store) => {
                   setOwnCatalogSearchIntent(previous => ({
                     serial: previous.serial + 1, text: term.slice(0, 120),
