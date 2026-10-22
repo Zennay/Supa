@@ -12,6 +12,7 @@ import { curatedFigmaRecipes } from '../recipes/curatedFigmaRecipes'
 import { historicalRetailerProducts, filterHistoricalProducts } from '../products/historicalRetailerProducts'
 import { filterDemoProductsByUnit, orderDemoProductsByUnitPrice, type DemoUnitFilter } from '../products/productUnitPrice'
 import { productSearchText } from '../products/productSearchText'
+import { encodePrivateShoppingList, parsePrivateShoppingList, type PortableShoppingItem } from './privateShoppingListPortable'
 import { readUnpricedShoppingDetails, saveUnpricedShoppingDetails, unpricedShoppingDetailsKey, type ShoppingPick } from './unpricedShoppingDetails'
 import { readUnpricedShoppingProgress, saveUnpricedShoppingProgress, unpricedShoppingProgressKey } from './unpricedShoppingProgress'
 
@@ -390,7 +391,7 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
   </div>
 }
 
-export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: string) => void }) {
+export function HiFiDemoList({ ids, onRemove, onAdd }: { ids: string[]; onRemove: (id: string) => void; onAdd?: (id: string) => void }) {
   // The standalone user-picked product collection is distinct from the meal-plan
   // ingredient checklist and never participates in the price comparator.
   const [progress, setProgress] = useState(readUnpricedShoppingProgress)
@@ -409,6 +410,11 @@ export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: 
   const [openOnly, setOpenOnly] = useState(false)
   const [copyOnlyOpen, setCopyOnlyOpen] = useState(false)
   const [copyMessage, setCopyMessage] = useState('')
+  const [portableShoppingText, setPortableShoppingText] = useState('')
+  const [portableShoppingPreview, setPortableShoppingPreview] =
+    useState<readonly PortableShoppingItem[] | null>(null)
+  const [portableShoppingMessage, setPortableShoppingMessage] = useState('')
+  const portableShoppingVersion = useRef(0)
   useEffect(() => {
     const sync = (event: StorageEvent) => {
       if (event.key !== null && event.key !== unpricedShoppingProgressKey) return
@@ -544,6 +550,76 @@ export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: 
       anchor.remove()
       window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
     }
+  }
+  const missingPortableItems = portableShoppingPreview?.filter(item => !ids.includes(item.id)) ?? []
+  function downloadPortableShoppingList() {
+    try {
+      const text = encodePrivateShoppingList(ids, details, progress, portableProductIds)
+      const url = URL.createObjectURL(new Blob([text], { type: 'application/json;charset=utf-8' }))
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = 'supa-mijn-ongeprijsde-boodschappen.json'
+      document.body.append(anchor)
+      try { anchor.click() } finally {
+        anchor.remove()
+        window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+      }
+      const omitted = ids.filter(id => !portableProductIds.has(id)).length
+      setPortableShoppingMessage('Eigen back-up bewaard. ' + omitted +
+        ' oude onbekende IDs niet overgezet; geen winkelprijs of brongegevens.')
+    } catch (error) {
+      setPortableShoppingMessage(error instanceof Error ? error.message : 'Back-up mislukt.')
+    }
+  }
+  function previewShoppingBackup() {
+    setPortableShoppingPreview(null)
+    try {
+      const loaded = parsePrivateShoppingList(portableShoppingText, portableProductIds)
+      setPortableShoppingPreview(loaded)
+      setPortableShoppingMessage(loaded.length + ' bekende persoonlijke identiteiten gelezen. ' +
+        'Bestaande keuzes worden niet overschreven; bevestig uitsluitend nieuwe artikelen.')
+    } catch (error) {
+      setPortableShoppingMessage(error instanceof Error ? error.message : 'Ongeldig lijstbestand.')
+    }
+  }
+  function restoreShoppingBackup() {
+    if (!onAdd || !portableShoppingPreview || !missingPortableItems.length) return
+    if (ids.length + missingPortableItems.length > 100) {
+      setPortableShoppingMessage('Niet toegevoegd: de gekozen lijst mag maximaal 100 artikelen bevatten.')
+      return
+    }
+    if (!details.writable || !progress.writable) {
+      setPortableShoppingMessage('De bestaande lokale opslag is beschermd. Import is geweigerd.')
+      return
+    }
+    const nextDetails = [
+      ...details.entries,
+      ...missingPortableItems.filter(item => item.count !== 1 || item.note)
+        .map(item => ({ id: item.id, count: item.count, note: item.note })),
+    ]
+    const nextDone = [...new Set([...progress.doneIds,
+      ...missingPortableItems.filter(item => item.done).map(item => item.id)])]
+    const savedDetails = saveUnpricedShoppingDetails(details, nextDetails)
+    if (!savedDetails) {
+      setDetails(readUnpricedShoppingDetails())
+      setPortableShoppingMessage('Aantallen/notities zijn elders gewijzigd. Niets toegevoegd.')
+      return
+    }
+    const savedProgress = saveUnpricedShoppingProgress(progress, nextDone)
+    if (!savedProgress) {
+      saveUnpricedShoppingDetails(savedDetails, details.entries)
+      setDetails(readUnpricedShoppingDetails())
+      setProgress(readUnpricedShoppingProgress())
+      setPortableShoppingMessage('Afvinkgegevens zijn elders gewijzigd. Er zijn geen artikelen toegevoegd.')
+      return
+    }
+    for (const item of missingPortableItems) onAdd(item.id)
+    setDetails(savedDetails)
+    setProgress(savedProgress)
+    setPortableShoppingPreview(null)
+    setPortableShoppingText('')
+    setPortableShoppingMessage(missingPortableItems.length +
+      ' nieuwe ongeprijsde producten met jouw aantallen, notities en vinkjes toegevoegd. Bestaande keuzes behouden.')
   }
   if (!selectedLines.length) return null
 
