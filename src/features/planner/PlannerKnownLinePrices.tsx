@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { privateKnownPricePairs, formatKnownUnitGap } from '../products/privateProgressProductRows.ts'
+import { useRef, useState } from 'react'
+import { privateKnownPricePairs, formatKnownUnitGap, type PrivateKnownPricePair } from '../products/privateProgressProductRows.ts'
+import { privateKnownLinePriceText } from '../products/privateKnownLinePriceText.ts'
 import { downloadPrivateKnownLinePriceCsv } from '../products/privateKnownLinePriceCsv.ts'
 import { downloadPrivateKnownLinePricePrint } from '../products/privateKnownLinePricePrint.ts'
 import type { PrivateCaptureProgress, PrivateReviewedBaskets, OwnStore } from '../comparison/privateReviewedBasketBridge.ts'
@@ -16,6 +17,9 @@ export function PlannerKnownLinePrices({ progress, reviewed, now, onReviewIngred
   const [query, setQuery] = useState('')
   const [showAll, setShowAll] = useState(false)
   const [message, setMessage] = useState('')
+  const [manualCopy, setManualCopy] = useState<{ text: string; selection: PrivateKnownPricePair[] } | null>(null)
+  const currentSourcesRef = useRef({ progress, reviewed })
+  currentSourcesRef.current = { progress, reviewed }
   const pairs = privateKnownPricePairs(progress, reviewed, now)
   if (!pairs.length) return null
   const search = query.trim().normalize('NFKC').toLocaleLowerCase('nl')
@@ -27,6 +31,47 @@ export function PlannerKnownLinePrices({ progress, reviewed, now, onReviewIngred
     .sort((a, b) => Math.abs(b.difference) - Math.abs(a.difference) ||
       a.ingredientId.localeCompare(b.ingredientId, 'nl'))
   const visible = showAll ? filtered : filtered.slice(0, 4)
+  function unchangedSelection(selection: readonly PrivateKnownPricePair[], content: string): boolean {
+    try {
+      const latest = currentSourcesRef.current
+      return privateKnownLinePriceText(latest.progress, latest.reviewed, Date.now(), selection) === content
+    } catch { return false }
+  }
+  async function copyVisiblePrices() {
+    setMessage('')
+    setManualCopy(null)
+    const selection = [...visible]
+    try {
+      const latest = currentSourcesRef.current
+      const content = privateKnownLinePriceText(latest.progress, latest.reviewed, Date.now(), selection)
+      if (navigator.clipboard?.writeText) {
+        try {
+          if (!unchangedSelection(selection, content))
+            throw Error('De geselecteerde bronprijs is gewijzigd.')
+          await navigator.clipboard.writeText(content)
+          if (!unchangedSelection(selection, content))
+            throw Error('De geselecteerde bronprijs is tijdens kopiëren gewijzigd.')
+          setMessage(selection.length + ' actuele eigen prijsparen gekopieerd; geen compleet mandtotaal.')
+          return
+        } catch {
+          // The same original source data is offered for manual selection.
+        }
+      }
+      if (!unchangedSelection(selection, content))
+        throw Error('De geselecteerde bronprijs is gewijzigd. Selecteer opnieuw.')
+      setManualCopy({ text: content, selection })
+      setMessage('Klembord niet beschikbaar. Selecteer de privétekst hieronder handmatig.')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'De oorspronkelijke bronprijzen konden niet worden gekopieerd.')
+    }
+  }
+  let manualCopyValid = false
+  if (manualCopy) {
+    try {
+      manualCopyValid = privateKnownLinePriceText(progress, reviewed, now,
+        manualCopy.selection) === manualCopy.text
+    } catch { manualCopyValid = false }
+  }
   function download(kind: 'csv' | 'html') {
     try {
       // Export EXACTLY the currently visible, personally reviewed lines.
@@ -91,9 +136,19 @@ export function PlannerKnownLinePrices({ progress, reviewed, now, onReviewIngred
     </button>}
     <p><small>Deze twee downloads nemen alleen de hierboven getoonde prijsparen mee. Kies ‘Toon alle’ voor meer regels. Geen volledig mandtotaal of besparingsclaim.</small></p>
     <div className="planner-known-lines__actions">
+      <button type="button" disabled={!visible.length}
+        onClick={copyVisiblePrices}>Kopieer deze {visible.length} zichtbare prijsparen</button>
       <button type="button" disabled={!visible.length} onClick={() => download('csv')}>Download deze {visible.length} getoonde ingrediëntprijzen (CSV)</button>
       <button type="button" disabled={!visible.length} onClick={() => download('html')}>Afdruk van deze {visible.length} getoonde prijsregels (HTML)</button>
     </div>
+    {manualCopyValid && manualCopy && <label className="planner-known-lines__manual-copy">
+      Selecteer en kopieer deze persoonlijke, alleen-lezen bronprijzen
+      <textarea readOnly rows={12} value={manualCopy.text}
+        onFocus={() => {
+          if (!unchangedSelection(manualCopy.selection, manualCopy.text))
+            setManualCopy(null)
+        }} />
+    </label>}
     {message && <p role="status">{message}</p>}
   </section>
 }
