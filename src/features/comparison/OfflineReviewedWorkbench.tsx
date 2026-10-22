@@ -1414,6 +1414,7 @@ export function OfflineReviewedWorkbench({
   async function importPastedSource() {
     const raw = pasteDraft
     const pastePlan = currentlySelectedPlan.current
+    const pasteWeek = captureWeekRef.current
     const version = ++importRevision.current
     if (!raw.trim()) {
       setMessage('Plak eerst eigen CSV- of JSON-brongegevens.')
@@ -1440,8 +1441,9 @@ export function OfflineReviewedWorkbench({
       const convert = module.convertOwnStoreCsv as (input: string) => string
       const sources = sheets.map(sheet => convert(sheet))
       if (version !== importRevision.current) return
-      if (pastePlan !== currentlySelectedPlan.current) {
-        setMessage('Je Planner-week is tijdens het lezen gewijzigd. Plak de originele bronnen opnieuw voor dit weekmenu.')
+      if (pastePlan !== currentlySelectedPlan.current ||
+          pasteWeek !== captureWeekRef.current) {
+        setMessage('De fysieke Planner-week is tijdens het lezen gewijzigd. Plak de originele bronnen opnieuw voor de huidige ingrediënten.')
         return
       }
       if (sources.length === 2) {
