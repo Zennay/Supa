@@ -348,7 +348,8 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays, manualNote
           </div>
           {onAddPersonalNotes && <PlannerPersonalNoteTransfer
             items={items} checked={checked} openOnly={openOnly} planKey={demandIdentity}
-            notes={manualNotes} onImport={onAddPersonalNotes} />}
+            notes={manualNotes} onImport={onAddPersonalNotes}
+            onOpenPriceImport={onOpenPriceImport} />}
           <details className="unpriced-planner-checklist__advanced">
             <summary>Deel, exporteer of herstel mijn lijst</summary>
             <div className="unpriced-planner-checklist__actions">
