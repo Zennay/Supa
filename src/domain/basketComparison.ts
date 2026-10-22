@@ -109,7 +109,7 @@ function invalidMatchedLineEconomics(line: MatchedBasketLine): boolean {
     !Number.isSafeInteger(line.packs) ||
     line.packs <= 0 ||
     !Number.isSafeInteger(line.pricePerPackCents) ||
-    line.pricePerPackCents < 0 ||
+    line.pricePerPackCents <= 0 ||
     !Number.isFinite(effectivePackAmount) ||
     effectivePackAmount <= 0 ||
     expectedPacks === null ||
@@ -181,7 +181,7 @@ function inspectBasket(label: string, basket: OneStoreBasket): string[] {
     basket.totalCents < 0 ||
     matched.some(
       (line) =>
-        !Number.isSafeInteger(line.lineTotalCents) || line.lineTotalCents < 0,
+        !Number.isSafeInteger(line.lineTotalCents) || line.lineTotalCents <= 0,
     )
   ) {
     reasons.push(`${label} basket contains an invalid monetary value`)
