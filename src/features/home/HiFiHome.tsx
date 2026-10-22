@@ -12,6 +12,7 @@ import { curatedFigmaRecipes } from '../recipes/curatedFigmaRecipes'
 import { historicalRetailerProducts, filterHistoricalProducts, historicalPackageEquivalent, type HistoricalPackFilter } from '../products/historicalRetailerProducts'
 import { filterDemoProductsByUnit, orderDemoProductsByUnitPrice, type DemoUnitFilter } from '../products/productUnitPrice'
 import { normalizeProductSearchValue } from '../products/productSearchText'
+import { encodePrivateShoppingList, parsePrivateShoppingList, type PortableShoppingItem } from './privateShoppingListPortable'
 import { readUnpricedShoppingDetails, saveUnpricedShoppingDetails, unpricedShoppingDetailsKey, type ShoppingPick } from './unpricedShoppingDetails'
 import { readUnpricedShoppingProgress, saveUnpricedShoppingProgress, unpricedShoppingProgressKey } from './unpricedShoppingProgress'
 
@@ -377,7 +378,7 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct,
   </div>
 }
 
-export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: string) => void }) {
+export function HiFiDemoList({ ids, onRemove, onAdd }: { ids: string[]; onRemove: (id: string) => void; onAdd?: (id: string) => void }) {
   // This personal discovery shortlist is deliberately separate from the priced
   // basket. Its counts, notes and checkmarks never become retailer evidence.
   const [progress, setProgress] = useState(readUnpricedShoppingProgress)
@@ -386,6 +387,11 @@ export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: 
   const [detailsMessage, setDetailsMessage] = useState('')
   const [openOnly, setOpenOnly] = useState(false)
   const [copyMessage, setCopyMessage] = useState('')
+  const [portableShoppingText, setPortableShoppingText] = useState('')
+  const [portableShoppingPreview, setPortableShoppingPreview] =
+    useState<readonly PortableShoppingItem[] | null>(null)
+  const [portableShoppingMessage, setPortableShoppingMessage] = useState('')
+  const portableShoppingVersion = useRef(0)
   const currentListRef = useRef(JSON.stringify(ids))
   currentListRef.current = JSON.stringify(ids)
 
@@ -557,10 +563,81 @@ export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: 
     }
   }
 
-  if (!selectedHistorical.length && !selectedExamples.length && !selectedUnknown.length) return null
+  const missingPortableItems = portableShoppingPreview?.filter(item => !ids.includes(item.id)) ?? []
+  function downloadPortableShoppingList() {
+    try {
+      const text = encodePrivateShoppingList(ids, details, progress, portableProductIds)
+      const url = URL.createObjectURL(new Blob([text], { type: 'application/json;charset=utf-8' }))
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = 'supa-mijn-ongeprijsde-boodschappen.json'
+      document.body.append(anchor)
+      try { anchor.click() } finally {
+        anchor.remove()
+        window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+      }
+      const omitted = ids.filter(id => !portableProductIds.has(id)).length
+      setPortableShoppingMessage('Eigen back-up bewaard. ' + omitted +
+        ' oude onbekende IDs niet overgezet; geen winkelprijs of brongegevens.')
+    } catch (error) {
+      setPortableShoppingMessage(error instanceof Error ? error.message : 'Back-up mislukt.')
+    }
+  }
+  function previewShoppingBackup() {
+    setPortableShoppingPreview(null)
+    try {
+      const loaded = parsePrivateShoppingList(portableShoppingText, portableProductIds)
+      setPortableShoppingPreview(loaded)
+      setPortableShoppingMessage(loaded.length + ' bekende persoonlijke identiteiten gelezen. ' +
+        'Bestaande keuzes worden niet overschreven; bevestig uitsluitend nieuwe artikelen.')
+    } catch (error) {
+      setPortableShoppingMessage(error instanceof Error ? error.message : 'Ongeldig lijstbestand.')
+    }
+  }
+  function restoreShoppingBackup() {
+    if (!onAdd || !portableShoppingPreview || !missingPortableItems.length) return
+    if (ids.length + missingPortableItems.length > 100) {
+      setPortableShoppingMessage('Niet toegevoegd: de gekozen lijst mag maximaal 100 artikelen bevatten.')
+      return
+    }
+    if (!details.writable || !progress.writable) {
+      setPortableShoppingMessage('De bestaande lokale opslag is beschermd. Import is geweigerd.')
+      return
+    }
+    const nextDetails = [
+      ...details.entries,
+      ...missingPortableItems.filter(item => item.count !== 1 || item.note)
+        .map(item => ({ id: item.id, count: item.count, note: item.note })),
+    ]
+    const nextDone = [...new Set([...progress.doneIds,
+      ...missingPortableItems.filter(item => item.done).map(item => item.id)])]
+    const savedDetails = saveUnpricedShoppingDetails(details, nextDetails)
+    if (!savedDetails) {
+      setDetails(readUnpricedShoppingDetails())
+      setPortableShoppingMessage('Aantallen/notities zijn elders gewijzigd. Niets toegevoegd.')
+      return
+    }
+    const savedProgress = saveUnpricedShoppingProgress(progress, nextDone)
+    if (!savedProgress) {
+      saveUnpricedShoppingDetails(savedDetails, details.entries)
+      setDetails(readUnpricedShoppingDetails())
+      setProgress(readUnpricedShoppingProgress())
+      setPortableShoppingMessage('Afvinkgegevens zijn elders gewijzigd. Er zijn geen artikelen toegevoegd.')
+      return
+    }
+    for (const item of missingPortableItems) onAdd(item.id)
+    setDetails(savedDetails)
+    setProgress(savedProgress)
+    setPortableShoppingPreview(null)
+    setPortableShoppingText('')
+    setPortableShoppingMessage(missingPortableItems.length +
+      ' nieuwe ongeprijsde producten met jouw aantallen, notities en vinkjes toegevoegd. Bestaande keuzes behouden.')
+  }
+  // Keep portable restore accessible even on a brand-new device with zero picks.
 
   return <section className="hifi-demo-list" aria-label="Zelf gekozen producten">
     <h3>Jouw gekozen producten</h3>
+    {ids.length === 0 && <p role="status">Je persoonlijke lijst is leeg. Je kunt hier een eerdere eigen back-up terugzetten.</p>}
     <p className="disclaimer">Eigen verzamelijst · niet meegenomen in de berekende maaltijdmand of winkelvergelijking.
       Dit is geen offerte, actuele voorraad of bewijs van besparing.</p>
     <div className="hifi-picked-progress" role="group" aria-label="Mijn afvinkvoortgang voor ongeprijsde producten">
@@ -621,6 +698,77 @@ export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: 
           aria-label={'Verwijder: ' + item.name}>Verwijder</button>
       </div>)}
     </div>}
+    <details className="hifi-picked-portable">
+      <summary>Mijn ongeprijsde boodschappenlijst inclusief aantallen, notities en vinkjes overzetten</summary>
+      <p>Een privé JSON-back-up bevat uitsluitend bekende productidentiteiten, jouw aantallen,
+        eigen notities en handmatige vinkjes. Geen geobserveerde winkelprijzen, actuele voorraad,
+        geverifieerde SKU-matches of bronrechten.</p>
+      <button type="button" className="ghost-button" onClick={downloadPortableShoppingList}>
+        Bewaar persoonlijke boodschappenlijst (.json)
+      </button>
+      <label>Open een eerder persoonlijk boodschappenbestand
+        <input type="file" accept=".json,application/json" onChange={async event => {
+          const version = ++portableShoppingVersion.current
+          setPortableShoppingPreview(null)
+          const input = event.currentTarget
+          const file = input.files?.[0]
+          input.value = ''
+          if (!file) return
+          if (!file.size || file.size > 32768) {
+            setPortableShoppingMessage('Selecteer een gevuld eigen JSON-bestand van maximaal 32 KiB.')
+            return
+          }
+          try {
+            const contents = new TextDecoder('utf-8', { fatal: true })
+              .decode(await file.arrayBuffer())
+            if (version !== portableShoppingVersion.current) return
+            setPortableShoppingText(contents)
+            setPortableShoppingMessage('Bestand lokaal gelezen. Bekijk eerst het importvoorbeeld.')
+          } catch {
+            if (version === portableShoppingVersion.current)
+              setPortableShoppingMessage('Geen geldig UTF-8 JSON-bestand; je keuzes blijven behouden.')
+          }
+        }} />
+      </label>
+      <label>Of plak eigen back-up-JSON
+        <textarea rows={4} maxLength={32768} value={portableShoppingText}
+          onChange={event => {
+            portableShoppingVersion.current += 1
+            setPortableShoppingText(event.currentTarget.value)
+            setPortableShoppingPreview(null)
+            setPortableShoppingMessage('')
+          }} />
+      </label>
+      <button type="button" className="ghost-button" disabled={!portableShoppingText.trim()}
+        onClick={previewShoppingBackup}>Controleer mijn importvoorbeeld</button>
+      {portableShoppingPreview !== null && <p role="status">
+        {portableShoppingPreview.length} bekende artikelen in back-up; {missingPortableItems.length}
+        {' '}nog niet op mijn lijst. Al gekozen artikelen worden niet overschreven.
+      </p>}
+      {portableShoppingPreview !== null && <details className="hifi-picked-portable-preview">
+        <summary>Bekijk de {missingPortableItems.length} nieuwe artikelen vóór toevoegen</summary>
+        {missingPortableItems.length === 0
+          ? <p>Er zijn geen nieuwe artikelen: de bestaande lijst wordt niet overschreven.</p>
+          : <ol>{missingPortableItems.map(item => {
+            const known = historicalRetailerProducts.find(product => product.id === item.id)
+              ?? designProducts.find(product => product.id === item.id)
+            return <li key={item.id}>
+              <strong>{known?.name ?? 'Bekend product'}</strong> · aantal {item.count}
+              {' · '}{item.done ? 'Door jou afgevinkt' : 'Nog te kopen'}
+              {item.note && <small> · eigen notitie: {item.note}</small>}
+              <small> · Alleen jouw ongeprijsde keuze, geen actuele winkelprijs.</small>
+            </li>
+          })}</ol>}
+      </details>}
+      {portableShoppingPreview !== null && <button type="button" className="ghost-button"
+        disabled={!onAdd || missingPortableItems.length === 0 ||
+          ids.length + missingPortableItems.length > 100 ||
+          !details.writable || !progress.writable}
+        onClick={restoreShoppingBackup}>
+        Voeg {missingPortableItems.length} nieuwe artikelen en persoonlijke gegevens toe
+      </button>}
+      <p role="status" aria-live="polite">{portableShoppingMessage}</p>
+    </details>
     <div className="recipe-backup-panel__actions">
       <button type="button" className="ghost-button" onClick={() => downloadSelection(false)}
         disabled={!selectionText}>Download ongeprijsde selectie (.txt)</button>
