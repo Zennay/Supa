@@ -1558,3 +1558,13 @@ In **Planner → hetzelfde weekmandje → productprijzen, verpakkingen en regelv
 Deze acties gebruiken uitsluitend de reeds toegelaten, persoonlijk gecontroleerde, volledige fysieke twee-winkelvergelijking uit freshReviewedBaskets en ownStoreWeekComparison. Na asynchroon laden van de CSV-bundel controleert de app opnieuw het daadwerkelijk laatst gerenderde bronpaar en opnieuw vóór de bestandsaanmaak. Ontbrekend, verlopen of vervangen bronmateriaal leidt niet tot een nieuwe prijs-export.
 
 De filterselectie bevat nadrukkelijk **geen opgeteld subtotaal, hele-mandtotaal of besparingsclaim**. Een geldige oorspronkelijke hele-mandvergelijking blijft elders in de Planner zichtbaar. Bronrechten, retailer-scraping, externe authenticiteit en het afzonderlijke menselijke PLUS/Deka-veldonderzoek worden door deze lokale export niet gewijzigd.
+
+
+## Gedeeltelijk bevestigde PLUS/Deka-prijsparen: de export volgt het scherm
+
+Ook als nog niet alle producten van beide winkels een geldige bron hebben, kan Planner afzonderlijke **wel gecontroleerde identieke fysieke ingrediëntparen** tonen via 'Bekende gedeeltelijke winkelprijzen'. Dat is niet hetzelfde als een complete winkelmandprijs.
+
+- Zoeken filtert originele ingrediëntnamen, SKU's en bronproducten; standaard zijn de eerste vier treffers zichtbaar.
+- **Download deze N getoonde ingrediëntprijzen (CSV)** en **Afdruk van deze N getoonde prijsregels (HTML)** gebruiken nu exact de zichtbare selectie, niet onzichtbare overige producten. Met **Toon alle** kan de gebruiker bewust alle zoektreffers zichtbaar maken.
+- Vlak vóór het maken van ieder lokaal bestand worden de oorspronkelijke PLUS/Deka-bronnen, fysieke benodigdheid en bronmomenten opnieuw via de bestaande admitted-source route bepaald. Als een geselecteerde ingrediënt-ID intussen ontbreekt, verloopt of verandert, wordt het hele bestand geweigerd in plaats van een andere SKU of een oud bedrag in zijn plaats te tonen.
+- Deze gefilterde gedeeltelijke rapporten bevatten alleen hele-pakbedragen van individueel geldig gepaarde producten; geen optelsom, volledig mandtotaal, kassagarantie, netto winkelvoordeel of nieuwe bronrechten. De gewone Planner en twee-winkeldekking blijven ontbrekende prijzen als onbekend tonen.
