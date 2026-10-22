@@ -2658,16 +2658,16 @@ export function OfflineReviewedWorkbench({
           : olderPairCapture === store && item.status === 'Persoonlijk bevestigd'
             ? 'Ouder bronmoment; neem binnen 24 uur van de andere winkel opnieuw op'
             : item.status
-        const clean = (value: string) => value.replace(/[\\r\\n\\u0000-\\u001f\\u007f-\\u009f]/gu, ' ')
+        const clean = (value: string) => value.replace(/[\r\n\u0000-\u001f\u007f-\u009f]/gu, ' ')
         return [
-          row.label.replace(/[\\r\\n\\u0000-\\u001f\\u007f-\\u009f]/gu, ' ') +
+          row.label.replace(/[\r\n\u0000-\u001f\u007f-\u009f]/gu, ' ') +
             ' · ' + (row.amount ?? '?') + ' ' + row.unit,
           '  Status: ' + status,
           item.product ? '  Voorgesteld bronartikel: ' + clean(item.product) : '  Bronartikel: nog onbekend',
           '  Controleer de originele SKU, verpakking, prijs en waarnemingstijd zelf.',
         ]
       }),
-    ].join('\\n')
+    ].join('\n')
     return { content, count: selected.length }
   }
 
@@ -3095,8 +3095,7 @@ export function OfflineReviewedWorkbench({
                     {' '}nog zonder productvoorstel · DekaMarkt:
                     {' '}{pairedPreviewRows.filter(row => !row.dekaCode).length}
                     {' '}nog zonder productvoorstel.
-                    {' '}Openstaande fysieke ingrediënten kun je onder deze voorinzage
-                    per winkel als leeg opname-CSV of rijgids meenemen.
+                    {' '}Na import kun je open of verouderde broncontroles hieronder per winkel kopiëren of als gids bewaren.
                   </p>
                   <p className="disclaimer">
                     Dit is uitsluitend een vergelijking van voorgestelde productmatches
