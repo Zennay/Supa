@@ -178,7 +178,7 @@ function buildObservedLine(line, requirement, path) {
   if (
     observed.priceCents === null ||
     !Number.isSafeInteger(observed.priceCents) ||
-    observed.priceCents < 0
+    observed.priceCents <= 0
   ) {
     return unresolvedLine(requirement, ['observed price is unknown or invalid'])
   }
