@@ -475,16 +475,31 @@ export function OfflineReviewedWorkbench({
 
   // A side-by-side coverage PREVIEW for two personally supplied shop files.
   // Matching proposals are not accepted product identities or priced savings.
+  // Source-level price previews never confer product equivalence or
+  // independent retailer validation. Only explicit final review may unlock
+  // confirmed basket totals; stale sources cannot present a price difference.
+  const pairedPreviewComparable = Boolean(currentPreview &&
+    currentPreview.stores.every(capturePreviewFresh) &&
+    (currentPreview.stores.length === 2 ? currentPreview.pairedWithin24h :
+      currentPreview.stores.length === 1 &&
+      currentPreview.retainedOther?.within24h &&
+      freshPreviewInstant(currentPreview.retainedOther.observedNs)))
+
   const pairedPreviewRows = useMemo(() => {
     const preview = capturePreview?.week === captureWeek ? capturePreview : null
     if (!preview) return null
-    // A user can bring one new shop sheet and retain the OTHER original
-    // shop capture from an earlier explicit import. Never invent a second
-    // store: evaluate its actual stored SKUs against exactly today's plan.
-    const forStore = (retailer: CaptureStore): Map<string, string | null> | null => {
+    type Candidate = {
+      sku: string | null; packs: number | null
+      cents: number | null; unitRate: string | null
+    }
+    const unknown: Candidate = { sku: null, packs: null, cents: null, unitRate: null }
+    const forStore = (retailer: CaptureStore): Map<string, Candidate> | null => {
       const newShop = preview.stores.find(shop => shop.retailer === retailer)
       if (newShop?.matching) return new Map(newShop.matching.lines.map(line =>
-        [line.id, line.status === 'matched' ? line.originalSku : null] as const))
+        [line.id, line.status === 'matched' ? {
+          sku: line.originalSku, packs: line.packs,
+          cents: line.lineTotalCents, unitRate: line.unitRate,
+        } : unknown] as const))
       if (preview.retainedOther?.retailer !== retailer) return null
       const retained = imported?.captures[retailer]
       if (!retained) return null
@@ -493,18 +508,27 @@ export function OfflineReviewedWorkbench({
         products: retained.products,
       })
       return new Map(basket.lines.map(line =>
-        [line.id, line.status === 'matched' ? line.productId : null] as const))
+        [line.id, line.status === 'matched' ? {
+          sku: line.productId, packs: line.packs,
+          cents: line.lineTotalCents, unitRate: privateUnitPrice(line),
+        } : unknown] as const))
     }
     try {
       const plus = forStore('PLUS')
       const deka = forStore('DekaMarkt')
       if (!plus || !deka) return null
-      return plannerCaptureNeeds.map(need => ({
-        id: need.id, label: need.label,
-        amount: need.amount, unit: need.unit,
-        plusCode: plus.get(need.id) ?? null,
-        dekaCode: deka.get(need.id) ?? null,
-      }))
+      return plannerCaptureNeeds.map(need => {
+        const p = plus.get(need.id) ?? unknown
+        const d = deka.get(need.id) ?? unknown
+        return {
+          id: need.id, label: need.label,
+          amount: need.amount, unit: need.unit,
+          plusCode: p.sku, dekaCode: d.sku,
+          plusPacks: p.packs, dekaPacks: d.packs,
+          plusCents: p.cents, dekaCents: d.cents,
+          plusUnitRate: p.unitRate, dekaUnitRate: d.unitRate,
+        }
+      })
     } catch {
       // Incompatible historical source or physical units never produce
       // invented match coverage.
