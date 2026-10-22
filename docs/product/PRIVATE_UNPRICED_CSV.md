@@ -60,3 +60,9 @@ artikelnamen, dubbele regels en groepscodes. Het resultaat moet altijd door
 de gewone expliciete persoonlijke importvoorinzage voordat de lijst wijzigt.
 
 **Dubbele omschrijvingen:** de persoonlijke lijst vergelijkt winkel + een Unicode-genormaliseerde identiteit (NFKC, onzichtbare default-ignorable tekens verwijderd, hoofdletterongevoelig). Dit is uitsluitend voor duplicaatdetectie; de originele omschrijving blijft zichtbaar en wordt in backups bewaard. Deze normalisatie creëert geen SKU, productmatch of prijs.
+
+## Zelf een deel van de boodschappen verplaatsen tussen winkels
+
+Open **Lijst → Zelf toevoegen, zonder prijs**. Kies per eigen boodschap **Kies voor winkelwissel**, of gebruik **Selecteer zichtbare PLUS-/DekaMarkt-/Algemeen-artikelen** voor één winkel. Kies bij die winkel de gewenste bestemming en klik **Verplaats N geselecteerde artikelen**. Dit verplaatst uitsluitend de geselecteerde **zichtbare** eigen items van die winkel; de afzonderlijke knop **Verplaats N zichtbare artikelen** blijft beschikbaar om de volledige gefilterde groep te verplaatsen.
+
+Supa weigert verplaatsen als de bestemming dezelfde persoonlijke omschrijving al heeft; de bestaande lijst wordt dan niet gedeeltelijk veranderd. De vinkjes, regel-ID's en eigen volgorde blijven behouden; **Herstel laatste groepsverplaatsing** zet een geslaagde batch terug zolang dat zonder conflicten kan. Met **Wis [winkel]-selectie** of **Wis mijn selectie** verwijder je alleen de tijdelijke schermselectie. Zoeken en de 'Alleen open'-filter bepalen welke geselecteerde regels in de huidige actie meegenomen worden. Er worden geen retailerprijzen, productmatches, SKU's of bronrechten gewijzigd.
