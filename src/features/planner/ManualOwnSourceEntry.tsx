@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { exportManualOwnSourceDraft, importManualOwnSourceDraft, MANUAL_DRAFT_MAX_BYTES, type ManualSources } from './manualOwnSourceDraft.ts'
+import type { OfflinePriceSnapshots } from '../../domain/offlineReviewedImport.ts'
 import './manualOwnSourceEntry.css'
 
 type Store = 'PLUS' | 'DekaMarkt'
@@ -47,9 +48,10 @@ function serializeManualCapture(sources: Record<Store, Source>): string {
 
 /** Manual entry is an alternative to preparing a spreadsheet, not an
  * alternative to source rights, original identifiers or user review. */
-export function ManualOwnSourceEntry({ onPreview, busy }: {
+export function ManualOwnSourceEntry({ onPreview, busy, template }: {
   onPreview: (raw: string) => void
   busy: boolean
+  template: OfflinePriceSnapshots | null
 }) {
   const [open, setOpen] = useState(false)
   const [sources, setSources] = useState<Record<Store, Source>>({
@@ -59,10 +61,12 @@ export function ManualOwnSourceEntry({ onPreview, busy }: {
   const [acknowledged, setAcknowledged] = useState(false)
   const [backupMessage, setBackupMessage] = useState('')
   const [pendingDraft, setPendingDraft] = useState<ManualSources | null>(null)
+  const [pendingTemplate, setPendingTemplate] = useState<ManualSources | null>(null)
   const readTicket = useRef(0)
   function invalidateRestore() {
     ++readTicket.current
     setPendingDraft(null)
+    setPendingTemplate(null)
     setBackupMessage('')
     setAcknowledged(false); setError('')
   }
@@ -102,6 +106,33 @@ export function ManualOwnSourceEntry({ onPreview, busy }: {
     }))
     invalidateRestore()
   }
+  function stageOriginalIdentifiers() {
+    if (!template) return
+    const reused = {} as ManualSources
+    for (const store of STORES) {
+      const products = template.captures[store]?.products ?? []
+      reused[store] = {
+        // Historic observation times cannot become new retail evidence.
+        observedAt: '',
+        products: products.slice(0, 30).map(product => ({
+          id: product.id, name: product.name, packAmount: '', packUnit: '',
+          packCount: '', priceCents: '', available: '',
+        })),
+      }
+    }
+    setPendingTemplate(reused)
+    setPendingDraft(null)
+    setBackupMessage('Alleen originele identificaties en namen staan klaar. Geen oude prijs, verpakking, beschikbaarheid of bronmoment is overgenomen.')
+  }
+  function applyOriginalIdentifiers() {
+    if (!pendingTemplate) return
+    ++readTicket.current
+    setSources(pendingTemplate)
+    setPendingTemplate(null)
+    setAcknowledged(false)
+    setError('')
+    setBackupMessage('Originele SKU’s en productnamen overgenomen. Vul alle nieuwe waarnemingen zelf opnieuw in.')
+  }
   function downloadDraft() {
     setBackupMessage('')
     try {
@@ -122,7 +153,7 @@ export function ManualOwnSourceEntry({ onPreview, busy }: {
   async function readDraft(file: File | undefined) {
     if (!file) return
     const ticket = ++readTicket.current
-    setPendingDraft(null); setBackupMessage('')
+    setPendingDraft(null); setPendingTemplate(null); setBackupMessage('')
     if (file.size > MANUAL_DRAFT_MAX_BYTES || file.size === 0) {
       setBackupMessage('Kies een ingevuld Supa-invulconcept van maximaal 64 kB.')
       return
@@ -176,7 +207,7 @@ export function ManualOwnSourceEntry({ onPreview, busy }: {
           <label>Werkelijk bronmoment, inclusief tijdzone
             <input type="text" maxLength={40} value={source.observedAt}
               spellCheck={false} autoComplete="off"
-              placeholder="2026-10-22T14:35:00+02:00"
+              placeholder="JJJJ-MM-DDTuu:mm:ss+02:00"
               onChange={event => updateSource(store, event.currentTarget.value)} />
           </label>
           <small>Alle artikelen hieronder moeten echt op ditzelfde bronmoment zijn
@@ -242,6 +273,27 @@ export function ManualOwnSourceEntry({ onPreview, busy }: {
             bestanden kun je bovenaan CSV of TSV importeren.</small>
         </fieldset>
       })}
+      {template && <section className="supa-manual-source__template">
+        <h4>Een bestaande eigen winkelbron opnieuw opnemen</h4>
+        <p>Herbruik uitsluitend de oorspronkelijke SKU’s en namen van jouw
+          al bekeken bron. Oude tijdstempels, prijzen, verpakking en beschikbaarheid
+          worden bewust <strong>leeg</strong> gemaakt. Controleer ze opnieuw.</p>
+        <button type="button" className="ghost-button" onClick={stageOriginalIdentifiers}>
+          Bereid nieuwe opname voor met oude SKU’s (zonder prijzen)
+        </button>
+        {pendingTemplate && <div className="supa-manual-source__pending" role="status">
+          <p>Nieuwe blanco opname: PLUS {pendingTemplate.PLUS.products.length} originele
+            {' '}SKU’s; DekaMarkt {pendingTemplate.DekaMarkt.products.length} originele
+            {' '}SKU’s. Per winkel maximaal 30; de rest blijft in de originele bron.</p>
+          <button type="button" onClick={applyOriginalIdentifiers}>
+            Vervang mijn formulier door de lege herhaalopname
+          </button>
+          <button type="button" className="ghost-button" onClick={() => {
+            setPendingTemplate(null)
+            setBackupMessage('Herhaalopname geannuleerd. Jouw huidige invoer blijft staan.')
+          }}>Annuleer herhaalopname</button>
+        </div>}
+      </section>}
       <details className="supa-manual-source__backup">
         <summary>Invulconcept bewaren of openen (ook als het nog niet af is)</summary>
         <p>Het invulconcept bevat uitsluitend jouw ingevoerde gegevens. Het wordt

@@ -502,7 +502,7 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
         en originele bronmomenten. Ook eigen JSON met één of beide winkels kan.
         Alles wordt lokaal gecontroleerd:
         een geldige import bewijst geen bronrechten of actuele winkelprijzen.</p>
-      <ManualOwnSourceEntry busy={busy} onPreview={raw => {
+      <ManualOwnSourceEntry busy={busy} template={currentPreview?.data ?? null} onPreview={raw => {
         changeDraft(raw)
         void inspectSource(raw)
       }} />
