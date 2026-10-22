@@ -2628,6 +2628,94 @@ export function OfflineReviewedWorkbench({
     } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
   }
 
+
+  function buildStoreCoverageGuide(store: CaptureStore): { content: string; count: number } | null {
+    if (!imported || coverageRows.length === 0) return null
+    const nowNs = BigInt(Date.now()) * 1_000_000n
+    const capture = imported.captures[store]
+    const fresh = !!capture &&
+      nowNs >= capture.observedNs - 300_000_000_000n &&
+      nowNs - capture.observedNs <= 604_800_000_000_000n
+    const selected = coverageRows.filter(row =>
+      row[store].status !== 'Persoonlijk bevestigd' || !fresh || olderPairCapture === store)
+    if (!selected.length) {
+      setCoverageMessage(store + ': geen open broncontroles. De bestaande bevestigingen blijven lokaal bewaard.')
+      return null
+    }
+    const content = [
+      'SUPA · ' + store + ' · open eigen broncontroles',
+      'Planner-week: ' + captureWeek,
+      'Eigen bronmoment: ' + (capture?.observedAt ?? 'ONTBREEKT'),
+      'Versheid: ' + (!fresh ? 'ontbreekt, verouderd of toekomstig' :
+        olderPairCapture === store ? 'ouder dan de andere winkel; opnieuw opnemen binnen 24 uur' :
+          'binnen zeven dagen'),
+      'Dit is een werkgids, geen prijs- of bronrechtenbewijs. Ontbrekend is onbekend, niet EUR 0.',
+      '',
+      ...selected.flatMap(row => {
+        const item = row[store]
+        const status = !fresh && item.status === 'Persoonlijk bevestigd'
+          ? 'Eigen opname verouderd of toekomstig; opnieuw opnemen'
+          : olderPairCapture === store && item.status === 'Persoonlijk bevestigd'
+            ? 'Ouder bronmoment; neem binnen 24 uur van de andere winkel opnieuw op'
+            : item.status
+        const clean = (value: string) => value.replace(/[\\r\\n\\u0000-\\u001f\\u007f-\\u009f]/gu, ' ')
+        return [
+          row.label.replace(/[\\r\\n\\u0000-\\u001f\\u007f-\\u009f]/gu, ' ') +
+            ' · ' + (row.amount ?? '?') + ' ' + row.unit,
+          '  Status: ' + status,
+          item.product ? '  Voorgesteld bronartikel: ' + clean(item.product) : '  Bronartikel: nog onbekend',
+          '  Controleer de originele SKU, verpakking, prijs en waarnemingstijd zelf.',
+        ]
+      }),
+    ].join('\\n')
+    return { content, count: selected.length }
+  }
+
+  async function copyStoreCoverageGuide(store: CaptureStore) {
+    const snapshot = buildStoreCoverageGuide(store)
+    if (!snapshot) return
+    const source = currentActiveSource.current
+    const week = captureWeekRef.current
+    const revision = importRevision.current
+    setCoverageCopyText(null)
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Geen klembordtoegang')
+      await navigator.clipboard.writeText(snapshot.content)
+      if (source !== currentActiveSource.current || week !== captureWeekRef.current ||
+          revision !== importRevision.current) {
+        setCoverageMessage('De bron of Planner-week veranderde tijdens het kopiëren. Maak de gids opnieuw.')
+        return
+      }
+      setCoverageMessage(store + ': ' + snapshot.count +
+        ' open broncontroles gekopieerd. De gids bevat geen prijzen of bronrechtenbewijs.')
+    } catch {
+      if (source !== currentActiveSource.current || week !== captureWeekRef.current ||
+          revision !== importRevision.current) {
+        setCoverageMessage('De bron is gewijzigd. Open de huidige winkelcontroles en probeer opnieuw.')
+        return
+      }
+      setCoverageCopyText(snapshot.content)
+      setCoverageMessage(store + ': klembord niet beschikbaar. Selecteer de bronstatusgids hieronder om zelf te kopiëren.')
+    }
+  }
+
+  function downloadStoreCoverageGuide(store: CaptureStore) {
+    const snapshot = buildStoreCoverageGuide(store)
+    if (!snapshot) return
+    const url = URL.createObjectURL(new Blob([snapshot.content], { type: 'text/plain;charset=utf-8' }))
+    try {
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'supa-' + store.toLowerCase() + '-open-broncontroles.txt'
+      document.body.append(link)
+      try { link.click() } finally { link.remove() }
+      setCoverageMessage(store + ': ' + snapshot.count +
+        ' open broncontroles lokaal bewaard. Geen prijs- of rechtenclaim toegevoegd.')
+    } finally {
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    }
+  }
+
   async function downloadReviewedIngredientLedger(format: 'csv' | 'html' = 'csv') {
     if (!imported || !basketPair || !coverageRows.length) return
     const sourceRevision = importRevision.current
@@ -3888,6 +3976,20 @@ export function OfflineReviewedWorkbench({
                       onClick={() => void downloadReviewedIngredientLedger('html')}>
                       Download offline leesbaar prijsblad (HTML)
                     </button>
+                  </div>
+                  <div className="offline-price-workbench__actions">
+                    {stores.map(store => <div key={store}>
+                      <button className="ghost-button" type="button"
+                        disabled={!imported || coverageRows.length === 0}
+                        onClick={() => void copyStoreCoverageGuide(store)}>
+                        Kopieer open {store}-broncontroles
+                      </button>
+                      <button className="ghost-button" type="button"
+                        disabled={!imported || coverageRows.length === 0}
+                        onClick={() => downloadStoreCoverageGuide(store)}>
+                        Download {store}-broncontroles (TXT)
+                      </button>
+                    </div>)}
                   </div>
                   <p className="disclaimer">Privé-werkblad, geen bronimport: alleen actuele
                     geaccepteerde artikelen krijgen geldvelden. Het prijsverschil geldt per
