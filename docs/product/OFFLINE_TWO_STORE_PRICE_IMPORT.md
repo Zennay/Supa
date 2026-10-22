@@ -54,6 +54,17 @@ In **Vergelijk → Gebruik ditzelfde weekmenu met jouw eigen winkelbronbestanden
 
 Onder het afzonderlijke per-winkel vervolgformulier voor ontbrekende of verlopen producten kun je dezelfde mobiele velden invullen en downloaden; wanneer **Controleer mijn echte winkelopname in Supa** beschikbaar is, gebruikt die uitsluitend de bovenstaande bestaande strikte browserimport. Elke nieuwe waarneming vereist een echt nieuw bronmoment. Publicatie en empirische claims wachten nog op aparte rechten-, review- en veldbewijsgates.
 
+## Hetzelfde fysieke mandje · voorlopige bedragen per Planner-regel
+
+Via **Vergelijk → Eigen ingevuld prijsblad eerst controleren** kun je één bronblad tegelijk of twee originele PLUS/DekaMarkt-bronnen vooraf bekijken. Als beide winkels voor dezelfde actieve Planner-vraag aanwezig zijn, toont de app nu óók een regel-voor-regeloverzicht met:
+
+- Per winkel de oorspronkelijke artikelcode, het benodigde aantal **hele verpakkingen** en de berekende totale aankoopkosten voor die fysieke regel; waar berekenbaar ook de afgeronde **€/kg, €/liter of €/stuk**.
+- Een rekenkundig **verschil DekaMarkt − PLUS** per regel, alleen als voor beide winkels dezelfde Planner-vraag, een verse bron binnen zeven dagen, maximaal 24 uur tussen de opnames, een bruikbare SKU en twee hele-verpakkingsbedragen beschikbaar zijn.
+- Een afzonderlijk eenheidsprijsverschil alleen bij dezelfde eenheidsfamilie; een pakverschil en een prijs per kilogram zijn verschillende grootheden.
+- Filters voor onbekende regels, voorlopige winkelvoordelen, gelijke bedragen en sortering op grootste prijsverschil. Gebruik **Alle prijsfilters wissen** om terug te keren naar de volledige fysieke Planner-vraag.
+
+**Voorlopige bronvoorinzage is niet hetzelfde als productbevestiging.** De waarden komen uitsluitend uit jouw zelf ingevoerde, nog te controleren winkelbestanden. Ontbrekende, onvolledige, verlopen of niet-vergelijkbare prijzen blijven zichtbaar als **onbekend**; een deelprijs mag geen volledige mandbesparing suggereren. Bevestig bron en elke match via de bestaande productreview voordat de gewone privévergelijker een volledig verschil kan gebruiken. Deze functie verstrekt geen bronrechten en activeert geen externe supermarktconnector.
+
 ## Twee losse winkel-CSV's zonder bestanden plakken
 
 In **Vergelijk → Plak eigen winkelopname(s)** kun je ook twee originele
