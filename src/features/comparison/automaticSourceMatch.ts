@@ -43,8 +43,8 @@ export function automaticallyAcceptedSourceLine(
       // The canonical matcher has already required a clear margin over the
       // runner-up. Exact semantic identity is the additional auto-accept gate.
       !Number.isFinite(line.matchScore) || line.matchScore < 65 ||
-      !Number.isSafeInteger(line.lineTotalCents) || line.lineTotalCents < 0 ||
-      !Number.isSafeInteger(line.pricePerPackCents) || line.pricePerPackCents < 0 ||
+      !Number.isSafeInteger(line.lineTotalCents) || line.lineTotalCents <= 0 ||
+      !Number.isSafeInteger(line.pricePerPackCents) || line.pricePerPackCents <= 0 ||
       !Number.isSafeInteger(line.packs) || line.packs <= 0 ||
       !tokensMatch(query, line.productName) ||
       !tokensMatch(line.ingredientLabel, line.productName)) return false
@@ -55,7 +55,7 @@ export function automaticallyAcceptedSourceLine(
   return source.available === true &&
     source.name === line.productName &&
     source.priceCents === line.pricePerPackCents &&
-    Number.isSafeInteger(source.priceCents) && source.priceCents >= 0 &&
+    Number.isSafeInteger(source.priceCents) && source.priceCents > 0 &&
     source.packAmount !== null && source.packAmount === line.pack.amount &&
     source.packUnit === line.pack.unit &&
     (source.packCount ?? 1) === line.pack.count
