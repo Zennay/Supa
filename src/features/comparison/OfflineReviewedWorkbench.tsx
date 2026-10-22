@@ -466,6 +466,30 @@ export function OfflineReviewedWorkbench({
   const capturePreviewFresh = (store: CapturePreviewStore) =>
     freshPreviewInstant(store.observedNs)
 
+  // A side-by-side coverage PREVIEW for two personally supplied shop files.
+  // Matching proposals are not accepted product identities or priced savings.
+  const pairedPreviewRows = useMemo(() => {
+    const preview = capturePreview?.week === captureWeek ? capturePreview : null
+    if (!preview || preview.stores.length !== 2 || preview.stores.some(shop => !shop.matching))
+      return null
+    const forStore = (retailer: CaptureStore) => new Map(
+      preview.stores.find(shop => shop.retailer === retailer)?.matching?.lines
+        .map(line => [line.id, line] as const) ?? [],
+    )
+    const plus = forStore('PLUS')
+    const deka = forStore('DekaMarkt')
+    return plannerCaptureNeeds.map(need => {
+      const plusLine = plus.get(need.id)
+      const dekaLine = deka.get(need.id)
+      return {
+        id: need.id, label: need.label,
+        amount: need.amount, unit: need.unit,
+        plusCode: plusLine?.status === 'matched' ? plusLine.originalSku : null,
+        dekaCode: dekaLine?.status === 'matched' ? dekaLine.originalSku : null,
+      }
+    })
+  }, [capturePreview, captureWeek, plannerCaptureNeeds])
+
   async function previewFilledCsv(files: File[]) {
     if (files.length === 0) return
     const version = ++importRevision.current
@@ -2755,6 +2779,29 @@ export function OfflineReviewedWorkbench({
                   )}
                 </details>
               ))}
+              {pairedPreviewRows && (
+                <details className="offline-price-workbench__capture-matching">
+                  <summary>Hetzelfde fysieke mandje, twee winkelbronnen:
+                    {' '}{pairedPreviewRows.filter(row => row.plusCode && row.dekaCode).length}
+                    {' '}van {pairedPreviewRows.length} ingrediënten hebben in beide winkels een voorstel
+                  </summary>
+                  <p className="disclaimer">
+                    Dit is uitsluitend een vergelijking van voorgestelde productmatches
+                    voor identieke Planner-hoeveelheden. Controleer beide originele SKU's,
+                    verpakkingen en opnametijden zelf. Geen prijsverschil of besparing is bevestigd.
+                  </p>
+                  <ul>
+                    {pairedPreviewRows.map(row => (
+                      <li key={row.id}>
+                        <strong>{row.label}</strong>
+                        {' '}· {row.amount ?? 'hoeveelheid onbekend'} {row.unit}
+                        {' '}· PLUS: {row.plusCode ? 'voorstel ' + row.plusCode : 'nog geen bruikbare match'}
+                        {' '}· DekaMarkt: {row.dekaCode ? 'voorstel ' + row.dekaCode : 'nog geen bruikbare match'}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
               {currentPreview.unobservedOtherStoreRows > 0 && (
                 <p>{currentPreview.unobservedOtherStoreRows}
                   {' '}niet geobserveerde regels bij de andere winkel;
