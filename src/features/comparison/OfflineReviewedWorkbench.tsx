@@ -3111,6 +3111,14 @@ export function OfflineReviewedWorkbench({
                     {pairedPreviewDisplayed.map(row => {
                       const pairedCents = row.deltaCents !== null
                       const delta = row.deltaCents
+                      const unitCandidate = pairedCents &&
+                        row.plusUnitCents !== null && row.dekaUnitCents !== null &&
+                        row.plusUnitFamily !== null && row.plusUnitFamily === row.dekaUnitFamily
+                        ? row.dekaUnitCents - row.plusUnitCents : null
+                      const unitDelta = unitCandidate !== null &&
+                        Number.isSafeInteger(unitCandidate) ? unitCandidate : null
+                      const differentWinner = delta !== null && unitDelta !== null &&
+                        delta !== 0 && unitDelta !== 0 && Math.sign(delta) !== Math.sign(unitDelta)
                       return <li key={row.id}>
                         <strong>{row.label}</strong>
                         {' '}· {row.amount ?? 'hoeveelheid onbekend'} {row.unit}
@@ -3132,6 +3140,22 @@ export function OfflineReviewedWorkbench({
                             {' '}Niet bevestigd: bronartikel, onderlinge gelijkwaardigheid
                             en echte aankoopprijs moeten nog worden gecontroleerd.
                           </small>
+                        )}
+                        {unitDelta !== null && (
+                          <small>
+                            {' '}· Voorlopig genormaliseerd eenheidsprijsverschil:
+                            {' '}{unitDelta > 0 ? '+' : unitDelta < 0 ? '−' : ''}
+                            {exactEuro.formatCents(Math.abs(unitDelta))}
+                            {' '}/ {row.plusUnitFamily} (DekaMarkt minus PLUS).
+                          </small>
+                        )}
+                        {differentWinner && (
+                          <p className="offline-price-workbench__capture-alert" role="status">
+                            Let op: laagste voorlopige eenheidsprijs en laagste prijs
+                            voor de benodigde hele verpakkingen wijzen hier naar
+                            verschillende winkels. Het hele-pakbedrag is leidend
+                            voor een uiteindelijke boodschappenmand, pas na jouw bronreview.
+                          </p>
                         )}
                         {!pairedCents && <small>Geen betrouwbaar vergelijkbare
                           regelprijs uit beide bronnen; onbekend, niet €0.</small>}
