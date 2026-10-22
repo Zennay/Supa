@@ -86,8 +86,13 @@ export function importPlainTextRecipe(raw: string): UserRecipeDraft {
         const markdownLink = /^\[[^\]\r\n]{1,180}\]\((https:\/\/[^()\s]+)\)$/iu.exec(candidate)
         const autolink = /^<([^<>\s]+)>$/u.exec(candidate)
         const rawSource = markdownLink?.[1] ?? autolink?.[1] ?? candidate
+        const canonicalOriginal = new URL(rawSource)
+        canonicalOriginal.hash = ''
         sourceUrl = safeRecipeSourceUrl(rawSource)
-        if (sourceUrl !== rawSource) sourceWarnings.push(
+        // URL canonicalization (for example adding a trailing slash) is not
+        // itself a warning. Only a change beyond normal URL serialization
+        // means sensitive query parameters were removed.
+        if (sourceUrl !== canonicalOriginal.toString()) sourceWarnings.push(
           'De bronlink is veilig opgeschoond; controleer de openbare bronvermelding.')
         continue
       }
