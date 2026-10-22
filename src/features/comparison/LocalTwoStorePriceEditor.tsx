@@ -95,7 +95,7 @@ function eurosToCents(raw: string): number | null {
   if (!/^\d{1,5}(?:[.,]\d{1,2})?$/.test(raw)) return null
   const [whole, decimal = ''] = raw.replace(',', '.').split('.')
   const cents = Number(whole) * 100 + Number(decimal.padEnd(2, '0'))
-  return Number.isSafeInteger(cents) && cents >= 0 && cents <= 1000000 ? cents : null
+  return Number.isSafeInteger(cents) && cents > 0 && cents <= 1000000 ? cents : null
 }
 
 // A completed form is still only an unverified personal observation.
@@ -168,7 +168,7 @@ function currentDraftPackMath(row: ProductDraft,
   )
   if (packs === null || !Number.isSafeInteger(packs) || packs <= 0) return null
   const total = packs * priceCents
-  if (!Number.isSafeInteger(total) || total < 0) return null
+  if (!Number.isSafeInteger(total) || total <= 0) return null
   const rate = privatePackUnitRate({
     amount: packAmount, unit: row.packUnit as Unit, count, priceCents,
   })

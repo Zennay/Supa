@@ -165,8 +165,8 @@ function convertStoreCsv(text, allowOne) {
     if (unit === 'piece' && amount !== null && !Number.isSafeInteger(amount)) {
       error(location + ': een verpakking met losse stuks vereist een heel aantal stuks.')
     }
-    const priceCents = cents === '' ? null : parseInteger(cents, 0, 1000000)
-    if (cents !== '' && priceCents === null) error(location + ': prijs in hele eurocenten vereist.')
+    const priceCents = cents === '' ? null : parseInteger(cents, 1, 1000000)
+    if (cents !== '' && priceCents === null) error(location + ': prijs in positieve hele eurocenten vereist.')
     const packCount = count === '' ? null : parseInteger(count, 1, 1000)
     if (count !== '' && packCount === null) error(location + ': multipack-aantal ongeldig.')
     if (available && (amount === null || priceCents === null || packCount === null)) {
