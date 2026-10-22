@@ -35,7 +35,7 @@ export function PrivatePartialProductCards({
   useEffect(() => {
     if (!incomingSearch?.serial) return
     setQuery(incomingSearch.text.slice(0, 120))
-    setStore(incomingSearch.store === 'PLUS' || incomingSearch.store === 'DekaMarkt'
+    setStore(incomingSearch.store && incomingSearch.store !== 'all'
       ? incomingSearch.store : 'both')
     setUnit('all')
     setSort('source')
@@ -209,8 +209,17 @@ export function PrivatePartialProductCards({
         </article>
       })}
     </div>
-    {filtered.length === 0 && <p role="status">Geen bevestigde bronproducten
-      voor deze selectie. Verwijder filters of open de bronreview.</p>}
+    {filtered.length === 0 && <div className="private-reviewed-products__no-match" role="status">
+      <p>Geen bevestigde losse bronproducten voor deze naam en filters. De eigen
+        bron kan een andere productnaam hebben; geen match of prijs wordt aangenomen.</p>
+      <button type="button" onClick={() => {
+        setQuery(''); setUnit('all'); setSort('source')
+      }}>Toon alle eigen {store === 'both' ? 'winkelproducten' : store + '-producten'}</button>
+      {store !== 'both' && <button type="button" onClick={() => {
+        setQuery(''); setStore('both'); setUnit('all'); setSort('source')
+      }}>Bekijk eigen producten van beide winkels</button>}
+      <button type="button" onClick={onOpenComparison}>Bekijk ontbrekende bronartikelen</button>
+    </div>}
     {message && <p role="status">{message}</p>}
     <button type="button" onClick={onOpenComparison}>
       Maak ontbrekende winkelproducten compleet in Vergelijk
