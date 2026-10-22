@@ -146,7 +146,9 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct,
   // design asset collection. Extra examples remain searchable and can be
   // expanded explicitly; neither view supplies real retailer prices.
   const featuredFigmaIds = new Set(['cola-regular', 'cola-zero', 'cola-pack', 'figma-paprika'])
-  const visibleFigmaMatches = expandedFigmaExamples || queryTerms.length > 0 || favoritesOnly
+  // A selected item can come from any Figma example, not just the four
+  // initially featured cards. "Only my selection" must never hide it.
+  const visibleFigmaMatches = expandedFigmaExamples || queryTerms.length > 0 || favoritesOnly || selectedOnly
     ? matchingProducts
     : matchingProducts.filter(product => featuredFigmaIds.has(product.id))
   const products = sortByPrice ? orderDemoProductsByUnitPrice(visibleFigmaMatches) :
