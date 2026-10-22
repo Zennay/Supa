@@ -161,3 +161,11 @@
   border-radius: .6rem;
   background: #fff9e9;
 }
+.supa-manual-source__product.is-invalid {
+  border: 2px solid #a32f26;
+  box-shadow: 0 0 0 2px rgba(163, 47, 38, 0.12);
+}
+.supa-manual-source__product.is-invalid:focus-within {
+  outline: 2px solid #a32f26;
+  outline-offset: 3px;
+}

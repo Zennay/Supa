@@ -82,6 +82,7 @@ export function ManualOwnSourceEntry({ onPreview, onOpenReview, busy, template, 
   const [activeScan, setActiveScan] = useState<{store: Store; index: number} | null>(null)
   const [scanned, setScanned] = useState<{store: Store; index: number; code: string} | null>(null)
   const [confirmedScan, setConfirmedScan] = useState(false)
+  const [invalidRow, setInvalidRow] = useState<string | null>(null)
   const [guideStore, setGuideStore] = useState<Store>('PLUS')
   const [guideNeedId, setGuideNeedId] = useState('')
   const [guideMessage, setGuideMessage] = useState('')
@@ -103,6 +104,7 @@ export function ManualOwnSourceEntry({ onPreview, onOpenReview, busy, template, 
     setBackupMessage('')
     setGuideMessage('')
     setAdmissionFeedback(null)
+    setInvalidRow(null)
     setAcknowledged(false); setError('')
   }
 
@@ -373,9 +375,22 @@ export function ManualOwnSourceEntry({ onPreview, onOpenReview, busy, template, 
     setError('')
     setBackupMessage('Concept hersteld als onbevestigde invoer. Controleer alle bronmomenten en prijzen opnieuw.')
   }
+  function sourceRowForLine(csvLine: number) {
+    // The form serializes only rows with original retailer fields; Planner
+    // reminder-only rows deliberately never occupy a canonical CSV line.
+    let line = 1 // source header
+    for (const store of STORES) {
+      for (const [index, row] of sources[store].products.entries()) {
+        if (!FIELDS.some(field => row[field].trim() !== '')) continue
+        if (++line === csvLine) return { store, index }
+      }
+    }
+    return null
+  }
   function preview() {
     setError('')
     setAdmissionFeedback(null)
+    setInvalidRow(null)
     if (!acknowledged) {
       setError('Bevestig eerst dat alle productgegevens en bronmomenten daadwerkelijk door jou zijn vastgelegd.')
       return
@@ -384,8 +399,12 @@ export function ManualOwnSourceEntry({ onPreview, onOpenReview, busy, template, 
       const raw = serializeManualCapture(sources)
       const ticket = ++readTicket.current
       onPreview(raw, (message, admitted) => {
-        if (ticket === readTicket.current)
-          setAdmissionFeedback({ message, admitted, raw })
+        if (ticket !== readTicket.current) return
+        setAdmissionFeedback({ message, admitted, raw })
+        const line = !admitted ? /^CSV-regel (\d+):/u.exec(message) : null
+        const row = line ? sourceRowForLine(Number(line[1])) : null
+        setInvalidRow(row ? row.store + '-' + row.index : null)
+        if (row) window.requestAnimationFrame(() => jumpToNeed(row.store, row.index))
       })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'De handmatige bron kon niet worden voorbereid.')
@@ -495,10 +514,18 @@ export function ManualOwnSourceEntry({ onPreview, onOpenReview, busy, template, 
           <small>Alle artikelen hieronder moeten echt op ditzelfde bronmoment zijn
             vastgelegd. Gebruik anders een apart bronbestand; geen geschat moment.</small>
           {source.products.map((product, index) =>
-            <div className="supa-manual-source__product" id={'supa-manual-' + store + '-' + index} key={index}>
+            <div className={'supa-manual-source__product' +
+              (invalidRow === store + '-' + index ? ' is-invalid' : '')}
+              id={'supa-manual-' + store + '-' + index} key={index}>
               {product.needHint && <p className="supa-manual-source__hint">
                 <strong>Planner-herinnering (geen winkelproduct):</strong>
-                {' '}{product.needHint.label} · nodig: {product.needHint.quantity}.
+                {' '}{needs.find(need => need.id === product.needHint?.id)
+                  ? (() => {
+                      const current = needs.find(need => need.id === product.needHint?.id)!
+                      return current.label + ' · nodig: ' +
+                        readablePlannerDemandAmount(current.amount) + ' ' + current.unit
+                    })()
+                  : product.needHint.label + ' · oude hoeveelheid: ' + product.needHint.quantity}.
                 {!needs.some(need => need.id === product.needHint?.id) &&
                   <em> Deze vraag staat niet meer in de huidige Planner-week.</em>}
               </p>}
