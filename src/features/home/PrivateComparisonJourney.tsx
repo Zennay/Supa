@@ -831,6 +831,10 @@ export function PrivateComparisonJourney({
             Bewaar persoonlijk prijs- en SKU-overzicht (TXT)
           </button>
           <button type="button" className="ghost-button"
+            onClick={() => void downloadCompleteOwnComparison('html')}>
+            Download afdrukbaar privévergelijkingsblad (HTML)
+          </button>
+          <button type="button" className="ghost-button"
             onClick={() => void handOffCompleteComparison('copy')}>
             Kopieer mijn volledige winkelvergelijking
           </button>
