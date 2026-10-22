@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import type { OneStoreBasket } from '../../domain/basket.ts'
+import type { OneStoreBasket, BasketTraceLine } from '../../domain/basket.ts'
 import type { OfflineCapture } from '../../domain/offlineReviewedImport.ts'
 import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
+import { privateUnitPrice } from './privateUnitPrice.ts'
 
 type StoreId = 'PLUS' | 'DekaMarkt'
-type PendingSourceReview = { id: string; ingredientLabel: string; productId: string; productName: string }
+type PendingSourceReview = Extract<BasketTraceLine, { status: 'matched' }>
 
 function singleLine(value: string): string {
   return value.replace(/[\r\n\t\u0000-\u001f\u007f\u2028\u2029]/gu, ' ').trim().slice(0, 200)
@@ -92,7 +93,10 @@ export function ComparisonReadiness({
         ...(pendingReviewByStore?.[store].length
           ? [`${pendingReviewByStore[store].length} voorgestelde bronartikelregels wachten op jouw controle:`,
               ...pendingReviewByStore[store].map(item =>
-                `☐ ${singleLine(item.ingredientLabel)} · ${singleLine(item.productName)} · originele SKU ${singleLine(item.productId)} · niet bevestigd`)]
+                `☐ ${singleLine(item.ingredientLabel)} · ${singleLine(item.productName)} · originele SKU ${singleLine(item.productId)}` +
+                ` · ${item.pack.count} × ${readablePlannerDemandAmount(item.pack.amount)} ${item.pack.unit} per pak` +
+                ` · ${new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(item.pricePerPackCents / 100)} ingevoerde pakprijs` +
+                ` · ${privateUnitPrice(item) ?? 'eenheidsprijs nog niet berekenbaar'} · NIET bevestigd`)]
           : []),
         ...(unresolved.length === 0 ? ['Geen onopgeloste productkoppelingen in dit mandje.'] : []),
       ]

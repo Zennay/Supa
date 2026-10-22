@@ -3462,17 +3462,11 @@ export function OfflineReviewedWorkbench({
                       PLUS: basketPair.plus.lines.filter(line =>
                         line.status === 'matched' &&
                         !isAcceptedKey(reviewedLineKey('PLUS', imported.captures.PLUS!.observedAt, line))
-                      ).flatMap(line => line.status === 'matched' ? [{
-                        id: line.id, ingredientLabel: line.ingredientLabel,
-                        productId: line.productId, productName: line.productName,
-                      }] : []),
+                      ).flatMap(line => line.status === 'matched' ? [line] : []),
                       DekaMarkt: basketPair.deka.lines.filter(line =>
                         line.status === 'matched' &&
                         !isAcceptedKey(reviewedLineKey('DekaMarkt', imported.captures.DekaMarkt!.observedAt, line))
-                      ).flatMap(line => line.status === 'matched' ? [{
-                        id: line.id, ingredientLabel: line.ingredientLabel,
-                        productId: line.productId, productName: line.productName,
-                      }] : []),
+                      ).flatMap(line => line.status === 'matched' ? [line] : []),
                     }}
                     onReviewFirstPending={() => {
                       const pending = stores.flatMap(store => {
