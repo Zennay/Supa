@@ -159,9 +159,12 @@ export function PrivateComparisonJourney({
     if (completeStoreFilter === 'plus' && row.deltaCents <= 0) return false
     if (completeStoreFilter === 'deka' && row.deltaCents >= 0) return false
     if (completeStoreFilter === 'equal' && row.deltaCents !== 0) return false
+    const formatPack = (line: typeof row.plusLine) =>
+      [line.pack.amount, line.pack.unit, line.pack.count + ' per pak',
+        line.packs + ' hele pakken'].join(' ')
     const haystack = [row.id, row.ingredientLabel,
-      row.plusLine.productId, row.plusLine.productName,
-      row.dekaLine.productId, row.dekaLine.productName,
+      row.plusLine.productId, row.plusLine.productName, formatPack(row.plusLine),
+      row.dekaLine.productId, row.dekaLine.productName, formatPack(row.dekaLine),
     ].join(' ').normalize('NFKC').toLocaleLowerCase('nl-NL')
     return completeWords.every(word => haystack.includes(word))
   }).sort((a, b) => {
@@ -884,7 +887,7 @@ export function PrivateComparisonJourney({
       <p className="disclaimer">De grootste controleerbare hele-pakverschillen staan bovenaan.
         Bekijk of zoek oorspronkelijke productregels; dit verandert het mandtotaal niet.</p>
       <label className="private-comparison-journey__partial-search">
-        <span>Zoek ingrediënt of originele PLUS/Deka-productnaam en SKU</span>
+        <span>Zoek ingrediënt, PLUS/Deka-product, SKU of verpakking</span>
         <input type="search" value={completeQuery}
           onChange={event => { setCompleteQuery(event.currentTarget.value); setShowAllComplete(true) }}
           placeholder="Bijvoorbeeld tomaten 500 g" />
