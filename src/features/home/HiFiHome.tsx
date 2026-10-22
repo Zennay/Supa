@@ -420,18 +420,31 @@ export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: 
   const selectedExamples = designProducts.filter(item => ids.includes(item.id))
   const recognizedIds = new Set([...selectedHistorical.map(item => item.id), ...selectedExamples.map(item => item.id)])
   const selectedUnknown = ids.filter(id => !recognizedIds.has(id))
-  const selectedLines = [...selectedHistorical.map(item => `☐ ${item.name} · ${item.store} · ${item.pack} · prijs onbekend (historisch)`),
-    ...selectedExamples.map(item => `☐ ${item.name} · Figma-demo, geen actuele prijs`),
-    ...selectedUnknown.map(id => `☐ Product niet beschikbaar · oude product-ID ${id} · prijs onbekend`)]
+  const selectedLines = [...selectedHistorical.map(item => `${completed(item.id) ? '☒' : '☐'} ${item.name} · ${item.store} · ${item.pack} · prijs onbekend (historisch)`),
+    ...selectedExamples.map(item => `${completed(item.id) ? '☒' : '☐'} ${item.name} · Figma-demo, geen actuele prijs`),
+    ...selectedUnknown.map(id => `${completed(id) ? '☒' : '☐'} Product niet beschikbaar · oude product-ID ${id} · prijs onbekend`)]
   const selectionText = selectedLines.join('\n')
-  const downloadSelection = () => {
-    if (typeof document === 'undefined' || !selectedLines.length) return
+  const openSelectionText = selectedLines.filter(line => line.startsWith('☐ ')).join('\n')
+  const visibleHistorical = openOnly ? selectedHistorical.filter(item => !completed(item.id)) : selectedHistorical
+  const visibleExamples = openOnly ? selectedExamples.filter(item => !completed(item.id)) : selectedExamples
+  const visibleUnknown = openOnly ? selectedUnknown.filter(id => !completed(id)) : selectedUnknown
+  const progressControl = (id: string, name: string) => (
+    <label className="hifi-picked-tick">
+      <input type="checkbox" checked={completed(id)} onChange={() => toggleDone(id)}
+        disabled={!progress.writable} aria-label={`Afgevinkt: ${name}`} />
+      <span>{completed(id) ? 'Gekocht' : 'Nog kopen'}</span>
+    </label>
+  )
+  const downloadSelection = (onlyOpen = false) => {
+    const selected = onlyOpen ? openSelectionText : selectionText
+    if (typeof document === 'undefined' || !selected) return
     const note = 'SUPA · eigen productselectie (ongeprijsd)\n' +
-      'Niet meegerekend in Planner, geverifieerde winkelmand of besparing.\n\n' + selectionText + '\n'
+      'Niet meegerekend in Planner, geverifieerde winkelmand of besparing.\n' +
+      'Gekocht = eigen handmatig afgevinkte status, geen winkelbewijs.\n\n' + selected + '\n'
     const url = URL.createObjectURL(new Blob([note], { type: 'text/plain;charset=utf-8' }))
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = 'supa-eigen-productselectie-ongeprijsd.txt'
+    anchor.download = onlyOpen ? 'supa-nog-te-kopen-ongeprijsd.txt' : 'supa-eigen-productselectie-ongeprijsd.txt'
     document.body.appendChild(anchor)
     try { anchor.click() } finally {
       anchor.remove()
@@ -476,7 +489,7 @@ export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: 
           aria-label={`Verwijder: ${p.name}`}>Verwijder</button>
       </div>)}
     </div>}
-    <button type="button" className="hifi-history-add" onClick={downloadSelection}>
+    <button type="button" className="hifi-history-add" onClick={() => downloadSelection(false)}>
       Download mijn ongeprijsde selectie (.txt)
     </button>
     <label className="hifi-picked-copy-label">Kopieer je gekozen productnamen
