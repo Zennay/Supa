@@ -13,6 +13,7 @@ import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureG
 import { PlannerSourceMatchPreview } from './PlannerSourceMatchPreview.tsx'
 import { replaceOwnStoreCapture, type CaptureRefreshChanges } from './combineOwnSourceCapture.ts'
 import { privateSourceChangeCsv } from './privateSourceChangeCsv.ts'
+import { readOwnSourceTextFile } from '../comparison/readLocalCaptureDraftFiles.ts'
 import './plannerQuickSourcePaste.css'
 
 type Preview = { raw: string; normalized: string; data: OfflinePriceSnapshots; needScope: string }
@@ -125,12 +126,13 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
     }
     setBusy(true)
     try {
-      const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      const raw = await readOwnSourceTextFile(file)
       if (ticket !== revision.current) return
       setDraft(raw)
       await inspectSource(raw)
-    } catch {
-      if (ticket === revision.current) setMessage('Bronbestand moet geldige UTF-8 CSV, TSV of JSON bevatten.')
+    } catch (cause) {
+      if (ticket === revision.current)
+        setMessage(cause instanceof Error ? cause.message : 'Bronbestand niet herkend.')
     } finally {
       if (ticket === revision.current) setBusy(false)
     }
@@ -150,7 +152,7 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
       for (const file of files) {
         if (file.size === 0 || file.size > limit)
           throw new Error('Elk bestand moet gevuld en maximaal 256 kB zijn.')
-        const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+        const raw = await readOwnSourceTextFile(file)
         if (ticket !== revision.current) return
         const normalized = await normalizedOwnSource(raw)
         if (ticket !== revision.current) return
@@ -196,7 +198,7 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
     }
     setBusy(true)
     try {
-      const raw = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      const raw = await readOwnSourceTextFile(file)
       if (ticket !== revision.current) return
       const normalized = await normalizedOwnSource(raw)
       if (ticket !== revision.current) return
