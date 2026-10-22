@@ -220,12 +220,25 @@ export function PrivateComparisonJourney({
   // canonical basket or promotes a partial sum into a whole-week estimate.
   const foldPartial = (value: string) => value.normalize('NFKC')
     .toLocaleLowerCase('nl-NL')
-  const normalizedPartialQuery = foldPartial(partialQuery.trim())
-  const filteredPartialPairs = partialPairs.filter(row =>
-    !normalizedPartialQuery || [row.name, row.id, row.plusProduct?.productName ?? '',
-      row.plusProduct?.productId ?? '', row.dekaProduct?.productName ?? '',
-      row.dekaProduct?.productId ?? ''].some(value =>
-      foldPartial(value).includes(normalizedPartialQuery)))
+  // Each word may match a different original fact (ingredient, retailer,
+  // SKU, pack, observation time). Never search demo prices or fabricated
+  // matches; a search result is still only an individually reviewed pair.
+  const partialWords = foldPartial(partialQuery.trim()).split(/\s+/u)
+    .filter(Boolean).slice(0, 12)
+  const filteredPartialPairs = partialPairs.filter(row => {
+    const productFacts = (store: OwnStore, product?: PrivateKnownProduct,
+      capturedAt?: string) => !product ? '' : [
+        store, product.productName, product.productId, product.packAmount,
+        product.packUnit, product.packCount, product.unitRate ?? '',
+        capturedAt ?? '',
+      ].join(' ')
+    const searchable = foldPartial([
+      row.name, row.id, row.amount, row.unit,
+      productFacts('PLUS', row.plusProduct, row.plusObservedAt),
+      productFacts('DekaMarkt', row.dekaProduct, row.dekaObservedAt),
+    ].join(' '))
+    return partialWords.every(word => searchable.includes(word))
+  })
   const orderedPartialPairs = [...filteredPartialPairs].sort((a, b) =>
     Math.abs(b.dekaCents - b.plusCents) - Math.abs(a.dekaCents - a.plusCents) ||
     a.name.localeCompare(b.name, 'nl-NL'))
