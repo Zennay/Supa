@@ -877,7 +877,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
               {unitDelta !== null && plusUnit && <p role="note">
                 <strong>Eenheidsprijsverschil (DekaMarkt min PLUS, afgerond): </strong>
                 {unitDelta > 0 ? '+' : unitDelta < 0 ? '−' : ''}
-                {money.format(Math.abs(unitDelta) / 100)} per {plusUnit.unit}.
+                {exactEuro.formatCents(Math.abs(unitDelta))} per {plusUnit.unit}.
                 {' '}Dit vergelijkt alleen de eenheidsprijs; hele verpakkingen bepalen de kosten.
               </p>}
             </article>
@@ -1024,7 +1024,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
     if (!Number.isSafeInteger(rawDelta)) return null
     return 'Eenheidsprijsverschil DekaMarkt min PLUS (afgerond): ' +
       (rawDelta > 0 ? '+' : rawDelta < 0 ? '−' : '') +
-      money.format(Math.abs(rawDelta) / 100) + ' per ' + a.unit + '.'
+      exactEuro.formatCents(Math.abs(rawDelta)) + ' per ' + a.unit + '.'
   }
   function unitPriceWarning(first: Matched, second: Matched): string | null {
     const a = rate(first)
