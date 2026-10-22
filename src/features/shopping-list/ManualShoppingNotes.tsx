@@ -1011,6 +1011,30 @@ export function ManualShoppingNotes({ notes, setNotes }: {
   }
   const exportText = formatOwnList(routeItems)
   const selectedExportText = formatOwnList(selectedVisible)
+  async function shareSelectedPersonalNotes() {
+    if (!selectedVisible.length) return
+    // Share sheet is explicitly user-initiated and receives ONLY selected,
+    // currently visible own notes. No retailer provenance, price or budget.
+    if (typeof navigator.share !== 'function') {
+      downloadSelected()
+      setMessage('Mobiel delen is niet beschikbaar. Alleen je zichtbare selectie is als ongeprijsd TXT-bestand opgeslagen.')
+      return
+    }
+    try {
+      await navigator.share({
+        title: 'Mijn geselecteerde ongeprijsde boodschappen',
+        text: selectedExportText,
+      })
+      setMessage('Alleen je geselecteerde persoonlijke boodschappen zijn aan het mobiele deelmenu aangeboden.')
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        setMessage('Delen geannuleerd; je geselecteerde boodschappen zijn niet aangepast.')
+      } else {
+        downloadSelected()
+        setMessage('Delen niet toegestaan. Alleen je zichtbare selectie is als privé-TXT opgeslagen.')
+      }
+    }
+  }
   async function sharePersonalShoppingList() {
     if (!visible.length) return
     // Only the currently visible personal notes are shared, after an explicit
@@ -1358,6 +1382,10 @@ export function ManualShoppingNotes({ notes, setNotes }: {
     <p className="manual-shopping-notes__order-hint">Orden je eigen artikelen binnen een winkel met ↑ en ↓. Zet zoeken en 'Alleen open' uit om de hele volgorde te bewerken; kopie, TXT en print nemen jouw volgorde over. Selecteer losse regels om alleen die naar een andere winkel te verplaatsen.</p>
     {selectedMoveIds.length > 0 && <p role="status" aria-live="polite">
       {selectedMoveIds.length} artikelen geselecteerd voor een mogelijke winkelwissel.
+      <button type="button" disabled={!selectedVisible.length}
+        onClick={() => void shareSelectedPersonalNotes()}>
+        Deel zichtbare selectie (mobiel)
+      </button>
       <button type="button" disabled={!selectedVisible.length} onClick={downloadSelected}>
         Download zichtbare selectie als TXT
       </button>
