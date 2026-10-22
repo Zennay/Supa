@@ -62,6 +62,9 @@ export function PrivateComparisonJourney({
   const [showPasteSource, setShowPasteSource] = useState(false)
   const [captureMessage, setCaptureMessage] = useState('')
   const [partialQuery, setPartialQuery] = useState('')
+  // Search is presentation-only; source admission and basket totals are unchanged.
+  const [completeQuery, setCompleteQuery] = useState('')
+  const [showAllComplete, setShowAllComplete] = useState(false)
   const [showAllPartial, setShowAllPartial] = useState(false)
   const [showTargetedCapture, setShowTargetedCapture] = useState(false)
   const [showTwoStoreCoverage, setShowTwoStoreCoverage] = useState(false)
@@ -136,6 +139,17 @@ export function PrivateComparisonJourney({
       }).sort((a, b) => Math.abs(b.deltaCents) - Math.abs(a.deltaCents) ||
         a.ingredientLabel.localeCompare(b.ingredientLabel, 'nl-NL'))
     : []
+  const completeWords = completeQuery.normalize('NFKC').toLocaleLowerCase('nl-NL')
+    .trim().split(/\s+/u).filter(Boolean).slice(0, 12)
+  const filteredFullLinePairs = fullLinePairs.filter(row => {
+    const haystack = [row.id, row.ingredientLabel,
+      row.plusLine.productId, row.plusLine.productName,
+      row.dekaLine.productId, row.dekaLine.productName,
+    ].join(' ').normalize('NFKC').toLocaleLowerCase('nl-NL')
+    return completeWords.every(word => haystack.includes(word))
+  })
+  const visibleFullLinePairs = showAllComplete || completeWords.length
+    ? filteredFullLinePairs : filteredFullLinePairs.slice(0, 3)
   const singleReady = !!plus || !!deka
   // The workbench emits partial source rows via captureProgress, never as a
   // falsely complete reviewed basket. Reuse the same admission logic used by
@@ -813,9 +827,23 @@ export function PrivateComparisonJourney({
         </div>
         <button type="button" onClick={() => onOpenList(cheaper ?? undefined)}>Open winkellijst</button>
       </div>
-      <details>
-        <summary>Bekijk alle {fullLinePairs.length} oorspronkelijke prijsregels</summary>
-        <ul>{fullLinePairs.map(row => <li key={row.id}>
+      <p className="disclaimer">De grootste controleerbare hele-pakverschillen staan bovenaan.
+        Bekijk of zoek oorspronkelijke productregels; dit verandert het mandtotaal niet.</p>
+      <label className="private-comparison-journey__partial-search">
+        <span>Zoek ingrediënt of originele PLUS/Deka-productnaam en SKU</span>
+        <input type="search" value={completeQuery}
+          onChange={event => { setCompleteQuery(event.currentTarget.value); setShowAllComplete(true) }}
+          placeholder="Bijvoorbeeld tomaten 500 g" />
+      </label>
+      <small role="status">{filteredFullLinePairs.length} van {fullLinePairs.length}
+        {' '}fysieke ingrediënten zichtbaar · geen andere prijsberekening.</small>
+      {visibleFullLinePairs.length === 0 && <div role="status">
+        <p>Geen gecontroleerde productregels gevonden voor deze zoekterm.</p>
+        <button type="button" onClick={() => { setCompleteQuery(''); setShowAllComplete(false) }}>
+          Wis zoekterm en toon grootste verschillen
+        </button>
+      </div>}
+      <ul>{visibleFullLinePairs.map(row => <li key={row.id}>
           <div className="private-comparison-journey__complete-ingredient">
             <strong>{row.ingredientLabel}</strong>
             <small>Nodig: {row.plusLine.requirement.amount} {row.plusLine.requirement.unit}</small>
@@ -837,12 +865,19 @@ export function PrivateComparisonJourney({
             })}
           </div>
         </li>)}</ul>
-        <p>Bedragen uit je eigen volledige bronmandje; eenheidsprijzen zijn indicatief.
-          Geen kassagarantie of onafhankelijk aangetoonde besparing.</p>
-        <button type="button" onClick={onOpenProducts}>
-          Controleer originele SKU’s en winkelkeuzes in Producten
-        </button>
-      </details>
+      {!showAllComplete && !completeWords.length && fullLinePairs.length > 3 &&
+        <button type="button" onClick={() => setShowAllComplete(true)}>
+          Bekijk alle {fullLinePairs.length} prijsverschillen per ingrediënt
+        </button>}
+      {showAllComplete && !completeWords.length && fullLinePairs.length > 3 &&
+        <button type="button" onClick={() => setShowAllComplete(false)}>
+          Toon alleen de drie grootste prijsverschillen
+        </button>}
+      <p>Bedragen uit je eigen volledige bronmandje; eenheidsprijzen zijn indicatief.
+        Geen kassagarantie of onafhankelijk aangetoonde besparing.</p>
+      <button type="button" onClick={onOpenProducts}>
+        Controleer originele SKU’s en winkelkeuzes in Producten
+      </button>
     </section>}
     {!ready && partialPairs.length > 0 && <section
       className="private-comparison-journey__partial"
