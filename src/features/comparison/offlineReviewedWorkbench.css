@@ -596,3 +596,14 @@ border-radius:10px;padding:.65rem;scroll-margin-top:1.25rem}
     width:100%; box-sizing:border-box; min-width:0;
   }
 }
+
+.offline-price-workbench__copy-fallback {
+  display: grid; gap: .55rem; min-width: 0; margin: 1rem 0;
+}
+.offline-price-workbench__copy-fallback textarea {
+  width: 100%; max-width: 100%; box-sizing: border-box;
+  resize: vertical; overflow-wrap: anywhere; font: inherit;
+}
+.offline-price-workbench__copy-fallback :is(textarea, button):focus-visible {
+  outline: 3px solid #276e55; outline-offset: 2px;
+}
