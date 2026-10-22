@@ -154,3 +154,10 @@
 .supa-manual-source__need-link small {
   font-size: .84rem;
 }
+.supa-manual-source__old-week {
+  padding: .8rem;
+  margin: 1rem 0;
+  border: 1px solid #a48d43;
+  border-radius: .6rem;
+  background: #fff9e9;
+}

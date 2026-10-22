@@ -254,6 +254,38 @@ export function ManualOwnSourceEntry({ onPreview, onOpenReview, busy, template, 
     invalidateRestore()
     setGuideMessage('Voor beide winkels ' + added + ' lege weekregels aangemaakt. Bestaande originele productvelden blijven staan; er zijn geen SKU’s of prijzen verzonnen.')
   }
+  function reconcileChangedWeek() {
+    const current = new Set(needs.map(item => item.id))
+    let dropped = 0
+    let preserved = 0
+    const next = {} as ManualSources
+    for (const store of STORES) {
+      const source = sources[store]
+      const products: Entry[] = []
+      for (const row of source.products) {
+        if (row.needHint && !current.has(row.needHint.id)) {
+          // Never discard a user-entered original SKU, observation, pack,
+          // availability or price. Only truly blank obsolete reminders go.
+          if (FIELDS.every(field => !row[field].trim())) {
+            dropped++
+            continue
+          }
+          products.push({ ...row, needHint: undefined })
+          preserved++
+        } else products.push(row)
+      }
+      next[store] = { ...source, products }
+    }
+    if (!dropped && !preserved) {
+      setGuideMessage('Er zijn geen oude Planner-geheugensteunen om op te schonen.')
+      return
+    }
+    setSources(next)
+    invalidateRestore()
+    setGuideMessage(dropped + ' lege regels uit vorige weken verwijderd; ' +
+      preserved + ' ingevulde originele bronregels behouden zonder oude Planner-koppeling. ' +
+      'Geen SKU, prijs of tijdstip gewijzigd.')
+  }
   function statusForNeed(store: Store, id: string) {
     const index = sources[store].products.findIndex(row => row.needHint?.id === id)
     if (index < 0) return { index: -1, complete: false }
@@ -360,6 +392,10 @@ export function ManualOwnSourceEntry({ onPreview, onOpenReview, busy, template, 
     }
   }
 
+  const currentNeedIds = new Set(needs.map(need => need.id))
+  const obsoleteHints = STORES.reduce((total, store) =>
+    total + sources[store].products.filter(row =>
+      row.needHint && !currentNeedIds.has(row.needHint.id)).length, 0)
   return <details className="supa-manual-source" open={open}
     onToggle={event => setOpen(event.currentTarget.open)}>
     <summary>Geen spreadsheet? Voer eigen winkelproducten in via formulier</summary>
@@ -435,6 +471,16 @@ export function ManualOwnSourceEntry({ onPreview, onOpenReview, busy, template, 
               bestaande CSV-invulblad.</small>}
           </div>
         </details>
+      </section>}
+      {obsoleteHints > 0 && <section className="supa-manual-source__old-week">
+        <strong>{obsoleteHints} invulregels verwijzen naar een vorig weekmandje.</strong>
+        <p>Ruim uitsluitend lege herinneringsregels op. Ingevulde originele
+          productcodes, prijzen, verpakkingen en bronmomenten blijven bestaan,
+          maar worden losgemaakt van de oude Planner-week.</p>
+        <button type="button" className="ghost-button"
+          onClick={reconcileChangedWeek}>
+          Werk het formulier veilig bij voor mijn huidige week
+        </button>
       </section>}
       {STORES.map(store => {
         const source = sources[store]
