@@ -23,8 +23,10 @@ export async function readOwnSourceTextFile(file: File): Promise<string> {
   const isUtf16Le = bytes[0] === 0xff && bytes[1] === 0xfe
   const isUtf16Be = bytes[0] === 0xfe && bytes[1] === 0xff
   const isUnicodeTsv = isUtf16Le || isUtf16Be
-  if (isUnicodeTsv && !/\.tsv$/iu.test(file.name))
-    throw Error('UTF-16 wordt alleen ondersteund bij een eigen .tsv-bestand met BOM. Bewaar CSV en JSON als UTF-8.')
+  // Excel's Unicode Text export normally uses .txt; both .txt and .tsv
+  // still pass the existing strict nine-column source converter afterwards.
+  if (isUnicodeTsv && !/\.(?:tsv|txt)$/iu.test(file.name))
+    throw Error('UTF-16 wordt alleen ondersteund bij een eigen .tsv- of .txt-bestand met BOM. Bewaar CSV en JSON als UTF-8.')
   let source: string
   try {
     source = new TextDecoder(
