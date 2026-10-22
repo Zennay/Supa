@@ -12,6 +12,7 @@ import { curatedFigmaRecipes } from '../recipes/curatedFigmaRecipes'
 import { historicalRetailerProducts, filterHistoricalProducts } from '../products/historicalRetailerProducts'
 import { filterDemoProductsByUnit, orderDemoProductsByUnitPrice, type DemoUnitFilter } from '../products/productUnitPrice'
 import { productSearchText } from '../products/productSearchText'
+import { readUnpricedShoppingProgress, saveUnpricedShoppingProgress, unpricedShoppingProgressKey } from './unpricedShoppingProgress'
 
 export type HiFiTab = 'home' | 'recipes' | 'products'
 export const designProducts = [
@@ -376,6 +377,45 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
 export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: string) => void }) {
   // The standalone user-picked product collection is distinct from the meal-plan
   // ingredient checklist and never participates in the price comparator.
+  const [progress, setProgress] = useState(readUnpricedShoppingProgress)
+  const [progressMessage, setProgressMessage] = useState('')
+  const [openOnly, setOpenOnly] = useState(false)
+  useEffect(() => {
+    const sync = (event: StorageEvent) => {
+      if (event.key !== null && event.key !== unpricedShoppingProgressKey) return
+      setProgress(readUnpricedShoppingProgress())
+      setProgressMessage('Je aparte, ongeprijsde afvinklijst is op dit apparaat bijgewerkt.')
+    }
+    window.addEventListener('storage', sync)
+    return () => window.removeEventListener('storage', sync)
+  }, [])
+  const completed = (id: string) => progress.doneIds.includes(id)
+  const completedCount = ids.filter(completed).length
+  function saveDone(next: readonly string[], success: string) {
+    const saved = saveUnpricedShoppingProgress(progress, next)
+    if (!saved) {
+      setProgress(readUnpricedShoppingProgress())
+      setProgressMessage('Afvinken niet opgeslagen: deze browseropslag is gewijzigd of niet beschikbaar. De bestaande lijst is beschermd.')
+      return false
+    }
+    setProgress(saved)
+    setProgressMessage(success)
+    return true
+  }
+  function toggleDone(id: string) {
+    if (!ids.includes(id)) return
+    const next = ids.filter(candidate =>
+      candidate === id ? !completed(candidate) : completed(candidate))
+    saveDone(next, completed(id) ? 'Weer te kopen gemarkeerd.' : 'Product afgevinkt op dit apparaat.')
+  }
+  function removeAndUncheck(id: string) {
+    if (completed(id)) {
+      const cleaned = progress.doneIds.filter(item => item !== id)
+      // Never delete future-schema bytes in order to remove a product.
+      saveDone(cleaned, 'Product uit de aparte lijst verwijderd.')
+    }
+    onRemove(id)
+  }
   const selectedHistorical = historicalRetailerProducts.filter(item => ids.includes(item.id))
   const selectedExamples = designProducts.filter(item => ids.includes(item.id))
   const recognizedIds = new Set([...selectedHistorical.map(item => item.id), ...selectedExamples.map(item => item.id)])
