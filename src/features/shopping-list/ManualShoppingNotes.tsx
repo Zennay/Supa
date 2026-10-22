@@ -3,7 +3,7 @@ import './manualShoppingNotes.css'
 import { exportUnpricedShoppingCsv, exportUnpricedShoppingTsv, importUnpricedShoppingCsv, importUnpricedShoppingPaste } from './manualShoppingNotesCsv.ts'
 import { mergePrivateNotes, normalizePrivateNotes, serializePrivateNotes, PRIVATE_NOTES_BACKUP_MAX_BYTES } from './manualShoppingNotesBackup.ts'
 import { privateNoteDuplicateKey, privateNoteLabelIdentity } from './manualShoppingNoteIdentity.ts'
-import { makePrivateShoppingTemplate, parsePrivateShoppingTemplate, PRIVATE_SHOPPING_TEMPLATE_KEY, PRIVATE_SHOPPING_TEMPLATE_MAX_BYTES, type PrivateShoppingTemplateItem } from './manualShoppingTemplate.ts'
+import { makePrivateShoppingTemplate, parsePrivateShoppingTemplate, readPrivateShoppingTemplate, PRIVATE_SHOPPING_TEMPLATE_KEY, PRIVATE_SHOPPING_TEMPLATE_MAX_BYTES, type PrivateShoppingTemplateItem } from './manualShoppingTemplate.ts'
 import { privateRepeatRoundPrintableHtml } from './privateRepeatRoundPrintableHtml.ts'
 
 export type UnpricedShoppingNote = { id: string; label: string; store: 'Algemeen' | 'PLUS' | 'DekaMarkt'; done: boolean }
@@ -1225,6 +1225,28 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       setRepeatMessage(error instanceof Error ? error.message : 'De volledige herhaalronde kon niet worden afgedrukt.')
     }
   }
+  function downloadChosenRepeatTemplateJson() {
+    try {
+      const { name, items } = selectedRepeatRoundItems()
+      const parsed = readPrivateShoppingTemplate({
+        schema: 'supa-private-shopping-template-v1', name, items,
+      })
+      const raw = JSON.stringify(parsed)
+      if (new TextEncoder().encode(raw).length > PRIVATE_SHOPPING_TEMPLATE_MAX_BYTES)
+        throw Error('De gekozen privéherhaalronde is groter dan 32 kB.')
+      const url = URL.createObjectURL(new Blob([raw + '\n'], { type: 'application/json;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-geselecteerde-herhaalronde.json'
+        document.body.append(link); link.click(); link.remove()
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setRepeatMessage(items.length + ' geselecteerde privéartikelen als overdraagbaar JSON-sjabloon gedownload; actieve lijst en bestaande opgeslagen herhaalronde onveranderd.')
+    } catch (error) {
+      setRepeatPreview(null)
+      setRepeatMessage(error instanceof Error ? error.message : 'Gekozen herhaalronde kon niet worden gedownload.')
+    }
+  }
   function downloadSelectedRepeatRoundText() {
     try {
       const text = selectedRepeatRoundText()
@@ -1969,6 +1991,10 @@ export function ManualShoppingNotes({ notes, setNotes }: {
           <button type="button" disabled={!repeatPreview.selectedIndices.length}
             onClick={downloadSelectedRepeatRoundText}>
             Download gekozen herhaalartikelen (TXT)
+          </button>
+          <button type="button" disabled={!repeatPreview.selectedIndices.length}
+            onClick={downloadChosenRepeatTemplateJson}>
+            Download gekozen artikelen als herbruikbaar JSON-sjabloon
           </button>
           <button type="button" disabled={!repeatPreview.selectedIndices.length}
             onClick={downloadSelectedRepeatRoundPrint}>
