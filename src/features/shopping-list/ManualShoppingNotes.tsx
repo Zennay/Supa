@@ -4,6 +4,7 @@ import { exportUnpricedShoppingCsv, exportUnpricedShoppingTsv, importUnpricedSho
 import { mergePrivateNotes, normalizePrivateNotes, serializePrivateNotes, PRIVATE_NOTES_BACKUP_MAX_BYTES } from './manualShoppingNotesBackup.ts'
 import { privateNoteDuplicateKey, privateNoteLabelIdentity } from './manualShoppingNoteIdentity.ts'
 import { makePrivateShoppingTemplate, parsePrivateShoppingTemplate, PRIVATE_SHOPPING_TEMPLATE_KEY, PRIVATE_SHOPPING_TEMPLATE_MAX_BYTES, type PrivateShoppingTemplateItem } from './manualShoppingTemplate.ts'
+import { privateRepeatRoundPrintableHtml } from './privateRepeatRoundPrintableHtml.ts'
 
 export type UnpricedShoppingNote = { id: string; label: string; store: 'Algemeen' | 'PLUS' | 'DekaMarkt'; done: boolean }
 type SetNotes = Dispatch<SetStateAction<UnpricedShoppingNote[]>>
@@ -1190,46 +1191,38 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       '', 'Geen supermarktbron, SKU, besparingsclaim of automatische opslag.', '',
     ].join('\n')
   }
+  function downloadRepeatRoundPrint(name: string, items: readonly PrivateShoppingTemplateItem[]) {
+    const html = privateRepeatRoundPrintableHtml(name, items)
+    const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
+    try {
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'supa-geselecteerde-herhaalronde-print.html'
+      document.body.append(link); link.click(); link.remove()
+    } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+    setRepeatMessage('Offline winkelblad met ' + items.length +
+      ' artikelen per winkel gedownload. De actieve lijst bleef gelijk.')
+  }
   function downloadSelectedRepeatRoundPrint() {
     try {
-      // Recheck current source, selected items and available capacity at the
-      // moment of download. A saved template is not a product/price source.
       const { name, items } = selectedRepeatRoundItems()
-      const escapeHtml = (value: string) => value.replace(/&/gu, '&amp;')
-        .replace(/</gu, '&lt;').replace(/>/gu, '&gt;')
-        .replace(/"/gu, '&quot;').replace(/'/gu, '&#39;')
-      const groups = stores.flatMap(shop => {
-        const own = items.filter(item => item.store === shop)
-        if (!own.length) return []
-        return ['<section><h2>' + shop + ' · ' + own.length + ' artikelen</h2><ul>' +
-          own.map(item => '<li><span aria-hidden="true">☐</span> ' +
-            escapeHtml(item.label) + '</li>').join('') + '</ul></section>']
-      }).join('')
-      const html = '<!doctype html><html lang="nl"><head><meta charset="utf-8">' +
-        '<meta name="viewport" content="width=device-width,initial-scale=1">' +
-        `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">` +
-        '<title>SUPA · Privé herhaalronde</title>' +
-        '<style>body{font:16px/1.5 system-ui,sans-serif;max-width:760px;margin:auto;padding:24px;color:#202820}' +
-        'section{break-inside:avoid;border-top:2px solid #ccc;margin:16px 0;padding:12px 0}' +
-        'ul{padding:0;list-style:none}li{padding:7px 0;border-bottom:1px solid #ddd;overflow-wrap:anywhere}' +
-        'li span{font-size:1.3em;margin-right:.6em}small{color:#555}' +
-        '@media print{body{padding:0}section{break-inside:avoid}}</style></head><body>' +
-        '<h1>' + escapeHtml(name) + '</h1><p>' + items.length +
-        ' bewust gekozen artikelen · niet toegevoegd aan de actieve lijst.</p>' +
-        groups + '<footer><small>Persoonlijke ongeprijsde herhaalronde. ' +
-        'Geen retailerbron, beschikbaarheidsclaim, SKU of besparing.</small></footer></body></html>'
-      const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
-      try {
-        const link = document.createElement('a')
-        link.href = url
-        link.download = 'supa-geselecteerde-herhaalronde-print.html'
-        document.body.append(link); link.click(); link.remove()
-      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
-      setRepeatMessage('Afdrukbaar winkelblad met ' + items.length +
-        ' gekozen artikelen per winkel gedownload. De actieve lijst bleef gelijk.')
+      downloadRepeatRoundPrint(name, items)
     } catch (error) {
       setRepeatPreview(null)
-      setRepeatMessage(error instanceof Error ? error.message : 'Afdrukbaar winkelblad kon niet worden gemaakt.')
+      setRepeatMessage(error instanceof Error ? error.message : 'Het gekozen winkelblad kon niet worden gemaakt.')
+    }
+  }
+  function downloadSavedRepeatRoundPrint() {
+    if (repeatProtected || repeatRaw === null) return
+    try {
+      if (window.localStorage.getItem(PRIVATE_SHOPPING_TEMPLATE_KEY) !== repeatRaw)
+        throw Error('Je opgeslagen herhaalronde is intussen veranderd. Niets gedownload.')
+      const template = parsePrivateShoppingTemplate(repeatRaw)
+      // Include ALL original private template items, even if the current list
+      // already contains them. Never reuse last trip's paid/checkmark status.
+      downloadRepeatRoundPrint(template.name, template.items)
+    } catch (error) {
+      setRepeatMessage(error instanceof Error ? error.message : 'De volledige herhaalronde kon niet worden afgedrukt.')
     }
   }
   function downloadSelectedRepeatRoundText() {
@@ -1903,6 +1896,10 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       </button>
       <button type="button" disabled={repeatProtected || repeatRaw === null}
         onClick={downloadRepeatTemplate}>Download mijn herhaalronde (JSON)</button>
+      <button type="button" disabled={repeatProtected || repeatRaw === null}
+        onClick={downloadSavedRepeatRoundPrint}>
+        Download complete bewaarde herhaalronde (print-HTML)
+      </button>
       <label>Importeer herhaalronde vanaf een ander apparaat (JSON, max. 32 kB)
         <input type="file" accept=".json,application/json"
           onChange={event => {
