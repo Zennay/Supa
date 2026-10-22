@@ -62,3 +62,10 @@ The M2 Firefox workflow enters Planner from the new Home before replaying all ex
 - The personal-source list, unpriced planner checklist and demo shopping list are also split into on-demand chunks with loading announcements, while keeping their existing mount/storage contracts.
 - Planner week-recovery controls and the optional share-text editor are also lazy-loaded; the share editor chunk is fetched only when the user requests copy text.
 - This is discovery-only behavior: it does not add current retailer prices, change source rights, or feed demo values into the private reviewed-basket calculator.
+
+
+## Private Producten selection transfer (2026-10-22)
+
+- Producten now supports selecting the currently visible catalog identities into a separate unpriced shortlist, with a hard cap of 100 items and a count of visible/already-selected items. This shortlist remains separate from the planner demand and reviewed basket comparator.
+- A portable JSON export/import carries only known version-1 catalog IDs. The import rejects unknown keys, unknown/stale IDs, duplicates, unsupported schema versions and files above 16 KiB, then previews and adds only after an explicit user click. It never carries recipes, prices, retailer rights, or SKU matches; legacy unknown IDs stay local and are not exported.
+- The interface exposes these actions on mobile with wrapped controls and announces selection/import status. No current price, source permission or saving claim is inferred from a selected catalog identity.
