@@ -59,9 +59,10 @@ function UnitPriceGap({ item }: { item: ComparedOwnLine }) {
  * Filtering and sorting must never change priced basket totals, store choice,
  * sources, original SKU reviews or the derived mixed-store route.
  */
-export function PlannerOwnProductDeltas({ lines, onChooseLine }: {
+export function PlannerOwnProductDeltas({ lines, onChooseLine, onExportSelection }: {
   lines: ComparedOwnLine[]
   onChooseLine: (ingredientId: string, store: OwnStore) => void
+  onExportSelection: (ingredientIds: string[]) => void
 }) {
   const [filter, setFilter] = useState<DifferenceFilter>('all')
   const [unitFamily, setUnitFamily] = useState<'all' | 'kg' | 'liter' | 'stuk'>('all')
@@ -135,6 +136,14 @@ export function PlannerOwnProductDeltas({ lines, onChooseLine }: {
       <span><strong>{plusLower}</strong> ingrediënten goedkoper bij PLUS</span>
       <span><strong>{dekaLower}</strong> ingrediënten goedkoper bij DekaMarkt</span>
       <span><strong>{tied}</strong> even duur</span>
+    </div>
+    <div className="own-store-breakdown__export">
+      <button type="button" className="ghost-button"
+        disabled={visibleLines.length === 0}
+        onClick={() => onExportSelection(visibleLines.map(line => line.id))}>
+        Bewaar deze {visibleLines.length} prijsregels als privé-TXT
+      </button>
+      <small>Bevat alleen de zichtbare, bevestigde productregels en bronmomenten; geen volledig mandtotaal.</small>
     </div>
     <div className="own-store-breakdown__controls">
       <label>Zoek ingrediënt, bronproduct of SKU
