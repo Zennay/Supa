@@ -574,13 +574,16 @@ export function OfflineReviewedWorkbench({
             !Number.isSafeInteger(packs) || packs < 1 ||
             lineCents === null || !Number.isSafeInteger(lineCents) || lineCents < 0)
           continue
+        // Count source coverage independently from arithmetic safety:
+        // an overflow makes the subtotal unknown, not the source line missing.
+        priced++
+        if (!safe) continue
         const next = cents + lineCents
         if (!Number.isSafeInteger(next)) {
           safe = false
-          break
+          continue
         }
         cents = next
-        priced++
       }
       return {
         priced,
