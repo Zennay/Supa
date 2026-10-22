@@ -451,7 +451,7 @@ export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: 
     // resurrect an old tick or private note. On a write conflict, keep the row.
     if (completed(id)) {
       const next = progress.doneIds.filter(value => value !== id)
-      if (!saveDone(next, 'Product uit de ongeprijsde lijst verwijderd.')) return
+      if (!saveDone(next, 'Afvinkstatus bijgewerkt.')) return
     }
     const previousPick = details.entries.find(item => item.id === id)
     if (previousPick && details.writable) {
@@ -459,6 +459,7 @@ export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: 
         details.entries.filter(item => item.id !== id))
       if (!saved) {
         setDetails(readUnpricedShoppingDetails())
+        setProgressMessage('Afvinkstatus is bijgewerkt, maar notitie/aantal is elders gewijzigd. De productregel blijft staan; probeer opnieuw.')
         setDetailsMessage('Notitie/aantal is elders gewijzigd. De productregel blijft staan; probeer opnieuw.')
         return
       }
