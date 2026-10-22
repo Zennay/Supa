@@ -385,6 +385,9 @@ export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: 
   const [progressMessage, setProgressMessage] = useState('')
   const [detailsMessage, setDetailsMessage] = useState('')
   const [openOnly, setOpenOnly] = useState(false)
+  const [copyMessage, setCopyMessage] = useState('')
+  const currentListRef = useRef(JSON.stringify(ids))
+  currentListRef.current = JSON.stringify(ids)
 
   useEffect(() => {
     const sync = (event: StorageEvent) => {
@@ -531,6 +534,29 @@ export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: 
       window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
     }
   }
+  async function copySelection(onlyOpen = false) {
+    const selected = onlyOpen ? openSelectionText : selectionText
+    if (!selected) return
+    const idsAtStart = currentListRef.current
+    const progressAtStart = progress.raw
+    const detailsAtStart = details.raw
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Klembord niet beschikbaar')
+      await navigator.clipboard.writeText(
+        (onlyOpen ? 'SUPA · nog te kopen · ongeprijsd\n' : 'SUPA · eigen productselectie · ongeprijsd\n') +
+        selected + '\n',
+      )
+      const unchanged = idsAtStart === currentListRef.current &&
+        progressAtStart === readUnpricedShoppingProgress().raw &&
+        detailsAtStart === readUnpricedShoppingDetails().raw
+      setCopyMessage(unchanged
+        ? 'Lijst gekopieerd, zonder winkelprijzen.'
+        : 'De lijst veranderde tijdens het kopiëren. Controleer de actuele lijst en kopieer opnieuw.')
+    } catch {
+      setCopyMessage('Klembord niet beschikbaar. Selecteer de tekst hieronder om handmatig te kopiëren.')
+    }
+  }
+
   if (!selectedHistorical.length && !selectedExamples.length && !selectedUnknown.length) return null
 
   return <section className="hifi-demo-list" aria-label="Zelf gekozen producten">
@@ -600,7 +626,12 @@ export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: 
         disabled={!selectionText}>Download ongeprijsde selectie (.txt)</button>
       <button type="button" className="ghost-button" onClick={() => downloadSelection(true)}
         disabled={!openSelectionText}>Download alleen nog te kopen (.txt)</button>
+      <button type="button" className="ghost-button" onClick={() => void copySelection(false)}
+        disabled={!selectionText}>Kopieer hele lijst</button>
+      <button type="button" className="ghost-button" onClick={() => void copySelection(true)}
+        disabled={!openSelectionText}>Kopieer alleen nog te kopen</button>
     </div>
+    {copyMessage && <p role="status" aria-live="polite">{copyMessage}</p>}
     <label className="hifi-picked-copy-label">Kopieer je gekozen productnamen, aantallen en notities
       <textarea readOnly rows={Math.min(ids.length + 2, 12)}
         onFocus={event => event.currentTarget.select()}
