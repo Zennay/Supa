@@ -238,7 +238,7 @@ function sourceOptions(products: OfflineStoreProduct[],
   // Search is discovery over ORIGINAL self-supplied product metadata, not
   // an automatic match or a new source for packaging/price assertions. Each
   // word may occur in a different field (e.g. "yoghurt 500 g" or "sku 2x").
-  const queryTerms = searchableSourceText(text).split(/\\s+/u).filter(Boolean)
+  const queryTerms = searchableSourceText(text).split(/\s+/u).filter(Boolean)
   const matchesQuery = (product: import('../../domain/basket.ts').StoreProduct) => {
     if (!queryTerms.length) return true
     const pack = product.packAmount === null ? '' :
@@ -3552,6 +3552,19 @@ export function OfflineReviewedWorkbench({
                                       ({ ...current, [searchKey]: event.currentTarget.value }))} />
                                   <small>{choices.total} prijsklare en {choices.unpricedTotal} niet-prijsklare bronartikelen in deze zoekopdracht.</small>
                                 </label>
+                                {Boolean(skuFilter[searchKey] ||
+                                  (sourceSort[searchKey] ?? 'relevance') !== 'relevance' ||
+                                  onlyCheaper[searchKey]) && (
+                                  <button type="button"
+                                    aria-label={`Wis zoek-, sorteer- en prijsfilters voor ${line.ingredientLabel} bij ${store}`}
+                                    onClick={() => {
+                                      setSkuFilter(previous => ({ ...previous, [searchKey]: '' }))
+                                      setSourceSort(previous => ({ ...previous, [searchKey]: 'relevance' }))
+                                      setOnlyCheaper(previous => ({ ...previous, [searchKey]: false }))
+                                    }}>
+                                    Wis zoekopdracht en filters
+                                  </button>
+                                )}
                                 {choices.availableCount > 0 && (
                                   <label>Sorteer mijn beschikbare geprijsde bronartikelen
                                     <select value={sourceSort[searchKey] ?? 'relevance'}
