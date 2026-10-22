@@ -691,7 +691,7 @@ export function PrivateComparisonJourney({
               </button>
             </div>
             <ol start={2 + storeIndex * captureNeeds.length}>
-              {captureNeeds.map((need, index) => <li key={store + '-' + index + '-' + need.id}>
+              {captureNeeds.map(need => <li key={store + '-' + need.id}>
                 <strong>{need.label}</strong>
                 <small>{readablePlannerDemandAmount(need.amount) === 'hoeveelheid nog controleren'
                   ? 'Planner-hoeveelheid nog controleren'
@@ -764,8 +764,8 @@ export function PrivateComparisonJourney({
             <summary>{pendingNeeds.length} openstaande ingrediënten bij {store}</summary>
             <p>Deze regels zijn nog niet volledig geprijsd en tellen daarom
               niet mee als een volledig winkelmandje.</p>
-            <ul>{pendingNeeds.map((need, index) => <li
-              key={JSON.stringify([store, need.id, index])}>
+            <ul>{pendingNeeds.map(need => <li
+              key={JSON.stringify([store, need.id])}>
               <div>
                 <strong>{need.label}</strong>
                 <small>{readablePlannerDemandAmount(need.amount ?? null) === 'hoeveelheid nog controleren'
