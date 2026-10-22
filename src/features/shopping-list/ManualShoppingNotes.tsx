@@ -407,6 +407,41 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       setMessage('Automatisch kopiëren is niet beschikbaar. Selecteer de vier kolommen hieronder en kopieer ze zelf.')
     }
   }
+  function downloadOwnTsv(mode: 'all' | 'visible' = 'all') {
+    const rows = mode === 'visible' ? routeItems : notes
+    if (!rows.length) return
+    try {
+      const uri = URL.createObjectURL(new Blob([exportUnpricedShoppingTsv(rows)], {
+        type: 'text/tab-separated-values;charset=utf-8',
+      }))
+      try {
+        const link = document.createElement('a')
+        link.href = uri
+        link.download = mode === 'visible'
+          ? 'supa-zichtbare-ongeprijsde-boodschappen.tsv'
+          : 'supa-eigen-ongeprijsde-boodschappen.tsv'
+        document.body.append(link); link.click(); link.remove()
+        setMessage(mode === 'visible'
+          ? rows.length + ' zichtbare eigen boodschappen als Excel/Calc-TSV bewaard (zonder prijzen).'
+          : 'Je hele eigen ongeprijsde lijst als Excel/Calc-TSV bewaard; geen SKU of bronprijzen.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
+    } catch { setMessage('Kon je eigen TSV-lijst niet bewaren.') }
+  }
+  function downloadOwnTsvTemplate() {
+    // A blank personal Excel/Calc template, not retailer source evidence.
+    // Deliberately no prices, SKUs, or inferred matches.
+    const template = '\ufeffartikel\twinkel\tafgevinkt\r\n\tAlgemeen\tnee\r\n'
+    try {
+      const uri = URL.createObjectURL(new Blob([template], { type: 'text/tab-separated-values;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = uri
+        link.download = 'supa-leeg-eigen-boodschappenblad.tsv'
+        document.body.append(link); link.click(); link.remove()
+        setMessage('Leeg Excel/Calc-TSV-invulblad opgeslagen. Vul het artikel in en bewaar het als TSV.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
+    } catch { setMessage('Kon het lege privé-TSV-invulblad niet bewaren.') }
+  }
   function prepareOwnCsvPreview(source: string, pasted = false) {
     const incoming = pasted ? importUnpricedShoppingPaste(source) : importUnpricedShoppingCsv(source)
     const draft = incoming.map(item => (item.done ? '☑ ' : '☐ ') +
@@ -414,7 +449,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
     if (draft.length > 15000) throw Error('Te veel tekst voor de voorinzage.')
     setBulkPreview(null)
     setBulkDraft(draft)
-    setMessage(incoming.length + ' eigen CSV-artikelen ingelezen. Bekijk en bevestig via de bestaande ongeprijsde lijstimport.')
+    setMessage(incoming.length + ' eigen spreadsheetartikelen ingelezen. Bekijk en bevestig via de bestaande ongeprijsde lijstimport.')
   }
   function preparePastedOwnCsv() {
     ++bulkFileSerial.current
@@ -425,11 +460,22 @@ export function ManualShoppingNotes({ notes, setNotes }: {
     const serial = ++bulkFileSerial.current
     if (!file) return
     try {
-      if (!file.size || file.size > 32768) throw Error('Kies een Supa-CSV van maximaal 32 kB.')
-      const source = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      if (!file.size || file.size > 32768) throw Error('Kies een privé-CSV of TSV van maximaal 32 kB.')
+      const extension = file.name.toLocaleLowerCase('nl-NL').split('.').at(-1)
+      if (extension !== 'csv' && extension !== 'tsv')
+        throw Error('Kies een .csv- of .tsv-bestand; geen prijslijst of werkmap.')
+      const bytes = await file.arrayBuffer()
       if (serial !== bulkFileSerial.current) return
-      // Reuse the same strict own-list parser for semicolon CSV and Excel TSV.
-      prepareOwnCsvPreview(source, true)
+      const bom = new Uint8Array(bytes, 0, Math.min(bytes.byteLength, 2))
+      // Excel's 'Unicode Text' TSV uses an explicit UTF-16 BOM. Only accept
+      // that legacy encoding for private TSV input; CSV remains strict UTF-8.
+      const encoding = extension === 'tsv' && bom[0] === 0xff && bom[1] === 0xfe
+        ? 'utf-16le' : extension === 'tsv' && bom[0] === 0xfe && bom[1] === 0xff
+          ? 'utf-16be' : 'utf-8'
+      const source = new TextDecoder(encoding, { fatal: true }).decode(bytes)
+      // Existing strict spreadsheet clipboard parser also supports offline TSV files.
+      // No retailer prices or SKUs: still requires explicit review and confirmation.
+      prepareOwnCsvPreview(source, extension === 'tsv')
     } catch (error) {
       if (serial === bulkFileSerial.current) setMessage(error instanceof Error ? error.message : 'CSV of TSV geweigerd.')
     }
@@ -1089,8 +1135,11 @@ export function ManualShoppingNotes({ notes, setNotes }: {
         <button type="button" onClick={() => downloadOwnCsv('template')}>
           Download leeg CSV-invulblad voor eigen boodschappen
         </button>
-        <label>Importeer eigen ongeprijsde Supa-CSV of Excel-TSV (max. 32 kB; geen winkelprijzen)
-          <input type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values,text/plain" onChange={event => {
+        <button type="button" onClick={downloadOwnTsvTemplate}>
+          Download leeg Excel/Calc-TSV-invulblad
+        </button>
+        <label>Importeer eigen ongeprijsde CSV of Excel/Calc-TSV (max. 32 kB; geen retailerprijzen)
+          <input type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values" onChange={event => {
             void readOwnCsv(event.currentTarget.files?.[0]); event.currentTarget.value = ''
           }} />
         </label>
@@ -1438,6 +1487,12 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       </button>
       <button type="button" disabled={!notes.length} onClick={() => void copyOwnSpreadsheet()}>
         Kopieer alle boodschappen als Excel-tabel (4 kolommen)
+      </button>
+      <button type="button" disabled={!visible.length} onClick={() => downloadOwnTsv('visible')}>
+        Zichtbare winkelronde (TSV voor Excel/Calc)
+      </button>
+      <button type="button" disabled={!notes.length} onClick={() => downloadOwnTsv('all')}>
+        Hele eigen ongeprijsde lijst (TSV voor Excel/Calc)
       </button>
       <button type="button" disabled={!notes.length} onClick={backupDownload}>Backup hele lijst (JSON)</button>
       <label>Herstel lijst uit JSON-backup (max. 64 kB)

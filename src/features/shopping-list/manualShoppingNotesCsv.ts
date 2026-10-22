@@ -25,12 +25,18 @@ export function exportUnpricedShoppingCsv(notes: readonly Row[]): string {
   return '\ufeff' + header + '\r\n' + notes.map(note =>
     ['eigen', note.store, note.label, note.done ? 'ja' : 'nee'].map(quote).join(';')).join('\r\n') + '\r\n'
 }
-/** Four-column clipboard roundtrip for Excel/Calc. Only private unpriced
- * notes; never a shop's observed product, offer or price evidence. */
+/** The same four private columns as CSV, for spreadsheet-native file exchange.
+ * Keep formula-shaped and literal apostrophe labels inert; reject cell-breaking
+ * characters instead of silently changing a user's original grocery text.
+ */
 export function exportUnpricedShoppingTsv(notes: readonly Row[]): string {
-  return header.replace(/;/gu, '\t') + '\r\n' + notes.map(note =>
-    ['eigen', note.store, note.label, note.done ? 'ja' : 'nee']
-      .map(spreadsheetSafe).join('\t')).join('\r\n') + '\r\n'
+  const lines = notes.map(note => {
+    if (safeLabel(note.label) !== note.label)
+      throw Error('Een boodschappenomschrijving bevat ongeldige tabeltekens.')
+    return ['eigen', note.store, note.label, note.done ? 'ja' : 'nee']
+      .map(spreadsheetSafe).join('\t')
+  })
+  return '\ufeff' + header.replace(/;/gu, '\t') + '\r\n' + lines.join('\r\n') + '\r\n'
 }
 /** Strict bounded semicolon CSV reader; no spreadsheet formula execution. */
 export function importUnpricedShoppingCsv(source: string): Row[] {

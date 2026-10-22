@@ -1,15 +1,17 @@
 # Supa: privéboodschappen uitwisselen als CSV
 
-De persoonlijke **ongeprijsde** boodschappenlijst kan als puntkomma-CSV worden gedownload en geïmporteerd, of als vierkoloms Excel/Calc-tabel worden gekopieerd en teruggeïmporteerd. De gebruiker kan eerst een leeg invulblad ophalen. Dit staat los van de afzonderlijke import van rechtmatig verkregen supermarktprijsbladen: er wordt geen SKU, winkelprijs, productmatch of retailersource afgeleid uit een persoonlijke CSV.
+De persoonlijke **ongeprijsde** boodschappenlijst kan als puntkomma-CSV of tab-gescheiden TSV worden gedownload en geïmporteerd. De gebruiker kan eerst een leeg invulblad ophalen. Dit staat los van de afzonderlijke import van rechtmatig verkregen supermarktprijsbladen: er wordt geen SKU, winkelprijs, productmatch of retailersource afgeleid uit een persoonlijke CSV. De volledige privélijst kan bovendien zonder opslag als Excel/Calc-tabel naar het klembord worden gekopieerd.
 
 ## Werkwijze
 
-1. Open **Lijst → Zelf toevoegen, zonder prijs**. Download desgewenst het lege CSV-invulblad.
+1. Open **Lijst → Zelf toevoegen, zonder prijs**. Download het lege Supa-CSV-invulblad of het lege **Excel/Calc-TSV-invulblad**. Bij TSV vul je in Excel/Calc de kolommen `artikel`, `winkel` en `afgevinkt` in, bewaar je het bestand als `.tsv` en kies je dat bestand daarna rechtstreeks bij de eigen boodschappenimport. De lege artikelcel moet vóór import worden ingevuld.
 2. Vul per rij `eigen`, de winkel (`Algemeen`, `PLUS` of `DekaMarkt`), een eigen artikelnaam en `ja` of `nee` bij `afgevinkt` in. Houd de vier kolommen en de vaste formaatregel bovenaan ongewijzigd. Export vanuit Supa bevat alle huidige persoonlijke notities, inclusief winkel en vinkje.
-3. Gebruik **Importeer eigen ongeprijsde Supa-CSV of Excel-TSV** (bestand), of plak vier gekopieerde Supa-kolommen als tab-gescheiden Excel/Calc-tabel, of de complete eigen Supa-CSV-tekst, in het uitklapbare spreadsheet-invoerveld en klik **Zet mijn CSV klaar voor controle**. De lokale lezer accepteert uitsluitend het eigen formaat, 1–100 artikelen en hoogstens 32 kB geldige UTF-8. Andere CSV-bestanden, prijsbestanden, dubbele artikelen, vreemde winkels, onbekende vinkjes, afwijkende kolommen en onveilige regelinhoud worden geweigerd.
+3. Gebruik **Importeer eigen ongeprijsde CSV of Excel/Calc-TSV** om een lokaal `.csv`- of `.tsv`-bestand direct te kiezen. Of plak vier gekopieerde Supa-kolommen als tab-gescheiden Excel/Calc-tabel, of de complete eigen Supa-CSV-tekst, in het uitklapbare spreadsheet-invoerveld en klik **Zet mijn spreadsheet klaar voor controle**. Een `.tsv`-bestand mag de originele vier Supa-kolommen bevatten of een eenvoudige tabel met `artikel`/`winkel` en optioneel `afgevinkt`, in dezelfde strikte vorm als het plakveld. De lezer accepteert 1–100 artikelen en hoogstens 32 kB geldige UTF-8. Andere bestanden, prijs-/SKU-kolommen, dubbele artikelen, vreemde winkels, onbekende vinkjes, afwijkende kolommen en onveilige regelinhoud worden geweigerd.
 4. De ingelezen regels verschijnen in de bestaande tekstinvoer. Kies daarna **Bekijk artikelen vóór toevoegen** en bevestig de voorinzage. Bestaande artikelen per winkel en bestaande vinkjes blijven behouden.
 
-De knop **Kopieer alle boodschappen als Excel-tabel (4 kolommen)** kopieert de complete persoonlijke lijst (ongeacht het actieve zoek- of vinkjesfilter), inclusief winkel en vinkje. Bij ontbrekende klembordrechten verschijnt een selecteerbare tabel. CSV- en TSV-uitvoer zetten potentieel uitvoerbare spreadsheetformules, ook met verborgen of compatibele Unicode-prefixen, om naar letterlijke tekst met een apostrof, en maakt ook oorspronkelijke apostrofs omkeerbaar. Invoer voert nooit spreadsheetfuncties uit. De browser uploadt hierbij niets. Persoonlijke artikelen blijven buiten Planner-ingredientvraag, supermarktverificatie, mandprijzen en besparingsclaims.
+CSV- én TSV-uitvoer zetten potentieel uitvoerbare spreadsheetformules om naar letterlijke tekst met een apostrof, en maken ook oorspronkelijke apostrofs omkeerbaar. Download in de Lijst de **zichtbare winkelronde** of de **hele privélijst** als `.tsv`; beide blijven ongeprijsd. Dezelfde gedownloade TSV kan na lokaal bewerken via de bestaande bestandsimport terug naar Supa, steeds met expliciete voorinzage. Invoer voert nooit spreadsheetfuncties uit. De browser uploadt hierbij niets. Persoonlijke artikelen blijven buiten Planner-ingredientvraag, supermarktverificatie, mandprijzen en besparingsclaims.
+
+De knop **Kopieer alle boodschappen als Excel-tabel (4 kolommen)** kopieert de complete persoonlijke lijst onafhankelijk van zichtbare filters. Als klembordrechten ontbreken verschijnt een selecteerbare tabel.
 
 De JSON-backup blijft de volledige private gegevensbackup. TXT, kopieertekst, mobiel delen en offline HTML-print blijven onafhankelijk beschikbaar.
 
@@ -52,6 +54,8 @@ artikel	winkel	afgevinkt
 Afwasmiddel	Algemeen	nee
 Havermout	PLUS	ja
 ```
+
+Ook als Excel op Windows de eigen tabgescheiden lijst als **Unicode Text** met een expliciete UTF-16 LE/BE-bytevolgordemarkering bewaart, kan Supa dit na keuze van een `.tsv`-bestand lokaal lezen. Zonder zo'n markering blijft het bestand verplicht UTF-8. De originele `.csv`-import accepteert uitsluitend UTF-8 en wordt niet ruimer gemaakt; bestanden zonder geldig formaat of met prijs-/SKU-kolommen blijven geweigerd.
 
 De bestaande begrensde Supa-CSV-parser controleert vervolgens nogmaals de
 artikelnamen, dubbele regels en groepscodes. Het resultaat moet altijd door
