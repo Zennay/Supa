@@ -788,6 +788,29 @@ export function OfflineReviewedWorkbench({
       'PLUS origineel bronmoment: ' + plain(captureInstant('PLUS')),
       'DekaMarkt origineel bronmoment: ' + plain(captureInstant('DekaMarkt')),
       '',
+      ...(pairedPreviewSummary ? [
+        'DEKKING EN VOORLOPIGE HELE-PAK-SOM (alleen verse gepaarde bronmomenten):',
+        'PLUS: ' + (pairedPreviewSummary.plus.cents === null
+          ? 'deelbedrag onbekend' : exactEuro.formatCents(pairedPreviewSummary.plus.cents)) +
+          ' · ' + pairedPreviewSummary.plus.priced + '/' + pairedPreviewSummary.rows +
+          ' geprijsde regels · ' + pairedPreviewSummary.plus.missing + ' onbekend.',
+        'DekaMarkt: ' + (pairedPreviewSummary.deka.cents === null
+          ? 'deelbedrag onbekend' : exactEuro.formatCents(pairedPreviewSummary.deka.cents)) +
+          ' · ' + pairedPreviewSummary.deka.priced + '/' + pairedPreviewSummary.rows +
+          ' geprijsde regels · ' + pairedPreviewSummary.deka.missing + ' onbekend.',
+        'Compleet mandverschil (DekaMarkt minus PLUS): ' +
+          (pairedPreviewSummary.completeDifferenceCents === null
+            ? 'ONBEKEND; er ontbreekt een geldige prijs of de bron is verouderd.'
+            : (pairedPreviewSummary.completeDifferenceCents > 0 ? '+' :
+              pairedPreviewSummary.completeDifferenceCents < 0 ? '−' : '') +
+              exactEuro.formatCents(Math.abs(pairedPreviewSummary.completeDifferenceCents)) +
+              ' · voorlopige rekenkundige kandidaat, geen bevestigde besparing.'),
+        'Bekende deelbedragen zijn nooit volledige totaalkosten. Onbekend is niet €0.',
+        '',
+      ] : [
+        'Geen bruikbare volledige twee-winkel-prijsdekking; mandverschil onbekend.',
+        '',
+      ]),
       ...pairedPreviewRows.flatMap((row, index) => {
         const comparable = pairedPreviewComparable && row.plusCode && row.dekaCode &&
           row.plusPacks !== null && row.dekaPacks !== null &&
