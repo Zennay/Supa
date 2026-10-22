@@ -417,6 +417,9 @@ export function OfflineReviewedWorkbench({
   const [pairedOnlyMissing, setPairedOnlyMissing] = useState(false)
   const [pairedPriceFilter, setPairedPriceFilter] = useState<'all' | 'plus' | 'deka' | 'equal' | 'unknown'>('all')
   const [pairedPriceSort, setPairedPriceSort] = useState<'plan' | 'difference'>('plan')
+  const [pairedCopyFallback, setPairedCopyFallback] = useState<{
+    week: string; version: number; text: string
+  } | null>(null)
   const [capturePreviewSearch, setCapturePreviewSearch] = useState<Record<CaptureStore, string>>({ PLUS: '', DekaMarkt: '' })
   const [capturePreviewSort, setCapturePreviewSort] = useState<Record<CaptureStore, 'source' | 'name' | 'sku' | 'price' | 'unknown'>>({ PLUS: 'source', DekaMarkt: 'source' })
   const [capturePreview, setCapturePreview] = useState<{
@@ -572,6 +575,7 @@ export function OfflineReviewedWorkbench({
     setPairedOnlyMissing(false)
     setPairedPriceFilter('all')
     setPairedPriceSort('plan')
+    setPairedCopyFallback(null)
     setCapturePreviewShown({ PLUS: 20, DekaMarkt: 20 })
     setCapturePreviewSearch({ PLUS: '', DekaMarkt: '' })
     setCapturePreviewSort({ PLUS: 'source', DekaMarkt: 'source' })
@@ -765,6 +769,29 @@ export function OfflineReviewedWorkbench({
       setWeekExportMessage('De voorlopige fysieke twee-winkel-SKU-controlelijst is lokaal opgeslagen; geen match of prijs is goedgekeurd.')
     } catch {
       setWeekExportMessage('De twee-winkel-controlelijst kon niet lokaal worden opgeslagen; eerdere winkeldata bleven behouden.')
+    }
+  }
+
+  async function copyPairedMatchReview() {
+    if (!currentPreview || !pairedPreviewRows || busy) return
+    const version = importRevision.current
+    const week = captureWeekRef.current
+    try {
+      const output = pairedMatchReviewText()
+      if (!navigator.clipboard?.writeText) throw new Error('no clipboard')
+      await navigator.clipboard.writeText(output)
+      if (version !== importRevision.current || week !== captureWeekRef.current) return
+      setPairedCopyFallback(null)
+      setWeekExportMessage('Je voorlopige twee-winkel-SKU- en prijscontrolelijst is lokaal gekopieerd. Geen prijzen of productmatches zijn goedgekeurd.')
+    } catch {
+      if (version !== importRevision.current || week !== captureWeekRef.current) return
+      try {
+        const output = pairedMatchReviewText()
+        setPairedCopyFallback({ week, version, text: output })
+        setWeekExportMessage('Kopiëren is niet beschikbaar: selecteer de lokale prijscontrolelijst hieronder. De browser stuurt niets naar een server.')
+      } catch {
+        setWeekExportMessage('Kan het voorlopige twee-winkel-overzicht niet meer veilig kopiëren. Kies beide originele bronnen opnieuw.')
+      }
     }
   }
 
@@ -3001,6 +3028,18 @@ export function OfflineReviewedWorkbench({
                     disabled={busy} onClick={downloadPairedMatchReview}>
                     Download offline SKU- en voorlopige prijscontrole (TXT)
                   </button>
+                  <button type="button" className="ghost-button"
+                    disabled={busy} onClick={() => { void copyPairedMatchReview() }}>
+                    Kopieer hetzelfde voorlopige winkeloverzicht
+                  </button>
+                  {pairedCopyFallback?.week === captureWeek &&
+                    pairedCopyFallback.version === importRevision.current && (
+                    <label>Handmatig kopiëren van dezelfde privébronregels
+                      <textarea readOnly rows={9} value={pairedCopyFallback.text}
+                        onFocus={event => event.currentTarget.select()} />
+                      <small>Selecteer de tekst en gebruik Kopiëren. Geen externe verzending.</small>
+                    </label>
+                  )}
                   <label>
                     <input type="checkbox" checked={pairedOnlyMissing}
                       onChange={event => setPairedOnlyMissing(event.currentTarget.checked)} />
