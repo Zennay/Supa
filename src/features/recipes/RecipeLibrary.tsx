@@ -1168,7 +1168,7 @@ export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
               <p>{recipe.servings ?? '?'} porties · {recipe.minutes ?? '?'} minuten.
                 {' '}Originele hoeveelheden en waarschuwingen blijven bij het recept.</p>
               {recipe.sourceUrl && <small>Bronvermelding (geen prijsbewijs):{' '}
-                <a href={safeRecipeSourceUrl(recipe.sourceUrl)} target="_blank" rel="noreferrer">
+                <a href={safeRecipeSourceUrl(recipe.sourceUrl)} target="_blank" rel="noopener noreferrer">
                   {safeRecipeSourceUrl(recipe.sourceUrl)}
                 </a>
               </small>}
