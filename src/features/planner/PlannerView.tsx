@@ -194,11 +194,18 @@ export function PlannerView({
                   value={item.recipeId}
                   onChange={(event) => onRecipeChange(item.day, event.target.value)}
                 >
-                  {recipes.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.title}
-                    </option>
-                  ))}
+                  {recipes.some(option => !option.tags?.includes('Eigen recept')) &&
+                    <optgroup label="Voorbeeldrecepten">
+                      {recipes.filter(option => !option.tags?.includes('Eigen recept')).map(option => (
+                        <option key={option.id} value={option.id}>{option.title}</option>
+                      ))}
+                    </optgroup>}
+                  {recipes.some(option => option.tags?.includes('Eigen recept')) &&
+                    <optgroup label="Mijn eigen recepten">
+                      {recipes.filter(option => option.tags?.includes('Eigen recept')).map(option => (
+                        <option key={option.id} value={option.id}>{option.title}</option>
+                      ))}
+                    </optgroup>}
                 </select>
                 <small>{recipe.minutes} min</small>
                 <RecipePriceExplanation estimatedCost={recipe.estimatedCost} />
