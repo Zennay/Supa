@@ -351,7 +351,7 @@ export function PlannerView({
         {trustedCents !== null && ownSource && <p className="disclaimer" role="status">
           Privécontrole: {ownSource.store} · eigen winkelopname {ownSource.observedAt}.
           Het getoonde budgetbedrag gebruikt jouw volledige, persoonlijk bevestigde winkelmand
-          in plaats van de Supa-voorbeeldprijzen. Geen kassagarantie of publieke besparingsclaim.
+          in plaats van de Supa-voorbeeldprijzen. Bedragen zijn indicatief; de kassaprijs kan afwijken.
         </p>}
         {trustedCents === null && <p className="disclaimer" role="status">
           Je weekbudget is ingesteld, maar de werkelijke mandprijs is onbekend.
