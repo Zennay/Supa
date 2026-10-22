@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent, type Dispatch, type SetStateAction } from 'react'
 import './manualShoppingNotes.css'
-import { exportUnpricedShoppingCsv, importUnpricedShoppingCsv, importUnpricedShoppingPaste } from './manualShoppingNotesCsv.ts'
+import { exportUnpricedShoppingCsv, exportUnpricedShoppingTsv, importUnpricedShoppingCsv, importUnpricedShoppingPaste } from './manualShoppingNotesCsv.ts'
 import { mergePrivateNotes, normalizePrivateNotes, serializePrivateNotes, PRIVATE_NOTES_BACKUP_MAX_BYTES } from './manualShoppingNotesBackup.ts'
 import { privateNoteDuplicateKey, privateNoteLabelIdentity } from './manualShoppingNoteIdentity.ts'
 
@@ -387,6 +387,26 @@ export function ManualShoppingNotes({ notes, setNotes }: {
             : 'Alle eigen boodschappen als CSV opgeslagen, zonder prijzen of SKU’s.')
       } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
     } catch { setMessage('Kon de ongeprijsde CSV niet bewaren.') }
+  }
+  function downloadOwnTsv(mode: 'all' | 'visible' = 'all') {
+    const rows = mode === 'visible' ? routeItems : notes
+    if (!rows.length) return
+    try {
+      const uri = URL.createObjectURL(new Blob([exportUnpricedShoppingTsv(rows)], {
+        type: 'text/tab-separated-values;charset=utf-8',
+      }))
+      try {
+        const link = document.createElement('a')
+        link.href = uri
+        link.download = mode === 'visible'
+          ? 'supa-zichtbare-ongeprijsde-boodschappen.tsv'
+          : 'supa-eigen-ongeprijsde-boodschappen.tsv'
+        document.body.append(link); link.click(); link.remove()
+        setMessage(mode === 'visible'
+          ? rows.length + ' zichtbare eigen boodschappen als Excel/Calc-TSV bewaard (zonder prijzen).'
+          : 'Je hele eigen ongeprijsde lijst als Excel/Calc-TSV bewaard; geen SKU of bronprijzen.')
+      } finally { window.setTimeout(() => URL.revokeObjectURL(uri), 1000) }
+    } catch { setMessage('Kon je eigen TSV-lijst niet bewaren.') }
   }
   function downloadOwnTsvTemplate() {
     // A blank personal Excel/Calc template, not retailer source evidence.
@@ -1445,6 +1465,12 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       </button>
       <button type="button" disabled={!notes.length} onClick={() => downloadOwnCsv('all')}>
         Hele eigen ongeprijsde lijst (CSV voor Excel)
+      </button>
+      <button type="button" disabled={!visible.length} onClick={() => downloadOwnTsv('visible')}>
+        Zichtbare winkelronde (TSV voor Excel/Calc)
+      </button>
+      <button type="button" disabled={!notes.length} onClick={() => downloadOwnTsv('all')}>
+        Hele eigen ongeprijsde lijst (TSV voor Excel/Calc)
       </button>
       <button type="button" disabled={!notes.length} onClick={backupDownload}>Backup hele lijst (JSON)</button>
       <label>Herstel lijst uit JSON-backup (max. 64 kB)
