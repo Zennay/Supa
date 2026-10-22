@@ -419,6 +419,7 @@ export function OfflineReviewedWorkbench({
   const [captureSheetStore, setCaptureSheetStore] = useState<'both' | CaptureStore>('both')
   const [captureDelimiter, setCaptureDelimiter] = useState<',' | ';' | '\t'>(',')
   const [capturePreviewShown, setCapturePreviewShown] = useState<Record<CaptureStore, number>>({ PLUS: 20, DekaMarkt: 20 })
+  const [capturePreviewSearch, setCapturePreviewSearch] = useState<Record<CaptureStore, string>>({ PLUS: '', DekaMarkt: '' })
   const [capturePreview, setCapturePreview] = useState<{
     files: File[]; week: string
     stores: CapturePreviewStore[]
@@ -530,6 +531,7 @@ export function OfflineReviewedWorkbench({
     const version = ++importRevision.current
     setCapturePreview(null)
     setCapturePreviewShown({ PLUS: 20, DekaMarkt: 20 })
+    setCapturePreviewSearch({ PLUS: '', DekaMarkt: '' })
     setBusy(true)
     try {
       if (files.length > 2) throw Error('Kies maximaal twee eigen CSV-bestanden.')
@@ -2715,14 +2717,39 @@ export function OfflineReviewedWorkbench({
                   actueel zijn en alle fysieke productmatches afzonderlijk zijn bevestigd.
                 </p>
               )}
-              {currentPreview.stores.map(store => (
+              {currentPreview.stores.map(store => {
+                const query = capturePreviewSearch[store.retailer]
+                  .normalize('NFC').trim().toLocaleLowerCase('nl-NL')
+                const visibleProducts = store.previewProducts.filter(product => {
+                  if (!query) return true
+                  const searchable = [product.name, product.id, product.packAmount, product.packUnit]
+                    .map(value => String(value ?? '')).join(' ')
+                    .normalize('NFC').toLocaleLowerCase('nl-NL')
+                  return searchable.includes(query)
+                })
+                const shownProducts = visibleProducts.slice(0, capturePreviewShown[store.retailer])
+                return (
                 <details key={'details-' + store.retailer}>
                   <summary>{store.retailer}: originele ingevoerde artikelen bekijken
                     {' '}({store.unavailableProducts} zonder bruikbare pakprijs)</summary>
                   <p>Oorspronkelijk ingevoerd bronmoment:
                     {' '}<time>{store.observedAt}</time>. Nog géén match- of herkomstbevestiging.</p>
+                  <label>Zoek in originele producten op naam, broncode of verpakking
+                    <input type="search" maxLength={100}
+                      value={capturePreviewSearch[store.retailer]}
+                      placeholder="Bijv. tomaten of SKU"
+                      onChange={event => {
+                        const value = event.currentTarget.value
+                        setCapturePreviewSearch(current => ({
+                          ...current, [store.retailer]: value,
+                        }))
+                        setCapturePreviewShown(current => ({ ...current, [store.retailer]: 20 }))
+                      }} />
+                  </label>
+                  <p role="status">{visibleProducts.length} van {store.previewProducts.length} originele artikelen gevonden.
+                    {' '}Zoeken verandert bronprijzen of productmatches niet.</p>
                   <ul>
-                    {store.previewProducts.slice(0, capturePreviewShown[store.retailer]).map(product => {
+                    {shownProducts.map(product => {
                       const rate = privatePackUnitRate({
                         amount: product.packAmount, unit: product.packUnit,
                         count: product.packCount ?? 0,
@@ -2738,19 +2765,21 @@ export function OfflineReviewedWorkbench({
                         {rate && <> · {exactEuro.formatCents(rate.roundedCentsPerUnit)} / {rate.unit}</>}
                       </li>
                     })}
+                    {visibleProducts.length === 0 && <li>Geen origineel bronartikel gevonden. Wis je zoekterm om alles te bekijken.</li>}
                   </ul>
-                  {capturePreviewShown[store.retailer] < store.previewProducts.length && (
+                  {shownProducts.length < visibleProducts.length && (
                     <button type="button" className="ghost-button" disabled={busy}
                       onClick={() => setCapturePreviewShown(current => ({ ...current,
-                        [store.retailer]: Math.min(store.previewProducts.length,
+                        [store.retailer]: Math.min(visibleProducts.length,
                           current[store.retailer] + 20),
                       }))}>
-                      Toon volgende bronartikelen ({Math.min(capturePreviewShown[store.retailer], store.previewProducts.length)}
-                      {' '}van {store.previewProducts.length} zichtbaar)
+                      Toon volgende bronartikelen ({shownProducts.length}
+                      {' '}van {visibleProducts.length} gevonden)
                     </button>
                   )}
                 </details>
-              ))}
+                )
+              })}
               {previewPlusLines && previewDekaLines && (
                   <CapturePairedPreview
                     key={'paired:' + captureWeek + ':' +
