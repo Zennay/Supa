@@ -381,3 +381,31 @@ body { background: #e9eeec; }
 }
 .hifi-products .hifi-filter-panel { flex-wrap: wrap; gap: 8px; }
 .hifi-products .hifi-filter-panel label { min-height: 36px; }
+
+/* Private, identity-only transfer of the supplementary Producten shortlist.
+   Never reuse this control for reviewed retailer captures or financial totals. */
+.hifi-products .hifi-product-portable {
+  background: #fff; border: 1px solid #d8e7dd; border-radius: 16px;
+  padding: 12px 16px; color: #294b36; min-width: 0;
+}
+.hifi-products .hifi-product-portable summary {
+  cursor: pointer; display: flex; align-items: center;
+  min-height: 44px; font-weight: 650; font-size: 14px;
+}
+.hifi-products .hifi-product-portable[open] { display: grid; gap: 10px; }
+.hifi-products .hifi-product-portable p {
+  margin: 0; color: #53675b; line-height: 1.45; font-size: 12px;
+}
+.hifi-products .hifi-product-portable label { display: grid; gap: 6px; font-size: 13px; }
+.hifi-products .hifi-product-portable input,
+.hifi-products .hifi-product-portable textarea {
+  width: 100%; box-sizing: border-box; font: inherit;
+  background: #f7faf7; color: #26372b; border: 1px solid #acbcae;
+  padding: 10px; border-radius: 10px; min-width: 0;
+}
+.hifi-products .hifi-product-portable button {
+  border: 1px solid #84a18f; color: #18452f; background: #e7f2e8;
+  font-size: 13px; font-weight: 650; min-height: 44px;
+  padding: 10px 12px; border-radius: 10px;
+}
+.hifi-products .hifi-product-portable button:disabled { opacity: .5; cursor: not-allowed; }
