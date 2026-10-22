@@ -965,12 +965,12 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
                     <p className="disclaimer">Deze selectie is door jou gemaakt in Producten.
                       Historische gegevens en Figma-voorbeelden zijn geen geverifieerde prijzen
                       en doen niet mee in een eigen winkelmandvergelijking.</p>
-                    <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
+                    <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} onAdd={toggleDesignProduct} />
                     <Suspense fallback={<p role="status">Voorbeeldlijst wordt geladen…</p>}><ShoppingListView basket={basket} /></Suspense>
                   </section>
                 : <details className="demo-comparison-disclosure">
-                    <summary>Toon oude voorbeeldboodschappen (geen actuele winkelprijzen)</summary>
-                    <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
+                    <summary>Herstel mijn productselectie of bekijk voorbeelden (geen actuele prijzen)</summary>
+                    <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} onAdd={toggleDesignProduct} />
                     <Suspense fallback={<p role="status">Voorbeeldlijst wordt geladen…</p>}><ShoppingListView basket={basket} /></Suspense>
                   </details>)}
             </section>
@@ -1010,13 +1010,13 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             </Suspense>
           </div>
         )}
-        {tab === 'list' && livePrivateReviewed && designProductIds.length > 0 && (
+        {tab === 'list' && livePrivateReviewed && (
           <section className="screen" aria-label="Extra zelf gekozen producten buiten het prijsmandje">
             <h3>Extra producten · niet meegerekend in jouw supermarktmand</h3>
             <p className="disclaimer">Jouw losse Producten-selectie is apart bewaard.
               Historische artikelen en Figma-voorbeelden zijn geen nieuwe bronprijzen,
               volledige verpakkingsmatches of besparingsbewijs.</p>
-            <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
+            <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} onAdd={toggleDesignProduct} />
           </section>
         )}
         {tab === 'list' && (
