@@ -47,6 +47,14 @@ export function RecipeWeekCookingMode({
     ? ownRecipeShoppingChecklist(selected, selected.servings)
     : null
   const steps = selected?.steps ?? []
+  const keyedSteps = useMemo(() => {
+    const occurrences = new Map<string, number>()
+    return steps.map(step => {
+      const occurrence = occurrences.get(step) ?? 0
+      occurrences.set(step, occurrence + 1)
+      return { step, key: JSON.stringify([step, occurrence]) }
+    })
+  }, [steps])
   // A recipe whose canonical physical ingredients require review must not be
   // rendered as an approved cooking/shopping measurement.
   const safe = !!selected && !!ingredients?.canCopy &&
@@ -155,7 +163,7 @@ export function RecipeWeekCookingMode({
         </details>
         <h5>Bereiding</h5>
         <ol className="recipe-week-cooking__steps">
-          {steps.map((step, index) => <li key={index}
+          {keyedSteps.map(({ step, key }, index) => <li key={key}
             className={doneSteps.has(index) ? 'done' : ''}>
             <label>
               <input type="checkbox" checked={doneSteps.has(index)}
