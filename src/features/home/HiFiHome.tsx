@@ -621,10 +621,11 @@ export function HiFiDemoList({ ids, onRemove, onAdd }: { ids: string[]; onRemove
     setPortableShoppingMessage(missingPortableItems.length +
       ' nieuwe ongeprijsde producten met jouw aantallen, notities en vinkjes toegevoegd. Bestaande keuzes behouden.')
   }
-  if (!selectedLines.length) return null
+  // Keep portable restore accessible even on a brand-new device with zero picks.
 
   return <section className="hifi-demo-list" aria-label="Zelf gekozen producten">
     <h3>Jouw gekozen producten</h3>
+    {ids.length === 0 && <p role="status">Je persoonlijke lijst is leeg. Je kunt hier een eerdere eigen back-up terugzetten.</p>}
     <p className="disclaimer">Eigen verzamelijst · niet meegenomen in de berekende maaltijdmand of winkelvergelijking.
       Dit is geen offerte, actuele voorraad of bewijs van besparing.</p>
     <div className="hifi-picked-progress" role="group" aria-label="Mijn afvinkvoortgang voor ongeprijsde producten">
@@ -687,6 +688,62 @@ export function HiFiDemoList({ ids, onRemove, onAdd }: { ids: string[]; onRemove
           aria-label={`Verwijder: ${p.name}`}>Verwijder</button>
       </div>)}
     </div>}
+    <details className="hifi-picked-portable">
+      <summary>Mijn ongeprijsde boodschappenlijst inclusief aantallen, notities en vinkjes overzetten</summary>
+      <p>Een privé JSON-back-up bevat uitsluitend bekende productidentiteiten, jouw aantallen,
+        eigen notities en handmatige vinkjes. Geen geobserveerde winkelprijzen, actuele voorraad,
+        geverifieerde SKU-matches of bronrechten.</p>
+      <button type="button" className="ghost-button" onClick={downloadPortableShoppingList}>
+        Bewaar persoonlijke boodschappenlijst (.json)
+      </button>
+      <label>Open een eerder persoonlijk boodschappenbestand
+        <input type="file" accept=".json,application/json" onChange={async event => {
+          const version = ++portableShoppingVersion.current
+          setPortableShoppingPreview(null)
+          const input = event.currentTarget
+          const file = input.files?.[0]
+          input.value = ''
+          if (!file) return
+          if (!file.size || file.size > 32768) {
+            setPortableShoppingMessage('Selecteer een gevuld eigen JSON-bestand van maximaal 32 KiB.')
+            return
+          }
+          try {
+            const contents = new TextDecoder('utf-8', { fatal: true })
+              .decode(await file.arrayBuffer())
+            if (version !== portableShoppingVersion.current) return
+            setPortableShoppingText(contents)
+            setPortableShoppingMessage('Bestand lokaal gelezen. Bekijk eerst het importvoorbeeld.')
+          } catch {
+            if (version === portableShoppingVersion.current)
+              setPortableShoppingMessage('Geen geldig UTF-8 JSON-bestand; je keuzes blijven behouden.')
+          }
+        }} />
+      </label>
+      <label>Of plak eigen back-up-JSON
+        <textarea rows={4} maxLength={32768} value={portableShoppingText}
+          onChange={event => {
+            portableShoppingVersion.current += 1
+            setPortableShoppingText(event.currentTarget.value)
+            setPortableShoppingPreview(null)
+            setPortableShoppingMessage('')
+          }} />
+      </label>
+      <button type="button" className="ghost-button" disabled={!portableShoppingText.trim()}
+        onClick={previewShoppingBackup}>Controleer mijn importvoorbeeld</button>
+      {portableShoppingPreview !== null && <p role="status">
+        {portableShoppingPreview.length} bekende artikelen in back-up; {missingPortableItems.length}
+        {' '}nog niet op mijn lijst. Al gekozen artikelen worden niet overschreven.
+      </p>}
+      {portableShoppingPreview !== null && <button type="button" className="ghost-button"
+        disabled={!onAdd || missingPortableItems.length === 0 ||
+          ids.length + missingPortableItems.length > 100 ||
+          !details.writable || !progress.writable}
+        onClick={restoreShoppingBackup}>
+        Voeg {missingPortableItems.length} nieuwe artikelen en persoonlijke gegevens toe
+      </button>}
+      <p role="status" aria-live="polite">{portableShoppingMessage}</p>
+    </details>
     <button type="button" className="hifi-history-add" onClick={() => downloadSelection(false)}>
       Download mijn ongeprijsde selectie (.txt)
     </button>
