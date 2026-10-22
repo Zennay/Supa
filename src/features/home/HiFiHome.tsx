@@ -11,7 +11,7 @@ const RecipeLibrary = lazy(async () => {
 import { curatedFigmaRecipes } from '../recipes/curatedFigmaRecipes'
 import { historicalRetailerProducts, filterHistoricalProducts, historicalPackageEquivalent, type HistoricalPackFilter } from '../products/historicalRetailerProducts'
 import { filterDemoProductsByUnit, orderDemoProductsByUnitPrice, type DemoUnitFilter } from '../products/productUnitPrice'
-import { productSearchText } from '../products/productSearchText'
+import { normalizeProductSearchValue } from '../products/productSearchText'
 
 export type HiFiTab = 'home' | 'recipes' | 'products'
 export const designProducts = [
@@ -119,11 +119,9 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct,
       setSortByPrice(false)
     }
   }, [view])
-  // Search only: normalize accents/case, Dutch decimal commas and spacing
-  // between a quantity and its unit. This never alters captured source data.
-  const normalizeCatalogSearch = (value: string) =>
-    productSearchText(value).replace(/(\d),(?=\d)/gu, '$1.')
-      .replace(/(\d)\s+([a-z])/gu, '$1$2')
+  // Search-only aliases are shared with the private source catalog; source
+  // labels, product identity and financial values remain byte-for-byte intact.
+  const normalizeCatalogSearch = normalizeProductSearchValue
   // Each word is a separate constraint, allowing product + retailer + pack
   // terms to match across fields without inventing a combined product identity.
   const queryTerms = normalizeCatalogSearch(query.trim()).split(/\s+/u).filter(Boolean)
