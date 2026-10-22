@@ -541,6 +541,11 @@ export function OfflineReviewedWorkbench({
   // Filter and order only the currently visible, honest own-source preview.
   // No change to automatic matching, user approval or canonical basket sums.
   const pairedPreviewDisplayed = useMemo(() => {
+    // A wall-clock rollover must never preserve a prior "cheaper" filter
+    // when the paired source is no longer eligible for price display.
+    const effectiveFilter = pairedPreviewComparable ? pairedPriceFilter :
+      (pairedPriceFilter === 'unknown' ? 'unknown' : 'all')
+    const effectiveSort = pairedPreviewComparable ? pairedPriceSort : 'plan'
     const rows = (pairedPreviewRows ?? []).map(row => {
       const comparable = pairedPreviewComparable && row.plusCode && row.dekaCode &&
         row.plusPacks !== null && row.dekaPacks !== null &&
@@ -549,12 +554,12 @@ export function OfflineReviewedWorkbench({
       return { ...row, deltaCents: candidateDelta !== null &&
         Number.isSafeInteger(candidateDelta) ? candidateDelta : null }
     }).filter(row => (!pairedOnlyMissing || !row.plusCode || !row.dekaCode) &&
-      (pairedPriceFilter === 'all' ||
-        (pairedPriceFilter === 'unknown' && row.deltaCents === null) ||
-        (pairedPriceFilter === 'plus' && row.deltaCents !== null && row.deltaCents > 0) ||
-        (pairedPriceFilter === 'deka' && row.deltaCents !== null && row.deltaCents < 0) ||
-        (pairedPriceFilter === 'equal' && row.deltaCents === 0)))
-    if (pairedPriceSort === 'difference') rows.sort((a, b) =>
+      (effectiveFilter === 'all' ||
+        (effectiveFilter === 'unknown' && row.deltaCents === null) ||
+        (effectiveFilter === 'plus' && row.deltaCents !== null && row.deltaCents > 0) ||
+        (effectiveFilter === 'deka' && row.deltaCents !== null && row.deltaCents < 0) ||
+        (effectiveFilter === 'equal' && row.deltaCents === 0)))
+    if (effectiveSort === 'difference') rows.sort((a, b) =>
       (b.deltaCents === null ? -1 : Math.abs(b.deltaCents)) -
       (a.deltaCents === null ? -1 : Math.abs(a.deltaCents)))
     return rows
@@ -2974,7 +2979,8 @@ export function OfflineReviewedWorkbench({
                     {' '}Toon alleen ingrediënten zonder bruikbaar matchvoorstel bij één of beide winkels
                   </label>
                   <label>Filter voorlopige hele-pak-prijsverschillen
-                    <select value={pairedPriceFilter}
+                    <select value={pairedPreviewComparable ? pairedPriceFilter :
+                      pairedPriceFilter === 'unknown' ? 'unknown' : 'all'}
                       onChange={event => setPairedPriceFilter(event.currentTarget.value as
                         'all' | 'plus' | 'deka' | 'equal' | 'unknown')}>
                       <option value="all">Alle fysieke ingrediënten</option>
@@ -2985,7 +2991,7 @@ export function OfflineReviewedWorkbench({
                     </select>
                   </label>
                   <label>Sorteer voorgestelde fysieke prijsregels
-                    <select value={pairedPriceSort}
+                    <select value={pairedPreviewComparable ? pairedPriceSort : 'plan'}
                       onChange={event => setPairedPriceSort(event.currentTarget.value as 'plan' | 'difference')}>
                       <option value="plan">Volgorde uit Planner</option>
                       <option value="difference" disabled={!pairedPreviewComparable}>
