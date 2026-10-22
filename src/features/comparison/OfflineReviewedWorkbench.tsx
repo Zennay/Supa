@@ -610,9 +610,11 @@ export function OfflineReviewedWorkbench({
       (pairedPriceFilter === 'unknown' ? 'unknown' : 'all')
     const effectiveSort = pairedPreviewComparable ? pairedPriceSort : 'plan'
     const rows = (pairedPreviewRows ?? []).map(row => {
-      const comparable = pairedPreviewComparable && row.plusCode && row.dekaCode &&
-        row.plusPacks !== null && row.dekaPacks !== null &&
-        row.plusCents !== null && row.dekaCents !== null
+      const comparable = pairedPreviewComparable && Boolean(row.plusCode) && Boolean(row.dekaCode) &&
+        row.plusPacks !== null && Number.isSafeInteger(row.plusPacks) && row.plusPacks > 0 &&
+        row.dekaPacks !== null && Number.isSafeInteger(row.dekaPacks) && row.dekaPacks > 0 &&
+        row.plusCents !== null && Number.isSafeInteger(row.plusCents) && row.plusCents >= 0 &&
+        row.dekaCents !== null && Number.isSafeInteger(row.dekaCents) && row.dekaCents >= 0
       const candidateDelta = comparable ? row.dekaCents! - row.plusCents! : null
       return { ...row, deltaCents: candidateDelta !== null &&
         Number.isSafeInteger(candidateDelta) ? candidateDelta : null }
@@ -826,7 +828,8 @@ export function OfflineReviewedWorkbench({
         const priceKnown = delta !== null && Number.isSafeInteger(delta)
         const unitCandidate = priceKnown &&
           row.plusUnitFamily !== null && row.plusUnitFamily === row.dekaUnitFamily &&
-          row.plusUnitCents !== null && row.dekaUnitCents !== null
+          row.plusUnitCents !== null && Number.isSafeInteger(row.plusUnitCents) && row.plusUnitCents >= 0 &&
+          row.dekaUnitCents !== null && Number.isSafeInteger(row.dekaUnitCents) && row.dekaUnitCents >= 0
           ? row.dekaUnitCents - row.plusUnitCents : null
         const unitDelta = unitCandidate !== null &&
           Number.isSafeInteger(unitCandidate) ? unitCandidate : null
@@ -3266,7 +3269,8 @@ export function OfflineReviewedWorkbench({
                       const pairedCents = plusPriceKnown && dekaPriceKnown && row.deltaCents !== null
                       const delta = pairedCents ? row.deltaCents : null
                       const unitCandidate = pairedCents &&
-                        row.plusUnitCents !== null && row.dekaUnitCents !== null &&
+                        row.plusUnitCents !== null && Number.isSafeInteger(row.plusUnitCents) && row.plusUnitCents >= 0 &&
+                        row.dekaUnitCents !== null && Number.isSafeInteger(row.dekaUnitCents) && row.dekaUnitCents >= 0 &&
                         row.plusUnitFamily !== null && row.plusUnitFamily === row.dekaUnitFamily
                         ? row.dekaUnitCents - row.plusUnitCents : null
                       const unitDelta = unitCandidate !== null &&
