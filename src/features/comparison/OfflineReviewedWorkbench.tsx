@@ -3517,7 +3517,7 @@ export function OfflineReviewedWorkbench({
           Gebruik uitsluitend gegevens die je mag bewaren en verwerken.
           Ontbrekende prijzen: zet <code>priceCents: null</code> en <code>available: false</code>.</p>
       </details>
-      <div id="supa-own-price-import" className="offline-price-workbench__input">
+      <div id="supa-own-price-import" className="offline-price-workbench__input" tabIndex={-1} aria-label="Eigen winkelprijsgegevens importeren">
         <label>Herstel eerdere privémand-sessie van ditzelfde weekmenu (zonder oude bevestigingen)
           <input type="file" accept=".json,application/json" disabled={busy}
             onChange={event => {
