@@ -222,7 +222,11 @@ export function importLocalRecipeHtmlCollection(raw: string): UserRecipeDraft[] 
     if (++seen > 80) throw new Error('Te veel scripts in deze HTML-bron.')
     const attrs = match[1]
     const type = /(?:^|\s)type\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/iu.exec(attrs)
-    if (!type || (type[1] ?? type[2] ?? type[3]).trim().toLowerCase() !== 'application/ld+json') continue
+    // Saved HTML commonly carries the optional UTF-8 charset parameter.
+    // This is still inert local script text, not permission to execute scripts,
+    // fetch the page or accept arbitrary script MIME types.
+    const mime = (type?.[1] ?? type?.[2] ?? type?.[3] ?? '').trim()
+    if (!/^application\/ld\+json(?:\s*;\s*charset\s*=\s*utf-8)?$/iu.test(mime)) continue
     const body = match[2].trim()
     if (!body) continue
     try { scripts.push(JSON.parse(body.replace(/^\uFEFF/u, ''))) }
