@@ -298,9 +298,12 @@ export function PlannerTwoStoreCoverage({
                 : 'Controleer ' + nextAction.need.label + ' bij ' + nextAction.store}
             </button>
           </>
-          : <p>Alle ingrediënten lijken gekoppeld, maar een betrouwbaar volledig
-            prijsverschil is nog onbekend. Controleer de bronmomenten en volledige
-            verpakkingen via Vergelijk.</p>}
+          : <p>{storeFilter !== 'both' && pending.length > 0
+            ? 'Voor ' + storeFilter + ' zijn geen openstaande ingrediëntcontroles; ' +
+              'de andere winkel heeft nog aandacht nodig. Kies Beide winkels om verder te gaan.'
+            : 'Alle ingrediënten lijken gekoppeld, maar een betrouwbaar volledig ' +
+              'prijsverschil is nog onbekend. Controleer de bronmomenten en volledige ' +
+              'verpakkingen via Vergelijk.'}</p>}
     </div>
     <div className="supa-two-store-coverage__export-actions">
       <button type="button" className="ghost-button" onClick={downloadCoverage}>
