@@ -189,15 +189,15 @@ function sourcePackRate(product: import('../../domain/basket.ts').StoreProduct):
  * part of a complete priced weekly shop. */
 function sourceWholePackCents(product: OfflineStoreProduct,
   required: BasketTraceLine['requirement']): number | null {
-  if (!product.available || product.packAmount === null ||
-      required.amount === null || !Number.isFinite(required.amount) ||
-      required.amount <= 0) return null
+  if (!product.available || !Number.isSafeInteger(product.priceCents) || product.priceCents <= 0 ||
+      product.packAmount === null || required.amount === null ||
+      !Number.isFinite(required.amount) || required.amount <= 0) return null
   const packs = calculateDecimalPackCount(
     [{ amount: required.amount, unit: required.unit }],
     { amount: product.packAmount, unit: product.packUnit, count: product.packCount ?? 1 })
   if (packs === null || !Number.isSafeInteger(packs) || packs < 1) return null
   const totalCents = packs * product.priceCents
-  return Number.isSafeInteger(totalCents) && totalCents >= 0 ? totalCents : null
+  return Number.isSafeInteger(totalCents) && totalCents > 0 ? totalCents : null
 }
 function sourceWholePackPreview(product: OfflineStoreProduct,
   required: BasketTraceLine['requirement'], currentCents: number | null = null): string {
