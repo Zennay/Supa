@@ -12,6 +12,8 @@ import { curatedFigmaRecipes } from '../recipes/curatedFigmaRecipes'
 import { historicalRetailerProducts, filterHistoricalProducts, historicalPackageEquivalent, type HistoricalPackFilter } from '../products/historicalRetailerProducts'
 import { filterDemoProductsByUnit, orderDemoProductsByUnitPrice, type DemoUnitFilter } from '../products/productUnitPrice'
 import { normalizeProductSearchValue } from '../products/productSearchText'
+import { readUnpricedShoppingDetails, saveUnpricedShoppingDetails, unpricedShoppingDetailsKey, type ShoppingPick } from './unpricedShoppingDetails'
+import { readUnpricedShoppingProgress, saveUnpricedShoppingProgress, unpricedShoppingProgressKey } from './unpricedShoppingProgress'
 
 export type HiFiTab = 'home' | 'recipes' | 'products'
 export const designProducts = [
@@ -376,24 +378,157 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct,
 }
 
 export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: string) => void }) {
-  // The standalone user-picked product collection is distinct from the meal-plan
-  // ingredient checklist and never participates in the price comparator.
+  // This personal discovery shortlist is deliberately separate from the priced
+  // basket. Its counts, notes and checkmarks never become retailer evidence.
+  const [progress, setProgress] = useState(readUnpricedShoppingProgress)
+  const [details, setDetails] = useState(readUnpricedShoppingDetails)
+  const [progressMessage, setProgressMessage] = useState('')
+  const [detailsMessage, setDetailsMessage] = useState('')
+  const [openOnly, setOpenOnly] = useState(false)
+
+  useEffect(() => {
+    const sync = (event: StorageEvent) => {
+      if (event.key !== null && event.key !== unpricedShoppingDetailsKey) return
+      setDetails(readUnpricedShoppingDetails())
+      setDetailsMessage('Aantallen en notities uit een andere tab bijgewerkt.')
+    }
+    window.addEventListener('storage', sync)
+    return () => window.removeEventListener('storage', sync)
+  }, [])
+  useEffect(() => {
+    const sync = (event: StorageEvent) => {
+      if (event.key !== null && event.key !== unpricedShoppingProgressKey) return
+      setProgress(readUnpricedShoppingProgress())
+      setProgressMessage('Je ongeprijsde afvinklijst is op dit apparaat bijgewerkt.')
+    }
+    window.addEventListener('storage', sync)
+    return () => window.removeEventListener('storage', sync)
+  }, [])
+
+  const pick = (id: string): ShoppingPick =>
+    details.entries.find(item => item.id === id) ?? { id, count: 1, note: '' }
+  function updatePick(id: string, changes: Partial<Pick<ShoppingPick, 'count' | 'note'>>) {
+    if (!ids.includes(id) || !details.writable) return
+    const next = { ...pick(id), ...changes }
+    if (!Number.isSafeInteger(next.count) || next.count < 1 || next.count > 99 ||
+        next.note.length > 120 || /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(next.note)) {
+      setDetailsMessage('Gebruik 1–99 aantallen en maximaal 120 gewone notitietekens.')
+      return
+    }
+    const entries = details.entries.filter(item => item.id !== id)
+    if (next.count !== 1 || next.note) entries.push(next)
+    const saved = saveUnpricedShoppingDetails(details, entries)
+    if (!saved) {
+      setDetails(readUnpricedShoppingDetails())
+      setDetailsMessage('Niet opgeslagen: een andere tab wijzigde de gegevens of browseropslag is beschermd.')
+      return
+    }
+    setDetails(saved)
+    setDetailsMessage('')
+  }
+  const completed = (id: string) => progress.doneIds.includes(id)
+  const completedCount = ids.filter(completed).length
+  function saveDone(next: readonly string[], success: string): boolean {
+    const saved = saveUnpricedShoppingProgress(progress, next)
+    if (!saved) {
+      setProgress(readUnpricedShoppingProgress())
+      setProgressMessage('Niet opgeslagen: bestaande afvinkgegevens zijn beschermd of in een andere tab gewijzigd.')
+      return false
+    }
+    setProgress(saved)
+    setProgressMessage(success)
+    return true
+  }
+  function toggleDone(id: string) {
+    if (!ids.includes(id)) return
+    const next = completed(id)
+      ? progress.doneIds.filter(value => value !== id)
+      : [...progress.doneIds, id]
+    saveDone(next, completed(id) ? 'Weer te kopen gemarkeerd.' : 'Product afgevinkt op dit apparaat.')
+  }
+  function removeAndClear(id: string) {
+    // Clear persisted state before removing an item, so re-adding it cannot
+    // resurrect an old tick or private note. On a write conflict, keep the row.
+    if (completed(id)) {
+      const next = progress.doneIds.filter(value => value !== id)
+      if (!saveDone(next, 'Product uit de ongeprijsde lijst verwijderd.')) return
+    }
+    const previousPick = details.entries.find(item => item.id === id)
+    if (previousPick && details.writable) {
+      const saved = saveUnpricedShoppingDetails(details,
+        details.entries.filter(item => item.id !== id))
+      if (!saved) {
+        setDetails(readUnpricedShoppingDetails())
+        setDetailsMessage('Notitie/aantal is elders gewijzigd. De productregel blijft staan; probeer opnieuw.')
+        return
+      }
+      setDetails(saved)
+    }
+    onRemove(id)
+  }
+
   const selectedHistorical = historicalRetailerProducts.filter(item => ids.includes(item.id))
   const selectedExamples = designProducts.filter(item => ids.includes(item.id))
   const recognizedIds = new Set([...selectedHistorical.map(item => item.id), ...selectedExamples.map(item => item.id)])
   const selectedUnknown = ids.filter(id => !recognizedIds.has(id))
-  const selectedLines = [...selectedHistorical.map(item => `☐ ${item.name} · ${item.store} · ${item.pack} · prijs onbekend (historisch)`),
-    ...selectedExamples.map(item => `☐ ${item.name} · Figma-demo, geen actuele prijs`),
-    ...selectedUnknown.map(id => `☐ Product niet beschikbaar · oude product-ID ${id} · prijs onbekend`)]
-  const downloadSelection = () => {
-    if (typeof document === 'undefined' || !selectedLines.length) return
+  const personalDetail = (id: string) => {
+    const item = pick(id)
+    return ' · aantal: ' + item.count + (item.note ? ' · notitie: ' + item.note : '')
+  }
+  const selectedLines = [
+    ...selectedHistorical.map(item => (completed(item.id) ? '☒ ' : '☐ ') +
+      item.name + ' · ' + item.store + ' · ' + item.pack + ' · prijs onbekend (historisch)' + personalDetail(item.id)),
+    ...selectedExamples.map(item => (completed(item.id) ? '☒ ' : '☐ ') +
+      item.name + ' · Figma-demo, geen actuele prijs' + personalDetail(item.id)),
+    ...selectedUnknown.map(id => (completed(id) ? '☒ ' : '☐ ') +
+      'Product niet beschikbaar · oude product-ID ' + id + ' · prijs onbekend' + personalDetail(id)),
+  ]
+  const openSelectionText = selectedLines.filter(line => line.startsWith('☐ ')).join('\n')
+  const selectionText = selectedLines.join('\n')
+  const visibleHistorical = openOnly ? selectedHistorical.filter(item => !completed(item.id)) : selectedHistorical
+  const visibleExamples = openOnly ? selectedExamples.filter(item => !completed(item.id)) : selectedExamples
+  const visibleUnknown = openOnly ? selectedUnknown.filter(id => !completed(id)) : selectedUnknown
+  const progressControl = (id: string, label: string) => (
+    <label className="hifi-picked-tick">
+      <input type="checkbox" checked={completed(id)} onChange={() => toggleDone(id)}
+        disabled={!progress.writable} aria-label={'Afgevinkt: ' + label} />
+      <span>{completed(id) ? 'Gekocht' : 'Nog kopen'}</span>
+    </label>
+  )
+  const detailControls = (id: string, label: string) => {
+    const item = pick(id)
+    return <div className="hifi-picked-edit" role="group" aria-label={'Aantal en notitie voor ' + label}>
+      <label>Aantal (eigen keuze)
+        <input type="number" min={1} max={99} step={1} inputMode="numeric"
+          disabled={!details.writable} aria-label={'Aantal voor ' + label}
+          value={item.count} onChange={event => {
+            const count = event.currentTarget.valueAsNumber
+            if (Number.isSafeInteger(count) && count >= 1 && count <= 99) updatePick(id, { count })
+          }} />
+      </label>
+      <label>Mijn notitie
+        <input type="text" maxLength={120} disabled={!details.writable}
+          aria-label={'Notitie voor ' + label} value={item.note}
+          placeholder="Bijvoorbeeld smaak of formaat"
+          onChange={event => updatePick(id, { note: event.currentTarget.value })} />
+      </label>
+    </div>
+  }
+  const downloadSelection = (onlyOpen = false) => {
+    const selected = onlyOpen ? openSelectionText : selectionText
+    if (typeof document === 'undefined' || !selected) return
     const note = 'SUPA · eigen productselectie (ongeprijsd)\n' +
-      'Niet meegerekend in Planner, geverifieerde winkelmand of besparing.\n\n' + selectedLines.join('\n') + '\n'
+      'Niet meegerekend in Planner, geverifieerde winkelmand of besparing.\n' +
+      'Gekocht = jouw eigen afvinkstatus, geen winkelbewijs.\n\n' + selected + '\n'
     const url = URL.createObjectURL(new Blob([note], { type: 'text/plain;charset=utf-8' }))
     const anchor = document.createElement('a')
-    anchor.href = url; anchor.download = 'supa-eigen-productselectie-ongeprijsd.txt'
+    anchor.href = url
+    anchor.download = onlyOpen ? 'supa-nog-te-kopen-ongeprijsd.txt' : 'supa-eigen-productselectie-ongeprijsd.txt'
     document.body.appendChild(anchor)
-    try { anchor.click() } finally { anchor.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 60_000) }
+    try { anchor.click() } finally {
+      anchor.remove()
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    }
   }
   if (!selectedHistorical.length && !selectedExamples.length && !selectedUnknown.length) return null
 
@@ -401,44 +536,75 @@ export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: 
     <h3>Jouw gekozen producten</h3>
     <p className="disclaimer">Eigen verzamelijst · niet meegenomen in de berekende maaltijdmand of winkelvergelijking.
       Dit is geen offerte, actuele voorraad of bewijs van besparing.</p>
+    <div className="hifi-picked-progress" role="group" aria-label="Mijn afvinkvoortgang voor ongeprijsde producten">
+      <p role="status" aria-live="polite">{completedCount} van {ids.length} eigen producten afgevinkt · {ids.length - completedCount} nog te kopen.</p>
+      <progress max={Math.max(1, ids.length)} value={completedCount}
+        aria-label="Afgevinkte producten uit mijn ongeprijsde selectie" />
+      <button type="button" className="ghost-button" aria-pressed={openOnly}
+        onClick={() => setOpenOnly(!openOnly)}>
+        {openOnly ? 'Toon ook gekochte producten' : 'Toon alleen nog te kopen'}
+      </button>
+      <button type="button" className="ghost-button"
+        disabled={!progress.writable || completedCount === 0}
+        onClick={() => {
+          if (window.confirm('Alle afvinkingen van deze persoonlijke, ongeprijsde lijst terugzetten op nog te kopen?'))
+            saveDone([], 'Alle productselecties opnieuw als nog te kopen gemarkeerd.')
+        }}>Zet alle vinkjes terug</button>
+    </div>
+    {!progress.writable && <p role="alert">Deze browseropslag is niet beschikbaar of bevat een onbekende versie.
+      Afvinken is uitgeschakeld; bestaande gegevens blijven behouden.</p>}
+    {progressMessage && <p role="status" aria-live="polite">{progressMessage}</p>}
+    {!details.writable && <p role="alert">Aantallen/notities zijn in deze browser beschermd. Supa overschrijft de bestaande opslag niet.</p>}
+    {detailsMessage && <p role="status" aria-live="polite">{detailsMessage}</p>}
+    {openOnly && completedCount === ids.length &&
+      <p role="status">Alles afgevinkt! Toon ook gekochte producten om de lijst terug te zien.</p>}
     {selectedHistorical.length > 0 && <div className="hifi-picked-history" aria-label="Historische bronproducten zonder prijs">
       <h4>Historische bronproducten</h4>
       <p className="disclaimer">Waargenomen op 4 oktober 2026. Geen actuele prijzen of bronrechten voor productie.</p>
-      {selectedHistorical.map(item => <div className="hifi-demo-list-row hifi-picked-history-row" key={item.id}>
+      {visibleHistorical.map(item => <div className="hifi-demo-list-row hifi-picked-history-row" key={item.id}>
         <div className="hifi-picked-source-logo" aria-hidden="true">{item.store === 'PLUS' ? 'P' : 'D'}</div>
-        <div className="hifi-picked-details">
-          <strong>{item.name}</strong>
-          <span>{item.store} · {item.pack} · prijs onbekend</span>
-        </div>
-        <button type="button" className="ghost-button" onClick={() => onRemove(item.id)}
-          aria-label={`Verwijder uit lijst: ${item.name} bij ${item.store}`}>Verwijder</button>
+        <div className="hifi-picked-details"><strong>{item.name}</strong><span>{item.store} · {item.pack} · prijs onbekend</span></div>
+        {progressControl(item.id, item.name)}
+        {detailControls(item.id, item.name)}
+        <button type="button" className="ghost-button" onClick={() => removeAndClear(item.id)}
+          aria-label={'Verwijder uit lijst: ' + item.name + ' bij ' + item.store}>Verwijder</button>
       </div>)}
     </div>}
     {selectedUnknown.length > 0 && <div className="hifi-picked-demo" aria-label="Oude productselecties die niet meer in de catalogus staan">
       <h4>Oude productselecties</h4>
       <p className="disclaimer">Deze product-ID's horen niet bij de huidige catalogus. Ze blijven bewaard totdat je ze verwijdert; er wordt geen prijs of productmatch afgeleid.</p>
-      {selectedUnknown.map(id => <div className="hifi-demo-list-row" key={id}>
+      {visibleUnknown.map(id => <div className="hifi-demo-list-row" key={id}>
         <div className="hifi-picked-source-logo" aria-hidden="true">?</div>
         <div className="hifi-picked-details"><strong>Product niet beschikbaar</strong><span>Oude product-ID: {id} · prijs onbekend</span></div>
-        <button type="button" className="ghost-button" onClick={() => onRemove(id)} aria-label={`Verwijder oude productselectie: ${id}`}>Verwijder</button>
+        {progressControl(id, 'oude product-ID ' + id)}
+        {detailControls(id, 'oude product-ID ' + id)}
+        <button type="button" className="ghost-button" onClick={() => removeAndClear(id)}
+          aria-label={'Verwijder oude productselectie: ' + id}>Verwijder</button>
       </div>)}
     </div>}
     {selectedExamples.length > 0 && <div className="hifi-picked-demo" aria-label="Figma demoproducten">
       <h4>Figma-voorbeelden</h4>
       <p className="disclaimer">Demolijst · geen actuele prijzen. Niet meegenomen in de mandvergelijking.</p>
-      {selectedExamples.map(p => <div className="hifi-demo-list-row" key={p.id}>
-        <FigmaImage asset={p.image} width="40" height="40" alt="" />
-        <span>{p.name}</span>
-        <button type="button" className="ghost-button" onClick={() => onRemove(p.id)}
-          aria-label={`Verwijder: ${p.name}`}>Verwijder</button>
+      {visibleExamples.map(item => <div className="hifi-demo-list-row" key={item.id}>
+        <FigmaImage asset={item.image} width="40" height="40" alt="" />
+        <span>{item.name}</span>
+        {progressControl(item.id, item.name)}
+        {detailControls(item.id, item.name)}
+        <button type="button" className="ghost-button" onClick={() => removeAndClear(item.id)}
+          aria-label={'Verwijder: ' + item.name}>Verwijder</button>
       </div>)}
     </div>}
-    <button type="button" className="ghost-button" onClick={downloadSelection}>Download ongeprijsde selectie (.txt)</button>
-    <label className="hifi-picked-copy-label">Kopieer je gekozen productnamen
+    <div className="recipe-backup-panel__actions">
+      <button type="button" className="ghost-button" onClick={() => downloadSelection(false)}
+        disabled={!selectionText}>Download ongeprijsde selectie (.txt)</button>
+      <button type="button" className="ghost-button" onClick={() => downloadSelection(true)}
+        disabled={!openSelectionText}>Download alleen nog te kopen (.txt)</button>
+    </div>
+    <label className="hifi-picked-copy-label">Kopieer je gekozen productnamen, aantallen en notities
       <textarea readOnly rows={Math.min(ids.length + 2, 12)}
         onFocus={event => event.currentTarget.select()}
-        value={selectedLines.join('\n')}
-        aria-label="Kopieerbare gekozen producten, zonder winkelprijzen" />
+        value={selectionText}
+        aria-label="Kopieerbare gekozen producten, aantallen en notities, zonder winkelprijzen" />
     </label>
   </section>
 }
