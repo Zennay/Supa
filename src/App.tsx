@@ -281,14 +281,17 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   }
   // Directly reveal the existing local source upload controls, not the
   // unrelated historical demonstration basket above them.
+  const revealOwnPriceImport = useCallback(() => {
+    const target = document.getElementById('supa-own-price-import')
+    if (!target) return
+    target.focus({ preventScroll: true })
+    target.scrollIntoView({ block: 'start', behavior: 'smooth' })
+  }, [])
   useEffect(() => {
     if (tab !== 'basket' || ownPriceImportSignal === 0) return
-    const frame = window.requestAnimationFrame(() =>
-      document.getElementById('supa-own-price-import')?.scrollIntoView({
-        block: 'start', behavior: 'smooth',
-      }))
+    const frame = window.requestAnimationFrame(revealOwnPriceImport)
     return () => window.cancelAnimationFrame(frame)
-  }, [tab, ownPriceImportSignal])
+  }, [tab, ownPriceImportSignal, revealOwnPriceImport])
   const toggleDesignProduct = (id: string) => {
     // A removed discovery item is a new task if added again; do not resurrect old private details.
     if (designProductIds.includes(id)) {
@@ -1148,9 +1151,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               // may fire before the price import node exists. The mount
               // callback runs after the workbench DOM is present.
               if (tab === 'basket' && ownPriceImportSignal > 0) {
-                document.getElementById('supa-own-price-import')?.scrollIntoView({
-                  block: 'start', behavior: 'smooth',
-                })
+                revealOwnPriceImport()
               }
             }}
             basket={basket}
