@@ -64,6 +64,32 @@ const examples = curatedFigmaRecipes.map(recipe => ({
 }))
 
 const blank = { title: '', servings: '2', minutes: '20', ingredients: '', steps: '' }
+
+/** Optional attribution must never prevent a local recipe from being imported.
+ * Invalid/credential-bearing links are omitted and explicitly require review;
+ * safe links are normalized using the same policy as recipe storage.
+ */
+function optionalRecipeAttribution(raw: string): { sourceUrl: string | null; warning: string | null } {
+  const value = raw.trim()
+  if (!value) return { sourceUrl: null, warning: null }
+  try {
+    const sourceUrl = safeRecipeSourceUrl(value)
+    const canonicalOriginal = new URL(value)
+    canonicalOriginal.hash = ''
+    return {
+      sourceUrl,
+      warning: sourceUrl !== canonicalOriginal.toString()
+        ? 'De bronlink is veilig opgeschoond; controleer de openbare bronvermelding.'
+        : null,
+    }
+  } catch {
+    return {
+      sourceUrl: null,
+      warning: 'De opgegeven bronlink was ongeldig of niet openbaar HTTPS en is niet bewaard; controleer de bronvermelding.',
+    }
+  }
+}
+
 /** Read local recipe/link files without guessing legacy encodings. UTF-16 is
  * accepted only when a .txt/.md workflow declares its byte order with a BOM;
  * HTML and JSON-LD remain strict UTF-8 to avoid silently reinterpreting data. */
@@ -923,8 +949,14 @@ export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
       const html = sourceText.startsWith('{') || sourceText.startsWith('[')
         ? '<script type="application/ld+json">' + sourceText + '</script>'
         : sourceText
-      const draft = importRecipeFromHtml(html, url)
-      adoptImportedRecipe(draft, 'Receptgegevens lokaal herkend. Controleer alle hoeveelheden vóór opslaan.')
+      const attribution = optionalRecipeAttribution(url)
+      const draft = importRecipeFromHtml(html, attribution.sourceUrl)
+      adoptImportedRecipe({
+        ...draft,
+        warnings: attribution.warning
+          ? [...new Set([...draft.warnings, attribution.warning])]
+          : draft.warnings,
+      }, 'Receptgegevens lokaal herkend. Controleer alle hoeveelheden vóór opslaan.')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Kon de geplakte receptgegevens niet verwerken.')
     }
@@ -941,15 +973,9 @@ export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
       // preserve that explicitly entered source link unless the text itself
       // supplies a more precise Bron: line. This is attribution only; no fetch.
       if (!sourceUrl && url.trim()) {
-        try {
-          sourceUrl = safeRecipeSourceUrl(url.trim())
-          const canonicalOriginal = new URL(url.trim())
-          canonicalOriginal.hash = ''
-          if (sourceUrl !== canonicalOriginal.toString()) warnings.push(
-            'De bronlink is veilig opgeschoond; controleer de openbare bronvermelding.')
-        } catch {
-          warnings.push('De opgegeven bronlink was ongeldig of niet openbaar HTTPS en is niet bewaard; controleer de bronvermelding.')
-        }
+        const attribution = optionalRecipeAttribution(url)
+        sourceUrl = attribution.sourceUrl
+        if (attribution.warning) warnings.push(attribution.warning)
       }
       const attributed = {
         ...draft,
