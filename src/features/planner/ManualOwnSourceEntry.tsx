@@ -1,8 +1,13 @@
-import { useRef, useState } from 'react'
+import { lazy, Suspense, useRef, useState } from 'react'
 import { exportManualOwnSourceDraft, importManualOwnSourceDraft, MANUAL_DRAFT_MAX_BYTES, type ManualEntry, type ManualSources } from './manualOwnSourceDraft.ts'
 import type { OfflinePriceSnapshots } from '../../domain/offlineReviewedImport.ts'
 import { readablePlannerDemandAmount, type PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
 import './manualOwnSourceEntry.css'
+// Reuse the existing device-only camera reader. Camera is opt-in and no
+// retailer identifier, offer or price is inferred by the barcode detector.
+const LocalDeviceBarcodeScanner = lazy(() =>
+  import('../comparison/LocalDeviceBarcodeScanner.tsx')
+    .then(module => ({ default: module.LocalDeviceBarcodeScanner })))
 
 type Store = 'PLUS' | 'DekaMarkt'
 type Field = 'id' | 'name' | 'packAmount' | 'packUnit' | 'packCount' | 'priceCents' | 'available'
@@ -56,6 +61,9 @@ export function ManualOwnSourceEntry({ onPreview, busy, template, needs }: {
   needs: readonly PlannerCaptureGuideNeed[]
 }) {
   const [open, setOpen] = useState(false)
+  const [activeScan, setActiveScan] = useState<{store: Store; index: number} | null>(null)
+  const [scanned, setScanned] = useState<{store: Store; index: number; code: string} | null>(null)
+  const [confirmedScan, setConfirmedScan] = useState(false)
   const [guideStore, setGuideStore] = useState<Store>('PLUS')
   const [guideNeedId, setGuideNeedId] = useState('')
   const [guideMessage, setGuideMessage] = useState('')
@@ -70,6 +78,7 @@ export function ManualOwnSourceEntry({ onPreview, busy, template, needs }: {
   const [pendingTemplate, setPendingTemplate] = useState<ManualSources | null>(null)
   const readTicket = useRef(0)
   function invalidateRestore() {
+    setActiveScan(null); setScanned(null); setConfirmedScan(false)
     ++readTicket.current
     setPendingDraft(null)
     setPendingTemplate(null)
@@ -79,6 +88,30 @@ export function ManualOwnSourceEntry({ onPreview, busy, template, needs }: {
     setAcknowledged(false); setError('')
   }
 
+  function startScan(store: Store, index: number) {
+    setScanned(null)
+    setConfirmedScan(false)
+    setActiveScan({ store, index })
+  }
+  function captureBarcode(code: string) {
+    if (!activeScan) return
+    // An EAN/UPC is a physical package code, not necessarily a retailer SKU.
+    // Keep it separate from admitted price/source fields until confirmation.
+    setScanned({ ...activeScan, code })
+    setActiveScan(null)
+    setConfirmedScan(false)
+  }
+  function acceptBarcode(store: Store, index: number) {
+    if (!confirmedScan || !scanned || scanned.store !== store ||
+        scanned.index !== index) return
+    if (!sources[store]?.products[index]) {
+      setError('De artikelregel is veranderd. Scan opnieuw.')
+      setScanned(null)
+      return
+    }
+    updateProduct(store, index, 'id', scanned.code)
+    setBackupMessage('Bevestigde verpakkingscode ingevuld als originele winkelartikelcode. Controleer ook zelf de bron, productnaam en pakprijs.')
+  }
   function updateSource(store: Store, observedAt: string) {
     setSources(previous => ({ ...previous, [store]: { ...previous[store], observedAt } }))
     invalidateRestore()
@@ -391,6 +424,39 @@ export function ManualOwnSourceEntry({ onPreview, busy, template, needs }: {
                   <input type="text" maxLength={100} value={product.id}
                     onChange={event => updateProduct(store, index, 'id', event.currentTarget.value)} />
                 </label>
+                <div className="supa-manual-source__scanner">
+                  <button type="button" className="ghost-button"
+                    onClick={() => startScan(store, index)}>
+                    Optioneel: scan EAN/UPC van deze verpakking
+                  </button>
+                  {activeScan?.store === store && activeScan.index === index &&
+                    <Suspense fallback={<p role="status">Lokale camerascan laden…</p>}>
+                      <LocalDeviceBarcodeScanner
+                        onAccept={captureBarcode}
+                        onClose={() => setActiveScan(null)} />
+                    </Suspense>}
+                  {scanned?.store === store && scanned.index === index && <div
+                    className="supa-manual-source__scan-confirm">
+                    <strong>Gescande verpakkingsbarcode: {scanned.code}</strong>
+                    <p>Een EAN/UPC is niet altijd de winkelartikelcode. Bevestig
+                      uitsluitend als je de code op de originele bron bij
+                      deze winkel hebt vergeleken. Geen automatische match.</p>
+                    <label>
+                      <input type="checkbox" checked={confirmedScan}
+                        onChange={event => setConfirmedScan(event.currentTarget.checked)} />
+                      Deze barcode komt exact overeen met de originele
+                      { ' '}{store}-artikelcode die ik heb waargenomen.
+                    </label>
+                    <button type="button" disabled={!confirmedScan}
+                      onClick={() => acceptBarcode(store, index)}>
+                      Neem gecontroleerde code over als SKU
+                    </button>
+                    <button type="button" className="ghost-button"
+                      onClick={() => { setScanned(null); setConfirmedScan(false) }}>
+                      Gebruik barcode niet
+                    </button>
+                  </div>}
+                </div>
                 <label>Originele productnaam
                   <input type="text" maxLength={160} value={product.name}
                     onChange={event => updateProduct(store, index, 'name', event.currentTarget.value)} />

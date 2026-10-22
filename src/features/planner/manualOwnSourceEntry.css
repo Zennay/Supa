@@ -106,3 +106,31 @@
   align-items: center;
   gap: 0.5rem;
 }
+.supa-manual-source__scanner {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 0.65rem;
+  justify-items: start;
+}
+.supa-manual-source__scan-confirm {
+  width: min(100%, 34rem);
+  display: grid;
+  gap: .6rem;
+  padding: .8rem;
+  border: 1px solid #afc3b5;
+  border-radius: .7rem;
+  background: #edf5ed;
+}
+.supa-manual-source__scan-confirm strong {
+  overflow-wrap: anywhere;
+}
+.supa-manual-source__scan-confirm label {
+  display: flex;
+  flex-direction: row;
+  gap: .55rem;
+  align-items: flex-start;
+}
+.supa-manual-source__scan-confirm input[type="checkbox"] {
+  flex: 0 0 auto;
+  margin: .3rem .2rem 0 0;
+}
