@@ -245,10 +245,19 @@ function sourceOptions(products: OfflineStoreProduct[],
   unit: BasketTraceLine['requirement']['unit'], text: string, keepId: string,
   ingredient: string, requestedAmount: number | null, sort: SourceSort,
   cheaperThanCents: number | null = null, limit = 40, unpricedLimit = 5) {
-  const query = searchableSourceText(text)
-  const matchesQuery = (product: import('../../domain/basket.ts').StoreProduct) =>
-    !query || searchableSourceText(product.name).includes(query) ||
-    searchableSourceText(product.id).includes(query)
+  // Product discovery only: separate words can match original SKU, name or
+  // physical packaging. Unit compatibility and manual SKU review still gate
+  // selection; this search does not infer identity or retailer price.
+  const queryTerms = searchableSourceText(text).split(/\s+/u).filter(Boolean)
+  const matchesQuery = (product: import('../../domain/basket.ts').StoreProduct) => {
+    if (!queryTerms.length) return true
+    const searchable = searchableSourceText([
+      product.name, product.id, product.packAmount ?? '', product.packUnit,
+      product.packCount ?? '',
+      product.packAmount === null ? '' : String(product.packAmount) + product.packUnit,
+    ].join(' '))
+    return queryTerms.every(term => searchable.includes(term))
+  }
   const physicallyCompatible = products.filter(p => compatibleSourceUnit(unit, p.packUnit))
   const available = physicallyCompatible.filter(p => p.available && p.packAmount !== null)
   const filtered = rankOwnSourceSuggestions(
@@ -3817,9 +3826,9 @@ export function OfflineReviewedWorkbench({
                             {(choices.availableCount > 0 || choices.unpricedCount > 0) && (
                               <div className="offline-price-workbench__source-choices">
                                 <label>Zoek eigen bronartikel voor dit ingrediënt
-                                  <span>Zoek op originele productnaam of artikelcode; ook zonder accent.</span>
+                                  <span>Zoek met meerdere woorden op originele naam, broncode of verpakking; ook zonder accent.</span>
                                   <input type="search" value={skuFilter[searchKey] ?? ''}
-                                    maxLength={120} placeholder="Zoek product of artikelcode"
+                                    maxLength={120} placeholder="Bijv. creme 500g of SKU"
                                     onChange={event => {
                                       setSkuFilter(current => ({ ...current, [searchKey]: event.currentTarget.value }))
                                       setSourceResultLimit(previous => ({ ...previous, [searchKey]: 40 }))
