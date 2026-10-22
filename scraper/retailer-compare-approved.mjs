@@ -45,7 +45,7 @@ function physicalPackKey(row) {
   const divisor = gcd(numerator, denominator)
   numerator /= divisor
   denominator /= divisor
-  return \`\${family}:\${numerator}/\${denominator}:count:\${count}\`
+  return `${family}:${numerator}/${denominator}:count:${count}`
 }
 
 function sameProductObservation(left, right) {
