@@ -62,9 +62,71 @@ export function previewPrivateRecipeShoppingNeeds(
   const groups = new Map<string, KnownGroup>()
   const order: Array<{ groupKey: string } | { review: UserRecipeShoppingNeed }> = []
 
+  // The editor deliberately rejects each entered amount above 1,000,000.
+  // When a legacy/alternate draft nevertheless contains repeated identical
+  // oversized rows, aggregate that exact physical demand before emitting
+  // review rows so the total cannot split into multiple plausible quantities.
+  // Never coalesce rows carrying source-review or portion-scaling warnings.
+  const editorMaxAmountReview = 'Vul een geldige hoeveelheid in (maximaal 1.000.000).'
+  const overflowByIndex = new Map<number, {
+    key: string; label: string; query: string; unit: EditorUnit
+  }>()
+  if (!unknownBase && source.warnings.length === 0) {
+    const candidates = new Map<string, {
+      indices: number[]; amounts: number[]; label: string; query: string; unit: EditorUnit
+    }>()
+    scaled.draft.ingredients.forEach((ingredient, index) => {
+      const amount = ingredient.amount
+      const unit = ingredient.unit
+      const label = ingredient.label.trim()
+      const query = ingredient.query.trim()
+      const sourceReviewReason =
+        (ingredient as typeof ingredient & { sourceReviewReason?: unknown }).sourceReviewReason
+      if (typeof amount !== 'number' || !Number.isFinite(amount) ||
+          amount <= 1_000_000 || amount > MAX_NEED_AMOUNT ||
+          !unit || !['g', 'ml', 'piece'].includes(unit) ||
+          ingredient.reviewReason !== editorMaxAmountReview ||
+          (typeof sourceReviewReason === 'string' && sourceReviewReason.length > 0) ||
+          (byIngredient.get(index)?.length ?? 0) > 0 || !label || !query) return
+      const key = JSON.stringify([
+        label.toLocaleLowerCase('nl-NL'), query.toLocaleLowerCase('nl-NL'), unit,
+      ])
+      const candidate = candidates.get(key)
+      if (candidate) {
+        candidate.indices.push(index)
+        candidate.amounts.push(amount)
+      } else {
+        candidates.set(key, { indices: [index], amounts: [amount], label, query, unit })
+      }
+    })
+    for (const [key, candidate] of candidates) {
+      if (candidate.indices.length < 2) continue
+      const exact = sumDecimalAmounts(candidate.amounts)
+      if (exact !== null && exact <= MAX_NEED_AMOUNT) continue
+      for (const index of candidate.indices) {
+        overflowByIndex.set(index, {
+          key, label: candidate.label, query: candidate.query, unit: candidate.unit,
+        })
+      }
+    }
+  }
+  const emittedOverflow = new Set<string>()
+
   scaled.draft.ingredients.forEach((ingredient, index) => {
     const label = ingredient.label.trim()
     const query = ingredient.query.trim()
+    const overflow = overflowByIndex.get(index)
+    if (overflow) {
+      if (!emittedOverflow.has(overflow.key)) {
+        emittedOverflow.add(overflow.key)
+        order.push({ review: {
+          status: 'review_required', label: overflow.label, query: overflow.query,
+          amount: null, unit: overflow.unit, priceCents: null,
+          reasons: ['Optellen van hoeveelheden is niet betrouwbaar. Controleer dit ingrediënt.'],
+        } })
+      }
+      return
+    }
     const reasons: string[] = []
     if (!label || !query) reasons.push('Naam of ingrediëntzoekterm ontbreekt.')
     if (unknownBase) reasons.push('Oorspronkelijk aantal porties ontbreekt.')
