@@ -419,6 +419,7 @@ export function OfflineReviewedWorkbench({
   const [tripExportMessage, setTripExportMessage] = useState('')
   const [tripProgressMessage, setTripProgressMessage] = useState('')
   const [coverageMessage, setCoverageMessage] = useState('')
+  const [coverageCopyText, setCoverageCopyText] = useState<string | null>(null)
   const [coverageScope, setCoverageScope] = useState<'all' | 'open' | 'PLUS' | 'DekaMarkt'>('open')
   const [coverageSearch, setCoverageSearch] = useState('')
   // Prevent stale imports from appearing comparable after an open browser tab
@@ -2236,6 +2237,33 @@ export function OfflineReviewedWorkbench({
     return { content, count: selected.length }
   }
 
+  // Explicit mobile hand-off: local source identity/status only, no inferred price.
+  // If the browser denies clipboard access, present selectable text instead.
+  async function copyCoverageChecklist(onlyOpen = false) {
+    const snapshot = buildCoverageChecklist(onlyOpen)
+    if (!snapshot) return
+    const source = currentActiveSource.current
+    const week = captureWeekRef.current
+    setCoverageCopyText(null)
+    try {
+      if (!navigator.clipboard?.writeText)
+        throw new Error('Geen klembordtoegang')
+      await navigator.clipboard.writeText(snapshot.content)
+      if (source !== currentActiveSource.current || week !== captureWeekRef.current) {
+        setCoverageMessage('De winkelbron of Planner-week veranderde tijdens het kopiëren. Kopieer de huidige lijst opnieuw.')
+        return
+      }
+      setCoverageMessage(snapshot.count + ' eigen winkelcontroles gekopieerd. Plak deze alleen waar je jouw privébrongegevens wilt bewaren; dit zijn geen gevalideerde winkelprijzen.')
+    } catch {
+      if (source !== currentActiveSource.current || week !== captureWeekRef.current) {
+        setCoverageMessage('De bron is ondertussen gewijzigd. Open de huidige lijst en probeer opnieuw.')
+        return
+      }
+      setCoverageCopyText(snapshot.content)
+      setCoverageMessage('Klembord niet beschikbaar. Selecteer de onderstaande privécontroletekst om zelf te kopiëren.')
+    }
+  }
+
   function downloadCoverageChecklist(onlyOpen = false) {
     const snapshot = buildCoverageChecklist(onlyOpen)
     if (!snapshot) return
@@ -3111,6 +3139,15 @@ export function OfflineReviewedWorkbench({
                   <div className="offline-price-workbench__actions">
                     <button className="ghost-button" type="button"
                       disabled={openCoverageRows.length === 0}
+                      onClick={() => void copyCoverageChecklist(true)}>
+                      Kopieer open controles
+                    </button>
+                    <button className="ghost-button" type="button"
+                      onClick={() => void copyCoverageChecklist(false)}>
+                      Kopieer volledige winkeldekking
+                    </button>
+                    <button className="ghost-button" type="button"
+                      disabled={openCoverageRows.length === 0}
                       onClick={() => downloadCoverageChecklist(true)}>
                       Download uitsluitend open controles (TXT)
                     </button>
@@ -3134,6 +3171,14 @@ export function OfflineReviewedWorkbench({
                     identieke ingrediëntbehoefte bij tijdsvergelijkbare eigen winkelopnames,
                     nooit als totale besparing of bewijs van retailerprijzen.</p>
                   {coverageMessage && <p role="status" aria-live="polite">{coverageMessage}</p>}
+                  {coverageCopyText !== null && <label className="offline-price-workbench__copy-fallback">
+                    Handmatig kopiëren (persoonlijke bronstatus, zonder prijzen)
+                    <textarea readOnly rows={8} value={coverageCopyText}
+                      onFocus={event => event.currentTarget.select()}
+                      aria-label="Selecteerbare privéwinkelcontroles" />
+                    <button type="button" className="ghost-button"
+                      onClick={() => setCoverageCopyText(null)}>Sluit kopieertekst</button>
+                  </label>}
                   <div className="offline-price-workbench__coverage-filters" role="group"
                     aria-label="Filter de winkeldekking van jouw mandje">
                     <label>Toon ingrediënten
