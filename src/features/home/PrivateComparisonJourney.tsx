@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import { observedInstant } from '../../domain/offlineReviewedImport.ts'
 import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
-import { privateKnownPricePairs, privateProgressProductRows, formatKnownUnitGap, type PrivateKnownProduct, type PrivateKnownUnitGap } from '../products/privateProgressProductRows.ts'
+import { privateKnownPricePairs, privateProgressProductRows, formatKnownUnitGap, privateMatchedUnitPriceGap, type PrivateKnownProduct, type PrivateKnownUnitGap } from '../products/privateProgressProductRows.ts'
 import { euro } from '../../lib/money.ts'
 import { privateKnownLinePriceCsv, downloadPrivateKnownLinePriceCsv } from '../products/privateKnownLinePriceCsv.ts'
 import { downloadPrivateKnownLinePricePrint } from '../products/privateKnownLinePricePrint.ts'
@@ -953,6 +953,10 @@ export function PrivateComparisonJourney({
               </div>
             })}
           </div>
+          <p className="disclaimer">Indicatieve prijs per gelijke hoeveelheid:
+            {' '}{privateMatchedUnitPriceGap(row.plusLine, row.dekaLine)}
+            {' '}Een voordelige eenheidsprijs kan door andere hele verpakkingseenheden
+            toch een duurder mandje opleveren.</p>
         </li>)}</ul>
       {!showAllComplete && !completeWords.length && completeStoreFilter === 'all' && fullLinePairs.length > 3 &&
         <button type="button" onClick={() => setShowAllComplete(true)}>
