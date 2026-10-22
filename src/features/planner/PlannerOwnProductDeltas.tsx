@@ -62,7 +62,7 @@ function UnitPriceGap({ item }: { item: ComparedOwnLine }) {
 export function PlannerOwnProductDeltas({ lines, onChooseLine, onExportSelection }: {
   lines: ComparedOwnLine[]
   onChooseLine: (ingredientId: string, store: OwnStore) => void
-  onExportSelection: (ingredientIds: string[]) => void
+  onExportSelection: (ingredientIds: string[], action: 'download' | 'copy') => void
 }) {
   const [filter, setFilter] = useState<DifferenceFilter>('all')
   const [unitFamily, setUnitFamily] = useState<'all' | 'kg' | 'liter' | 'stuk'>('all')
@@ -178,8 +178,13 @@ export function PlannerOwnProductDeltas({ lines, onChooseLine, onExportSelection
     <div className="own-store-breakdown__export">
       <button type="button" className="ghost-button"
         disabled={visibleLines.length === 0}
-        onClick={() => onExportSelection(visibleLines.map(line => line.id))}>
+        onClick={() => onExportSelection(visibleLines.map(line => line.id), 'download')}>
         Bewaar deze {visibleLines.length} prijsregels als privé-TXT
+      </button>
+      <button type="button" className="ghost-button"
+        disabled={visibleLines.length === 0}
+        onClick={() => onExportSelection(visibleLines.map(line => line.id), 'copy')}>
+        Kopieer deze {visibleLines.length} privéprijsregels
       </button>
       <small>Bevat alleen de zichtbare, bevestigde productregels en bronmomenten; geen volledig mandtotaal.</small>
     </div>
