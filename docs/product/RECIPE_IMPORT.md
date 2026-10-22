@@ -25,7 +25,7 @@ De aparte privévergelijker kan gecontroleerde eigen recepten gebruiken als fysi
 ## Privacy en bronintegriteit
 
 - HTML wordt lokaal als tekst gelezen. Supa mount of rendert de pagina niet, voert geen ingesloten scripts uit, laadt geen externe assets en doet tijdens deze lokale import geen netwerkverzoeken.
-- De automatische linkroute is een afzonderlijke, expliciet door de gebruiker gestarte serveractie. Een statische deployment zonder die API kan de URL niet rechtstreeks ophalen; gebruik dan de lokale HTML- of JSON-LD-route.
+- De automatische linkroute is een afzonderlijke, expliciet door de gebruiker gestarte serveractie. Een statische deployment zonder die API kan de URL niet rechtstreeks ophalen; gebruik dan de lokale HTML- of JSON-LD-route. De server weigert gedeclareerde requestbody's boven 4 KiB vóór parsing en controleert dezelfde grens op werkelijke UTF-8-bytes bij chunked requests. Alleen een JSON-object met één URL-string van maximaal 2048 tekens wordt geaccepteerd.
 - De bronpagina bewijst geen actuele winkelprijs, voorraad of toestemming voor een retailerfeed. Prijzen blijven onbekend totdat je echte, toegestane winkelbrondata afzonderlijk importeert en beoordeelt.
 - Originele receptregels blijven ter controle zichtbaar. Onzekere hoeveelheden, stuks en niet-metrische eenheden worden niet stilzwijgend omgezet in bevestigde fysieke boodschappen.
 - HTML-import is begrensd tot 500 kB en maximaal 15 herkende recepten. Iedere import blijft een concept dat je vóór het bewaren controleert.
