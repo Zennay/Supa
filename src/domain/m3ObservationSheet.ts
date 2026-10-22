@@ -312,7 +312,7 @@ function restoreStoreObservation(
               priceCents:
                 typeof product.priceCents === 'number' &&
                 Number.isSafeInteger(product.priceCents) &&
-                product.priceCents >= 0
+                product.priceCents > 0
                   ? product.priceCents
                   : null,
               available: true,
@@ -404,7 +404,7 @@ export function observationLineCollectionComplete(
     product.packCount > 0 &&
     product.priceCents !== null &&
     Number.isSafeInteger(product.priceCents) &&
-    product.priceCents >= 0
+    product.priceCents > 0
   )
 }
 
@@ -704,7 +704,7 @@ export function observationSheetReadiness(
       if (
         product.priceCents === null ||
         !Number.isSafeInteger(product.priceCents) ||
-        product.priceCents < 0
+        product.priceCents <= 0
       ) {
         issues.push(`${lineLabel}: prijs per verpakking ontbreekt of is ongeldig.`)
       }

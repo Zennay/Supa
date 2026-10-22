@@ -40,10 +40,10 @@ export function privatePairedSourceCsv(
         !one.productId || !other.productId ||
         !Number.isSafeInteger(one.packagesNeeded) || one.packagesNeeded <= 0 ||
         !Number.isSafeInteger(other.packagesNeeded) || other.packagesNeeded <= 0 ||
-        !Number.isSafeInteger(one.pricePerPackCents) || one.pricePerPackCents < 0 ||
-        !Number.isSafeInteger(other.pricePerPackCents) || other.pricePerPackCents < 0 ||
-        !Number.isSafeInteger(one.lineTotalCents) || one.lineTotalCents < 0 ||
-        !Number.isSafeInteger(other.lineTotalCents) || other.lineTotalCents < 0 ||
+        !Number.isSafeInteger(one.pricePerPackCents) || one.pricePerPackCents <= 0 ||
+        !Number.isSafeInteger(other.pricePerPackCents) || other.pricePerPackCents <= 0 ||
+        !Number.isSafeInteger(one.lineTotalCents) || one.lineTotalCents <= 0 ||
+        !Number.isSafeInteger(other.lineTotalCents) || other.lineTotalCents <= 0 ||
         one.packagesNeeded * one.pricePerPackCents !== one.lineTotalCents ||
         other.packagesNeeded * other.pricePerPackCents !== other.lineTotalCents ||
         !Number.isSafeInteger(difference) ||

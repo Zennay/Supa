@@ -237,7 +237,7 @@ export function observationPriceCents(value: unknown): number | null {
   const fractionalCents = Number(fractionalPart.padEnd(2, '0'))
   const cents = euros * 100 + fractionalCents
 
-  return Number.isSafeInteger(euros) && Number.isSafeInteger(cents)
+  return Number.isSafeInteger(euros) && Number.isSafeInteger(cents) && cents > 0
     ? cents
     : null
 }

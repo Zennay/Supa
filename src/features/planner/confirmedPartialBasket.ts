@@ -50,8 +50,8 @@ export function confirmedPartialBasket(
         !supportedUnit(line.packUnit) ||
         !Number.isSafeInteger(line.packCount) || line.packCount < 1 ||
         !Number.isSafeInteger(line.packagesNeeded) || line.packagesNeeded < 1 ||
-        !Number.isSafeInteger(line.pricePerPackCents) || line.pricePerPackCents < 0 ||
-        !Number.isSafeInteger(line.lineTotalCents) || line.lineTotalCents < 0 ||
+        !Number.isSafeInteger(line.pricePerPackCents) || line.pricePerPackCents <= 0 ||
+        !Number.isSafeInteger(line.lineTotalCents) || line.lineTotalCents <= 0 ||
         line.packagesNeeded * line.pricePerPackCents !== line.lineTotalCents ||
         calculateDecimalPackCount(
           [{ amount: line.requiredAmount, unit: line.requiredUnit }],

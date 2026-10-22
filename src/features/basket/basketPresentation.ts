@@ -161,9 +161,9 @@ export function basketComparisonCanShowMoney(
     storeName.trim().length === 0 ||
     storeName !== storeName.trim() ||
     !Number.isSafeInteger(comparison.baselineTotalCents) ||
-    comparison.baselineTotalCents < 0 ||
+    comparison.baselineTotalCents <= 0 ||
     !Number.isSafeInteger(comparison.candidateTotalCents) ||
-    comparison.candidateTotalCents < 0 ||
+    comparison.candidateTotalCents <= 0 ||
     !Number.isSafeInteger(comparison.deltaCents) ||
     !Number.isSafeInteger(comparison.savingsCents)
   ) {

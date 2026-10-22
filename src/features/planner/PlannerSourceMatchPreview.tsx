@@ -99,7 +99,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
           product.available === true &&
           typeof product.sourcePriceCents === 'number' &&
           Number.isSafeInteger(product.sourcePriceCents) &&
-          product.sourcePriceCents >= 0 &&
+          product.sourcePriceCents > 0 &&
           product.packAmount !== null && product.packAmount > 0 &&
           family(product.packUnit) === family(need.unit))
         const requirement = {
@@ -116,7 +116,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
           // unknown packaging may be shown only as an unpriced identity hint.
           if (productFamily !== null && productFamily !== family(need.unit)) return false
           const priceValid = typeof product.sourcePriceCents === 'number' &&
-            Number.isSafeInteger(product.sourcePriceCents) && product.sourcePriceCents >= 0
+            Number.isSafeInteger(product.sourcePriceCents) && product.sourcePriceCents > 0
           const packValid = product.packAmount !== null && product.packAmount > 0 &&
             productFamily === family(need.unit)
           return !product.available || !priceValid || !packValid
@@ -140,7 +140,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
               found.packAmount === null || found.packAmount <= 0 ||
                 family(found.packUnit) === null ? 'verpakking of maateenheid ontbreekt' : null,
               typeof found.sourcePriceCents !== 'number' ||
-                !Number.isSafeInteger(found.sourcePriceCents) || found.sourcePriceCents < 0
+                !Number.isSafeInteger(found.sourcePriceCents) || found.sourcePriceCents <= 0
                 ? 'pakprijs ontbreekt of is ongeldig' : null,
             ].filter((reason): reason is string => !!reason)
             unpricedHints[store] = {
@@ -161,7 +161,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
         // e.g. ml rice as a viable candidate for a gram-based rice demand.
         suggestions[store] = match && match.available &&
           typeof match.sourcePriceCents === 'number' &&
-          Number.isSafeInteger(match.sourcePriceCents) && match.sourcePriceCents >= 0 &&
+          Number.isSafeInteger(match.sourcePriceCents) && match.sourcePriceCents > 0 &&
           match.packAmount !== null && family(match.packUnit) === family(need.unit)
           ? (() => {
               const count = match.packCount ?? 1

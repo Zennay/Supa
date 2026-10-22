@@ -28,6 +28,6 @@ export function observationNextRequiredProductField(
   if (!product.packUnit || product.packUnit === 'unknown') return 'packUnit'
   if (!Number.isSafeInteger(product.packCount) || product.packCount <= 0) return 'packCount'
   if (!Number.isSafeInteger(product.priceCents) ||
-      product.priceCents === null || product.priceCents < 0) return 'priceCents'
+      product.priceCents === null || product.priceCents <= 0) return 'priceCents'
   return null
 }

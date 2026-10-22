@@ -149,7 +149,7 @@ const selected = (select) => select.value === '' ? null : select.value
 
 const ownEuro = new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' })
 function observedPackDescription(product) {
-  if (!product || product.priceCents === null || !Number.isSafeInteger(product.priceCents) ||
+  if (!product || product.priceCents === null || !Number.isSafeInteger(product.priceCents) || product.priceCents <= 0 ||
       !Number.isFinite(product.packAmount) || product.packAmount <= 0 ||
       !Number.isSafeInteger(product.packCount) || product.packCount < 1) return ''
   const count = product.packCount
@@ -562,7 +562,7 @@ function acceptJson(json) {
           used.has(p.id) || !units.includes(p.packUnit) ||
           (p.packAmount !== null && (!Number.isFinite(p.packAmount) || p.packAmount <= 0 || p.packAmount > 100000)) ||
           (p.packCount !== undefined && (!Number.isSafeInteger(p.packCount) || p.packCount < 1 || p.packCount > 1000)) ||
-          (p.priceCents !== null && (!Number.isSafeInteger(p.priceCents) || p.priceCents < 0 || p.priceCents > 1000000)) ||
+          (p.priceCents !== null && (!Number.isSafeInteger(p.priceCents) || p.priceCents <= 0 || p.priceCents > 1000000)) ||
           typeof p.available !== 'boolean' ||
           (p.available && (p.packAmount === null || p.priceCents === null || !Number.isSafeInteger(p.packCount)))) {
         throw Error('Ongeldige of dubbele winkelartikelgegevens.')

@@ -132,9 +132,9 @@ function attributeSavingsEffectsTrusted({
   // a caller's claimable flag. Never infer missing cents as zero.
   if (
     !Number.isSafeInteger(comparison.baselineTotalCents) ||
-    comparison.baselineTotalCents < 0 ||
+    comparison.baselineTotalCents <= 0 ||
     !Number.isSafeInteger(comparison.candidateTotalCents) ||
-    comparison.candidateTotalCents < 0 ||
+    comparison.candidateTotalCents <= 0 ||
     !Number.isSafeInteger(comparison.deltaCents) ||
     !Number.isSafeInteger(comparison.candidateTotalCents - comparison.baselineTotalCents) ||
     comparison.candidateTotalCents - comparison.baselineTotalCents !== comparison.deltaCents
@@ -223,8 +223,8 @@ function attributeSavingsEffectsTrusted({
     if (
       !baseline || !('value' in baseline) ||
       !candidate || !('value' in candidate) ||
-      !Number.isSafeInteger(baseline.value) || baseline.value < 0 ||
-      !Number.isSafeInteger(candidate.value) || candidate.value < 0 ||
+      !Number.isSafeInteger(baseline.value) || baseline.value <= 0 ||
+      !Number.isSafeInteger(candidate.value) || candidate.value <= 0 ||
       !Number.isSafeInteger(candidate.value - baseline.value) ||
       candidate.value - baseline.value !== line.deltaCents
     ) {

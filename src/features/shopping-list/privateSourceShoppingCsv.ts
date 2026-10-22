@@ -30,8 +30,8 @@ export function privateSingleStoreShoppingCsv({ basket, observedAt, done }: {
   for (const line of basket.lines) {
     if (line.status !== 'matched' || seen.has(line.id) ||
         !Number.isSafeInteger(line.packs) || line.packs <= 0 ||
-        !Number.isSafeInteger(line.pricePerPackCents) || line.pricePerPackCents < 0 ||
-        !Number.isSafeInteger(line.lineTotalCents) ||
+        !Number.isSafeInteger(line.pricePerPackCents) || line.pricePerPackCents <= 0 ||
+        !Number.isSafeInteger(line.lineTotalCents) || line.lineTotalCents <= 0 ||
         line.lineTotalCents !== line.packs * line.pricePerPackCents) {
       throw Error('Controleer de originele producten en centprijzen opnieuw.')
     }

@@ -18,8 +18,8 @@ export function hasTrustedComparisonLineEvidence(comparison: BasketComparison): 
       !['better', 'same', 'worse'].includes(comparison.outcome) ||
       !Array.isArray(comparison.reasons) || comparison.reasons.length !== 0 ||
       !Array.isArray(comparison.lineDeltas) || comparison.lineDeltas.length === 0 ||
-      !Number.isSafeInteger(comparison.baselineTotalCents) || comparison.baselineTotalCents < 0 ||
-      !Number.isSafeInteger(comparison.candidateTotalCents) || comparison.candidateTotalCents < 0 ||
+      !Number.isSafeInteger(comparison.baselineTotalCents) || comparison.baselineTotalCents <= 0 ||
+      !Number.isSafeInteger(comparison.candidateTotalCents) || comparison.candidateTotalCents <= 0 ||
       !Number.isSafeInteger(comparison.deltaCents) ||
       !Number.isSafeInteger(comparison.savingsCents)) return false
 
@@ -40,8 +40,8 @@ export function hasTrustedComparisonLineEvidence(comparison: BasketComparison): 
         line.ingredientLabel.length > 180 || line.ingredientLabel.trim() !== line.ingredientLabel ||
         !/[\p{L}\p{N}]/u.test(line.ingredientLabel) ||
         /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(line.ingredientLabel) ||
-        !Number.isSafeInteger(line.baselineLineTotalCents) || line.baselineLineTotalCents < 0 ||
-        !Number.isSafeInteger(line.candidateLineTotalCents) || line.candidateLineTotalCents < 0 ||
+        !Number.isSafeInteger(line.baselineLineTotalCents) || line.baselineLineTotalCents <= 0 ||
+        !Number.isSafeInteger(line.candidateLineTotalCents) || line.candidateLineTotalCents <= 0 ||
         !Number.isSafeInteger(line.deltaCents) ||
         line.deltaCents !== line.candidateLineTotalCents - line.baselineLineTotalCents) return false
     seen.add(line.id)
@@ -90,7 +90,7 @@ export function comparisonMatchesVisibleBaskets(
     for (const line of basket.lines) {
       if (!line || line.status !== 'matched' ||
           typeof line.id !== 'string' || lines.has(line.id) ||
-          !Number.isSafeInteger(line.lineTotalCents) || line.lineTotalCents < 0) return false
+          !Number.isSafeInteger(line.lineTotalCents) || line.lineTotalCents <= 0) return false
       lines.set(line.id, line)
     }
     if (lines.size !== comparison.lineDeltas.length) return false
