@@ -2753,6 +2753,7 @@ export function OfflineReviewedWorkbench({
           'hele_pakken', 'pakinhoud', 'pakeenheid', 'stuks_per_verpakking',
           'pakprijs_cent', 'regel_cent', 'eenheidsprijs'].map(field => store + '_' + field)),
         'Deka_minus_PLUS_cent', 'betekenis',
+        'Deka_minus_PLUS_eenheidsprijs_cent', 'eenheidsprijs_eenheid',
       ]]
       for (const need of coverageRows) {
         const plus = exactLine('PLUS', need.id)
@@ -2761,10 +2762,24 @@ export function OfflineReviewedWorkbench({
           samePhysicalDemand(plus.line.requirement, deka.line.requirement)
         const delta = both ? deka.line!.lineTotalCents - plus.line!.lineTotalCents : null
         const comparable = delta !== null && Number.isSafeInteger(delta)
+        const plusUnit = plus.line ? privatePackUnitRate({
+          amount: plus.line.pack.amount, unit: plus.line.pack.unit,
+          count: plus.line.pack.count, priceCents: plus.line.pricePerPackCents,
+        }) : null
+        const dekaUnit = deka.line ? privatePackUnitRate({
+          amount: deka.line.pack.amount, unit: deka.line.pack.unit,
+          count: deka.line.pack.count, priceCents: deka.line.pricePerPackCents,
+        }) : null
+        const rawUnitDelta = both && plusUnit && dekaUnit && plusUnit.unit === dekaUnit.unit
+          ? dekaUnit.roundedCentsPerUnit - plusUnit.roundedCentsPerUnit : null
+        const unitDelta = rawUnitDelta !== null && Number.isSafeInteger(rawUnitDelta)
+          ? rawUnitDelta : null
         rows.push([need.id, need.label, need.amount === null ? '' : String(need.amount),
           need.unit, ...plus.values, ...deka.values,
           comparable ? String(delta) : '',
-          comparable ? 'Eigen gekoppelde ingredientregels' : 'Prijsverschil onbekend'])
+          comparable ? 'Eigen gekoppelde ingredientregels' : 'Prijsverschil onbekend',
+          unitDelta === null ? '' : String(unitDelta),
+          unitDelta === null || !plusUnit ? '' : plusUnit.unit])
       }
       const csv = '\uFEFF' + rows.map(row => row.map((cell, index) =>
         literalCsv(cell, index === rows[0].length - 2)).join(';')).join('\r\n') + '\r\n'
