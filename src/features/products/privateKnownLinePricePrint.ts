@@ -1,5 +1,5 @@
 import type { PrivateCaptureProgress, PrivateReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
-import { privateKnownPricePairs, privateProgressProductRows, formatKnownUnitGap } from './privateProgressProductRows.ts'
+import { privateKnownPricePairs, privateProgressProductRows, formatKnownUnitGap, type PrivateKnownPricePair } from './privateProgressProductRows.ts'
 import { readablePlannerDemandAmount } from '../comparison/plannerPriceCaptureGuide.ts'
 import { selectOriginalPricePairs } from './selectOriginalPricePairs.ts'
 
@@ -14,10 +14,10 @@ export function privateKnownLinePricePrintHtml(
   progress: PrivateCaptureProgress | null,
   reviewed: PrivateReviewedBaskets | null,
   now: number,
-  selectedIngredientIds?: readonly string[],
+  selectedPairs?: readonly PrivateKnownPricePair[],
 ): string {
   const pairs = selectOriginalPricePairs(
-    privateKnownPricePairs(progress, reviewed, now), selectedIngredientIds)
+    privateKnownPricePairs(progress, reviewed, now), selectedPairs)
   const needs = new Map(privateProgressProductRows(progress, now).map(row =>
     [row.line.ingredientId, row.line]))
   if (!pairs.length) throw Error('Geen actuele vergelijkbare twee-winkel-ingrediënten.')
@@ -67,7 +67,7 @@ export function privateKnownLinePricePrintHtml(
     'producten zijn onbekend, nooit € 0. Geen kassagarantie, winkelwinnaar of ' +
     'onafhankelijk bewezen besparing.</p><p>Zelfde oorspronkelijke fysieke ' +
     'ingrediëntbehoefte, bronmomenten binnen 24 uur. Geen publieke winkelcatalogus.</p>' +
-    '<p>' + (selectedIngredientIds ? 'Gefilterde selectie: ' + pairs.length +
+    '<p>' + (selectedPairs ? 'Gefilterde selectie: ' + pairs.length +
     ' oorspronkelijke ingrediëntprijsparen. Geen gefilterd mandtotaal.' :
     'Alle momenteel bekende persoonlijk gecontroleerde prijsparen.') + '</p>' +
     '<table><thead><tr><th>Ingrediënt</th><th>PLUS</th><th>DekaMarkt</th>' +
@@ -82,14 +82,14 @@ export function privateKnownLinePricePrintHtml(
 export function downloadPrivateKnownLinePricePrint(
   progress: PrivateCaptureProgress | null,
   reviewed: PrivateReviewedBaskets | null,
-  selectedIngredientIds?: readonly string[],
+  selectedPairs?: readonly PrivateKnownPricePair[],
 ): void {
-  const html = privateKnownLinePricePrintHtml(progress, reviewed, Date.now(), selectedIngredientIds)
+  const html = privateKnownLinePricePrintHtml(progress, reviewed, Date.now(), selectedPairs)
   const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
   try {
     const link = document.createElement('a')
     link.href = url
-    link.download = selectedIngredientIds
+    link.download = selectedPairs
       ? 'supa-eigen-gefilterde-plus-deka-regelprijzen.html'
       : 'supa-eigen-bekende-plus-deka-regelprijzen.html'
     document.body.append(link)
