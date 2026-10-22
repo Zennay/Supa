@@ -1,4 +1,5 @@
 import { createManualRecipeDraft, type UserRecipeDraft } from '../../domain/userRecipeImport'
+import { safeRecipeSourceUrl } from '../../domain/recipeSourceUrl.ts'
 
 const maxBytes = 500_000
 const headingPrefix = /^#{1,6}\s+/u
@@ -47,6 +48,8 @@ export function importPlainTextRecipe(raw: string): UserRecipeDraft {
   }
 
   let title = ''
+  let sourceUrl: string | null = null
+  const sourceWarnings: string[] = []
   let servings: number | null = null
   let minutes: number | null = null
   let section: 'header' | 'ingredients' | 'steps' = 'header'
@@ -73,6 +76,18 @@ export function importPlainTextRecipe(raw: string): UserRecipeDraft {
     }
 
     if (section === 'header') {
+      // Preserve a sanitized public attribution when a recipe is shared as
+      // Markdown/plain text. This is metadata only: it never fetches the URL
+      // or turns the recipe into a verified retailer product or price.
+      const sourceLine = /^(?:bron(?:link|url)?|source(?:\s+url)?)\s*:\s*(.+)$/iu.exec(headingText(original))
+      if (sourceLine) {
+        if (sourceUrl !== null) throw new Error('Gebruik maximaal één Bron:-regel per recept.')
+        const rawSource = sourceLine[1].trim()
+        sourceUrl = safeRecipeSourceUrl(rawSource)
+        if (sourceUrl !== rawSource) sourceWarnings.push(
+          'De bronlink is veilig opgeschoond; controleer de openbare bronvermelding.')
+        continue
+      }
       const named = /^(?:recept|recipe|titel|title|naam)\s*:\s*(.+)$/iu.exec(headingText(original))
       const count = headerNumber(original, 'servings')
       const duration = headerNumber(original, 'minutes')
@@ -94,5 +109,11 @@ export function importPlainTextRecipe(raw: string): UserRecipeDraft {
   if (!title || !ingredients.length || ingredients.length > 80 || steps.length > 100) {
     throw new Error('Een titel en 1–80 regels onder Ingrediënten: zijn vereist.')
   }
-  return createManualRecipeDraft({ title, servings, minutes, ingredients, steps })
+  const draft = createManualRecipeDraft({ title, servings, minutes, ingredients, steps })
+  return {
+    ...draft,
+    source: sourceUrl ? 'url' : 'manual',
+    sourceUrl,
+    warnings: [...draft.warnings, ...sourceWarnings],
+  }
 }
