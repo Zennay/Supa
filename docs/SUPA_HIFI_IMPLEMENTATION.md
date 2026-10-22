@@ -84,3 +84,10 @@ Als de zoekterm uit een historische kaart geen eigen product oplevert, toont zow
 - De afvinkvoortgang heeft een totaal, een voortgangsbalk, een filter voor alleen nog te kopen, een expliciete resetactie en één-klik kopiëren/downloaden voor de volledige of resterende lijst. De klembordactie waarschuwt als de lijst tijdens het kopiëren verandert. Bij ongeldige of toekomstige opslagformaten blijven bestaande gegevens behouden en worden bewerken/afvinken uitgeschakeld.
 - Het tekstexportbestand bevat status, aantallen en notities. Historische productwaarnemingen en Figma-voorbeelden blijven duidelijk ongeprijsd; afvinken is geen aankoopbewijs en deze selectie voedt niet de Planner, bronmatching of winkelmandvergelijking.
 - Bij verwijderen worden geldige lokale vinkjes en persoonlijke details eerst opgeruimd, zodat opnieuw toevoegen niet stilzwijgend een oude vinkstatus terughaalt. Als opslag door een ander tabblad is gewijzigd, blijft de regel staan totdat de conflictmelding is opgelost.
+
+## Persoonlijke ongeprijsde boodschappenlijst: veilige JSON-back-up en herstel (22 oktober 2026)
+
+- De aparte Producten-selectie kan worden geëxporteerd als versiegebonden JSON van maximaal 32 KiB UTF-8. Alleen bekende lokale productidentiteiten, eigen aantallen (1–99), notities (maximaal 120 tekens) en handmatige afvinkstatus worden meegenomen.
+- Import valideert eerst de volledige structuur, toegestane catalogus-ID's, unieke regels, veldset, aantallen, notities en capaciteit (maximaal 100 items). De gebruiker ziet een voorbeeld en bevestigt daarna alleen nieuwe items; bestaande keuzes worden niet overschreven.
+- De back-up bevat geen prijzen, actuele voorraad, SKU-matches, retailerbrondata of rechtenbewijs en voedt de geprijsde Planner/mandvergelijking niet.
+- Bij onbekende of gewijzigde browseropslag wordt import geweigerd; twee lokale opslagblokken gebruiken compare-and-set en bij mislukte voortgangsopslag wordt een rollback geprobeerd. Verwijderen uit Producten ruimt de eigen vinkjes en notities op, zodat opnieuw toevoegen geen oude status herstelt.
