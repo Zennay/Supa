@@ -106,6 +106,14 @@
 .private-comparison-journey__partial-search{display:grid;gap:.4rem;max-width:650px;font-weight:700}
 .private-comparison-journey__partial-search input{font:inherit;min-height:44px;padding:.65rem;border:1px solid #a8bcae;border-radius:10px;min-width:0}
 .private-comparison-journey__partial-search input:focus-visible{outline:3px solid #cf9738;outline-offset:2px}
+.private-comparison-journey__partial-search label{display:grid;gap:.4rem;min-width:0;font-size:.9rem}
+.private-comparison-journey__partial-search select{font:inherit;min-width:0;width:100%;min-height:44px;padding:.6rem .75rem;border:1px solid #a8bcae;border-radius:10px;background:#fff;color:#204a30}
+.private-comparison-journey__partial-search select:focus-visible{outline:3px solid #cf9738;outline-offset:2px}
+.private-comparison-journey__partial-product{display:grid;gap:.35rem;padding:.65rem;border:1px solid #dce9de;border-radius:10px;background:#f5f9f5;min-width:0}
+.private-comparison-journey__partial-product strong{font-size:.94rem;line-height:1.45;overflow-wrap:anywhere}
+.private-comparison-journey__partial-product small{display:block;overflow-wrap:anywhere}
+.private-comparison-journey__partial-product button{min-height:44px;background:#e8f1e9;color:#204a30;padding:.5rem .7rem}
+@media(max-width:630px){.private-comparison-journey__partial-search{max-width:100%}.private-comparison-journey__partial-product button{width:100%}}
 .private-comparison-journey__partial-review{display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.3rem}
 .private-comparison-journey__partial-review button{flex:1 1 165px;background:#e8f1e9;color:#204a30;padding:.55rem .7rem;font-size:.88rem}
 /* Home review queue is a read-only projection of the existing capture progress. */
