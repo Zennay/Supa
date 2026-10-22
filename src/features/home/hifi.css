@@ -520,3 +520,17 @@ body { background: #e9eeec; }
   .hifi-demo-list .hifi-picked-portable { padding:.75rem; }
   .hifi-demo-list .hifi-picked-portable button { width:100%; }
 }
+
+
+.hifi-demo-list .hifi-picked-portable-preview {
+  min-width:0; max-width:100%; border:1px solid #c6d5c8;
+  border-radius:10px; padding:.65rem; background:#fff;
+}
+.hifi-picked-portable-preview summary { cursor:pointer; font-weight:700; }
+.hifi-picked-portable-preview ol {
+  max-height:18rem; overflow:auto; padding-left:1.5rem; margin:.6rem 0;
+}
+.hifi-picked-portable-preview li {
+  margin:.55rem 0; overflow-wrap:anywhere; line-height:1.5;
+}
+.hifi-picked-portable-preview li small { display:block; color:#4b6152; }
