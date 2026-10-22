@@ -35,7 +35,7 @@ Bereiding:
 - Kook de pasta en bereid de tomatensaus.
 ~~~
 
-De optionele `Bron:`-regel mag ook een openbare HTTPS-Markdownlink (`[website](https://…)`) of autolink (`<https://…>`) zijn. Deze link dient **alleen als bronvermelding**: gewone tekstimport doet geen netwerkverzoek en importeert nooit een winkelprijs. Een ongeldige, lege of niet-openbare bronlink wordt niet bewaard; het recept blijft een controleerbaar concept met een duidelijke bronwaarschuwing. Een tweede `Bron:`-regel in hetzelfde recept is een fout, ook als de eerste link ongeldig was. Controleer en herstel die waarschuwing in de bewerkbare preview vóór definitieve planning of boodschappenberekening.
+Ook gebruikelijke Markdown-labels zoals `**Porties:** 2`, `**Tijd:** 25 min` en `**Bron:** https://...` worden herkend. De optionele `Bron:`-regel mag ook een openbare HTTPS-Markdownlink (`[website](https://…)`) of autolink (`<https://…>`) zijn. Deze link dient **alleen als bronvermelding**: gewone tekstimport doet geen netwerkverzoek en importeert nooit een winkelprijs. Een ongeldige, lege of niet-openbare bronlink wordt niet bewaard; het recept blijft een controleerbaar concept met een duidelijke bronwaarschuwing. Een tweede `Bron:`-regel in hetzelfde recept is een fout, ook als de eerste link ongeldig was. Controleer en herstel die waarschuwing in de bewerkbare preview vóór definitieve planning of boodschappenberekening.
 
 ## Recepten gebruiken voor een ongeprijsde boodschappenmand
 
