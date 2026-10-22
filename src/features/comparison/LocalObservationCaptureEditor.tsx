@@ -605,7 +605,7 @@ export function LocalObservationCaptureEditor({
             amount: Number(value.amount), unit: value.unit,
             count: Number(value.count), priceCents: Number(value.cents),
           }) : null
-        return <details key={store + ':' + index + ':' + need.id}>
+        return <details key={store + ':' + need.id}>
           <summary>Regel {index + 2}: {need.label} · Planner-vraag{' '}
             {physical === 'hoeveelheid nog controleren'
               ? physical : physical + ' ' + need.unit}
