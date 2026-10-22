@@ -408,3 +408,13 @@ body { background: #e9eeec; }
 .hifi-products .hifi-product-card[data-product-source="historical"] .hifi-source-link {
   justify-content: center;
 }
+
+/* Derived historical pack display only; never a price or product-match claim. */
+.hifi-products .hifi-product-card[data-product-source="historical"] .hifi-product-pack-equivalent {
+  display: block;
+  min-width: 0;
+  margin-top: 4px;
+  line-height: 1.35;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
