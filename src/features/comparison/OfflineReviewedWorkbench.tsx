@@ -3204,15 +3204,23 @@ export function OfflineReviewedWorkbench({
               )}
               <div className="offline-price-workbench__capture-followup">
                 <strong>Vul alleen de nog ontbrekende winkelproducten aan</strong>
+                {stores.filter(needsFullPreviewRecapture).map(store => (
+                  <p key={'recapture-' + store} role="status"
+                    className="offline-price-workbench__capture-alert">
+                    {store}: voor dit winkelbronmoment is een volledige nieuwe
+                    opname nodig. Dat komt door een verlopen eigen bron of doordat
+                    dit de oudere opname is binnen een paar dat meer dan 24 uur
+                    uiteenligt. De nieuwere winkelbron wordt niet fictief vernieuwd.
+                    Download hieronder het volledige lege opnameblad voor deze winkel.
+                  </p>
+                ))}
                 <p>Per winkel kun je een kort leeg CSV-opnameblad plus de bijhorende
                   ingrediëntenrijgids downloaden. Er wordt geen winkelprijs,
                   productcode of bronmoment voor je ingevuld. Bij een verlopen
                   of buiten 24 uur gepaarde bron is een volledige nieuwe opname nodig.</p>
                 {stores.map(store => {
                   const missing = missingPreviewCaptureNeeds(store).length
-                  const retained = currentPreview.retainedOther
-                  const recapture = retained?.retailer === store &&
-                    (!retained.within24h || !freshPreviewInstant(retained.observedNs))
+                  const recapture = needsFullPreviewRecapture(store)
                   return <div key={'missing-' + store} className="offline-price-workbench__capture-followup-row">
                     <span>{store}: {missing ? missing + (recapture ? ' opnieuw te observeren fysieke regels' : ' nog onbekende productregels') :
                       'geen ontbrekende nieuwe bronregels vanuit deze preview'}</span>
