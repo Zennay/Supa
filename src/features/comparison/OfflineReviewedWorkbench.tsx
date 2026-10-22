@@ -409,6 +409,9 @@ export function OfflineReviewedWorkbench({
   const [capturePreviewSearch, setCapturePreviewSearch] = useState<Record<CaptureStore, string>>({ PLUS: '', DekaMarkt: '' })
   const [capturePreviewSort, setCapturePreviewSort] = useState<Record<CaptureStore, 'source' | 'name' | 'sku' | 'price' | 'unknown'>>({ PLUS: 'source', DekaMarkt: 'source' })
   const [capturePreviewPriceFilter, setCapturePreviewPriceFilter] = useState<Record<CaptureStore, 'all' | 'unknown' | 'priced' | 'unit-unknown'>>({ PLUS: 'all', DekaMarkt: 'all' })
+  const [pairedOnlyMissing, setPairedOnlyMissing] = useState(false)
+  const [pairedPriceFilter, setPairedPriceFilter] = useState<'all' | 'plus' | 'deka' | 'equal' | 'unknown'>('all')
+  const [pairedPriceSort, setPairedPriceSort] = useState<'plan' | 'difference'>('plan')
   const [capturePreview, setCapturePreview] = useState<{
     files: File[]; week: string
     stores: CapturePreviewStore[]
@@ -521,10 +524,161 @@ export function OfflineReviewedWorkbench({
     setWeekExportMessage('Je eigen nog onbevestigde winkelinvoer is gewijzigd. Bekijk de nieuwe bron opnieuw.')
   }
 
+  const pairedPreviewComparable = Boolean(currentPreview && previewPairFresh && previewPair24h)
+
+  const pairedPreviewRows = useMemo(() => {
+    const preview = capturePreview?.week === captureWeek ? capturePreview : null
+    if (!preview) return null
+    type Candidate = {
+      sku: string | null; packs: number | null
+      cents: number | null; unitRate: string | null
+      unitCents: number | null; unitFamily: 'kg' | 'liter' | 'stuk' | null
+    }
+    const unknown: Candidate = {
+      sku: null, packs: null, cents: null, unitRate: null,
+      unitCents: null, unitFamily: null,
+    }
+    const forStore = (retailer: CaptureStore): Map<string, Candidate> | null => {
+      const newShop = preview.stores.find(shop => shop.retailer === retailer)
+      if (newShop?.matching) return new Map(newShop.matching.lines.map(line =>
+        [line.id, line.status === 'matched' ? {
+          sku: line.originalSku, packs: line.packs,
+          cents: line.lineTotalCents, unitRate: line.unitRate,
+          unitCents: line.unitCents, unitFamily: line.unitFamily,
+        } : unknown] as const))
+      if (preview.retainedOther?.retailer !== retailer) return null
+      const retained = imported?.captures[retailer]
+      if (!retained) return null
+      const basket = buildOneStoreBasket({
+        store: { id: retailer, name: retailer }, plan, recipes, activeDays,
+        products: retained.products,
+      })
+      return new Map(basket.lines.map(line =>
+        [line.id, line.status === 'matched' ? {
+          sku: line.productId, packs: line.packs,
+          cents: line.lineTotalCents, unitRate: privateUnitPrice(line),
+          unitCents: privatePackUnitRate({
+            amount: line.pack.amount, unit: line.pack.unit, count: line.pack.count,
+            priceCents: line.pricePerPackCents,
+          })?.roundedCentsPerUnit ?? null,
+          unitFamily: privatePackUnitRate({
+            amount: line.pack.amount, unit: line.pack.unit, count: line.pack.count,
+            priceCents: line.pricePerPackCents,
+          })?.unit ?? null,
+        } : unknown] as const))
+    }
+    try {
+      const plus = forStore('PLUS')
+      const deka = forStore('DekaMarkt')
+      if (!plus || !deka) return null
+      return plannerCaptureNeeds.map(need => {
+        const p = plus.get(need.id) ?? unknown
+        const d = deka.get(need.id) ?? unknown
+        return {
+          id: need.id, label: need.label,
+          amount: need.amount, unit: need.unit,
+          plusCode: p.sku, dekaCode: d.sku,
+          plusPacks: p.packs, dekaPacks: d.packs,
+          plusCents: p.cents, dekaCents: d.cents,
+          plusUnitRate: p.unitRate, dekaUnitRate: d.unitRate,
+          plusUnitCents: p.unitCents, dekaUnitCents: d.unitCents,
+          plusUnitFamily: p.unitFamily, dekaUnitFamily: d.unitFamily,
+        }
+      })
+    } catch {
+      // Incompatible historical source or physical units never produce
+      // invented match coverage.
+      return null
+    }
+  }, [capturePreview, captureWeek, plannerCaptureNeeds, imported, plan, recipes, activeDays])
+
+  // A provisional subtotal is useful before every SKU is reviewed, but
+  // it must never masquerade as a complete basket total. Only fresh paired
+  // sources and actual matched whole-pack amounts are eligible.
+  const pairedPreviewSummary = useMemo(() => {
+    if (!pairedPreviewRows) return null
+    const summarize = (store: 'PLUS' | 'DekaMarkt') => {
+      let cents = 0
+      let priced = 0
+      let safe = true
+      for (const row of pairedPreviewRows) {
+        const sku = store === 'PLUS' ? row.plusCode : row.dekaCode
+        const packs = store === 'PLUS' ? row.plusPacks : row.dekaPacks
+        const lineCents = store === 'PLUS' ? row.plusCents : row.dekaCents
+        if (!pairedPreviewComparable || !sku || packs === null ||
+            !Number.isSafeInteger(packs) || packs < 1 ||
+            lineCents === null || !Number.isSafeInteger(lineCents) || lineCents < 0)
+          continue
+        // Count source coverage independently from arithmetic safety:
+        // an overflow makes the subtotal unknown, not the source line missing.
+        priced++
+        if (!safe) continue
+        const next = cents + lineCents
+        if (!Number.isSafeInteger(next)) {
+          safe = false
+          continue
+        }
+        cents = next
+      }
+      return {
+        priced,
+        missing: pairedPreviewRows.length - priced,
+        cents: safe && priced > 0 ? cents : null,
+        complete: safe && pairedPreviewRows.length > 0 && priced === pairedPreviewRows.length,
+      }
+    }
+    const plus = summarize('PLUS')
+    const deka = summarize('DekaMarkt')
+    const candidateDelta = plus.complete && deka.complete &&
+      plus.cents !== null && deka.cents !== null ? deka.cents - plus.cents : null
+    return {
+      rows: pairedPreviewRows.length,
+      plus, deka,
+      completeDifferenceCents: candidateDelta !== null &&
+        Number.isSafeInteger(candidateDelta) ? candidateDelta : null,
+    }
+  }, [pairedPreviewRows, pairedPreviewComparable])
+
+  // Filter and order only the currently visible, honest own-source preview.
+  // No change to automatic matching, user approval or canonical basket sums.
+  const pairedPreviewDisplayed = useMemo(() => {
+    // A wall-clock rollover must never preserve a prior "cheaper" filter
+    // when the paired source is no longer eligible for price display.
+    const effectiveFilter = pairedPreviewComparable ? pairedPriceFilter :
+      (pairedPriceFilter === 'unknown' ? 'unknown' : 'all')
+    const effectiveSort = pairedPreviewComparable ? pairedPriceSort : 'plan'
+    const rows = (pairedPreviewRows ?? []).map(row => {
+      const comparable = pairedPreviewComparable && Boolean(row.plusCode) && Boolean(row.dekaCode) &&
+        row.plusPacks !== null && Number.isSafeInteger(row.plusPacks) && row.plusPacks > 0 &&
+        row.dekaPacks !== null && Number.isSafeInteger(row.dekaPacks) && row.dekaPacks > 0 &&
+        row.plusCents !== null && Number.isSafeInteger(row.plusCents) && row.plusCents >= 0 &&
+        row.dekaCents !== null && Number.isSafeInteger(row.dekaCents) && row.dekaCents >= 0
+      const candidateDelta = comparable ? row.dekaCents! - row.plusCents! : null
+      return { ...row, deltaCents: candidateDelta !== null &&
+        Number.isSafeInteger(candidateDelta) ? candidateDelta : null }
+    }).filter(row => (!pairedOnlyMissing || !row.plusCode || !row.dekaCode) &&
+      (effectiveFilter === 'all' ||
+        (effectiveFilter === 'unknown' && row.deltaCents === null) ||
+        (effectiveFilter === 'plus' && row.deltaCents !== null && row.deltaCents > 0) ||
+        (effectiveFilter === 'deka' && row.deltaCents !== null && row.deltaCents < 0) ||
+        (effectiveFilter === 'equal' && row.deltaCents === 0)))
+    if (effectiveSort === 'difference') rows.sort((a, b) => {
+      // Known differences first (largest absolute gap); unknown rows last.
+      if (a.deltaCents === null && b.deltaCents !== null) return 1
+      if (a.deltaCents !== null && b.deltaCents === null) return -1
+      if (a.deltaCents === null || b.deltaCents === null) return 0
+      return Math.abs(b.deltaCents) - Math.abs(a.deltaCents)
+    })
+    return rows
+  }, [pairedPreviewRows, pairedPreviewComparable, pairedOnlyMissing, pairedPriceFilter, pairedPriceSort])
+
   async function previewFilledCsv(files: File[]): Promise<boolean> {
     if (files.length === 0) return false
     const version = ++importRevision.current
     setCapturePreview(null)
+    setPairedOnlyMissing(false)
+    setPairedPriceFilter('all')
+    setPairedPriceSort('plan')
     setCapturePreviewShown({ PLUS: 20, DekaMarkt: 20 })
     setCapturePreviewSearch({ PLUS: '', DekaMarkt: '' })
     setCapturePreviewSort({ PLUS: 'source', DekaMarkt: 'source' })
@@ -2842,6 +2996,73 @@ export function OfflineReviewedWorkbench({
                   Ook na import kan Supa hieruit geen vergelijkbaar prijsverschil afleiden.
                 </p>
               )}
+              {pairedPreviewRows && (
+                <details className="offline-price-workbench__capture-matching">
+                  <summary>Hetzelfde fysieke mandje, twee winkelbronnen:
+                    {' '}{pairedPreviewRows.filter(row => row.plusCode && row.dekaCode).length}
+                    {' '}van {pairedPreviewRows.length} ingrediënten hebben in beide winkels een voorstel
+                  </summary>
+                  <p role="status">
+                    PLUS: {pairedPreviewRows.filter(row => !row.plusCode).length}
+                    {' '}nog zonder productvoorstel · DekaMarkt:
+                    {' '}{pairedPreviewRows.filter(row => !row.dekaCode).length}
+                    {' '}nog zonder productvoorstel.
+                    {' '}Openstaande fysieke ingrediënten kun je onder deze voorinzage
+                    per winkel als leeg opname-CSV of rijgids meenemen.
+                  </p>
+                  <p className="disclaimer">
+                    Dit is uitsluitend een vergelijking van voorgestelde productmatches
+                    voor identieke Planner-hoeveelheden. Controleer beide originele SKU's,
+                    verpakkingen en opnametijden zelf. Geen prijsverschil of besparing is bevestigd.
+                  </p>
+                  <p role="status" className={pairedPreviewComparable
+                    ? 'disclaimer' : 'offline-price-workbench__capture-alert'}>
+                    {pairedPreviewComparable
+                      ? 'Bronmomenten zijn binnen zeven dagen en binnen 24 uur van elkaar. Onderstaande hele-pakbedragen zijn alleen rekenkundige voorbeelden uit jouw eigen ingevoerde, nog niet goedgekeurde bronproducten. Productgelijkwaardigheid en besparing zijn NIET vastgesteld.'
+                      : 'Een of beide bronmomenten zijn verouderd, niet vergelijkbaar binnen 24 uur of onvoldoende bekend. Daarom blijven voorlopige regelprijzen en prijsverschillen hier onbekend.'}
+                  </p>
+                  {pairedPreviewSummary && (
+                    <section className="offline-price-workbench__paired-summary"
+                      aria-label="Voorlopige prijsdekking van hetzelfde fysieke mandje"
+                      aria-live="polite" aria-atomic="true">
+                      <h4>Voorlopige hele-pakbedragen voor dezelfde Planner-week</h4>
+                      <p>
+                        PLUS: {pairedPreviewSummary.plus.cents !== null
+                          ? (pairedPreviewSummary.plus.complete
+                            ? 'voorlopige kandidaat-som ' : 'bekende deelprijs ') +
+                            exactEuro.formatCents(pairedPreviewSummary.plus.cents)
+                          : 'bedrag onbekend'}
+                        {' '}({pairedPreviewSummary.plus.priced}/{pairedPreviewSummary.rows}
+                        {' '}regels met bruikbare prijzen; {pairedPreviewSummary.plus.missing} onbekend).
+                      </p>
+                      <p>
+                        DekaMarkt: {pairedPreviewSummary.deka.cents !== null
+                          ? (pairedPreviewSummary.deka.complete
+                            ? 'voorlopige kandidaat-som ' : 'bekende deelprijs ') +
+                            exactEuro.formatCents(pairedPreviewSummary.deka.cents)
+                          : 'bedrag onbekend'}
+                        {' '}({pairedPreviewSummary.deka.priced}/{pairedPreviewSummary.rows}
+                        {' '}regels met bruikbare prijzen; {pairedPreviewSummary.deka.missing} onbekend).
+                      </p>
+                      {pairedPreviewSummary.completeDifferenceCents !== null ? (
+                        <p role="status" className="disclaimer">
+                          Voorlopig verschil voor alle {pairedPreviewSummary.rows} fysieke regels
+                          (DekaMarkt minus PLUS):{' '}
+                          {pairedPreviewSummary.completeDifferenceCents > 0 ? '+' :
+                            pairedPreviewSummary.completeDifferenceCents < 0 ? '−' : ''}
+                          {exactEuro.formatCents(Math.abs(pairedPreviewSummary.completeDifferenceCents))}.
+                          Dit is geen bevestigde besparing: productgelijkwaardigheid,
+                          beschikbaarheid en originele prijzen moeten nog worden gecontroleerd.
+                        </p>
+                      ) : (
+                        <p role="status" className="offline-price-workbench__capture-alert">
+                          Geen volledig mandverschil: minstens één hele-pakprijs per winkel
+                          ontbreekt, is verouderd of kan niet veilig worden opgeteld.
+                          Deelbedragen zijn geen totaalkosten; onbekend is niet €0.
+                        </p>
+                      )}
+                    </section>
+                  )}
               {currentPreview.retainedOther && (
                 <p role="status" className={
                   currentPreview.retainedOther.within24h &&
