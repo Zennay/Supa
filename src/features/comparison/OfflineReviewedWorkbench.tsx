@@ -733,7 +733,7 @@ export function OfflineReviewedWorkbench({
       currentPreview.stores.find(entry => entry.retailer === store)?.observedAt ??
       imported?.captures[store]?.observedAt ?? 'geen bronmoment'
     const lines = [
-      'SUPA · privé controlelijst · hetzelfde fysieke mandje in twee winkels',
+      'SUPA · privé SKU- en voorlopige prijscontrole · hetzelfde fysieke mandje in twee winkels',
       'Dit zijn onbevestigde matches. Geen onafhankelijk geverifieerde winkelprijzen, bronrechten of besparingsbewijs.',
       'Alle eventuele kosten zijn slechts voorlopige hele-pak-berekeningen op eigen invoer; geen mandtotaal.',
       'Controleer originele SKU, verpakking en winkelmoment afzonderlijk bij beide winkels.',
@@ -801,11 +801,11 @@ export function OfflineReviewedWorkbench({
       try {
         const link = document.createElement('a')
         link.href = url
-        link.download = 'supa-prive-plus-deka-sku-controlelijst.txt'
+        link.download = 'supa-prive-plus-deka-sku-en-prijscontrole.txt'
         document.body.append(link)
         try { link.click() } finally { link.remove() }
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
-      setWeekExportMessage('De voorlopige fysieke twee-winkel-SKU-controlelijst is lokaal opgeslagen; geen match of prijs is goedgekeurd.')
+      setWeekExportMessage('De voorlopige fysieke twee-winkel-SKU- en prijscontrole is lokaal opgeslagen; geen match, prijs of besparing is goedgekeurd.')
     } catch {
       setWeekExportMessage('De twee-winkel-controlelijst kon niet lokaal worden opgeslagen; eerdere winkeldata bleven behouden.')
     }
