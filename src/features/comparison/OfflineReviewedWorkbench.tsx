@@ -421,7 +421,7 @@ export function OfflineReviewedWorkbench({
   const [capturePreviewShown, setCapturePreviewShown] = useState<Record<CaptureStore, number>>({ PLUS: 20, DekaMarkt: 20 })
   const [capturePreviewSearch, setCapturePreviewSearch] = useState<Record<CaptureStore, string>>({ PLUS: '', DekaMarkt: '' })
   const [capturePreviewSort, setCapturePreviewSort] = useState<Record<CaptureStore, 'source' | 'name' | 'sku' | 'price' | 'unknown'>>({ PLUS: 'source', DekaMarkt: 'source' })
-  const [capturePreviewPriceFilter, setCapturePreviewPriceFilter] = useState<Record<CaptureStore, 'all' | 'unknown' | 'priced'>>({ PLUS: 'all', DekaMarkt: 'all' })
+  const [capturePreviewPriceFilter, setCapturePreviewPriceFilter] = useState<Record<CaptureStore, 'all' | 'unknown' | 'priced' | 'unit-unknown'>>({ PLUS: 'all', DekaMarkt: 'all' })
   const [capturePreview, setCapturePreview] = useState<{
     files: File[]; week: string
     stores: CapturePreviewStore[]
@@ -2737,10 +2737,19 @@ export function OfflineReviewedWorkbench({
                   return terms.every(term => searchable.includes(term))
                 })
                 const priceFilter = capturePreviewPriceFilter[store.retailer]
-                const priceFilteredProducts = filteredProducts.filter(product =>
-                  priceFilter === 'all' ||
-                  (priceFilter === 'priced' ? product.available && product.priceCents !== null
-                    : !product.available || product.priceCents === null))
+                const priceFilteredProducts = filteredProducts.filter(product => {
+                  const hasPackPrice = product.available && product.priceCents !== null
+                  if (priceFilter === 'all') return true
+                  if (priceFilter === 'priced') return hasPackPrice
+                  if (priceFilter === 'unknown') return !hasPackPrice
+                  // A pack price alone is not a comparable unit-price quote.
+                  // An absent/invalid physical package stays unresolved.
+                  return !hasPackPrice || !privatePackUnitRate({
+                    amount: product.packAmount, unit: product.packUnit,
+                    count: product.packCount ?? 0,
+                    priceCents: product.priceCents,
+                  })
+                })
                 const sort = capturePreviewSort[store.retailer]
                 const visibleProducts = [...priceFilteredProducts].sort((a, b) => {
                   if (sort === 'source') return 0
@@ -2776,13 +2785,14 @@ export function OfflineReviewedWorkbench({
                   <label>Prijsdekking van deze eigen bron
                     <select value={capturePreviewPriceFilter[store.retailer]}
                       onChange={event => {
-                        const value = event.currentTarget.value as 'all' | 'unknown' | 'priced'
+                        const value = event.currentTarget.value as 'all' | 'unknown' | 'priced' | 'unit-unknown'
                         setCapturePreviewPriceFilter(current => ({ ...current, [store.retailer]: value }))
                         setCapturePreviewShown(current => ({ ...current, [store.retailer]: 20 }))
                       }}>
                       <option value="all">Alle originele artikelen</option>
                       <option value="unknown">Alleen zonder bruikbare pakprijs</option>
                       <option value="priced">Alleen met opgegeven pakprijs</option>
+                      <option value="unit-unknown">Zonder berekenbare eenheidsprijs</option>
                     </select>
                   </label>
                   <label>Sorteer originele bronartikelen
