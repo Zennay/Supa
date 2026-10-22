@@ -121,7 +121,11 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
   // Search only: normalize accents/case, Dutch decimal commas and spacing
   // between a quantity and its unit. This never alters captured source data.
   const normalizeCatalogSearch = (value: string) =>
-    productSearchText(value).replace(/(\d),(?=\d)/gu, '$1.')
+    productSearchText(value)
+      .replace(/(\d),(?=\d)/gu, '$1.')
+      // Treat common multipack spellings as the same search-only form:
+      // “6 × 330 ml”, “6x330ml” and “6 x 330 ml”. Captured data stays intact.
+      .replace(/(\d)\s*[×✕✖x]\s*(?=\d)/gu, '$1x')
       .replace(/(\d)\s+([a-z])/gu, '$1$2')
   // Each word is a separate constraint, allowing product + retailer + pack
   // terms to match across fields without inventing a combined product identity.
