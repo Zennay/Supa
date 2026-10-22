@@ -40,8 +40,18 @@ export function createRecipeServer({ root = resolve('dist'), fetchHtml = fetchRe
       if (quota.count >= 10 || active >= 4 || clients.size > 1000) return json(429, { error: 'Even wachten: probeer de import over een minuut opnieuw.' })
       quota.count++; clients.set(key, quota); active++
       let bodyTimedOut = false
+      const timeoutBody = () => {
+        if (bodyTimedOut) return
+        bodyTimedOut = true
+        if (!res.destroyed && !res.headersSent && !res.writableEnded) {
+          res.setHeader('Connection', 'close')
+          json(408, { error: 'De receptlink-aanvraag duurde te lang. Probeer opnieuw of importeer de HTML lokaal.' })
+          res.once('finish', () => req.destroy())
+        } else {
+          req.destroy()
+        }
+      }
       try {
-        req.setTimeout(10_000, () => req.destroy())
         const declaredLength = req.headers['content-length']
         if (declaredLength !== undefined) {
           const bytes = Number(declaredLength)
@@ -49,12 +59,10 @@ export function createRecipeServer({ root = resolve('dist'), fetchHtml = fetchRe
             return json(413, { error: 'De receptlink is te lang.' })
         }
         let body = ''
-        // req.setTimeout above is an inactivity timeout; a client sending one byte
-        // periodically could still occupy an import slot. Bound the whole body read.
-        const bodyDeadline = setTimeout(() => {
-          bodyTimedOut = true
-          req.destroy()
-        }, 10_000)
+        // Inactivity timeout plus an absolute deadline prevent slow-drip uploads
+        // from occupying one of the four concurrent import slots indefinitely.
+        req.setTimeout(10_000, timeoutBody)
+        const bodyDeadline = setTimeout(timeoutBody, 10_000)
         try {
           for await (const chunk of req) {
             body += chunk
