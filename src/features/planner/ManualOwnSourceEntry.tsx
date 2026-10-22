@@ -12,7 +12,7 @@ const LocalDeviceBarcodeScanner = lazy(() =>
 
 type Store = 'PLUS' | 'DekaMarkt'
 type Field = 'id' | 'name' | 'packAmount' | 'packUnit' | 'packCount' | 'priceCents' | 'available'
-type Entry = ManualEntry
+type Entry = ManualEntry & { uiKey: string }
 type Source = { observedAt: string; products: Entry[] }
 
 const STORES: readonly Store[] = ['PLUS', 'DekaMarkt']
@@ -21,11 +21,31 @@ const HEADER = [
   'retailer', 'observedAt', 'id', 'name', 'packAmount',
   'packUnit', 'packCount', 'priceCents', 'available',
 ] as const
+let manualEntrySequence = 0
+const newManualEntryKey = () =>
+  'manual-entry-' + Date.now().toString(36) + '-' + (++manualEntrySequence).toString(36)
 const emptyEntry = (): Entry => ({
+  uiKey: newManualEntryKey(),
   id: '', name: '', packAmount: '', packUnit: '', packCount: '',
   priceCents: '', available: '',
 })
 const initialSource = (): Source => ({ observedAt: '', products: [emptyEntry()] })
+
+function attachUiKeys(sources: ManualSources): Record<Store, Source> {
+  const source = (value: ManualSources[Store]): Source => ({
+    observedAt: value.observedAt,
+    products: value.products.map(product => ({ ...product, uiKey: newManualEntryKey() })),
+  })
+  return { PLUS: source(sources.PLUS), DekaMarkt: source(sources.DekaMarkt) }
+}
+
+function stripUiKeys(sources: Record<Store, Source>): ManualSources {
+  const source = (value: Source): ManualSources[Store] => ({
+    observedAt: value.observedAt,
+    products: value.products.map(({ uiKey, ...product }) => product),
+  })
+  return { PLUS: source(sources.PLUS), DekaMarkt: source(sources.DekaMarkt) }
+}
 function enteredUnitPrice(row: Entry): string | null {
   if (row.available !== 'true' ||
       !/^(?:0|[1-9]\d*)(?:[.,]\d{1,6})?$/.test(row.packAmount) ||
@@ -229,7 +249,7 @@ export function ManualOwnSourceEntry({ onPreview, onOpenReview, busy, template, 
       setGuideMessage('Een Planner-ingrediënthint is te lang. Gebruik het bestaande weekinvulblad.')
       return
     }
-    const staged = {} as ManualSources
+    const staged = {} as Record<Store, Source>
     let added = 0
     for (const store of STORES) {
       const source = sources[store]
@@ -260,7 +280,7 @@ export function ManualOwnSourceEntry({ onPreview, onOpenReview, busy, template, 
     const current = new Set(needs.map(item => item.id))
     let dropped = 0
     let preserved = 0
-    const next = {} as ManualSources
+    const next = {} as Record<Store, Source>
     for (const store of STORES) {
       const source = sources[store]
       const products: Entry[] = []
@@ -323,7 +343,7 @@ export function ManualOwnSourceEntry({ onPreview, onOpenReview, busy, template, 
   function applyOriginalIdentifiers() {
     if (!pendingTemplate) return
     ++readTicket.current
-    setSources(pendingTemplate)
+    setSources(attachUiKeys(pendingTemplate))
     setPendingTemplate(null)
     setAcknowledged(false)
     setError('')
@@ -332,7 +352,7 @@ export function ManualOwnSourceEntry({ onPreview, onOpenReview, busy, template, 
   function downloadDraft() {
     setBackupMessage('')
     try {
-      const content = exportManualOwnSourceDraft(sources)
+      const content = exportManualOwnSourceDraft(stripUiKeys(sources))
       const url = URL.createObjectURL(new Blob([content], { type: 'application/json' }))
       try {
         const link = document.createElement('a')
@@ -369,7 +389,7 @@ export function ManualOwnSourceEntry({ onPreview, onOpenReview, busy, template, 
   function applyDraft() {
     if (!pendingDraft) return
     ++readTicket.current
-    setSources(pendingDraft)
+    setSources(attachUiKeys(pendingDraft))
     setPendingDraft(null)
     setAcknowledged(false)
     setError('')
@@ -441,7 +461,7 @@ export function ManualOwnSourceEntry({ onPreview, onOpenReview, busy, template, 
           <label>Kies eventueel één weekingrediënt
             <select value={guideNeedId} onChange={event => setGuideNeedId(event.target.value)}>
               <option value="">Alle nog niet toegevoegde ingrediënten</option>
-              {needs.map((need, index) => <option key={need.id + ':' + index} value={need.id}>
+              {needs.map(need => <option key={need.id} value={need.id}>
                 {need.label} · {readablePlannerDemandAmount(need.amount)} {need.unit}
               </option>)}
             </select>
@@ -467,8 +487,8 @@ export function ManualOwnSourceEntry({ onPreview, onOpenReview, busy, template, 
             </span>)}
           </div>
           <div className="supa-manual-source__coverage-list">
-            {needs.slice(0, 30).map((need, index) => <div
-              className="supa-manual-source__coverage-row" key={need.id + ':' + index}>
+            {needs.slice(0, 30).map(need => <div
+              className="supa-manual-source__coverage-row" key={need.id}>
               <strong>{need.label}</strong>
               <small>Nodig: {readablePlannerDemandAmount(need.amount)} {need.unit}</small>
               {STORES.map(store => {
@@ -516,7 +536,7 @@ export function ManualOwnSourceEntry({ onPreview, onOpenReview, busy, template, 
           {source.products.map((product, index) =>
             <div className={'supa-manual-source__product' +
               (invalidRow === store + '-' + index ? ' is-invalid' : '')}
-              id={'supa-manual-' + store + '-' + index} key={index}>
+              id={'supa-manual-' + store + '-' + index} key={product.uiKey}>
               {product.needHint && <p className="supa-manual-source__hint">
                 <strong>Planner-herinnering (geen winkelproduct):</strong>
                 {' '}{needs.find(need => need.id === product.needHint?.id)
