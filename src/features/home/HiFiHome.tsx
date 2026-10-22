@@ -153,7 +153,8 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct,
     view === 'products' ? [...visibleFigmaMatches].sort((left, right) =>
       ['cola-regular', 'cola-zero', 'figma-paprika', 'figma-watermelon', 'figma-cola-classic', 'figma-arla-milk', 'figma-heineken', 'figma-pastry', 'figma-muffins', 'figma-peanut-butter', 'figma-fruit', 'figma-ginger', 'cola-pack'].indexOf(left.id) -
       ['cola-regular', 'cola-zero', 'figma-paprika', 'figma-watermelon', 'figma-cola-classic', 'figma-arla-milk', 'figma-heineken', 'figma-pastry', 'figma-muffins', 'figma-peanut-butter', 'figma-fruit', 'figma-ginger', 'cola-pack'].indexOf(right.id)) : visibleFigmaMatches
-  const historical = filterHistoricalProducts(historicalRetailerProducts, query, storeFilter, historicalPackFilter).filter(item =>
+  const historical = filterHistoricalProducts(historicalRetailerProducts, '', storeFilter, historicalPackFilter).filter(item =>
+    includesQuery([item.name, item.pack, item.store, item.capturedAt, item.sourceUrl, item.id]) &&
     (!favoritesOnly || favorites.includes(item.id)) &&
     (!selectedOnly || addedProducts.includes(item.id)))
   const visibleProductIds = (productSource === 'history' ? historical : products).map(item => item.id)
