@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { freshReviewedBaskets, recentOwnCaptureInstant, type PrivateReviewedBaskets, type PrivateCaptureProgress, type OwnStore, type PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
 import { privatePriceAgeNotice } from '../comparison/privatePriceAgeNotice.ts'
 import { currentPrivateRouteChoice } from '../comparison/privateRouteChoice.ts'
@@ -26,7 +26,8 @@ const PlannerReviewedSourceLines = lazy(() => import('./PlannerReviewedSourceLin
 const PlannerQuickSourcePaste = lazy(() => import('./PlannerQuickSourcePaste.tsx')
   .then(module => ({ default: module.PlannerQuickSourcePaste })))
 import type { CaptureStore } from '../comparison/plannerPriceCaptureSheet.ts'
-import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
+import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../domain/basket.ts'
+import type { PlannedMeal } from '../../domain/types.ts'
 import { validCustomWeekBudgetEuros } from './customWeekBudget.ts'
 import { euro as exactEuro } from '../../lib/money.ts'
 import { confirmedPartialBasket } from './confirmedPartialBasket.ts'
@@ -37,10 +38,13 @@ import './plannerOwnStoreComparison.css'
 const stores = ['PLUS', 'DekaMarkt'] as const
 
 /** Exact own-source totals only. No fixture or unreviewed prices. */
-export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred, hasDemand, budget, onSelect, onOpenComparison, onImportSourceFiles, onReviewIngredient, onOpenList, onOpenMixedRoute, onChooseRouteLine, captureNeeds }: {
+export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred, hasDemand, budget, onSelect, onOpenComparison, onImportSourceFiles, onReviewIngredient, onOpenList, onOpenMixedRoute, onChooseRouteLine, plannedMeals, ingredientRecipes, activeDays, hasIngredientData }: {
   reviewed: PrivateReviewedBaskets | null
   captureProgress: PrivateCaptureProgress | null
-  captureNeeds: readonly PlannerCaptureGuideNeed[]
+  plannedMeals: PlannedMeal[]
+  ingredientRecipes: RecipeWithIngredients[]
+  activeDays: string[]
+  hasIngredientData: boolean
   preferred: OwnStore
   hasDemand: boolean
   budget: number
@@ -52,6 +56,13 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
   onOpenMixedRoute: (extraCostRaw?: string) => void
   onChooseRouteLine: (choice: Omit<PrivateRouteChoice, 'serial'>) => void
 }) {
+  // Keep the heavyweight basket/matching graph inside this lazy comparison
+  // panel, not in PlannerView's ordinary budget interaction path.
+  const captureNeeds = useMemo(() => {
+    if (!hasIngredientData) return []
+    try { return aggregatePlanIngredients(plannedMeals, ingredientRecipes, activeDays) }
+    catch { return [] }
+  }, [hasIngredientData, plannedMeals, ingredientRecipes, activeDays])
   const [downloadMessage, setDownloadMessage] = useState('')
   // Do not authorize an asynchronous copy/download against a source object
   // that another render (e.g. another tab's replacement) has already removed.
