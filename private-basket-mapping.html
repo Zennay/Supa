@@ -74,6 +74,12 @@ button:disabled{background:#b6c6bc;cursor:not-allowed}.secondary{background:#e5e
 #own-recipe-review-needed p{margin:.4rem 0 .8rem}
 #own-recipe-review-needed details{background:#fff;border-color:#e2d1b2}
 #own-recipe-review-needed summary{overflow-wrap:anywhere}
+.own-recipe-backup-picker{display:grid;gap:9px;margin:12px 0;padding:14px;border:1px solid #ccdfd0;border-radius:12px;background:#f7faf6}
+.own-recipe-backup-picker label{margin:0}
+.own-recipe-backup-picker input[type=file]{max-width:100%;width:100%;min-height:44px}
+.own-recipe-backup-picker button{justify-self:start}
+.own-recipe-backup-picker small{line-height:1.5}
+@media(max-width:530px){.own-recipe-backup-picker button{justify-self:stretch}}
 /* Saved recipes become first-class physical inputs on desktop and narrow phones. */
 .own-recipe-pick-card{min-width:0}
 .own-recipe-pick-controls{display:grid;grid-template-columns:repeat(2,minmax(75px,95px));gap:10px}
@@ -170,6 +176,12 @@ andere open ingrediënt- of bronwaarschuwingen blijven in Mijn recepten totdat j
 daar corrigeert. Selecteer maximaal zeven maaltijden, kies desgewenst herhalingen en
 maak dezelfde ongeprijsde fysieke boodschappenbehoefte als een Planner-weekmenu.</p>
 <button id="load-own-recipes" type="button" class="secondary">Laad mijn eigen recepten op dit apparaat</button>
+<div class="own-recipe-backup-picker">
+<label for="own-recipe-backup-file">Of: open je eigen Supa-receptenback-up van een ander apparaat (JSON, maximaal 2 MB)</label>
+<input id="own-recipe-backup-file" type="file" accept=".json,application/json">
+<button id="load-own-recipe-backup" type="button" class="secondary">Controleer mijn receptenback-up</button>
+<small>Geen account nodig voor dit lokale bestand. Supa controleert de bestaande back-upindeling, toont de beschikbare recepten en bewaart het bestand niet automatisch. De huidige receptenbibliotheek, winkel-SKU’s, prijzen en afvinkingen worden niet gewijzigd.</small>
+</div>
 <div id="own-recipe-status" class="notice" role="status" aria-live="polite">Nog geen toegang tot jouw lokale recepten gevraagd.</div>
 <div id="own-recipe-choices" role="group" aria-label="Kies eigen recepten" style="display:grid;gap:8px"></div>
 <div id="own-recipe-review-needed" class="notice warning own-recipe-review-needed" role="region" aria-live="polite" hidden aria-label="Eigen recepten die nog controle nodig hebben"></div>
