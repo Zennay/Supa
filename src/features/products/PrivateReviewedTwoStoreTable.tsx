@@ -1016,6 +1016,16 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
     if (!intent) { onOpenComparison(); return }
     onChooseRouteLine(intent)
   }
+  function unitPriceDifference(first: Matched, second: Matched): string | null {
+    const a = rate(first)
+    const b = rate(second)
+    if (!a || !b || a.unit !== b.unit) return null
+    const rawDelta = b.roundedCentsPerUnit - a.roundedCentsPerUnit
+    if (!Number.isSafeInteger(rawDelta)) return null
+    return 'Eenheidsprijsverschil DekaMarkt min PLUS (afgerond): ' +
+      (rawDelta > 0 ? '+' : rawDelta < 0 ? '−' : '') +
+      money.format(Math.abs(rawDelta) / 100) + ' per ' + a.unit + '.'
+  }
   function unitPriceWarning(first: Matched, second: Matched): string | null {
     const a = rate(first)
     const b = rate(second)
@@ -1233,7 +1243,11 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
           : (first.lineTotalCents < second.lineTotalCents ? 'PLUS' : 'DekaMarkt') + ' is ' +
             money.format(Math.abs(first.lineTotalCents - second.lineTotalCents) / 100) +
             ' voordeliger voor dit ingrediënt.'}</p>
-        {unitPriceWarning(first, second) && <p className="private-reviewed-products__unit-caveat">
+        {unitPriceDifference(first, second) && <p className="private-reviewed-products__unit-caveat" role="note">
+          {unitPriceDifference(first, second)}
+          {' '}Dit is een afgeronde indicatieve eenheidsprijs; de werkelijke kosten volgen uit hele verpakkingen.
+        </p>}
+        {unitPriceWarning(first, second) && <p className="private-reviewed-products__unit-caveat" role="note">
           {unitPriceWarning(first, second)}
           {' '}Supa rekent het winkelmandje met de werkelijk benodigde hele pakken,
           nooit alleen met de indicatieve eenheidsprijs.
