@@ -61,6 +61,7 @@ export function PlannerPersonalNoteTransfer({ items, checked, openOnly, planKey,
       setMessage(result)
     } catch (cause) {
       setPending(null)
+      setTransferred(false)
       setMessage(cause instanceof Error ? cause.message : 'Overdracht geweigerd.')
     }
   }
@@ -75,6 +76,7 @@ export function PlannerPersonalNoteTransfer({ items, checked, openOnly, planKey,
     <label>Mijn eigen ongeprijsde winkellijst
       <select value={destination} onChange={event => {
         setDestination(event.currentTarget.value as PersonalNoteDestination)
+        setTransferred(false)
         setPending(null)
         setMessage('Winkelkeuze gewijzigd; maak een nieuwe voorinzage.')
       }}>
