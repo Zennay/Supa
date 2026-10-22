@@ -1053,7 +1053,10 @@ export function ManualShoppingNotes({ notes, setNotes }: {
     if (repeatProtected || !selectedVisible.length) return
     try {
       const actual = window.localStorage.getItem(PRIVATE_SHOPPING_TEMPLATE_KEY)
-      if (actual !== repeatRaw) throw Error('Een andere versie is opgeslagen. Niets overschreven.')
+      if (actual !== repeatRaw) {
+        setRepeatProtected(true)
+        throw Error('Een andere versie is opgeslagen. Niets overschreven.')
+      }
       const raw = makePrivateShoppingTemplate(repeatName, selectedVisible)
       if (repeatRaw !== null && !window.confirm('Vervang je eerder bewaarde eigen herhaalronde? Je geopende boodschappen blijven behouden.')) return
       // Recheck after the user has reviewed the replacement dialog.
@@ -1064,7 +1067,8 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       setRepeatPreview(null)
       setRepeatMessage(selectedVisible.length + ' zichtbare geselecteerde eigen artikelen als herhaalronde bewaard, zonder vinkjes of prijzen.')
     } catch (error) {
-      setRepeatProtected(true)
+      // An invalid draft name is editable; never lock the user's UI simply
+      // because an incomplete title was rejected before anything was stored.
       setRepeatMessage(error instanceof Error ? error.message : 'Sjabloon kon niet worden bewaard.')
     }
   }
