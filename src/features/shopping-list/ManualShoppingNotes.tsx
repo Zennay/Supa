@@ -1165,7 +1165,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       setRepeatMessage(error instanceof Error ? error.message : 'Herhaalronde geweigerd.')
     }
   }
-  function selectedRepeatRoundText(): string {
+  function selectedRepeatRoundItems(): { name: string; items: PrivateShoppingTemplateItem[] } {
     const preview = repeatPreview
     if (!preview || !preview.selectedIndices.length ||
         preview.raw !== repeatRaw ||
@@ -1177,13 +1177,61 @@ export function ManualShoppingNotes({ notes, setNotes }: {
         [...selected].some(index => !Number.isSafeInteger(index) || index < 0 || index >= preview.additions.length) ||
         selected.size > 100 - notes.length)
       throw Error('Ongeldige of te grote selectie. Kies je artikelen opnieuw.')
+    return {
+      name: preview.name,
+      items: preview.additions.filter((_, index) => selected.has(index)),
+    }
+  }
+  function selectedRepeatRoundText(): string {
+    const { name, items } = selectedRepeatRoundItems()
     return [
-      'SUPA · PRIVÉ HERHAALRONDE · ' + preview.name,
+      'SUPA · PRIVÉ HERHAALRONDE · ' + name,
       'Uitsluitend door jou gekozen eigen boodschappen; geen winkelprijzen of productmatching.', '',
-      ...preview.additions.filter((_, index) => selected.has(index))
-        .map(item => '☐ [' + item.store + '] ' + item.label),
+      ...items.map(item => '☐ [' + item.store + '] ' + item.label),
       '', 'Geen supermarktbron, SKU, besparingsclaim of automatische opslag.', '',
     ].join('\n')
+  }
+  function downloadSelectedRepeatRoundPrint() {
+    try {
+      // Recheck current source, selected items and available capacity at the
+      // moment of download. A saved template is not a product/price source.
+      const { name, items } = selectedRepeatRoundItems()
+      const escapeHtml = (value: string) => value.replace(/&/gu, '&amp;')
+        .replace(/</gu, '&lt;').replace(/>/gu, '&gt;')
+        .replace(/"/gu, '&quot;').replace(/'/gu, '&#39;')
+      const groups = stores.flatMap(shop => {
+        const own = items.filter(item => item.store === shop)
+        if (!own.length) return []
+        return ['<section><h2>' + shop + ' · ' + own.length + ' artikelen</h2><ul>' +
+          own.map(item => '<li><span aria-hidden="true">☐</span> ' +
+            escapeHtml(item.label) + '</li>').join('') + '</ul></section>']
+      }).join('')
+      const html = '<!doctype html><html lang="nl"><head><meta charset="utf-8">' +
+        '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+        `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">` +
+        '<title>SUPA · Privé herhaalronde</title>' +
+        '<style>body{font:16px/1.5 system-ui,sans-serif;max-width:760px;margin:auto;padding:24px;color:#202820}' +
+        'section{break-inside:avoid;border-top:2px solid #ccc;margin:16px 0;padding:12px 0}' +
+        'ul{padding:0;list-style:none}li{padding:7px 0;border-bottom:1px solid #ddd;overflow-wrap:anywhere}' +
+        'li span{font-size:1.3em;margin-right:.6em}small{color:#555}' +
+        '@media print{body{padding:0}section{break-inside:avoid}}</style></head><body>' +
+        '<h1>' + escapeHtml(name) + '</h1><p>' + items.length +
+        ' bewust gekozen artikelen · niet toegevoegd aan de actieve lijst.</p>' +
+        groups + '<footer><small>Persoonlijke ongeprijsde herhaalronde. ' +
+        'Geen retailerbron, beschikbaarheidsclaim, SKU of besparing.</small></footer></body></html>'
+      const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-geselecteerde-herhaalronde-print.html'
+        document.body.append(link); link.click(); link.remove()
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setRepeatMessage('Afdrukbaar winkelblad met ' + items.length +
+        ' gekozen artikelen per winkel gedownload. De actieve lijst bleef gelijk.')
+    } catch (error) {
+      setRepeatPreview(null)
+      setRepeatMessage(error instanceof Error ? error.message : 'Afdrukbaar winkelblad kon niet worden gemaakt.')
+    }
   }
   function downloadSelectedRepeatRoundText() {
     try {
@@ -1924,6 +1972,10 @@ export function ManualShoppingNotes({ notes, setNotes }: {
           <button type="button" disabled={!repeatPreview.selectedIndices.length}
             onClick={downloadSelectedRepeatRoundText}>
             Download gekozen herhaalartikelen (TXT)
+          </button>
+          <button type="button" disabled={!repeatPreview.selectedIndices.length}
+            onClick={downloadSelectedRepeatRoundPrint}>
+            Download afdrukbaar winkelblad (HTML, per winkel)
           </button>
           <button type="button" disabled={!repeatPreview.selectedIndices.length}
             onClick={() => void shareSelectedRepeatRoundText()}>
