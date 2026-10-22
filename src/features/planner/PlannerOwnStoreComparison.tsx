@@ -513,7 +513,8 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
       const originalDeka = current.stores.DekaMarkt
       const sameSources = () => {
         const latest = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
-        return latest?.stores.PLUS === originalPlus && latest.stores.DekaMarkt === originalDeka &&
+        return !!latest && latest.planKey === current.planKey &&
+          latest.stores.PLUS === originalPlus && latest.stores.DekaMarkt === originalDeka &&
           ownStoreWeekComparison(latest).status === 'comparable'
       }
       try {
