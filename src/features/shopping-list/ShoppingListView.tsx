@@ -4,6 +4,7 @@ import type { PlannedMeal } from '../../domain/types'
 import { quantityUnitLabelNl } from '../../lib/quantityPresentation'
 import { ShoppingListCompletionBanner } from './ShoppingListCompletionBanner'
 import { ShoppingListCopyButton } from './ShoppingListCopyButton'
+import { ShoppingListCsvExport } from './ShoppingListCsvExport.tsx'
 import { PrintableShoppingChecklist } from './PrintableShoppingChecklist'
 import {
   restoreShoppingListProgress,
@@ -264,6 +265,7 @@ export function ShoppingListView({ basket, plan, recipes, activeDays }: {
         <summary>Deel of print je lijst</summary>
         <div className="hifi-shoplist-tool-actions">
           <ShoppingListCopyButton basket={basket} doneLineIds={done} />
+          <ShoppingListCsvExport basket={basket} doneLineIds={done} />
           <PrintableShoppingChecklist basket={basket} doneLineIds={done} />
         </div>
       </details>
