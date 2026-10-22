@@ -545,3 +545,87 @@ body { background: #e9eeec; }
   overflow-wrap: anywhere; cursor: pointer;
 }
 .hifi-products .hifi-figma-own-source:focus-visible { outline: 3px solid #235b44; outline-offset: 2px; }
+
+
+/* Local, intentionally unpriced shopping selection. This does not mark
+   retailer baskets reviewed or inherit any source or price evidence. */
+.hifi-picked-progress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .65rem;
+  padding: .85rem;
+  border: 1px solid #cad9ca;
+  border-radius: 12px;
+  background: #f5faf4;
+}
+.hifi-picked-progress p {
+  flex: 1 1 100%;
+  margin: 0;
+  font-weight: 650;
+}
+.hifi-picked-progress progress {
+  flex: 1 1 170px;
+  min-width: 0;
+  height: 16px;
+  accent-color: #226f52;
+}
+.hifi-picked-progress button { min-height: 44px; }
+.hifi-picked-tick {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  min-height: 44px;
+  padding: .35rem .5rem;
+  border: 1px solid #a9baa9;
+  border-radius: 9px;
+  background: #f8fbf8;
+  font-weight: 650;
+  font-size: .88rem;
+  cursor: pointer;
+}
+.hifi-picked-tick input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: #226f52;
+}
+.hifi-picked-tick:focus-within { outline: 3px solid #276e55; outline-offset: 2px; }
+.hifi-demo-list .hifi-demo-list-row {
+  flex-wrap: wrap;
+  min-width: 0;
+  padding: .25rem 0;
+}
+.hifi-demo-list .hifi-demo-list-row > :is(span, .hifi-picked-details) {
+  flex: 1 1 180px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.hifi-demo-list .hifi-demo-list-row > .ghost-button { min-height: 44px; }
+@media (max-width: 540px) {
+  .hifi-picked-progress { display: grid; grid-template-columns: minmax(0,1fr); }
+  .hifi-picked-progress progress { width: 100%; }
+  .hifi-picked-progress button { width: 100%; }
+  .hifi-picked-tick { justify-content: center; }
+}
+
+
+/* Personal shopping amounts are user-entered counts, not measured pack sizes. */
+.hifi-demo-list .hifi-picked-edit {
+  display:grid; grid-template-columns:minmax(125px,1fr) minmax(150px,2fr);
+  gap:.55rem; flex:1 1 100%; min-width:0; padding:.4rem 0 .75rem;
+  border-bottom:1px solid #e1e9df;
+}
+.hifi-picked-edit label {
+  display:grid; gap:.3rem; min-width:0; color:#385247;
+  font-size:.84rem; font-weight:600;
+}
+.hifi-picked-edit input {
+  width:100%; min-width:0; min-height:44px; box-sizing:border-box;
+  padding:.6rem; font:inherit; font-size:1rem; border:1px solid #9cac9e;
+  border-radius:8px; background:#fff; color:#202b22;
+}
+.hifi-picked-edit input:focus-visible { outline:3px solid #276e55; outline-offset:2px; }
+@media(max-width:520px) {
+  .hifi-demo-list .hifi-picked-edit { grid-template-columns:minmax(0,1fr); }
+}
