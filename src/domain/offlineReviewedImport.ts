@@ -83,7 +83,7 @@ function parseProduct(raw: unknown, retailer: OfflineRetailer): OfflineStoreProd
         (raw.packCount as number) < 1 || (raw.packCount as number) > 1000)) ||
       typeof raw.available !== 'boolean' ||
       (raw.priceCents !== null && (!Number.isSafeInteger(raw.priceCents) ||
-        (raw.priceCents as number) < 0 || (raw.priceCents as number) > 1000000)) ||
+        (raw.priceCents as number) <= 0 || (raw.priceCents as number) > 1000000)) ||
       (raw.available && raw.priceCents === null) ||
       !hasOwn(raw, 'priceCents')) {
     throw new Error('Productrecord ongeldig: controleer ID, verpakking, voorraad en prijs in centen.')
