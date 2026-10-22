@@ -1061,8 +1061,11 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
       {topDrivers.length > 0 && <div>
         <h5>Grootste verschillen in je huidige selectie</h5>
         <ol>{topDrivers.map(line => <li key={line.id}>
-          <button type="button" onClick={() => document.getElementById(
-            driverAnchor(line.id))?.scrollIntoView({ block: 'center', behavior: 'smooth' })}>
+          <button type="button" onClick={() => {
+            const target = document.getElementById(driverAnchor(line.id))
+            target?.focus({ preventScroll: true })
+            target?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+          }}>
             {line.label}: {exactEuro.formatCents(BigInt(Math.abs(line.plusCents - line.dekaCents)))}
             {' '}goedkoper bij {line.plusCents < line.dekaCents ? 'PLUS' : 'DekaMarkt'}
           </button>
