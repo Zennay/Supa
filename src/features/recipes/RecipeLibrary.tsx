@@ -1451,8 +1451,8 @@ export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
               aria-label="Controleer alle hoeveelheden vóór bewaren">
               <strong>Nieuwe variant: {portionVariantPreview.draft.title}</strong>
               <p>Deze hoeveelheden worden ongeprijsd bewaard. Productmatching blijft apart.</p>
-              <ul>{portionVariantPreview.draft.ingredients.map(ingredient =>
-                <li key={ingredient.clientId}>{ingredient.original}</li>)}</ul>
+              <ul>{portionVariantPreview.draft.ingredients.map((ingredient, index) =>
+                <li key={index}>{ingredient.original}</li>)}</ul>
               <div className="recipe-backup-panel__actions">
                 <button type="button" onClick={() => savePortionVariant(selected)}>
                   Bevestig en bewaar deze variant
