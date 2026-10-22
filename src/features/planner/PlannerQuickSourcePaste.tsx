@@ -101,12 +101,16 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
     setDraft(raw); setPreview(null); setUndoSnapshot(null); setRefreshSummary(null); setBusy(false)
     setMessage(raw ? 'Concept gewijzigd. Controleer opnieuw voor import.' : '')
   }
-  async function inspectSource(raw: string) {
+  async function inspectSource(raw: string, report?: (message: string, admitted: boolean) => void) {
     const ticket = ++revision.current
     setPreview(null); setUndoSnapshot(null); setRefreshSummary(null); setMessage('')
-    if (!raw.trim()) { setMessage('Plak eerst echte eigen CSV-, TSV- of JSON-bronregels.'); return }
+    if (!raw.trim()) {
+      const error = 'Plak eerst echte eigen CSV-, TSV- of JSON-bronregels.'
+      setMessage(error); report?.(error, false); return
+    }
     if (new TextEncoder().encode(raw).length > limit) {
-      setMessage('Bron groter dan 256 kB. Splits de originele opnames op.'); return
+      const error = 'Bron groter dan 256 kB. Splits de originele opnames op.'
+      setMessage(error); report?.(error, false); return
     }
     setBusy(true)
     try {
@@ -116,10 +120,13 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
         throw Error('De genormaliseerde winkelopnames zijn groter dan 256 kB.')
       const data = parseOfflinePriceSnapshots(normalized, Date.now())
       setPreview({ raw, normalized, data, needScope })
-      setMessage('Structuur lokaal herkend. Controleer de bronmomenten en prijsdekking.')
+      const success = 'Structuur lokaal herkend. Controleer de bronmomenten en prijsdekking.'
+      setMessage(success); report?.(success, true)
     } catch (cause) {
-      if (ticket === revision.current)
-        setMessage(cause instanceof Error ? cause.message : 'Bronindeling niet herkend.')
+      if (ticket === revision.current) {
+        const error = cause instanceof Error ? cause.message : 'Bronindeling niet herkend.'
+        setMessage(error); report?.(error, false)
+      }
     } finally {
       if (ticket === revision.current) setBusy(false)
     }
@@ -502,9 +509,9 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
         en originele bronmomenten. Ook eigen JSON met één of beide winkels kan.
         Alles wordt lokaal gecontroleerd:
         een geldige import bewijst geen bronrechten of actuele winkelprijzen.</p>
-      <ManualOwnSourceEntry busy={busy} template={currentPreview?.data ?? null} needs={needs} onPreview={raw => {
+      <ManualOwnSourceEntry busy={busy} template={currentPreview?.data ?? null} needs={needs} onPreview={(raw, report) => {
         changeDraft(raw)
-        void inspectSource(raw)
+        void inspectSource(raw, report)
       }} />
       <div className={'supa-planner-source-paste__drop' + (dropActive ? ' is-dragging' : '')}
         onDragOver={event => {

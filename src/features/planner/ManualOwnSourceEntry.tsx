@@ -50,7 +50,7 @@ function serializeManualCapture(sources: Record<Store, Source>): string {
 /** Manual entry is an alternative to preparing a spreadsheet, not an
  * alternative to source rights, original identifiers or user review. */
 export function ManualOwnSourceEntry({ onPreview, busy, template, needs }: {
-  onPreview: (raw: string) => void
+  onPreview: (raw: string, report: (message: string, admitted: boolean) => void) => void
   busy: boolean
   template: OfflinePriceSnapshots | null
   needs: readonly PlannerCaptureGuideNeed[]
@@ -63,6 +63,7 @@ export function ManualOwnSourceEntry({ onPreview, busy, template, needs }: {
     PLUS: initialSource(), DekaMarkt: initialSource(),
   })
   const [error, setError] = useState('')
+  const [admissionFeedback, setAdmissionFeedback] = useState<{message: string; admitted: boolean} | null>(null)
   const [acknowledged, setAcknowledged] = useState(false)
   const [backupMessage, setBackupMessage] = useState('')
   const [pendingDraft, setPendingDraft] = useState<ManualSources | null>(null)
@@ -74,6 +75,7 @@ export function ManualOwnSourceEntry({ onPreview, busy, template, needs }: {
     setPendingTemplate(null)
     setBackupMessage('')
     setGuideMessage('')
+    setAdmissionFeedback(null)
     setAcknowledged(false); setError('')
   }
 
@@ -264,12 +266,18 @@ export function ManualOwnSourceEntry({ onPreview, busy, template, needs }: {
   }
   function preview() {
     setError('')
+    setAdmissionFeedback(null)
     if (!acknowledged) {
       setError('Bevestig eerst dat alle productgegevens en bronmomenten daadwerkelijk door jou zijn vastgelegd.')
       return
     }
     try {
-      onPreview(serializeManualCapture(sources))
+      const raw = serializeManualCapture(sources)
+      const ticket = ++readTicket.current
+      onPreview(raw, (message, admitted) => {
+        if (ticket === readTicket.current)
+          setAdmissionFeedback({ message, admitted })
+      })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'De handmatige bron kon niet worden voorbereid.')
     }
@@ -490,6 +498,10 @@ export function ManualOwnSourceEntry({ onPreview, busy, template, needs }: {
         Zet mijn invoer om naar de bestaande broncontrole
       </button>
       {error && <p role="alert">{error}</p>}
+      {admissionFeedback && <p role={admissionFeedback.admitted ? 'status' : 'alert'}>
+        <strong>{admissionFeedback.admitted ? 'Bronpreview geopend:' : 'Corrigeer je invoer:'}</strong>
+        {' '}{admissionFeedback.message}
+      </p>}
     </>}
   </details>
 }
