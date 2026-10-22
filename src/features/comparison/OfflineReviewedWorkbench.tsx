@@ -3064,6 +3064,10 @@ export function OfflineReviewedWorkbench({
       />
       <details className="offline-price-workbench__schema">
         <summary>Welk importbestand werkt?</summary>
+        <p>Eigen negenkoloms CSV/TSV/TXT-bronbladen: UTF-8 of Excel/Calc
+          Unicode Text met expliciete UTF-16-BOM (alleen .txt en .tsv).
+          Echte retailer-ID, bronmoment, SKU, hele verpakking en prijs blijven verplicht;
+          bestandsformaat bewijst geen toestemming of prijs. Gebruik de voorinzage.</p>
         <p>UTF-8 JSON met <code>schema: "supa-offline-prices-v1"</code> en precies twee
           <code> captures</code>, of <code>supa-private-single-store-prices-v1</code> met één opname; elk met <code>retailer</code> (PLUS / DekaMarkt),
           <code>observedAt</code> (ISO-tijd met tijdzone) en een <code>products</code>-lijst.
