@@ -111,10 +111,10 @@ export function PlannerTwoStoreCoverage({
   const nextAction = (
     pending.flatMap(({ need, cells }) => STORES.map((store, index) => ({
       need, store, cell: cells[index],
-    }))).find(item => item.cell.kind === 'review' || item.cell.kind === 'missing') ??
+    })).filter(item => storeFilter === 'both' || item.store === storeFilter)).find(item => item.cell.kind === 'review' || item.cell.kind === 'missing') ??
     pending.flatMap(({ need, cells }) => STORES.map((store, index) => ({
       need, store, cell: cells[index],
-    }))).find(item => item.cell.kind === 'source' || item.cell.kind === 'expired') ??
+    })).filter(item => storeFilter === 'both' || item.store === storeFilter)).find(item => item.cell.kind === 'source' || item.cell.kind === 'expired') ??
     null
   )
   function openNextAction() {
