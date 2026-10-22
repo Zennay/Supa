@@ -82,7 +82,7 @@ export function importPlainTextRecipe(raw: string): UserRecipeDraft {
       // Preserve a sanitized public attribution when a recipe is shared as
       // Markdown/plain text. This is metadata only: it never fetches the URL
       // or turns the recipe into a verified retailer product or price.
-      const sourceLine = /^(?:bron(?:link|url)?|source(?:\s+url)?)\s*:\s*(.+)$/iu.exec(headingText(original))
+      const sourceLine = /^(?:bron(?:link|url)?|source(?:\s+url)?)\s*:\s*(.*)$/iu.exec(original.replace(headingPrefix, '').replace(markdownStrong, '$1').trim())
       if (sourceLine) {
         if (sawSourceLine) throw new Error('Gebruik maximaal één Bron:-regel per recept.')
         sawSourceLine = true
