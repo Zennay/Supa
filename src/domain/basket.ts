@@ -83,8 +83,8 @@ function compatibleDemandUnits(left: MatchUnit, right: MatchUnit): boolean {
 
 /** Stable output units keep equivalent demand independent of recipe order. */
 function canonicalDemandUnit(unit: MatchUnit): MatchUnit {
-  if (unit === 'kg') return 'g'
-  if (unit === 'l') return 'ml'
+  if (unit === 'g') return 'kg'
+  if (unit === 'ml') return 'l'
   return unit
 }
 
