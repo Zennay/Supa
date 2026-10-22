@@ -1784,7 +1784,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
           <li key={index}>☐ [{item.store}] {item.label}</li>)}</ul>
         {repeatFilePreview.items.length > 15 &&
           <p>En {repeatFilePreview.items.length - 15} andere artikelen; download en inspecteer
-            het JSON-bestand als je deze volledige lijst wilt controleren.</p>
+            het JSON-bestand als je deze volledige lijst wilt controleren.</p>}
         <button type="button" onClick={confirmRepeatTemplateFile}>Bewaar dit sjabloon op mijn apparaat</button>
         <button type="button" onClick={() => setRepeatFilePreview(null)}>Annuleer bestandimport</button>
       </div>}
