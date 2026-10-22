@@ -496,7 +496,7 @@ export function PrivateComparisonJourney({
     }
   }
 
-  async function downloadCompleteOwnComparison(format: 'csv' | 'txt') {
+  async function downloadCompleteOwnComparison(format: 'csv' | 'txt' | 'html') {
     setExportMessage('')
     try {
       // Formatters are loaded only on demand. Re-check the exact personal
@@ -512,10 +512,34 @@ export function PrivateComparisonJourney({
         throw new Error('Deze winkelprijzen zijn verlopen of niet meer volledig vergelijkbaar.')
       }
       if (format === 'csv') formatter.downloadOwnStoreCsv(current, summary)
-      else formatter.downloadOwnStoreText(formatter.printableOwnStoreComparison(summary, {
+      else if (format === 'txt') formatter.downloadOwnStoreText(formatter.printableOwnStoreComparison(summary, {
         PLUS: current.stores.PLUS.observedAt,
         DekaMarkt: current.stores.DekaMarkt.observedAt,
       }))
+      else {
+        // Existing workbench HTML is the single source of markup, money and
+        // physical-demand admission, never a second invented export contract.
+        const { privateComparisonHtml } = await import('../comparison/PrivateBasketComparisonExport.tsx')
+        const fresh = freshReviewedBaskets(current, current.planKey, Date.now())
+        const latest = ownStoreWeekComparison(fresh)
+        if (!fresh?.stores.PLUS || !fresh.stores.DekaMarkt ||
+            latest.status !== 'comparable') {
+          throw new Error('Een bronopname is verlopen tijdens het maken van het afdrukblad.')
+        }
+        const html = privateComparisonHtml(
+          fresh.stores.PLUS.basket, fresh.stores.DekaMarkt.basket,
+          fresh.stores.PLUS.observedAt, fresh.stores.DekaMarkt.observedAt,
+          true, new Date().toISOString(),
+        )
+        const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
+        try {
+          const a = document.createElement('a')
+          a.href = url
+          a.download = 'supa-persoonlijke-plus-deka-weekvergelijking.html'
+          document.body.append(a)
+          try { a.click() } finally { a.remove() }
+        } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      }
       setExportMessage('Alleen je eigen volledig gecontroleerde, actuele mandje is als privé-' +
         format.toUpperCase() + ' gedownload. Geen onafhankelijke besparingsclaim.')
     } catch (error) {
