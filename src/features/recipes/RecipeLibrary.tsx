@@ -1000,7 +1000,7 @@ export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
         : collectionFormat === 'html'
           ? 'Lees schema.org/Recipe uit opgeslagen HTML-webpagina’s, zonder scripts uit te voeren of iets op internet te openen.'
           : collectionFormat === 'links'
-            ? 'Plak of upload maximaal acht openbare HTTPS-receptlinks. Directe URL’s en Markdown-bullets/genummerde links werken. Alleen na jouw klik worden ze via de bestaande beveiligde receptimport opgehaald; bij mislukking blijft de bibliotheek onveranderd.'
+            ? 'Plak of upload maximaal acht openbare HTTPS-receptlinks. Markdown-koppen, scheidingslijnen, directe URL’s en [receptnaam](https://…) werken. Alleen na jouw klik worden ze via de bestaande beveiligde receptimport opgehaald; bij mislukking blijft de bibliotheek onveranderd.'
           : 'Kies 1–15 Recipe-objecten uit een JSON-LD-array of @graph. Bronlinks en winkelprijzen worden niet aangenomen.'}</p>
       <label className="recipe-collection-label">{collectionFormat === 'plain'
         ? 'Importeer .txt/.md-bestanden (samen maximaal 500 kB)'
@@ -1020,7 +1020,7 @@ export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
         ? 'Recepttekst (titel, Ingrediënten:, Bereiding:)' : collectionFormat === 'html' ? 'HTML-bron van lokaal opgeslagen recepten'
         : collectionFormat === 'links' ? 'Openbare HTTPS-receptlinks (één per regel)'
         : 'JSON-LD receptverzameling'}
-        <textarea rows={8} maxLength={500000} value={collectionText}
+        <textarea rows={8} maxLength={collectionFormat === 'links' ? 32_000 : 500_000} value={collectionText}
           placeholder={collectionFormat === 'plain'
             ? 'Tomatensoep\nIngrediënten:\n500 g tomaten\nBereiding:\nKook tomaten\n---\nPasta\nIngrediënten:\n200 g pasta\nBereiding:\nKook pasta'
             : collectionFormat === 'html'
@@ -1033,6 +1033,7 @@ export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
             setCollectionPreview(null); setCollectionError(''); setCollectionMessage('')
           }} />
       </label>
+      {collectionFormat === 'links' && <small>{collectionText.length.toLocaleString('nl-NL')} / 32.000 tekens · maximaal acht unieke HTTPS-receptlinks. Koppen en scheidingslijnen tellen niet mee.</small>}
       <p role="status">{markdownExportable.length} gecontroleerde recepten beschikbaar voor Markdown;
         {' '}{library.recipes.length - markdownExportable.length} recept(en) met bronvermelding,
         waarschuwingen of ongeldig exportformaat blijven uitsluitend in de volledige JSON-back-up.</p>
