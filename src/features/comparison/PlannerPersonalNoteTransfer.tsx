@@ -22,10 +22,11 @@ export function PlannerPersonalNoteTransfer({ items, checked, openOnly, planKey,
 }) {
   const [pending, setPending] = useState<Pending | null>(null)
   const [message, setMessage] = useState('')
-  const fingerprint = JSON.stringify([planKey, checked, openOnly])
+  const [destination, setDestination] = useState<UnpricedShoppingNote['store']>('Algemeen')
+  const fingerprint = JSON.stringify([planKey, checked, openOnly, destination])
   function prepare() {
     try {
-      const proposal = preparePlannerPersonalNotes(items, checked, openOnly, notes)
+      const proposal = preparePlannerPersonalNotes(items, checked, openOnly, notes, destination)
       if (!proposal.incoming.length) {
         setPending(null)
         setMessage('Deze ingrediënten staan al in je eigen lijst; bestaande vinkjes blijven behouden.')
@@ -58,12 +59,24 @@ export function PlannerPersonalNoteTransfer({ items, checked, openOnly, planKey,
     pending?.planKey === planKey &&
     (() => { try { return serializePrivateNotes([...notes]) === pending.original } catch { return false } })()
   return <div className="unpriced-planner-checklist__personal-transfer">
+    <label>Mijn eigen ongeprijsde winkellijst
+      <select value={destination} onChange={event => {
+        setDestination(event.currentTarget.value as UnpricedShoppingNote['store'])
+        setPending(null)
+        setMessage('Winkelkeuze gewijzigd; maak een nieuwe voorinzage.')
+      }}>
+        <option value="Algemeen">Algemeen · winkel nog zelf kiezen</option>
+        <option value="PLUS">PLUS · zelf gekozen, niet gematcht</option>
+        <option value="DekaMarkt">DekaMarkt · zelf gekozen, niet gematcht</option>
+      </select>
+    </label>
     <button type="button" className="ghost-button" onClick={prepare}>
       {openOnly ? 'Neem open Planner-ingrediënten over in mijn eigen lijst' :
         'Neem mijn hele Planner-week over in mijn eigen lijst'}
     </button>
-    <p className="disclaimer">Zonder winkelprijzen, SKU’s of bronclaims; je originele
-      Planner-planning en bestaande vinkjes blijven behouden.</p>
+    <p className="disclaimer">De winkel is uitsluitend jouw persoonlijke keuze,
+      geen automatische artikelmatch. Zonder winkelprijzen, SKU’s of bronclaims;
+      je originele Planner-planning en bestaande vinkjes blijven behouden.</p>
     {message && <p role="status" className="unpriced-planner-checklist__note">{message}</p>}
     {pending && current && <section role="group"
       aria-label="Controleer Planner-ingrediënten voor de persoonlijke lijst"

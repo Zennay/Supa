@@ -18,8 +18,8 @@ export function applyPlannerPersonalNotes(
     throw Error('De eigen boodschappen zijn veranderd. Herbekijk je Planner-overdracht.')
   }
   const allowed = importUnpricedShoppingCsv(exportUnpricedShoppingCsv(incoming))
-  if (allowed.length !== incoming.length || allowed.some(item => item.store !== 'Algemeen')) {
-    throw Error('Alleen echte ongeprijsde Planner-ingrediënten mogen worden overgenomen.')
+  if (allowed.length !== incoming.length || allowed.some(item => !['Algemeen', 'PLUS', 'DekaMarkt'].includes(item.store))) {
+    throw Error('Alleen geldig beoordeelde ongeprijsde Planner-ingrediënten mogen worden overgenomen.')
   }
   const seen = new Set(current.map(note => privateNoteDuplicateKey(note.store, note.label)))
   const additions: UnpricedShoppingNote[] = []

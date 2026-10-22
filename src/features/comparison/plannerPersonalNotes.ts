@@ -18,11 +18,13 @@ export function preparePlannerPersonalNotes(
   checked: Readonly<Record<string, boolean>>,
   openOnly: boolean,
   current: readonly UnpricedShoppingNote[],
+  destination: UnpricedShoppingNote['store'] = 'Algemeen',
 ): { incoming: PersonalNoteDraft[]; skipped: number; before: string } {
   if (!Array.isArray(lines) || !Array.isArray(current) || lines.length < 1 ||
       lines.length > 2000 || !checked || typeof checked !== 'object') {
     throw Error('Geen geldige actuele Planner-week.')
   }
+  if (!['Algemeen', 'PLUS', 'DekaMarkt'].includes(destination)) throw Error('Kies een geldige persoonlijke winkellijst.')
   const before = serializePrivateNotes([...current])
   const selection = openOnly ? lines.filter(line => checked[key(line)] !== true) : lines
   if (!selection.length) throw Error('Alle geselecteerde ingrediënten zijn al afgevinkt.')
@@ -36,7 +38,7 @@ export function preparePlannerPersonalNotes(
     const quantity = amount === 'hoeveelheid nog controleren'
       ? 'hoeveelheid controleren (' + line.unit + ')'
       : amount.replace('.', ',') + ' ' + (line.unit === 'piece' ? 'stuks' : line.unit)
-    return { store: 'Algemeen', label: line.label + ' · ' + quantity,
+    return { store: destination, label: line.label + ' · ' + quantity,
       done: checked[key(line)] === true }
   })
   // Existing strict personal note importer is the single schema and
