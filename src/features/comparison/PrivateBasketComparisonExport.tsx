@@ -77,8 +77,8 @@ function physicalLedgerValid(basket: OneStoreBasket): boolean {
       ids.add(item.id)
       if (item.status === 'unresolved') { unresolved++; continue }
       if (item.status !== 'matched' || !Number.isSafeInteger(item.packs) || item.packs <= 0 ||
-          !Number.isSafeInteger(item.pricePerPackCents) || item.pricePerPackCents < 0 ||
-          !Number.isSafeInteger(item.lineTotalCents) || item.lineTotalCents < 0 ||
+          !Number.isSafeInteger(item.pricePerPackCents) || item.pricePerPackCents <= 0 ||
+          !Number.isSafeInteger(item.lineTotalCents) || item.lineTotalCents <= 0 ||
           item.lineTotalCents !== item.packs * item.pricePerPackCents) return false
       matched++
       sum += item.lineTotalCents
