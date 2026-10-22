@@ -137,14 +137,6 @@ export function PlannerOwnProductDeltas({ lines, onChooseLine, onExportSelection
       <span><strong>{dekaLower}</strong> ingrediënten goedkoper bij DekaMarkt</span>
       <span><strong>{tied}</strong> even duur</span>
     </div>
-    <div className="own-store-breakdown__export">
-      <button type="button" className="ghost-button"
-        disabled={visibleLines.length === 0}
-        onClick={() => onExportSelection(visibleLines.map(line => line.id))}>
-        Bewaar deze {visibleLines.length} prijsregels als privé-TXT
-      </button>
-      <small>Bevat alleen de zichtbare, bevestigde productregels en bronmomenten; geen volledig mandtotaal.</small>
-    </div>
     <div className="own-store-breakdown__controls">
       <label>Zoek ingrediënt, bronproduct of SKU
         <input type="search" value={query} maxLength={120}
@@ -183,6 +175,14 @@ export function PlannerOwnProductDeltas({ lines, onChooseLine, onExportSelection
       {visibleLines.length} van {lines.length} gecontroleerde ingrediënten zichtbaar.
       {visibleLines.length < lines.length ? ' De volledige mandtotalen hierboven blijven ongewijzigd.' : ''}
     </p>
+    <div className="own-store-breakdown__export">
+      <button type="button" className="ghost-button"
+        disabled={visibleLines.length === 0}
+        onClick={() => onExportSelection(visibleLines.map(line => line.id))}>
+        Bewaar deze {visibleLines.length} prijsregels als privé-TXT
+      </button>
+      <small>Bevat alleen de zichtbare, bevestigde productregels en bronmomenten; geen volledig mandtotaal.</small>
+    </div>
     {visibleLines.length > 0
       ? <>
         <div className="own-store-planner__scroll" role="region"
