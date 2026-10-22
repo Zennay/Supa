@@ -92,7 +92,7 @@ function localCaptureGuidance(captures) {
   const details = captures.map(item => {
     const usable = item.products.filter(product =>
       product.available === true && Number.isSafeInteger(product.priceCents) &&
-      product.priceCents >= 0 && product.packAmount !== null &&
+      product.priceCents > 0 && product.packAmount !== null &&
       (product.packCount ?? 1) > 0).length
     return item.retailer + ': ' + usable + ' van ' + item.products.length +
       ' producten met bruikbare eigen prijs; ' + (item.products.length - usable) +
