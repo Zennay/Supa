@@ -62,3 +62,11 @@ The M2 Firefox workflow enters Planner from the new Home before replaying all ex
 - The personal-source list, unpriced planner checklist and demo shopping list are also split into on-demand chunks with loading announcements, while keeping their existing mount/storage contracts.
 - Planner week-recovery controls and the optional share-text editor are also lazy-loaded; the share editor chunk is fetched only when the user requests copy text.
 - This is discovery-only behavior: it does not add current retailer prices, change source rights, or feed demo values into the private reviewed-basket calculator.
+
+## Eigen Producten-selectie afvinken in Lijst (22 oktober 2026, bestaande PR #3959)
+
+- Historische bronidentiteiten, Figma-voorbeelden en oude/onbekende persoonlijke IDs hebben nu een aparte ongeprijsde afvinklijst in Lijst: per product aantikken, voortgang, alleen nog open tonen, bevestigde reset en grote mobiele raakvlakken.
+- De afvinkstatus heeft eigen begrensde lokale opslag met versienummer en compare-and-set tegen andere-tabwijzigingen. Onbekende schema's worden beschermd in plaats van overschreven; selectie en afvinkstatus blijven separate data.
+- Verwijderen van een selectie wist, als opslag dat toestaat, de oude afvinkstatus. Hele persoonlijke selectie en uitsluitend nog te kopen kunnen afzonderlijk als lokale TXT worden bewaard.
+- Een knop kopieert uitsluitend nog te kopen op het klembord; bij geweigerde toegang is handmatige tekstselectie mogelijk.
+- De status is handmatig bijgehouden: geen kassabon, bronrecht, SKU-match, voorraad, actuele prijs, besparing of gecontroleerde aankoop. Planner, persoonlijk goedgekeurde winkelprijzen en echte winkelafvinkingen blijven onaangeroerd. Geen QA- of regressiesuites geschreven of gedraaid.
