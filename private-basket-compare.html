@@ -51,12 +51,13 @@ Ontbrekende matches, prijzen en verouderde opnames blokkeren altijd een volledig
 <input id="session" type="file" accept=".json,application/json">
 <p class="hint">Eigen <code>supa-private-basket-session-v1</code> uit het koppelscherm: geen andere bestanden nodig. Originale prijsopnames blijven ongewijzigd en de berekening start pas na jouw klik.</p>
 <h3>Of: kies losse bronbestanden en mandvraag</h3>
-<label for="combined">Gecombineerde PLUS/Deka CSV of bestaande Supa-bron JSON</label>
+<label for="combined">Gecombineerde PLUS/Deka CSV, TSV/TXT of bestaande Supa-bron JSON</label>
 <input id="combined" type="file" accept=".csv,.tsv,.json,.txt,text/csv,text/plain,text/tab-separated-values,application/json">
 <div class="grid">
-<div><label for="plus">Of: PLUS CSV of eigen JSON (ook als alleen deze winkel bekend is)</label><input id="plus" type="file" accept=".csv,.tsv,.txt,.json,text/csv,text/plain,text/tab-separated-values,application/json"></div>
-<div><label for="deka">En/of: DekaMarkt CSV of eigen JSON (ook alleen deze winkel)</label><input id="deka" type="file" accept=".csv,.tsv,.txt,.json,text/csv,text/plain,text/tab-separated-values,application/json"></div>
+<div><label for="plus">Of: PLUS CSV, TSV/TXT of eigen JSON (ook als alleen deze winkel bekend is)</label><input id="plus" type="file" accept=".csv,.tsv,.txt,.json,text/csv,text/plain,text/tab-separated-values,application/json"></div>
+<div><label for="deka">En/of: DekaMarkt CSV, TSV/TXT of eigen JSON (ook alleen deze winkel)</label><input id="deka" type="file" accept=".csv,.tsv,.txt,.json,text/csv,text/plain,text/tab-separated-values,application/json"></div>
 </div>
+<p class="hint">CSV en JSON blijven UTF-8. Excel/Calc <strong>Unicode Text</strong> is toegestaan als <code>.txt</code> of <code>.tsv</code> met een expliciete UTF-16 LE/BE-BOM; alle bestanden gaan daarna door dezelfde strikte bronvalidatie.</p>
 <label for="demand">2 · Jouw mandvraag JSON uit het koppelscherm</label>
 <input id="demand" type="file" accept=".json,application/json">
 <button type="button" id="compare">Vergelijk mijn twee mandjes</button>
