@@ -113,15 +113,15 @@ Deze pagina leest bestanden alleen in je browser. Ze haalt geen prijzen op, verz
 Onbekende productmatches blijven onbekend. Bekende artikelen zonder prijs of beschikbaarheid kun je wel vastleggen, maar ze tellen nooit mee als geprijsde winkelmandregel.</p></header>
 <section aria-labelledby="source-title">
 <h2 id="source-title">1 · Open je eigen winkelopnames</h2>
-<label for="source">Gecombineerde eigen CSV, of supa-offline-prices-v1 JSON</label>
+<label for="source">Gecombineerde eigen CSV/TSV/TXT, of supa-offline-prices-v1 JSON</label>
 <input id="source" type="file" accept=".csv,.tsv,.json,.txt,text/csv,text/plain,text/tab-separated-values,application/json">
 <div class="stores">
-<div><label for="plus-source">Of: jouw PLUS CSV of eigen JSON (ook zonder DekaMarkt)</label><input id="plus-source" type="file" accept=".csv,.tsv,.txt,.json,text/csv,text/plain,text/tab-separated-values,application/json"></div>
-<div><label for="deka-source">En/of: jouw DekaMarkt CSV of eigen JSON (ook zonder PLUS)</label><input id="deka-source" type="file" accept=".csv,.tsv,.txt,.json,text/csv,text/plain,text/tab-separated-values,application/json"></div>
+<div><label for="plus-source">Of: jouw PLUS CSV/TSV/TXT of eigen JSON (ook zonder DekaMarkt)</label><input id="plus-source" type="file" accept=".csv,.tsv,.txt,.json,text/csv,text/plain,text/tab-separated-values,application/json"></div>
+<div><label for="deka-source">En/of: jouw DekaMarkt CSV/TSV/TXT of eigen JSON (ook zonder PLUS)</label><input id="deka-source" type="file" accept=".csv,.tsv,.txt,.json,text/csv,text/plain,text/tab-separated-values,application/json"></div>
 </div>
-<p class="muted">Kies één eigen CSV-/JSON-bestand met één of twee werkelijke winkelopnames, of aparte CSV-bestanden per winkel.
-Elk afzonderlijk bestand moet de negen kolommen met de volledige CSV-kop bevatten.
-Aangeleverde bronnen worden alleen lokaal verwerkt door de bestaande strikte Supa-converter. Een ontbrekende tweede winkel wordt niet automatisch ingevuld.
+<p class="muted">Kies één eigen CSV/TSV/TXT-bestand met één of twee werkelijke winkelopnames, of aparte bronbestanden per winkel.
+Elk CSV/TSV-bestand moet de negen kolommen met de volledige originele kop bevatten. CSV en JSON blijven UTF-8; Excel/Calc <strong>Unicode Text</strong> wordt alleen voor <code>.txt</code>/<code>.tsv</code> met een expliciete UTF-16 LE/BE-BOM gedecodeerd.
+Aangeleverde bronnen worden lokaal verwerkt door de bestaande strikte Supa-converter. Een ontbrekende tweede winkel wordt niet automatisch ingevuld.
 Productnamen en prijzen komen uitsluitend uit jouw eigen bestanden.</p>
 <div class="row-actions"><button id="edit-owned-source" type="button" class="secondary" disabled>Bewerk mijn geopende eigen winkelopnames</button>
 <button id="download-admitted-sources" type="button" class="secondary" disabled>Bewaar alle toegelaten eigen winkelopnames als JSON</button></div>
