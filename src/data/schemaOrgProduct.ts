@@ -94,7 +94,7 @@ function malformedDeclaredOfferPrice(offers: JsonObject[]): boolean {
         const field = key.toLocaleLowerCase('en')
         if (field !== 'price' && field !== 'lowprice') continue
         const amount = cents(value)
-        if (amount === null || !Number.isSafeInteger(amount) || amount < 0) return true
+        if (amount === null || !Number.isSafeInteger(amount) || amount <= 0) return true
       }
     }
   }
