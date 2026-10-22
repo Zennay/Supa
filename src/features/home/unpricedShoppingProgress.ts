@@ -52,3 +52,13 @@ export function saveUnpricedShoppingProgress(
     return null
   }
 }
+
+/** Removing a catalog selection must not resurrect its old completed tick
+ * when that same example is added again from Producten.
+ */
+export function clearUnpricedShoppingProduct(id: string): void {
+  if (!validId(id)) return
+  const snapshot = readUnpricedShoppingProgress()
+  if (!snapshot.writable || !snapshot.doneIds.includes(id)) return
+  saveUnpricedShoppingProgress(snapshot, snapshot.doneIds.filter(value => value !== id))
+}
