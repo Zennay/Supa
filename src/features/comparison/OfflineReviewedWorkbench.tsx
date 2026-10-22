@@ -3169,6 +3169,8 @@ export function OfflineReviewedWorkbench({
                       )}
                     </section>
                   )}
+                </details>
+              )}
               {currentPreview.retainedOther && (
                 <p role="status" className={
                   currentPreview.retainedOther.within24h &&
