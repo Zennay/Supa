@@ -1,3 +1,5 @@
+import { productFieldsMatchTerms, productSearchTerms } from './productSearchText.ts'
+
 /**
  * Deliberately PRICE-FREE identity projection of archived M1 captures.
  *
@@ -36,13 +38,42 @@ const identities: HistoricalRetailerProduct[] = [
 export const historicalRetailerProducts: readonly HistoricalRetailerProduct[] =
   Object.freeze(identities.map(item => Object.freeze(item)))
 
+export type HistoricalPackKind = 'mass' | 'volume' | 'other'
+export type HistoricalPackFilter = 'all' | HistoricalPackKind
+
+type ParsedHistoricalPack = { kind: HistoricalPackKind; label: string } | null
+
+/** Parse only an explicit amount/unit from the source label; never infer SKU or price. */
+function parseHistoricalPack(pack: string): ParsedHistoricalPack {
+  const match = /(?:^|\s)(\d+(?:[.,]\d+)?)\s*(kilogram|kg|gram|g|milliliter|millilitre|ml|liter|litre|l)\b/iu.exec(pack)
+  if (!match) return null
+  const amount = Number(match[1].replace(',', '.'))
+  if (!Number.isFinite(amount) || amount <= 0) return null
+  const unit = match[2].toLocaleLowerCase('nl-NL')
+  if (['kilogram', 'kg', 'gram', 'g'].includes(unit)) {
+    const kg = ['gram', 'g'].includes(unit) ? amount / 1000 : amount
+    return { kind: 'mass', label: (kg >= 1 ? kg : kg * 1000).toLocaleString('nl-NL', { maximumFractionDigits: 3 }) + (kg >= 1 ? ' kg' : ' g') }
+  }
+  const liters = ['milliliter', 'millilitre', 'ml'].includes(unit) ? amount / 1000 : amount
+  return { kind: 'volume', label: (liters >= 1 ? liters : liters * 1000).toLocaleString('nl-NL', { maximumFractionDigits: 3 }) + (liters >= 1 ? ' l' : ' ml') }
+}
+
+export function historicalPackageEquivalent(pack: string): string | null {
+  return parseHistoricalPack(pack)?.label ?? null
+}
+
 export function filterHistoricalProducts(
   products: readonly HistoricalRetailerProduct[],
   query: string,
   store: 'all' | 'PLUS' | 'DekaMarkt',
+  packFilter: HistoricalPackFilter = 'all',
 ): HistoricalRetailerProduct[] {
-  const cleanQuery = query.trim().toLocaleLowerCase('nl-NL')
-  return products.filter(item => item.status === 'historical-source-only' &&
-    item.price === null && (store === 'all' || item.store === store) &&
-    item.name.toLocaleLowerCase('nl-NL').includes(cleanQuery))
+  const terms = productSearchTerms(query)
+  return products.filter(item => {
+    if (item.status !== 'historical-source-only' || item.price !== null ||
+        (store !== 'all' && item.store !== store)) return false
+    const pack = parseHistoricalPack(item.pack)
+    if (packFilter !== 'all' && (pack?.kind ?? 'other') !== packFilter) return false
+    return productFieldsMatchTerms([item.name, item.pack, item.store, item.capturedAt, item.sourceUrl, item.id], terms)
+  })
 }
