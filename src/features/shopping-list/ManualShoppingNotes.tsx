@@ -35,6 +35,8 @@ export function ManualShoppingNotes({ notes, setNotes }: {
     Algemeen: 'PLUS', PLUS: 'DekaMarkt', DekaMarkt: 'PLUS',
   })
   const [filterStore, setFilterStore] = useState<'Alle winkels' | UnpricedShoppingNote['store']>('Alle winkels')
+  // Ephemeral UI selection only. It never changes note IDs, prices or stored backup format.
+  const [selectedMoveIds, setSelectedMoveIds] = useState<string[]>([])
   const [exportVisible, setExportVisible] = useState(false)
   const [message, setMessage] = useState('')
   const [lastRemoved, setLastRemoved] = useState<{ note: UnpricedShoppingNote; index: number } | null>(null)
@@ -934,9 +936,11 @@ export function ManualShoppingNotes({ notes, setNotes }: {
     })
     setMessage('Persoonlijke boodschappenvolgorde aangepast. TXT en print volgen de winkelvolgorde; originele bronprijzen blijven onaangeroerd.')
   }
-  function moveVisibleOwnNotes(from: UnpricedShoppingNote['store']) {
+  function moveVisibleOwnNotes(from: UnpricedShoppingNote['store'], selectedOnly = false) {
     const target = moveTargets[from]
-    const candidates = visible.filter(note => note.store === from)
+    const selected = new Set(selectedMoveIds)
+    const candidates = visible.filter(note => note.store === from &&
+      (!selectedOnly || selected.has(note.id)))
     if (!candidates.length || target === from) return
     const existing = new Set(notes.filter(item => item.store === target)
       .map(item => duplicateKey(item.store, item.label)))
@@ -960,6 +964,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       return current.map(item => byId.has(item.id) ? { ...item, store: target } : item)
     })
     setLastGroupMove({ from, to: target, items: candidates.map(({ id, label, done }) => ({ id, label, done })) })
+    setSelectedMoveIds(current => current.filter(id => !candidates.some(note => note.id === id)))
     setMessage(candidates.length + ' eigen boodschappen van ' + from + ' naar ' + target +
       ' verplaatst met behoud van de vinkjes. Prijzen en artikelmatching blijven onaangeroerd.')
   }
@@ -1332,7 +1337,11 @@ export function ManualShoppingNotes({ notes, setNotes }: {
         {nextOpenStore ? 'Ga naar eerstvolgende open winkel: ' + nextOpenStore : 'Alle zichtbare boodschappen klaar'}
       </button>
     </nav>
-    <p className="manual-shopping-notes__order-hint">Orden je eigen artikelen binnen een winkel met ↑ en ↓. Zet zoeken en 'Alleen open' uit om de hele volgorde te bewerken; kopie, TXT en print nemen jouw volgorde over.</p>
+    <p className="manual-shopping-notes__order-hint">Orden je eigen artikelen binnen een winkel met ↑ en ↓. Zet zoeken en 'Alleen open' uit om de hele volgorde te bewerken; kopie, TXT en print nemen jouw volgorde over. Selecteer losse regels om alleen die naar een andere winkel te verplaatsen.</p>
+    {selectedMoveIds.length > 0 && <p role="status" aria-live="polite">
+      {selectedMoveIds.length} artikelen geselecteerd voor een mogelijke winkelwissel.
+      <button type="button" onClick={() => setSelectedMoveIds([])}>Wis mijn selectie</button>
+    </p>}
     {lastGroupMove && <div className="manual-shopping-notes__undo-move">
       <span>{lastGroupMove.items.length} eigen artikelen verplaatst: {lastGroupMove.from} → {lastGroupMove.to}.</span>
       <button type="button" onClick={undoGroupMove}>Herstel laatste groepsverplaatsing</button>
@@ -1361,7 +1370,11 @@ export function ManualShoppingNotes({ notes, setNotes }: {
               </select>
             </label>
             <button type="button" onClick={() => moveVisibleOwnNotes(group.store)}>
-              Verplaats {group.items.length} eigen artikelen
+              Verplaats {group.items.length} zichtbare artikelen
+            </button>
+            <button type="button" disabled={!group.items.some(item => selectedMoveIds.includes(item.id))}
+              onClick={() => moveVisibleOwnNotes(group.store, true)}>
+              Verplaats {group.items.filter(item => selectedMoveIds.includes(item.id)).length} geselecteerde artikelen
             </button>
             <small>Alleen jouw eigen ongeprijsde lijst: bestaande dubbelen blokkeren verplaatsing;
               de afvinkingen en brongegevens blijven behouden.</small>
@@ -1388,6 +1401,14 @@ export function ManualShoppingNotes({ notes, setNotes }: {
         <button type="button" onClick={() => setEditing(null)}>Annuleer</button>
         <small>Het vinkje en privé-ID blijven behouden; nooit automatisch een prijs.</small>
       </form> : <>
+        <label><input type="checkbox" checked={selectedMoveIds.includes(note.id)}
+          aria-label={`Selecteer ${note.label} bij ${note.store} voor winkelwissel`}
+          onChange={event => {
+            const checked = event.currentTarget.checked
+            setSelectedMoveIds(current => checked
+              ? current.includes(note.id) ? current : [...current, note.id]
+              : current.filter(id => id !== note.id))
+          }} /> Kies voor winkelwissel</label>
         <label><input type="checkbox" checked={note.done}
           onChange={() => setNotes(current => current.map(item => item.id === note.id
             ? { ...item, done: !item.done } : item))} />
