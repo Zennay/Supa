@@ -497,14 +497,19 @@ export function OfflineReviewedWorkbench({
     type Candidate = {
       sku: string | null; packs: number | null
       cents: number | null; unitRate: string | null
+      unitCents: number | null; unitFamily: 'kg' | 'liter' | 'stuk' | null
     }
-    const unknown: Candidate = { sku: null, packs: null, cents: null, unitRate: null }
+    const unknown: Candidate = {
+      sku: null, packs: null, cents: null, unitRate: null,
+      unitCents: null, unitFamily: null,
+    }
     const forStore = (retailer: CaptureStore): Map<string, Candidate> | null => {
       const newShop = preview.stores.find(shop => shop.retailer === retailer)
       if (newShop?.matching) return new Map(newShop.matching.lines.map(line =>
         [line.id, line.status === 'matched' ? {
           sku: line.originalSku, packs: line.packs,
           cents: line.lineTotalCents, unitRate: line.unitRate,
+          unitCents: line.unitCents, unitFamily: line.unitFamily,
         } : unknown] as const))
       if (preview.retainedOther?.retailer !== retailer) return null
       const retained = imported?.captures[retailer]
@@ -517,6 +522,14 @@ export function OfflineReviewedWorkbench({
         [line.id, line.status === 'matched' ? {
           sku: line.productId, packs: line.packs,
           cents: line.lineTotalCents, unitRate: privateUnitPrice(line),
+          unitCents: privatePackUnitRate({
+            amount: line.pack.amount, unit: line.pack.unit, count: line.pack.count,
+            priceCents: line.pricePerPackCents,
+          })?.roundedCentsPerUnit ?? null,
+          unitFamily: privatePackUnitRate({
+            amount: line.pack.amount, unit: line.pack.unit, count: line.pack.count,
+            priceCents: line.pricePerPackCents,
+          })?.unit ?? null,
         } : unknown] as const))
     }
     try {
@@ -533,6 +546,8 @@ export function OfflineReviewedWorkbench({
           plusPacks: p.packs, dekaPacks: d.packs,
           plusCents: p.cents, dekaCents: d.cents,
           plusUnitRate: p.unitRate, dekaUnitRate: d.unitRate,
+          plusUnitCents: p.unitCents, dekaUnitCents: d.unitCents,
+          plusUnitFamily: p.unitFamily, dekaUnitFamily: d.unitFamily,
         }
       })
     } catch {
