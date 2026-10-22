@@ -29,12 +29,16 @@ export function PlannerKnownLinePrices({ progress, reviewed, now, onReviewIngred
   const visible = showAll ? filtered : filtered.slice(0, 4)
   function download(kind: 'csv' | 'html') {
     try {
+      // Export EXACTLY the currently visible, personally reviewed lines.
+      // The exporter re-checks their original source identity at click time.
+      const selection = visible.map(pair => pair.ingredientId)
+      if (!selection.length) throw Error('Geen zichtbare prijsregels om te bewaren.')
       if (kind === 'csv') {
-        const count = downloadPrivateKnownLinePriceCsv(progress, reviewed)
+        const count = downloadPrivateKnownLinePriceCsv(progress, reviewed, selection)
         setMessage(count + ' origineel gepaarde privé-ingrediënten als CSV opgeslagen.')
       } else {
-        downloadPrivateKnownLinePricePrint(progress, reviewed)
-        setMessage('Offline afdruk met echte bronproducten lokaal opgeslagen.')
+        downloadPrivateKnownLinePricePrint(progress, reviewed, selection)
+        setMessage(selection.length + ' zichtbare echte bronprijsparen lokaal opgeslagen als offline afdruk.')
       }
     } catch {
       setMessage('De winkelprijzen of originele bronmomenten zijn verlopen of gewijzigd. Herzie ze in Vergelijk.')
@@ -84,9 +88,10 @@ export function PlannerKnownLinePrices({ progress, reviewed, now, onReviewIngred
     {filtered.length > 4 && <button type="button" onClick={() => setShowAll(value => !value)}>
       {showAll ? 'Toon eerste vier' : 'Toon alle ' + filtered.length + ' productparen'}
     </button>}
+    <p><small>Deze twee downloads nemen alleen de hierboven getoonde prijsparen mee. Kies ‘Toon alle’ voor meer regels. Geen volledig mandtotaal of besparingsclaim.</small></p>
     <div className="planner-known-lines__actions">
-      <button type="button" onClick={() => download('csv')}>Download echte ingrediëntprijzen (CSV)</button>
-      <button type="button" onClick={() => download('html')}>Offline afdruk (HTML)</button>
+      <button type="button" disabled={!visible.length} onClick={() => download('csv')}>Download deze {visible.length} getoonde ingrediëntprijzen (CSV)</button>
+      <button type="button" disabled={!visible.length} onClick={() => download('html')}>Afdruk van deze {visible.length} getoonde prijsregels (HTML)</button>
     </div>
     {message && <p role="status">{message}</p>}
   </section>
