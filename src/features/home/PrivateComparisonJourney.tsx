@@ -205,6 +205,7 @@ export function PrivateComparisonJourney({
     plusProduct?: PrivateKnownProduct; dekaProduct?: PrivateKnownProduct;
     plusObservedAt?: string; dekaObservedAt?: string;
     unitGap?: PrivateKnownUnitGap | null;
+    restoredUnitGapText?: string;
   }> = ready ? [] : privateKnownPricePairs(progress, reviewed, nowMs)
     .flatMap(pair => {
       const need = originalNeeds.get(pair.ingredientId)
@@ -243,6 +244,9 @@ export function PrivateComparisonJourney({
         unitRate: privateUnitPrice(other),
       },
       plusObservedAt: plus?.observedAt, dekaObservedAt: deka?.observedAt,
+      // Same canonical original package-unit comparison as full reviewed
+      // lines, still advisory only and never a new shopping-basket total.
+      restoredUnitGapText: privateMatchedUnitPriceGap(one, other),
     })))
   }
   // Only preexisting source pairs qualify. Search/filter never changes the
@@ -1111,6 +1115,7 @@ export function PrivateComparisonJourney({
               ' heeft ' + euro.formatCents(Math.abs(item.plusCents - item.dekaCents)) +
               ' lagere hele-pakkosten'}.</small>
           {item.unitGap !== undefined && <small>{formatKnownUnitGap(item.unitGap)}</small>}
+          {item.restoredUnitGapText && <small>{item.restoredUnitGapText}</small>}
           <small>Dit is het bedrag voor de benodigde <strong>hele verpakkingen</strong>.
             Een lagere prijs per kg, liter of stuk betekent niet vanzelf lagere
             kosten voor deze hoeveelheid; incomplete mandjes hebben geen totaalwinnaar.</small>
