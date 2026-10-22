@@ -18,6 +18,10 @@ Supa kan eigen recepten lokaal bewaren en omzetten naar het interne receptformaa
 
 Bij HTML met JSON-LD gebruikt Supa eerst de JSON-LD-bron. Microdata is de terugvalroute wanneer er geen JSON-LD-scriptblokken aanwezig zijn. Niet iedere website publiceert bruikbare receptmetadata; gebruik dan de gewone tekstimport of voer het recept handmatig in.
 
+## Recepten gebruiken voor een ongeprijsde boodschappenmand
+
+De aparte privévergelijker kan gecontroleerde eigen recepten gebruiken als fysieke boodschappenbehoefte. Dit vereist een geldig aantal porties, metrische hoeveelheden en hele fysieke stuks. Een ontbrekende of onduidelijke bereidingstijd blijft onbekend, maar blokkeert deze ingrediëntenlijst niet: bereidingstijd is geen ingrediënt en wordt niet verzonnen. Hetzelfde recept blijft voor de gewone maaltijdplanner geblokkeerd totdat de ontbrekende bereidingstijd is gecorrigeerd. Andere open ingrediënt-, hoeveelheid- of bronwaarschuwingen blijven uitgesloten en worden bij het laden concreet getoond, zodat je ze in **Mijn recepten** kunt corrigeren.
+
 ## Privacy en bronintegriteit
 
 - HTML wordt lokaal als tekst gelezen. Supa mount of rendert de pagina niet, voert geen ingesloten scripts uit, laadt geen externe assets en doet tijdens deze lokale import geen netwerkverzoeken.
@@ -26,7 +30,8 @@ Bij HTML met JSON-LD gebruikt Supa eerst de JSON-LD-bron. Microdata is de terugv
 - Originele receptregels blijven ter controle zichtbaar. Onzekere hoeveelheden, stuks en niet-metrische eenheden worden niet stilzwijgend omgezet in bevestigde fysieke boodschappen.
 - HTML-import is begrensd tot 500 kB en maximaal 15 herkende recepten. Iedere import blijft een concept dat je vóór het bewaren controleert.
 
+## Direct een receptenback-up als winkelmandvraag gebruiken (22 oktober 2026)
 
-## Eigen recepten direct naar de zelfstandige offline winkelvergelijker (22 oktober 2026)
+Open **Vergelijk → Hetzelfde mandje bij twee winkels samenstellen → Eigen Supa-recepten**. Kies **Of: open je eigen Supa-receptenback-up van een ander apparaat (JSON)** en klik **Controleer mijn recepten-back-up**. Dit gebruikt de bestaande strikt gecontroleerde `supa-owned-recipes-backup-v1`-import (maximaal 2 MB en 100 recepten) **uitsluitend in het geopende browsertabblad**, zonder eerdere recepten te vervangen of iets te uploaden. Selecteer de fysiek bevestigde recepten, aantallen bereidingen en porties en klik pas daarna op **Gebruik geselecteerde recepten als mandvraag**.
 
-In de aparte privévergelijker op `private-basket-mapping.html` staat **Laad mijn eigen recepten op dit apparaat**. De leesactie gebeurt pas na de expliciete knop; geen netwerkverzoek of automatische wijziging van het huidige mandje. Recepten die geen volledig bevestigde metrische fysieke vraag opleveren, verschijnen nu onder **Eigen recepten vragen eerst menselijke controle**, met hun opgeslagen reviewmelding of een concreet controleadvies. Herstel zulke recepten in Supa → Recepten en laad de lokale lijst opnieuw. Recepten die wel geschikt zijn blijven apart selecteerbaar om maximaal zeven bereidingen met gewenste gehele porties samen te stellen. Fysieke `piece`-hoeveelheden vereisen veilige gehele aantallen: bij de eerste toelating én vóór export van de definitieve fysieke vraag; halve eieren worden niet afgerond, een ontbrekende hoeveelheid krijgt geen supermarktprijs. De bestaande expliciete bevestiging voor het vervangen van een eerder ingevuld mandje blijft intact.
+Een ontbrekende bereidingstijd wordt niet verzonnen en blokkeert een verder correct, ongeprijsd boodschappenmandje niet; de gewone maaltijdplanner houdt zijn strengere eisen. Andere reviewpunten, ongeldige hoeveelheden en fractionele fysieke stuks blijven uitgesloten en worden met originele ingrediënttekst getoond. Tijdens import en omzetting wordt opnieuw gecontroleerd dat de geselecteerde bestandsversie en eventuele lokale bibliotheek niet veranderd zijn. De bestaande fysieke winkelmand wordt alleen na expliciete bevestiging vervangen; SKU's en prijzen worden nooit uit recepten afgeleid.

@@ -194,9 +194,9 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [ownPriceImportSignal, setOwnPriceImportSignal] = useState(0)
   const [incomingPriceFiles, setIncomingPriceFiles] = useState<PrivateSourceFileHandoff | null>(null)
   const [listSourceFileWarning, setListSourceFileWarning] = useState('')
-  const [ownCatalogSearchIntent, setOwnCatalogSearchIntent] = useState<{
-    serial: number; text: string; store: 'all' | OwnStore
-  }>({ serial: 0, text: '', store: 'all' })
+  const [ownCatalogSearchIntent, setOwnCatalogSearchIntent] = useState({
+    serial: 0, text: '', store: 'all' as 'all' | 'PLUS' | 'DekaMarkt',
+  })
   // Separate, explicitly unpriced human notes. Never counted in shop totals.
   const [manualShoppingNotes, setManualShoppingNotes] = useState<UnpricedShoppingNote[]>([])
   const nextPriceFileSerial = useRef(0)
@@ -913,7 +913,8 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               <HiFiHome view="products" onNavigate={navigate} activeDays={activeDays}
                 onOpenOwnSources={(term, store) => {
                   setOwnCatalogSearchIntent(previous => ({
-                    serial: previous.serial + 1, text: term.slice(0, 120), store: store ?? 'all',
+                    serial: previous.serial + 1, text: term.slice(0, 120),
+                    store: store ?? 'all',
                   }))
                   const source = document.getElementById('supa-real-source-catalog')
                   source?.focus({ preventScroll: true })
@@ -931,7 +932,8 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               <HiFiHome view="products" onNavigate={navigate} activeDays={activeDays}
                 onOpenOwnSources={(term, store) => {
                   setOwnCatalogSearchIntent(previous => ({
-                    serial: previous.serial + 1, text: term.slice(0, 120), store: store ?? 'all',
+                    serial: previous.serial + 1, text: term.slice(0, 120),
+                    store: store ?? 'all',
                   }))
                   const source = document.getElementById('supa-real-source-catalog')
                   source?.focus({ preventScroll: true })
