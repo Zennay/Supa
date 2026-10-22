@@ -471,3 +471,24 @@ body { background: #e9eeec; }
   .hifi-picked-progress button { width: 100%; }
   .hifi-picked-tick { justify-content: center; }
 }
+
+
+/* Personal shopping amounts are user-entered counts, not measured pack sizes. */
+.hifi-demo-list .hifi-picked-edit {
+  display:grid; grid-template-columns:minmax(125px,1fr) minmax(150px,2fr);
+  gap:.55rem; flex:1 1 100%; min-width:0; padding:.4rem 0 .75rem;
+  border-bottom:1px solid #e1e9df;
+}
+.hifi-picked-edit label {
+  display:grid; gap:.3rem; min-width:0; color:#385247;
+  font-size:.84rem; font-weight:600;
+}
+.hifi-picked-edit input {
+  width:100%; min-width:0; min-height:44px; box-sizing:border-box;
+  padding:.6rem; font:inherit; font-size:1rem; border:1px solid #9cac9e;
+  border-radius:8px; background:#fff; color:#202b22;
+}
+.hifi-picked-edit input:focus-visible { outline:3px solid #276e55; outline-offset:2px; }
+@media(max-width:520px) {
+  .hifi-demo-list .hifi-picked-edit { grid-template-columns:minmax(0,1fr); }
+}
