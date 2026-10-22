@@ -12,20 +12,23 @@ type Pending = { fingerprint: string; planKey: string; original: string;
  * week to personal unpriced notes. No retailer evidence or price transfers.
  */
 export function PlannerPersonalNoteTransfer({ items, checked, openOnly, planKey,
-  notes, onImport }: {
+  notes, onImport, onOpenPriceImport }: {
   items: readonly Demand[]
   checked: Readonly<Record<string, boolean>>
   openOnly: boolean
   planKey: string
   notes: readonly UnpricedShoppingNote[]
   onImport: (incoming: readonly PersonalNoteDraft[], expected: string) => string
+  onOpenPriceImport?: () => void
 }) {
   const [pending, setPending] = useState<Pending | null>(null)
   const [message, setMessage] = useState('')
   const [showAll, setShowAll] = useState(false)
+  const [transferred, setTransferred] = useState(false)
   const [destination, setDestination] = useState<PersonalNoteDestination>('Algemeen')
   const fingerprint = JSON.stringify([planKey, checked, openOnly, destination])
   function prepare() {
+    setTransferred(false)
     setShowAll(false)
     try {
       const proposal = preparePlannerPersonalNotes(items, checked, openOnly, notes, destination)
@@ -54,6 +57,7 @@ export function PlannerPersonalNoteTransfer({ items, checked, openOnly, planKey,
       }
       const result = onImport(pending.incoming, pending.original)
       setPending(null)
+      setTransferred(true)
       setMessage(result)
     } catch (cause) {
       setPending(null)
@@ -89,6 +93,14 @@ export function PlannerPersonalNoteTransfer({ items, checked, openOnly, planKey,
       je originele Planner-planning en bestaande vinkjes blijven behouden.
       Beide winkels betekent twee parallelle controlelijsten, niet twee aankopen.</p>
     {message && <p role="status" className="unpriced-planner-checklist__note">{message}</p>}
+    {transferred && onOpenPriceImport && <div className="unpriced-planner-checklist__next-step">
+      <p className="disclaimer">De eigen lijsten zijn nog ongeprijsd. Voor een werkelijke
+        vergelijking moeten beide winkels onafhankelijk ingevulde, toegestane
+        bronproducten, originele SKU's, verpakkingen, prijzen en tijden bevatten.</p>
+      <button type="button" className="ghost-button" onClick={onOpenPriceImport}>
+        Open Vergelijk om mijn originele PLUS/Deka-winkelprijzen te controleren
+      </button>
+    </div>}
     {pending && current && <section role="group"
       aria-label="Controleer Planner-ingrediënten voor de persoonlijke lijst"
       className="attention-card">
