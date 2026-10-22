@@ -51,6 +51,12 @@ export async function importRecipeLinksCollection(
   if (urls.length < 1 || urls.length > 8) {
     throw new Error('Kies één tot acht openbare receptlinks per import. Markdown-koppen en scheidingslijnen tellen niet mee.')
   }
+  // The existing same-origin recipe API admits at most 2048 characters per
+  // link. Refuse the entire batch before fetching anything if one URL cannot
+  // be admitted: completed earlier fetches should not be wasted needlessly.
+  if (urls.some(url => url.length > 2048)) {
+    throw new Error('Eén van je receptlinks is te lang voor de beveiligde import (maximaal 2048 tekens). Kort de openbare link in.')
+  }
   if (new Set(urls).size !== urls.length) {
     throw new Error('Dezelfde receptlink staat meerdere keren in deze import.')
   }
