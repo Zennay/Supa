@@ -485,14 +485,20 @@ export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: 
       saveDone(cleaned, 'Product uit de aparte lijst verwijderd.')
     }
     onRemove(id)
+    setDetails(readUnpricedShoppingDetails())
   }
   const selectedHistorical = historicalRetailerProducts.filter(item => ids.includes(item.id))
   const selectedExamples = designProducts.filter(item => ids.includes(item.id))
   const recognizedIds = new Set([...selectedHistorical.map(item => item.id), ...selectedExamples.map(item => item.id)])
   const selectedUnknown = ids.filter(id => !recognizedIds.has(id))
-  const selectedLines = [...selectedHistorical.map(item => `${completed(item.id) ? '☒' : '☐'} ${item.name} · ${item.store} · ${item.pack} · prijs onbekend (historisch)`),
-    ...selectedExamples.map(item => `${completed(item.id) ? '☒' : '☐'} ${item.name} · Figma-demo, geen actuele prijs`),
-    ...selectedUnknown.map(id => `${completed(id) ? '☒' : '☐'} Product niet beschikbaar · oude product-ID ${id} · prijs onbekend`)]
+  const personalDetail = (id: string) => {
+    const entry = pick(id)
+    return ' · gevraagd aantal: ' + entry.count +
+      (entry.note ? ' · eigen notitie: ' + entry.note : '')
+  }
+  const selectedLines = [...selectedHistorical.map(item => `${completed(item.id) ? '☒' : '☐'} ${item.name} · ${item.store} · ${item.pack} · prijs onbekend (historisch)${personalDetail(item.id)}`),
+    ...selectedExamples.map(item => `${completed(item.id) ? '☒' : '☐'} ${item.name} · Figma-demo, geen actuele prijs${personalDetail(item.id)}`),
+    ...selectedUnknown.map(id => `${completed(id) ? '☒' : '☐'} Product niet beschikbaar · oude product-ID ${id} · prijs onbekend${personalDetail(id)}`)]
   const selectionText = selectedLines.join('\n')
   const openSelectionText = selectedLines.filter(line => line.startsWith('☐ ')).join('\n')
   const currentIdsRef = useRef(JSON.stringify(ids))
@@ -563,6 +569,8 @@ export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: 
     {!progress.writable && <p role="alert">Deze browseropslag is niet beschikbaar of bevat een onbekende versie.
       Afvinken is uitgeschakeld; jouw bestaande opgeslagen gegevens worden niet overschreven.</p>}
     {progressMessage && <p role="status" aria-live="polite">{progressMessage}</p>}
+    {!details.writable && <p role="alert">Aantallen/notities zijn in deze browser beschermd. Supa overschrijft hun bestaande opslag niet.</p>}
+    {detailsMessage && <p role="status" aria-live="polite">{detailsMessage}</p>}
     {openOnly && completedCount === ids.length &&
       <p role="status">Alles afgevinkt! Toon ook gekochte producten om de lijst terug te zien.</p>}
     {selectedHistorical.length > 0 && <div className="hifi-picked-history" aria-label="Historische bronproducten zonder prijs">
@@ -575,6 +583,7 @@ export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: 
           <span>{item.store} · {item.pack} · prijs onbekend</span>
         </div>
         {progressControl(item.id, item.name)}
+        {detailControls(item.id, item.name)}
         <button type="button" className="ghost-button" onClick={() => removeAndUncheck(item.id)}
           aria-label={`Verwijder uit lijst: ${item.name} bij ${item.store}`}>Verwijder</button>
       </div>)}
@@ -586,6 +595,7 @@ export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: 
         <div className="hifi-picked-source-logo" aria-hidden="true">?</div>
         <div className="hifi-picked-details"><strong>Product niet beschikbaar</strong><span>Oude product-ID: {id} · prijs onbekend</span></div>
         {progressControl(id, 'oude product-ID ' + id)}
+        {detailControls(id, 'oude product-ID ' + id)}
         <button type="button" className="ghost-button" onClick={() => removeAndUncheck(id)} aria-label={`Verwijder oude productselectie: ${id}`}>Verwijder</button>
       </div>)}
     </div>}
@@ -596,6 +606,7 @@ export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: 
         <FigmaImage asset={p.image} width="40" height="40" alt="" />
         <span>{p.name}</span>
         {progressControl(p.id, p.name)}
+        {detailControls(p.id, p.name)}
         <button type="button" className="ghost-button" onClick={() => removeAndUncheck(p.id)}
           aria-label={`Verwijder: ${p.name}`}>Verwijder</button>
       </div>)}
