@@ -18,6 +18,10 @@ Supa kan eigen recepten lokaal bewaren en omzetten naar het interne receptformaa
 
 Bij HTML met JSON-LD gebruikt Supa eerst de JSON-LD-bron. Microdata is de terugvalroute wanneer er geen JSON-LD-scriptblokken aanwezig zijn. Niet iedere website publiceert bruikbare receptmetadata; gebruik dan de gewone tekstimport of voer het recept handmatig in.
 
+## Recepten gebruiken voor een ongeprijsde boodschappenmand
+
+De aparte privévergelijker kan gecontroleerde eigen recepten gebruiken als fysieke boodschappenbehoefte. Dit vereist een geldig aantal porties, metrische hoeveelheden en hele fysieke stuks. Een ontbrekende of onduidelijke bereidingstijd blijft onbekend, maar blokkeert deze ingrediëntenlijst niet: bereidingstijd is geen ingrediënt en wordt niet verzonnen. Hetzelfde recept blijft voor de gewone maaltijdplanner geblokkeerd totdat de ontbrekende bereidingstijd is gecorrigeerd. Andere open ingrediënt-, hoeveelheid- of bronwaarschuwingen blijven uitgesloten en worden bij het laden concreet getoond, zodat je ze in **Mijn recepten** kunt corrigeren.
+
 ## Privacy en bronintegriteit
 
 - HTML wordt lokaal als tekst gelezen. Supa mount of rendert de pagina niet, voert geen ingesloten scripts uit, laadt geen externe assets en doet tijdens deze lokale import geen netwerkverzoeken.
