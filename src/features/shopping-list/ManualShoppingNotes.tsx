@@ -3,6 +3,7 @@ import './manualShoppingNotes.css'
 import { exportUnpricedShoppingCsv, exportUnpricedShoppingTsv, importUnpricedShoppingCsv, importUnpricedShoppingPaste } from './manualShoppingNotesCsv.ts'
 import { mergePrivateNotes, normalizePrivateNotes, serializePrivateNotes, PRIVATE_NOTES_BACKUP_MAX_BYTES } from './manualShoppingNotesBackup.ts'
 import { privateNoteDuplicateKey, privateNoteLabelIdentity } from './manualShoppingNoteIdentity.ts'
+import { makePrivateShoppingTemplate, parsePrivateShoppingTemplate, PRIVATE_SHOPPING_TEMPLATE_KEY, type PrivateShoppingTemplateItem } from './manualShoppingTemplate.ts'
 
 export type UnpricedShoppingNote = { id: string; label: string; store: 'Algemeen' | 'PLUS' | 'DekaMarkt'; done: boolean }
 type SetNotes = Dispatch<SetStateAction<UnpricedShoppingNote[]>>
@@ -37,6 +38,14 @@ export function ManualShoppingNotes({ notes, setNotes }: {
   const [filterStore, setFilterStore] = useState<'Alle winkels' | UnpricedShoppingNote['store']>('Alle winkels')
   // Ephemeral UI selection only. It never changes note IDs, prices or stored backup format.
   const [selectedMoveIds, setSelectedMoveIds] = useState<string[]>([])
+  const [repeatName, setRepeatName] = useState('Mijn vaste boodschappen')
+  const [repeatRaw, setRepeatRaw] = useState<string | null>(null)
+  const [repeatProtected, setRepeatProtected] = useState(false)
+  const [repeatMessage, setRepeatMessage] = useState('')
+  const [repeatPreview, setRepeatPreview] = useState<{
+    name: string; raw: string; original: string;
+    additions: PrivateShoppingTemplateItem[]; skipped: number;
+  } | null>(null)
   const [exportVisible, setExportVisible] = useState(false)
   const [message, setMessage] = useState('')
   const [lastRemoved, setLastRemoved] = useState<{ note: UnpricedShoppingNote; index: number } | null>(null)
@@ -220,13 +229,42 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       setSessionMessage('Browsertab-opslag geweigerd; gebruik een eigen JSON-backup.')
     }
   }
+  // A reusable personal template is saved only after a direct user action.
+  // Device changes from other tabs are treated as conflicts, not overwrites.
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(PRIVATE_SHOPPING_TEMPLATE_KEY)
+      if (raw !== null) {
+        const template = parsePrivateShoppingTemplate(raw)
+        setRepeatRaw(raw)
+        setRepeatName(template.name)
+        setRepeatMessage('Je eigen herhaalronde is beschikbaar, maar nog niet aan je lijst toegevoegd.')
+      }
+    } catch {
+      setRepeatProtected(true)
+      setRepeatMessage('Een bestaand sjabloon is ongeldig of opslag is geweigerd. Niets overschreven.')
+    }
+  }, [])
+  useEffect(() => {
+    const onChange = (event: StorageEvent) => {
+      if (event.key !== PRIVATE_SHOPPING_TEMPLATE_KEY && event.key !== null) return
+      if (event.newValue !== repeatRaw) {
+        setRepeatProtected(true)
+        setRepeatPreview(null)
+        setRepeatMessage('Een andere tab heeft je herhaalronde veranderd. Deze versie blijft beschermd.')
+      }
+    }
+    window.addEventListener('storage', onChange)
+    return () => window.removeEventListener('storage', onChange)
+  }, [repeatRaw])
+
   const [backupPreview, setBackupPreview] = useState<{
     incoming: UnpricedShoppingNote[]; existing: string;
     additions: UnpricedShoppingNote[]; duplicateCount: number;
   } | null>(null)
   const [backupBusy, setBackupBusy] = useState(false)
   const [lastImport, setLastImport] = useState<{
-    source: 'JSON-backup' | 'tekstlijst'; added: UnpricedShoppingNote[]
+    source: 'JSON-backup' | 'tekstlijst' | 'sjabloon'; added: UnpricedShoppingNote[]
   } | null>(null)
   const readVersion = useRef(0)
   function backupDownload() {
@@ -1011,6 +1049,88 @@ export function ManualShoppingNotes({ notes, setNotes }: {
   }
   const exportText = formatOwnList(routeItems)
   const selectedExportText = formatOwnList(selectedVisible)
+  function saveRepeatTemplate() {
+    if (repeatProtected || !selectedVisible.length) return
+    try {
+      const actual = window.localStorage.getItem(PRIVATE_SHOPPING_TEMPLATE_KEY)
+      if (actual !== repeatRaw) throw Error('Een andere versie is opgeslagen. Niets overschreven.')
+      const raw = makePrivateShoppingTemplate(repeatName, selectedVisible)
+      if (repeatRaw !== null && !window.confirm('Vervang je eerder bewaarde eigen herhaalronde? Je geopende boodschappen blijven behouden.')) return
+      // Recheck after the user has reviewed the replacement dialog.
+      if (window.localStorage.getItem(PRIVATE_SHOPPING_TEMPLATE_KEY) !== actual)
+        throw Error('Herhaalronde is intussen gewijzigd; vervangen geweigerd.')
+      window.localStorage.setItem(PRIVATE_SHOPPING_TEMPLATE_KEY, raw)
+      setRepeatRaw(raw)
+      setRepeatPreview(null)
+      setRepeatMessage(selectedVisible.length + ' zichtbare geselecteerde eigen artikelen als herhaalronde bewaard, zonder vinkjes of prijzen.')
+    } catch (error) {
+      setRepeatProtected(true)
+      setRepeatMessage(error instanceof Error ? error.message : 'Sjabloon kon niet worden bewaard.')
+    }
+  }
+  function prepareRepeatTemplate() {
+    setRepeatPreview(null)
+    if (repeatProtected || !repeatRaw) return
+    try {
+      if (window.localStorage.getItem(PRIVATE_SHOPPING_TEMPLATE_KEY) !== repeatRaw)
+        throw Error('Herhaalronde is intussen gewijzigd. Open geen verouderde kopie.')
+      const template = parsePrivateShoppingTemplate(repeatRaw)
+      const known = new Set(notes.map(note => privateNoteDuplicateKey(note.store, note.label)))
+      const additions = template.items.filter(note => !known.has(privateNoteDuplicateKey(note.store, note.label)))
+      if (notes.length + additions.length > 100) {
+        setRepeatMessage('Je eigen lijst heeft onvoldoende ruimte voor deze herhaalronde (maximaal 100 artikelen).')
+        return
+      }
+      setRepeatPreview({
+        name: template.name, raw: repeatRaw, original: serializePrivateNotes(notes),
+        additions, skipped: template.items.length - additions.length,
+      })
+      setRepeatMessage(additions.length + ' nieuwe eigen artikelen gevonden. Controleer en bevestig voordat ze worden toegevoegd.')
+    } catch (error) {
+      setRepeatProtected(true)
+      setRepeatMessage(error instanceof Error ? error.message : 'Herhaalronde is niet beschikbaar.')
+    }
+  }
+  function confirmRepeatTemplate() {
+    const preview = repeatPreview
+    if (!preview) return
+    try {
+      if (window.localStorage.getItem(PRIVATE_SHOPPING_TEMPLATE_KEY) !== preview.raw ||
+          repeatRaw !== preview.raw || serializePrivateNotes(notes) !== preview.original)
+        throw Error('Sjabloon of boodschappen zijn intussen gewijzigd. Open de voorinzage opnieuw.')
+      const known = new Set(notes.map(note => privateNoteDuplicateKey(note.store, note.label)))
+      if (notes.length + preview.additions.length > 100 ||
+          preview.additions.some(note => known.has(privateNoteDuplicateKey(note.store, note.label))))
+        throw Error('De huidige lijst is veranderd; niets toegevoegd.')
+      const added = preview.additions.map(item => ({
+        ...item, done: false, id: 'own-note-' + crypto.randomUUID(),
+      }))
+      setNotes(current => serializePrivateNotes(current) === preview.original
+        ? [...current, ...added] : current)
+      setLastImport({ source: 'sjabloon', added })
+      setRepeatPreview(null)
+      setRepeatMessage(added.length + ' nieuwe ongeprijsde artikelen toegevoegd; bestaande vinkjes en winkels behouden.')
+    } catch (error) {
+      setRepeatPreview(null)
+      setRepeatMessage(error instanceof Error ? error.message : 'Herhaalronde geweigerd.')
+    }
+  }
+  function deleteRepeatTemplate() {
+    try {
+      const before = window.localStorage.getItem(PRIVATE_SHOPPING_TEMPLATE_KEY)
+      if (before === null) return
+      if (!window.confirm('Verwijder je bewaarde herhaalronde op dit apparaat? Je huidige boodschappen blijven behouden.')) return
+      if (window.localStorage.getItem(PRIVATE_SHOPPING_TEMPLATE_KEY) !== before)
+        throw Error('Het sjabloon veranderde tijdens de bevestiging; verwijderen geweigerd.')
+      window.localStorage.removeItem(PRIVATE_SHOPPING_TEMPLATE_KEY)
+      setRepeatRaw(null)
+      setRepeatProtected(false)
+      setRepeatPreview(null)
+      setRepeatMessage('Alleen je bewaarde herhaalronde verwijderd. Je actieve privéboodschappen blijven staan.')
+    } catch (error) {
+      setRepeatMessage(error instanceof Error ? error.message : 'Sjabloon kon niet worden verwijderd.')
+    }
+  }
   async function shareSelectedPersonalNotes() {
     if (!selectedVisible.length) return
     // Share sheet is explicitly user-initiated and receives ONLY selected,
@@ -1529,6 +1649,42 @@ export function ManualShoppingNotes({ notes, setNotes }: {
         <button type="button" onClick={() => previewSavedCopy('device')}>Bekijk apparaatkopie om samen te voegen</button>
         <button type="button" onClick={() => discardProtectedCopy('device')}>Wis alleen oude apparaatkopie…</button>
       </div>}
+    </section>
+    <section className="manual-shopping-notes__session" aria-label="Herbruikbare eigen boodschappenronde">
+      <h3>Mijn vaste boodschappen · herhaalronde</h3>
+      <p>Bewaar zelfgekozen artikelen voor een volgende winkelronde. Alleen de namen
+        en jouw winkellijst worden na toestemming lokaal op dit apparaat opgeslagen;
+        vinkjes worden bij het opnieuw toevoegen weer open, prijzen en bronopnames
+        worden nooit meegesleept. Er is één vervangbaar privé-sjabloon.</p>
+      <label>Naam van mijn herhaalronde
+        <input maxLength={60} value={repeatName} disabled={repeatProtected}
+          onChange={event => setRepeatName(event.currentTarget.value)} />
+      </label>
+      <button type="button" disabled={repeatProtected || !selectedVisible.length}
+        onClick={saveRepeatTemplate}>
+        Bewaar {selectedVisible.length} geselecteerde zichtbare artikelen als herhaalronde…
+      </button>
+      <button type="button" disabled={repeatProtected || repeatRaw === null}
+        onClick={prepareRepeatTemplate}>Bekijk mijn bewaarde herhaalronde</button>
+      <button type="button" onClick={deleteRepeatTemplate}
+        disabled={repeatRaw === null && !repeatProtected}>
+        {repeatProtected ? 'Wis beschermd sjabloon na bevestiging…' : 'Verwijder mijn bewaarde herhaalronde…'}
+      </button>
+      {repeatPreview && <div role="group" aria-label="Voorinzage van persoonlijke herhaalronde">
+        <strong>{repeatPreview.name} · {repeatPreview.additions.length} nieuwe artikelen</strong>
+        <p>{repeatPreview.skipped} bestaande of dubbele artikelen overgeslagen.
+          De nieuwe artikelen krijgen open vinkjes en tellen nooit mee als winkelprijs.</p>
+        <ul>{repeatPreview.additions.slice(0, 15).map((item, index) =>
+          <li key={index}>☐ [{item.store}] {item.label}</li>)}</ul>
+        {repeatPreview.additions.length > 15 &&
+          <p>En {repeatPreview.additions.length - 15} andere nieuwe artikelen.</p>}
+        <button type="button" disabled={!repeatPreview.additions.length}
+          onClick={confirmRepeatTemplate}>
+          Voeg {repeatPreview.additions.length} nieuwe artikelen toe
+        </button>
+        <button type="button" onClick={() => setRepeatPreview(null)}>Annuleer herhaalronde</button>
+      </div>}
+      {repeatMessage && <p role="status" aria-live="polite">{repeatMessage}</p>}
     </section>
     <div className="manual-shopping-notes__actions">
       <button type="button" disabled={!visible.length} onClick={() => setExportVisible(value => !value)}>
