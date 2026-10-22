@@ -100,6 +100,25 @@
   margin: 0;
   line-height: 1.45;
 }
+.supa-two-store-coverage__export-actions[aria-label="Alleen openstaande winkelbroncontroles meenemen"] > label {
+  display: grid;
+  flex: 1 1 100%;
+  gap: .3rem;
+  font-weight: 600;
+}
+.supa-two-store-coverage__export-actions[aria-label="Alleen openstaande winkelbroncontroles meenemen"] select {
+  min-height: 44px;
+  max-width: 100%;
+  padding: .45rem;
+  border: 1px solid #8a9d90;
+  border-radius: 8px;
+  font: inherit;
+  background: #fff;
+}
+.supa-two-store-coverage__export-actions[aria-label="Alleen openstaande winkelbroncontroles meenemen"] select:focus-visible {
+  outline: 3px solid #286b50;
+  outline-offset: 2px;
+}
 .supa-two-store-coverage__export-actions[aria-label="Alleen openstaande winkelbroncontroles meenemen"] > button {
   min-width: 0;
 }
