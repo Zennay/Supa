@@ -1,6 +1,7 @@
 import { literalCsv } from '../../privateBasketComparisonCsv.ts'
 import type { PrivateCaptureProgress, PrivateReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
 import { privateKnownPricePairs, privateProgressProductRows } from './privateProgressProductRows.ts'
+import { selectOriginalPricePairs } from './selectOriginalPricePairs.ts'
 
 const headers = [
   'soort', 'ingredient_id', 'ingredient', 'fysieke_hoeveelheid', 'eenheid',
@@ -25,8 +26,10 @@ export function privateKnownLinePriceCsv(
   progress: PrivateCaptureProgress | null,
   reviewed: PrivateReviewedBaskets | null,
   now: number,
+  selectedIngredientIds?: readonly string[],
 ): string {
-  const pairs = privateKnownPricePairs(progress, reviewed, now)
+  const pairs = selectOriginalPricePairs(
+    privateKnownPricePairs(progress, reviewed, now), selectedIngredientIds)
   const needs = new Map(privateProgressProductRows(progress, now).map(row =>
     [row.line.ingredientId, row.line]))
   if (pairs.length === 0) throw Error('Er zijn nog geen twee actuele, per ingrediënt vergelijkbare winkelprijzen.')
@@ -66,13 +69,16 @@ export function privateKnownLinePriceCsv(
 export function downloadPrivateKnownLinePriceCsv(
   progress: PrivateCaptureProgress | null,
   reviewed: PrivateReviewedBaskets | null,
+  selectedIngredientIds?: readonly string[],
 ): number {
-  const text = privateKnownLinePriceCsv(progress, reviewed, Date.now())
+  const text = privateKnownLinePriceCsv(progress, reviewed, Date.now(), selectedIngredientIds)
   const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }))
   try {
     const link = document.createElement('a')
     link.href = url
-    link.download = 'supa-eigen-vergelijkbare-ingredientprijzen.csv'
+    link.download = selectedIngredientIds
+      ? 'supa-eigen-gefilterde-ingredientprijzen.csv'
+      : 'supa-eigen-vergelijkbare-ingredientprijzen.csv'
     document.body.append(link)
     try { link.click() } finally { link.remove() }
   } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
