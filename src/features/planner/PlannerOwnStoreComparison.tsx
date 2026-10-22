@@ -456,6 +456,65 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
     }
   }
 
+  function downloadSelectedProductPrices(ids: string[]) {
+    // Export the actual current reviewed pair, never stale rows held by a
+    // filtered child view. A filtered selection is NOT a full basket total.
+    const current = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
+    const paired = ownStoreWeekComparison(current)
+    if (paired.status !== 'comparable' || !current?.stores.PLUS || !current.stores.DekaMarkt) {
+      setDownloadMessage('De twee winkelbronnen zijn verlopen of niet meer vergelijkbaar. Herzie de bron in Vergelijk.')
+      return
+    }
+    const byId = new Map(paired.lines.map(line => [line.id, line]))
+    const unique = [...new Set(ids)]
+    if (!unique.length || unique.some(id => !byId.has(id))) {
+      setDownloadMessage('Je productselectie is veranderd. Controleer de filters en probeer opnieuw.')
+      return
+    }
+    const selected = unique.map(id => byId.get(id)!)
+    // Product and ingredient names may originate in pasted personal data;
+    // preserve content but never let embedded line breaks forge extra lines.
+    const oneLine = (value: string) => value.replace(/[\r\n\u2028\u2029]/gu, ' ')
+    const priceLine = (shop: OwnStore, line: typeof selected[number]['plus']) =>
+      shop + ': ' + oneLine(line.productName) + ' · SKU ' + oneLine(line.productId) +
+      ' · ' + line.packs + ' hele verpakkingen · ' +
+      line.pack.amount + ' ' + line.pack.unit + ' × ' + line.pack.count +
+      ' per pak · ' + exactEuro.formatCents(line.pricePerPackCents) + '/pak · ' +
+      (line.packs + ' × ' + exactEuro.formatCents(line.pricePerPackCents)) +
+      ' = ' + exactEuro.formatCents(line.lineTotalCents)
+    const content = [
+      'SUPA · eigen gecontroleerde productprijsselectie',
+      'Dit is een FILTERSELECTIE, niet het hele mandje of een onafhankelijke besparingsclaim.',
+      'De bedragen komen uitsluitend uit de twee persoonlijk bevestigde, nog actuele bronopnames.',
+      'PLUS bronmoment: ' + current.stores.PLUS.observedAt,
+      'DekaMarkt bronmoment: ' + current.stores.DekaMarkt.observedAt,
+      'Geselecteerde ingrediënten: ' + selected.length + ' van ' + paired.lines.length,
+      '',
+      ...selected.flatMap(line => [
+        oneLine(line.ingredientLabel),
+        priceLine('PLUS', line.plus),
+        priceLine('DekaMarkt', line.deka),
+        line.deltaCents === 0 ? 'Regelprijs: gelijk' :
+          'Regelprijsverschil: ' + exactEuro.formatCents(Math.abs(line.deltaCents)) +
+          ' lager bij ' + (line.deltaCents > 0 ? 'PLUS' : 'DekaMarkt'),
+        '',
+      ]),
+      'Voor een betrouwbaar HEEL-MANDTOTAAL gebruik je de volledige vergelijking, niet deze selectie.',
+      '',
+    ].join('\n')
+    const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }))
+    try {
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'supa-eigen-geselecteerde-productprijzen.txt'
+      document.body.append(link)
+      try { link.click() } finally { link.remove() }
+      setDownloadMessage(selected.length + ' originele productprijsregels lokaal bewaard, zonder gefilterd mandtotaal.')
+    } finally {
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    }
+  }
+
   function chooseConfirmedLine(id: string, store: OwnStore) {
     const choice = currentPrivateRouteChoice(reviewed, id, store, Date.now())
     if (!choice) {
@@ -910,7 +969,7 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
               Open mijn gecombineerde winkelroute in Lijst
             </button>
           </div>}
-          <Suspense fallback={<p role="status">Winkelprijsregels laden…</p>}><PlannerOwnProductDeltas lines={summary.lines} onChooseLine={chooseConfirmedLine} /></Suspense>
+          <Suspense fallback={<p role="status">Winkelprijsregels laden…</p>}><PlannerOwnProductDeltas lines={summary.lines} onChooseLine={chooseConfirmedLine} onExportSelection={downloadSelectedProductPrices} /></Suspense>
         </div>
       : summary.available.length > 0 ? <div className="own-store-planner__result" role="status">
           <strong>Geen betrouwbaar twee-winkelprijsverschil</strong>
