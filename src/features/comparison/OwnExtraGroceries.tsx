@@ -129,7 +129,15 @@ export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
         setNotice('Gebruik één artikel per regel of artikel; hoeveelheid; stuks/g/ml.')
         return
       }
-      const next: Item = { id: 'preview', name, quantity, unit, done }
+      const previewId = new Uint32Array(4)
+      try { window.crypto.getRandomValues(previewId) } catch {
+        setNotice('Deze browser kan geen veilige voorbeeld-ID maken.')
+        return
+      }
+      const next: Item = {
+        id: Array.from(previewId, value => value.toString(16).padStart(8, '0')).join('-'),
+        name, quantity, unit, done,
+      }
       if (!valid(next)) {
         setNotice('Een van de regels bevat een ongeldig artikel of een ongeldige hoeveelheid.')
         return
@@ -389,7 +397,7 @@ export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
     </form>
     {pendingPaste && <div className="unpriced-planner-checklist__paste-preview">
       <h4>Controleer {pendingPaste.length} extra boodschappen zonder winkelprijzen</h4>
-      <ul>{pendingPaste.map((row, index) => <li key={index}>
+      <ul>{pendingPaste.map(row => <li key={row.id}>
         {row.done ? '☑' : '☐'} {row.quantity} {row.unit === 'piece' ? 'stuks' : row.unit} {row.name}
       </li>)}</ul>
       <button type="button" onClick={acceptPaste}>Voeg alle artikelen toe</button>
