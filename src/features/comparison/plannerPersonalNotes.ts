@@ -29,12 +29,8 @@ export function preparePlannerPersonalNotes(
   const before = serializePrivateNotes([...current])
   const selection = openOnly ? lines.filter(line => checked[key(line)] !== true) : lines
   if (!selection.length) throw Error('Alle geselecteerde ingrediënten zijn al afgevinkt.')
-  if (selection.length > 100) throw Error('Meer dan 100 ingrediënten. Exporteer je week als CSV.')
   const destinations: UnpricedShoppingNote['store'][] = destination === 'Beide winkels'
     ? ['PLUS', 'DekaMarkt'] : [destination]
-  if (selection.length * destinations.length > 100) {
-    throw Error('Beide winkeloverzichten samen passen niet binnen 100 regels. Kies minder ingrediënten.')
-  }
   const source: PersonalNoteDraft[] = selection.flatMap(line => {
     if (typeof line.label !== 'string' || !line.label.trim() ||
         !['g', 'kg', 'ml', 'l', 'piece', 'unknown'].includes(line.unit)) {
@@ -47,24 +43,28 @@ export function preparePlannerPersonalNotes(
     return destinations.map(store => ({ store, label: line.label + ' · ' + quantity,
       done: checked[key(line)] === true }))
   })
-  // Existing strict personal note importer is the single schema and
-  // spreadsheet-safe boundary. Nothing is saved or downloaded here.
-  const csv = exportUnpricedShoppingCsv(source)
-  if (new TextEncoder().encode(csv).byteLength > 32768) {
-    throw Error('Deze persoonlijke import is groter dan 32 kB; download de Planner-CSV.')
-  }
-  const parsed = importUnpricedShoppingCsv(csv)
+  // First discard only identities already present or repeated within the
+  // selected week. A partly filled PLUS/Deka list must stay usable even when
+  // the full two-store proposal exceeds the personal 100-row import limit.
   const known = new Set(current.map(note => privateNoteDuplicateKey(note.store, note.label)))
+  const unresolved: PersonalNoteDraft[] = []
   let skipped = 0
-  const incoming: PersonalNoteDraft[] = []
-  for (const item of parsed) {
+  for (const item of source) {
     const identity = privateNoteDuplicateKey(item.store, item.label)
     if (known.has(identity)) { skipped++; continue }
     known.add(identity)
-    incoming.push(item)
+    unresolved.push(item)
   }
-  if (current.length + incoming.length > 100) {
-    throw Error('De persoonlijke lijst heeft maximaal 100 regels. Er is niets toegevoegd.')
+  if (current.length + unresolved.length > 100) {
+    throw Error('Je persoonlijke lijst past niet binnen 100 regels. Kies minder ingrediënten.')
   }
+  if (!unresolved.length) return { incoming: [], skipped, before }
+  // Pass ONLY the missing rows through the existing strict CSV importer.
+  // Nothing is saved, scraped, priced or assigned a retailer SKU here.
+  const csv = exportUnpricedShoppingCsv(unresolved)
+  if (new TextEncoder().encode(csv).byteLength > 32768) {
+    throw Error('De persoonlijke import is groter dan 32 kB; download de Planner-CSV.')
+  }
+  const incoming = importUnpricedShoppingCsv(csv)
   return { incoming, skipped, before }
 }
