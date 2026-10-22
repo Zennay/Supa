@@ -58,11 +58,12 @@ export function prepareUnpricedPrivateRecipe(
         reasons.push('invalid_metric_unit')
         break
       }
-      // The editor/scaler contract rejects fractional physical pieces. Keep
-      // that gate at the basket boundary too, so stale or alternate editor
-      // branches cannot promote 1.5 eggs/onions into ready shopping demand.
+      // A fraction of an indivisible item cannot be assumed purchasable
+      // without a separate explicit review contract. Keep the original
+      // issue-specific reason while preserving the parent branch's safe-integer
+      // check, metric-unit allowlist, and outstanding measurement review gate.
       if (ingredient.unit === 'piece' && !Number.isSafeInteger(ingredient.amount)) {
-        reasons.push('fractional_piece_requires_review')
+        reasons.push('fractional_piece_requires_human_review')
         break
       }
       const sourceReviewReason =
