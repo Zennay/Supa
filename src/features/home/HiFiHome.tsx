@@ -81,6 +81,7 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
   const [portableText, setPortableText] = useState('')
   const [portablePreview, setPortablePreview] = useState<string[] | null>(null)
   const [portableMessage, setPortableMessage] = useState('')
+  const portableReadVersion = useRef(0)
   const [initialFavorites] = useState(readDiscoveryFavorites)
   const [favorites, setFavorites] = useState<string[]>(initialFavorites.ids)
   const [favoritesRaw, setFavoritesRaw] = useState(initialFavorites.raw)
@@ -184,7 +185,7 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
   }
   const previewPortableSelection = () => {
     setPortablePreview(null)
-    if (portableText.length > 16_384) { setPortableMessage('Bestand te groot (maximaal 16 kB).'); return }
+    if (new TextEncoder().encode(portableText).byteLength > 16_384) { setPortableMessage('Bestand te groot (maximaal 16 kB UTF-8).'); return }
     try {
       const parsed: unknown = JSON.parse(portableText)
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw Error('Ongeldig selectiebestand.')
@@ -311,21 +312,35 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
       <button type="button" onClick={downloadPortableSelection}>Download eigen selectie (.json)</button>
       <label>Eigen JSON-selectiebestand openen
         <input type="file" accept=".json,application/json" onChange={async event => {
+          const version = ++portableReadVersion.current
           setPortablePreview(null)
           const input = event.currentTarget
           const file = input.files?.[0]
           input.value = ''
           if (!file) return
-          if (file.size > 16_384) { setPortableMessage('Bestand te groot (maximaal 16 kB).'); return }
+          if (file.size > 16_384 || !file.size) {
+            setPortableMessage('Selectiebestand moet gevuld zijn en maximaal 16 kB bevatten.')
+            return
+          }
           try {
-            setPortableText(await file.text())
-            setPortableMessage('Lokale tekst geladen. Kies Voorbeeld controleren vóór toevoegen.')
-          } catch { setPortableMessage('Kon het lokale bestand niet lezen.') }
+            const bytes = await file.arrayBuffer()
+            if (version !== portableReadVersion.current) return
+            // JSON backups produced by Supa are UTF-8. Never silently repair
+            // invalid bytes into a different list of product identities.
+            const contents = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+            if (new TextEncoder().encode(contents).byteLength > 16_384)
+              throw Error('Bestand te groot')
+            setPortableText(contents)
+            setPortableMessage('Eigen UTF-8 selectiebestand geladen. Controleer de voorbeeldlijst vóór toevoegen.')
+          } catch {
+            if (version === portableReadVersion.current)
+              setPortableMessage('Geen geldig UTF-8 JSON-selectiebestand; je bestaande lijst is behouden.')
+          }
         }} />
       </label>
       <label>Of plak eigen JSON
         <textarea value={portableText} maxLength={16_384} rows={4}
-          onChange={event => { setPortableText(event.target.value); setPortablePreview(null); setPortableMessage('') }}
+          onChange={event => { portableReadVersion.current += 1; setPortableText(event.target.value); setPortablePreview(null); setPortableMessage('') }}
           placeholder='{"kind":"supa-unpriced-product-selection","schemaVersion":1,"ids":[]}' />
       </label>
       <button type="button" disabled={!portableText.trim()} onClick={previewPortableSelection}>Voorbeeld controleren</button>
