@@ -1,6 +1,6 @@
 import { literalCsv } from '../../privateBasketComparisonCsv.ts'
 import type { PrivateCaptureProgress, PrivateReviewedBaskets } from '../comparison/privateReviewedBasketBridge.ts'
-import { privateKnownPricePairs, privateProgressProductRows } from './privateProgressProductRows.ts'
+import { privateKnownPricePairs, privateProgressProductRows, type PrivateKnownPricePair } from './privateProgressProductRows.ts'
 import { selectOriginalPricePairs } from './selectOriginalPricePairs.ts'
 
 const headers = [
@@ -26,10 +26,10 @@ export function privateKnownLinePriceCsv(
   progress: PrivateCaptureProgress | null,
   reviewed: PrivateReviewedBaskets | null,
   now: number,
-  selectedIngredientIds?: readonly string[],
+  selectedPairs?: readonly PrivateKnownPricePair[],
 ): string {
   const pairs = selectOriginalPricePairs(
-    privateKnownPricePairs(progress, reviewed, now), selectedIngredientIds)
+    privateKnownPricePairs(progress, reviewed, now), selectedPairs)
   const needs = new Map(privateProgressProductRows(progress, now).map(row =>
     [row.line.ingredientId, row.line]))
   if (pairs.length === 0) throw Error('Er zijn nog geen twee actuele, per ingrediënt vergelijkbare winkelprijzen.')
@@ -69,14 +69,14 @@ export function privateKnownLinePriceCsv(
 export function downloadPrivateKnownLinePriceCsv(
   progress: PrivateCaptureProgress | null,
   reviewed: PrivateReviewedBaskets | null,
-  selectedIngredientIds?: readonly string[],
+  selectedPairs?: readonly PrivateKnownPricePair[],
 ): number {
-  const text = privateKnownLinePriceCsv(progress, reviewed, Date.now(), selectedIngredientIds)
+  const text = privateKnownLinePriceCsv(progress, reviewed, Date.now(), selectedPairs)
   const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }))
   try {
     const link = document.createElement('a')
     link.href = url
-    link.download = selectedIngredientIds
+    link.download = selectedPairs
       ? 'supa-eigen-gefilterde-ingredientprijzen.csv'
       : 'supa-eigen-vergelijkbare-ingredientprijzen.csv'
     document.body.append(link)
