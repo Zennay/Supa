@@ -3,7 +3,7 @@ import './manualShoppingNotes.css'
 import { exportUnpricedShoppingCsv, exportUnpricedShoppingTsv, importUnpricedShoppingCsv, importUnpricedShoppingPaste } from './manualShoppingNotesCsv.ts'
 import { mergePrivateNotes, normalizePrivateNotes, serializePrivateNotes, PRIVATE_NOTES_BACKUP_MAX_BYTES } from './manualShoppingNotesBackup.ts'
 import { privateNoteDuplicateKey, privateNoteLabelIdentity } from './manualShoppingNoteIdentity.ts'
-import { makePrivateShoppingTemplate, parsePrivateShoppingTemplate, PRIVATE_SHOPPING_TEMPLATE_KEY, type PrivateShoppingTemplateItem } from './manualShoppingTemplate.ts'
+import { makePrivateShoppingTemplate, parsePrivateShoppingTemplate, PRIVATE_SHOPPING_TEMPLATE_KEY, PRIVATE_SHOPPING_TEMPLATE_MAX_BYTES, type PrivateShoppingTemplateItem } from './manualShoppingTemplate.ts'
 
 export type UnpricedShoppingNote = { id: string; label: string; store: 'Algemeen' | 'PLUS' | 'DekaMarkt'; done: boolean }
 type SetNotes = Dispatch<SetStateAction<UnpricedShoppingNote[]>>
@@ -42,6 +42,10 @@ export function ManualShoppingNotes({ notes, setNotes }: {
   const [repeatRaw, setRepeatRaw] = useState<string | null>(null)
   const [repeatProtected, setRepeatProtected] = useState(false)
   const [repeatMessage, setRepeatMessage] = useState('')
+  const repeatFileSerial = useRef(0)
+  const [repeatFilePreview, setRepeatFilePreview] = useState<{
+    raw: string; name: string; items: number; previous: string | null;
+  } | null>(null)
   const [repeatPreview, setRepeatPreview] = useState<{
     name: string; raw: string; original: string;
     additions: PrivateShoppingTemplateItem[]; skipped: number;
@@ -1119,6 +1123,70 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       setRepeatMessage(error instanceof Error ? error.message : 'Herhaalronde geweigerd.')
     }
   }
+  function downloadRepeatTemplate() {
+    if (repeatProtected || !repeatRaw) return
+    try {
+      if (window.localStorage.getItem(PRIVATE_SHOPPING_TEMPLATE_KEY) !== repeatRaw)
+        throw Error('Het bewaarde sjabloon is intussen gewijzigd.')
+      const template = parsePrivateShoppingTemplate(repeatRaw)
+      const url = URL.createObjectURL(new Blob([repeatRaw + '\n'], { type: 'application/json;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-prive-herhaalronde.json'
+        document.body.append(link); link.click(); link.remove()
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setRepeatMessage(template.items.length + ' artikelen in je eigen herhaalronde veilig als JSON bewaard.')
+    } catch (error) {
+      setRepeatMessage(error instanceof Error ? error.message : 'Kon privé-sjabloon niet downloaden.')
+    }
+  }
+  async function readRepeatTemplateFile(file?: File) {
+    const serial = ++repeatFileSerial.current
+    setRepeatFilePreview(null)
+    if (!file) return
+    try {
+      if (!file.name.toLocaleLowerCase('nl-NL').endsWith('.json') ||
+          !file.size || file.size > PRIVATE_SHOPPING_TEMPLATE_MAX_BYTES)
+        throw Error('Kies een Supa-herhaalronde als JSON van maximaal 32 kB.')
+      const bytes = await file.arrayBuffer()
+      if (serial !== repeatFileSerial.current) return
+      if (!bytes.byteLength || bytes.byteLength > PRIVATE_SHOPPING_TEMPLATE_MAX_BYTES)
+        throw Error('Privé-sjabloon is leeg of te groot.')
+      const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes).trim()
+      const template = parsePrivateShoppingTemplate(text)
+      const current = window.localStorage.getItem(PRIVATE_SHOPPING_TEMPLATE_KEY)
+      if (current !== repeatRaw || repeatProtected)
+        throw Error('Opgeslagen sjabloon wijkt af of is beschermd. Niets overschreven.')
+      setRepeatFilePreview({ raw: text, name: template.name, items: template.items.length, previous: current })
+      setRepeatMessage('Controleer dit privé-sjabloon en bevestig eerst de lokale import.')
+    } catch (error) {
+      if (serial === repeatFileSerial.current)
+        setRepeatMessage(error instanceof Error ? error.message : 'Sjabloonbestand geweigerd.')
+    }
+  }
+  function confirmRepeatTemplateFile() {
+    const preview = repeatFilePreview
+    if (!preview || repeatProtected) return
+    try {
+      if (repeatRaw !== preview.previous ||
+          window.localStorage.getItem(PRIVATE_SHOPPING_TEMPLATE_KEY) !== preview.previous)
+        throw Error('Een ander sjabloon is intussen opgeslagen. Import geweigerd.')
+      const template = parsePrivateShoppingTemplate(preview.raw)
+      if (preview.previous !== null && !window.confirm('Vervang je huidige bewaarde herhaalronde door dit aangeleverde privé-sjabloon?')) return
+      if (window.localStorage.getItem(PRIVATE_SHOPPING_TEMPLATE_KEY) !== preview.previous)
+        throw Error('Het sjabloon is tijdens bevestiging gewijzigd. Import geweigerd.')
+      window.localStorage.setItem(PRIVATE_SHOPPING_TEMPLATE_KEY, preview.raw)
+      setRepeatRaw(preview.raw)
+      setRepeatName(template.name)
+      setRepeatPreview(null)
+      setRepeatFilePreview(null)
+      setRepeatMessage(template.items.length + ' eigen sjabloonartikelen opgeslagen. Ze zijn nog niet aan de actieve lijst toegevoegd.')
+    } catch (error) {
+      setRepeatFilePreview(null)
+      setRepeatMessage(error instanceof Error ? error.message : 'Sjabloonimport geweigerd.')
+    }
+  }
   function deleteRepeatTemplate() {
     try {
       const before = window.localStorage.getItem(PRIVATE_SHOPPING_TEMPLATE_KEY)
@@ -1670,10 +1738,27 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       </button>
       <button type="button" disabled={repeatProtected || repeatRaw === null}
         onClick={prepareRepeatTemplate}>Bekijk mijn bewaarde herhaalronde</button>
+      <button type="button" disabled={repeatProtected || repeatRaw === null}
+        onClick={downloadRepeatTemplate}>Download mijn herhaalronde (JSON)</button>
+      <label>Importeer herhaalronde vanaf een ander apparaat (JSON, max. 32 kB)
+        <input type="file" accept=".json,application/json"
+          onChange={event => {
+            void readRepeatTemplateFile(event.currentTarget.files?.[0])
+            event.currentTarget.value = ''
+          }} />
+      </label>
       <button type="button" onClick={deleteRepeatTemplate}
         disabled={repeatRaw === null && !repeatProtected}>
         {repeatProtected ? 'Wis beschermd sjabloon na bevestiging…' : 'Verwijder mijn bewaarde herhaalronde…'}
       </button>
+      {repeatFilePreview && <div role="group" aria-label="Privé-sjabloonimport controleren">
+        <strong>Importbestand: {repeatFilePreview.name}</strong>
+        <p>{repeatFilePreview.items} persoonlijke ongeprijsde artikelen. Dit bestand bevat geen
+          afvinkingen, SKU's of bronprijzen. Alleen het lokale herhaalsjabloon wordt vervangen,
+          niet de huidige boodschappenlijst. Herhalen vraagt daarna apart om bevestiging.</p>
+        <button type="button" onClick={confirmRepeatTemplateFile}>Bewaar dit sjabloon op mijn apparaat</button>
+        <button type="button" onClick={() => setRepeatFilePreview(null)}>Annuleer bestandimport</button>
+      </div>}
       {repeatPreview && <div role="group" aria-label="Voorinzage van persoonlijke herhaalronde">
         <strong>{repeatPreview.name} · {repeatPreview.additions.length} nieuwe artikelen</strong>
         <p>{repeatPreview.skipped} bestaande of dubbele artikelen overgeslagen.
