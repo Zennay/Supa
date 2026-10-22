@@ -410,8 +410,15 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       const extension = file.name.toLocaleLowerCase('nl-NL').split('.').at(-1)
       if (extension !== 'csv' && extension !== 'tsv')
         throw Error('Kies een .csv- of .tsv-bestand; geen prijslijst of werkmap.')
-      const source = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      const bytes = await file.arrayBuffer()
       if (serial !== bulkFileSerial.current) return
+      const bom = new Uint8Array(bytes, 0, Math.min(bytes.byteLength, 2))
+      // Excel's 'Unicode Text' TSV uses an explicit UTF-16 BOM. Only accept
+      // that legacy encoding for private TSV input; CSV remains strict UTF-8.
+      const encoding = extension === 'tsv' && bom[0] === 0xff && bom[1] === 0xfe
+        ? 'utf-16le' : extension === 'tsv' && bom[0] === 0xfe && bom[1] === 0xff
+          ? 'utf-16be' : 'utf-8'
+      const source = new TextDecoder(encoding, { fatal: true }).decode(bytes)
       // Existing strict spreadsheet clipboard parser also supports offline TSV files.
       // No retailer prices or SKUs: still requires explicit review and confirmation.
       prepareOwnCsvPreview(source, extension === 'tsv')
