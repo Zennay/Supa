@@ -1108,6 +1108,11 @@ export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
                 {' '}{recipe.warnings.length ? recipe.warnings.length + ' controlepunten' : 'Geen openstaande importwaarschuwingen'}</summary>
               <p>{recipe.servings ?? '?'} porties · {recipe.minutes ?? '?'} minuten.
                 {' '}Originele hoeveelheden en waarschuwingen blijven bij het recept.</p>
+              {recipe.sourceUrl && <small>Bronvermelding (geen prijsbewijs):{' '}
+                <a href={safeRecipeSourceUrl(recipe.sourceUrl)} target="_blank" rel="noreferrer">
+                  {safeRecipeSourceUrl(recipe.sourceUrl)}
+                </a>
+              </small>}
               <ul>{recipe.ingredients.map((ingredient, itemIndex) => <li key={itemIndex}>
                 <span>{ingredient.original}</span>
                 {ingredient.reviewReason
