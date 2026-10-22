@@ -3,11 +3,14 @@
  */
 import { aggregatePlanIngredients, type RecipeWithIngredients } from './domain/basket.ts'
 import { readRecipeLibrary, type SavedRecipe } from './features/recipes/recipeLibrary.ts'
+import { prepareRecipeBackupImport, RECIPE_BACKUP_MAX_BYTES } from './features/recipes/recipeBackup.ts'
 import { toPlannerRecipe } from './features/recipes/plannerRecipes.ts'
 import { scaledMetricPortionAmount } from './domain/metricPortionScale.ts'
 import type { MetricUnit } from './domain/userRecipeImport.ts'
 
 const loadButton = document.querySelector<HTMLButtonElement>('#load-own-recipes')!
+const backupFileInput = document.querySelector<HTMLInputElement>('#own-recipe-backup-file')!
+const backupLoadButton = document.querySelector<HTMLButtonElement>('#load-own-recipe-backup')!
 const convertButton = document.querySelector<HTMLButtonElement>('#own-recipes-to-demand')!
 const status = document.querySelector<HTMLElement>('#own-recipe-status')!
 const choices = document.querySelector<HTMLElement>('#own-recipe-choices')!
@@ -90,101 +93,167 @@ function renderReviewNeeded(recipes: SavedRecipe[]) {
 
 let loaded: SavedRecipe[] = []
 let libraryRaw: string | null = null
+let selectedSource: 'device' | 'backup' | null = null
+let selectedBackupFile: File | null = null
+// Ignore obsolete asynchronous file reads when the input, selected source or
+// inspected file changes. File contents remain private and are never persisted.
+let sourceRevision = 0
 const setStatus = (message: string, warning = false) => {
   status.textContent = message
   status.className = 'notice' + (warning ? ' warning' : '')
 }
 
-loadButton.addEventListener('click', () => {
+function clearRecipeSelection() {
   loaded = []
   libraryRaw = null
+  selectedSource = null
+  selectedBackupFile = null
   choices.replaceChildren()
   reviewNeeded.replaceChildren()
   reviewNeeded.hidden = true
   convertButton.disabled = true
+}
+
+/** Same picker and physical eligibility regardless of a device or file source. */
+function presentRecipes(recipes: SavedRecipe[], sourceLabel: string) {
+  if (new Set(recipes.map(recipe => recipe.id)).size !== recipes.length) {
+    throw Error('Deze receptenbron bevat dubbele recept-ID’s; er is geen mandvraag gemaakt.')
+  }
+  const ready = recipes.filter(recipe =>
+    recipe.warnings.every(warning => warning === missingMinutesWarning) &&
+    reviewedForBasket(recipe) !== null)
+  const held = recipes.filter(recipe => !ready.includes(recipe))
+  renderReviewNeeded(held)
+  loaded = ready
+  for (const recipe of ready.slice(0, 100)) {
+    const card = document.createElement('label')
+    card.className = 'own-recipe-pick-card'
+    card.style.display = 'grid'
+    card.style.gridTemplateColumns = 'auto minmax(0,1fr) auto'
+    card.style.padding = '10px 0'
+    card.style.borderBottom = '1px solid #d8e5d9'
+    card.style.maxWidth = '100%'
+    card.style.alignItems = 'center'
+    card.style.gap = '10px'
+    const selected = document.createElement('input')
+    selected.type = 'checkbox'
+    selected.style.width = '20px'
+    selected.dataset.recipeSelected = recipe.id
+    const caption = document.createElement('span')
+    caption.textContent = recipe.title + ' · ' + recipe.servings + ' porties per bereiding · ' +
+      recipe.ingredients.length + ' ingrediënten'
+    const repeats = document.createElement('input')
+    repeats.type = 'number'
+    repeats.min = '1'
+    repeats.max = '7'
+    repeats.step = '1'
+    repeats.value = '1'
+    repeats.setAttribute('aria-label', 'Aantal bereidingen van ' + recipe.title)
+    repeats.dataset.recipeRepeats = recipe.id
+    const portions = document.createElement('input')
+    portions.type = 'number'
+    portions.min = '1'
+    portions.max = '100'
+    portions.step = '1'
+    portions.value = String(recipe.servings ?? 2)
+    portions.setAttribute('aria-label', 'Porties per bereiding van ' + recipe.title)
+    portions.title = 'Gewenste porties per bereiding (1–100)'
+    portions.dataset.recipePortions = recipe.id
+    const controls = document.createElement('span')
+    controls.className = 'own-recipe-pick-controls'
+    for (const [name, field] of [['Bereidingen', repeats], ['Porties', portions]] as const) {
+      const wrapper = document.createElement('span')
+      const title = document.createElement('span')
+      title.textContent = name
+      title.className = 'own-recipe-pick-caption'
+      wrapper.append(title, field)
+      controls.append(wrapper)
+    }
+    card.append(selected, caption, controls)
+    choices.append(card)
+  }
+  convertButton.disabled = ready.length === 0
+  const missingMinutes = ready.filter(recipe => recipe.warnings.includes(missingMinutesWarning)).length
+  setStatus(sourceLabel + ': ' + ready.length + ' gecontroleerde eigen recepten geschikt voor de ongeprijsde boodschappenmand. ' +
+    held.length + ' recept(en) wachten op controle; details hieronder. ' +
+    (missingMinutes ? missingMinutes + ' recept(en) zonder betrouwbare bereidingstijd kunnen wel naar de boodschappenmand; de tijd blijft onbekend. ' : '') +
+    'Vink maximaal zeven bereidingen aan. Per recept kies je het aantal bereidingen en de porties. ' +
+    'Alle originele SKU’s en winkelprijzen blijven onbekend totdat jij toegestane bronproducten bewust koppelt.',
+  ready.length === 0)
+}
+
+backupFileInput.addEventListener('change', () => {
+  ++sourceRevision
+  // A changed file invalidates an earlier preview immediately; never convert
+  // the previous file after the user selects a different private backup.
+  if (selectedSource === 'backup') {
+    clearRecipeSelection()
+    setStatus('Ander back-upbestand gekozen. Controleer het bestand opnieuw vóór omzetting.')
+  }
+})
+
+loadButton.addEventListener('click', () => {
+  ++sourceRevision
+  clearRecipeSelection()
   try {
-    // Access storage only on the user's explicit click; never save or mutate it.
+    // Device storage is only accessed on this explicit click. Its raw snapshot
+    // is checked again just before emitting the physical shopping demand.
     const snapshot = readRecipeLibrary(window.localStorage)
     if (snapshot.error) throw Error('Jouw receptbibliotheek kan niet veilig worden gelezen. Herstel die eerst in Mijn recepten.')
-    // A missing preparation duration is irrelevant to the physical grocery demand.
-    // Keep it unknown; all ingredient/portion/source review warnings still hold the recipe.
-    const ready = snapshot.recipes.filter(recipe =>
-      recipe.warnings.every(warning => warning === missingMinutesWarning) &&
-      reviewedForBasket(recipe) !== null)
-    const held = snapshot.recipes.filter(recipe => !ready.includes(recipe))
-    renderReviewNeeded(held)
-    loaded = ready
+    presentRecipes(snapshot.recipes, 'Op dit apparaat')
+    selectedSource = 'device'
     libraryRaw = snapshot.raw
-    for (const recipe of ready.slice(0, 100)) {
-      const card = document.createElement('label')
-      card.className = 'own-recipe-pick-card'
-      card.style.display = 'grid'
-      card.style.gridTemplateColumns = 'auto minmax(0,1fr) auto'
-      card.style.padding = '10px 0'
-      card.style.borderBottom = '1px solid #d8e5d9'
-      card.style.maxWidth = '100%'
-      card.style.alignItems = 'center'
-      card.style.gap = '10px'
-      const selected = document.createElement('input')
-      selected.type = 'checkbox'
-      selected.style.width = '20px'
-      selected.dataset.recipeSelected = recipe.id
-      const caption = document.createElement('span')
-      caption.textContent = recipe.title + ' · ' + recipe.servings + ' porties per bereiding · ' +
-        recipe.ingredients.length + ' ingrediënten'
-      const repeats = document.createElement('input')
-      repeats.type = 'number'
-      repeats.min = '1'
-      repeats.max = '7'
-      repeats.step = '1'
-      repeats.value = '1'
-      repeats.setAttribute('aria-label', 'Aantal bereidingen van ' + recipe.title)
-      repeats.dataset.recipeRepeats = recipe.id
-      const portions = document.createElement('input')
-      portions.type = 'number'
-      portions.min = '1'
-      portions.max = '100'
-      portions.step = '1'
-      portions.value = String(recipe.servings ?? 2)
-      portions.setAttribute('aria-label', 'Porties per bereiding van ' + recipe.title)
-      portions.title = 'Gewenste porties per bereiding (1–100)'
-      portions.dataset.recipePortions = recipe.id
-      const inputs = [repeats, portions]
-      for (const field of inputs) {
-        field.style.minWidth = '0'
-        field.style.width = '100%'
-      }
-      const controls = document.createElement('span')
-      controls.className = 'own-recipe-pick-controls'
-      for (const [name, field] of [['Bereidingen', repeats], ['Porties', portions]] as const) {
-        const wrapper = document.createElement('span')
-        const title = document.createElement('span')
-        title.textContent = name
-        title.className = 'own-recipe-pick-caption'
-        wrapper.append(title, field)
-        controls.append(wrapper)
-      }
-      card.append(selected, caption, controls)
-      choices.append(card)
-    }
-    convertButton.disabled = ready.length === 0
-    const missingMinutes = ready.filter(recipe => recipe.warnings.includes(missingMinutesWarning)).length
-    setStatus(ready.length + ' eigen recepten met gecontroleerde fysieke ingrediënten beschikbaar voor de ongeprijsde boodschappenmand. ' +
-      held.length + ' recepten blijven apart staan met concrete controlepunten hieronder. ' +
-      (missingMinutes ? missingMinutes + ' bruikbare recepten hebben geen betrouwbare bereidingstijd; die blijft onbekend en blokkeert alleen de maaltijdplanning. ' : '') +
-      'Vink maximaal zeven bereidingen aan. De eerste invoer per recept is het aantal bereidingen, de tweede het gewenste aantal porties per bereiding. ' +
-      'Porties worden voor de bronmatching opnieuw uit de bevestigde metrische ingrediënten berekend. Geen winkel-SKU of prijs wordt afgeleid.',
-    ready.length === 0)
   } catch (error) {
+    clearRecipeSelection()
     setStatus(error instanceof Error ? error.message : 'Kan lokale eigen recepten niet lezen.', true)
+  }
+})
+
+backupLoadButton.addEventListener('click', async () => {
+  const ticket = ++sourceRevision
+  clearRecipeSelection()
+  const file = backupFileInput.files?.[0]
+  if (!file) {
+    setStatus('Kies eerst je eigen JSON-receptenback-up.', true)
+    return
+  }
+  if (file.size === 0 || file.size > RECIPE_BACKUP_MAX_BYTES) {
+    setStatus('Kies een gevuld eigen receptenbestand van maximaal 2 MB.', true)
+    return
+  }
+  backupLoadButton.disabled = true
+  setStatus('Je privé-receptenback-up wordt uitsluitend op dit apparaat gelezen en gecontroleerd.')
+  try {
+    const raw = await file.text()
+    if (ticket !== sourceRevision || backupFileInput.files?.[0] !== file) return
+    // Existing strict Supa backup admission: no localStorage write, no remote
+    // fetch, no fabricated price; even one malformed record rejects the file.
+    const preview = prepareRecipeBackupImport(raw, [])
+    if (ticket !== sourceRevision || backupFileInput.files?.[0] !== file) return
+    presentRecipes(preview.additions, 'Je gecontroleerde JSON-back-up')
+    selectedSource = 'backup'
+    selectedBackupFile = file
+  } catch (error) {
+    if (ticket !== sourceRevision) return
+    clearRecipeSelection()
+    setStatus(error instanceof Error ? error.message : 'Kan je eigen JSON-back-up niet veilig lezen.', true)
+  } finally {
+    if (ticket === sourceRevision) backupLoadButton.disabled = false
   }
 })
 
 convertButton.addEventListener('click', () => {
   try {
-    const latest = readRecipeLibrary(window.localStorage)
-    if (latest.error || latest.raw !== libraryRaw || !loaded.length) {
-      throw Error('De eigen recepten zijn gewijzigd. Laad ze opnieuw vóór omzetten.')
+    if (!selectedSource || !loaded.length) {
+      throw Error('Laad eerst gecontroleerde eigen recepten vanaf je apparaat of back-up.')
+    }
+    if (selectedSource === 'device') {
+      const latest = readRecipeLibrary(window.localStorage)
+      if (latest.error || latest.raw !== libraryRaw) {
+        throw Error('De eigen recepten zijn in een ander tabblad gewijzigd. Laad ze opnieuw vóór omzetten.')
+      }
+    } else if (!selectedBackupFile || backupFileInput.files?.[0] !== selectedBackupFile) {
+      throw Error('Je back-upselectie is gewijzigd. Controleer opnieuw vóór omzetten.')
     }
     const recipes = []
     const plan: { day: string; recipeId: string }[] = []
