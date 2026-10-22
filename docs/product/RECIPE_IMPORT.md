@@ -19,6 +19,24 @@ Supa kan eigen recepten lokaal bewaren en omzetten naar het interne receptformaa
 
 Bij HTML met JSON-LD gebruikt Supa eerst de JSON-LD-bron. Microdata is de terugvalroute wanneer er geen JSON-LD-scriptblokken aanwezig zijn. Niet iedere website publiceert bruikbare receptmetadata; gebruik dan de gewone tekstimport of voer het recept handmatig in.
 
+## Gewone recepttekst en bronvermelding
+
+Via **Recepten → Meerdere eigen recepten importeren → Gewone tekst/Markdown** kun je een of meer zelf uitgeschreven recepten importeren. Een recept kan bijvoorbeeld beginnen met:
+
+~~~text
+Pasta met tomaat
+Porties: 2
+Tijd: 25 min
+Bron: https://voorbeeld.nl/recept/pasta
+Ingrediënten:
+- 200 g pasta
+- 300 g tomaten
+Bereiding:
+- Kook de pasta en bereid de tomatensaus.
+~~~
+
+De optionele `Bron:`-regel mag ook een openbare HTTPS-Markdownlink (`[website](https://…)`) of autolink (`<https://…>`) zijn. Deze link dient **alleen als bronvermelding**: gewone tekstimport doet geen netwerkverzoek en importeert nooit een winkelprijs. Een ongeldige, lege of niet-openbare bronlink wordt niet bewaard; het recept blijft een controleerbaar concept met een duidelijke bronwaarschuwing. Een tweede `Bron:`-regel in hetzelfde recept is een fout, ook als de eerste link ongeldig was. Controleer en herstel die waarschuwing in de bewerkbare preview vóór definitieve planning of boodschappenberekening.
+
 ## Recepten gebruiken voor een ongeprijsde boodschappenmand
 
 De aparte privévergelijker kan gecontroleerde eigen recepten gebruiken als fysieke boodschappenbehoefte. Dit vereist een geldig aantal porties, metrische hoeveelheden groter dan nul en maximaal 100.000 per ingrediënt; fysieke `piece`-hoeveelheden moeten veilige gehele aantallen zijn. De lijst toont een recept alleen als klaar wanneer dezelfde grenzen gelden als bij de uiteindelijke mandtoelating; te grote of onveilige hoeveelheden verschijnen direct als controlepunt in plaats van pas na selectie te falen. Een ontbrekende of onduidelijke bereidingstijd blijft onbekend, maar blokkeert deze ingrediëntenlijst niet: bereidingstijd is geen ingrediënt en wordt niet verzonnen. Hetzelfde recept blijft voor de gewone maaltijdplanner geblokkeerd totdat de ontbrekende bereidingstijd is gecorrigeerd. Andere open ingrediënt-, hoeveelheid- of bronwaarschuwingen blijven uitgesloten en worden bij het laden concreet getoond, zodat je ze in **Mijn recepten** kunt corrigeren.
