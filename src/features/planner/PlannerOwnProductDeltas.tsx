@@ -62,7 +62,7 @@ function UnitPriceGap({ item }: { item: ComparedOwnLine }) {
 export function PlannerOwnProductDeltas({ lines, onChooseLine, onExportSelection }: {
   lines: ComparedOwnLine[]
   onChooseLine: (ingredientId: string, store: OwnStore) => void
-  onExportSelection: (ingredientIds: string[], action: 'download' | 'copy') => void
+  onExportSelection: (ingredientIds: string[], action: 'download' | 'copy' | 'csv') => void
 }) {
   const [filter, setFilter] = useState<DifferenceFilter>('all')
   const [unitFamily, setUnitFamily] = useState<'all' | 'kg' | 'liter' | 'stuk'>('all')
@@ -186,7 +186,14 @@ export function PlannerOwnProductDeltas({ lines, onChooseLine, onExportSelection
         onClick={() => onExportSelection(visibleLines.map(line => line.id), 'copy')}>
         Kopieer deze {visibleLines.length} privéprijsregels
       </button>
-      <small>Bevat alleen de zichtbare, bevestigde productregels en bronmomenten; geen volledig mandtotaal.</small>
+      <button type="button" className="ghost-button"
+        disabled={visibleLines.length === 0}
+        onClick={() => onExportSelection(visibleLines.map(line => line.id), 'csv')}>
+        Bewaar deze {visibleLines.length} prijsregels als spreadsheet-CSV
+      </button>
+      <small>Bevat uitsluitend zichtbare, bevestigde producten met oorspronkelijke
+        SKU, pakprijzen, eenheidsprijzen, regelverschillen en bronmomenten. De CSV
+        gebruikt Nederlandse puntkomma-kolommen; geen volledig mandtotaal.</small>
     </div>
     {visibleLines.length > 0
       ? <>
