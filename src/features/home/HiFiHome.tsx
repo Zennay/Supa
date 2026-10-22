@@ -457,40 +457,68 @@ export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: 
     <h3>Jouw gekozen producten</h3>
     <p className="disclaimer">Eigen verzamelijst · niet meegenomen in de berekende maaltijdmand of winkelvergelijking.
       Dit is geen offerte, actuele voorraad of bewijs van besparing.</p>
+    <div className="hifi-picked-progress" role="group" aria-label="Mijn afvinkvoortgang voor ongeprijsde producten">
+      <p role="status" aria-live="polite">{completedCount} van {ids.length} eigen producten afgevinkt · {ids.length - completedCount} nog te kopen.</p>
+      <progress max={Math.max(1, ids.length)} value={completedCount}
+        aria-label="Afgevinkte producten uit mijn ongeprijsde selectie" />
+      <button type="button" className="ghost-button" aria-pressed={openOnly}
+        onClick={() => setOpenOnly(!openOnly)}>
+        {openOnly ? 'Toon ook gekochte producten' : 'Toon alleen nog te kopen'}
+      </button>
+      <button type="button" className="ghost-button"
+        disabled={!progress.writable || completedCount === 0}
+        onClick={() => {
+          if (window.confirm('Alle afvinkingen van deze persoonlijke, ongeprijsde lijst terugzetten op nog te kopen?'))
+            saveDone([], 'Alle productselecties opnieuw als nog te kopen gemarkeerd.')
+        }}>Zet alle vinkjes terug</button>
+    </div>
+    {!progress.writable && <p role="alert">Deze browseropslag is niet beschikbaar of bevat een onbekende versie.
+      Afvinken is uitgeschakeld; jouw bestaande opgeslagen gegevens worden niet overschreven.</p>}
+    {progressMessage && <p role="status" aria-live="polite">{progressMessage}</p>}
+    {openOnly && completedCount === ids.length &&
+      <p role="status">Alles afgevinkt! Toon ook gekochte producten om de lijst terug te zien.</p>}
     {selectedHistorical.length > 0 && <div className="hifi-picked-history" aria-label="Historische bronproducten zonder prijs">
       <h4>Historische bronproducten</h4>
       <p className="disclaimer">Waargenomen op 4 oktober 2026. Geen actuele prijzen of bronrechten voor productie.</p>
-      {selectedHistorical.map(item => <div className="hifi-demo-list-row hifi-picked-history-row" key={item.id}>
+      {visibleHistorical.map(item => <div className="hifi-demo-list-row hifi-picked-history-row" key={item.id}>
         <div className="hifi-picked-source-logo" aria-hidden="true">{item.store === 'PLUS' ? 'P' : 'D'}</div>
         <div className="hifi-picked-details">
           <strong>{item.name}</strong>
           <span>{item.store} · {item.pack} · prijs onbekend</span>
         </div>
-        <button type="button" className="ghost-button" onClick={() => onRemove(item.id)}
+        {progressControl(item.id, item.name)}
+        <button type="button" className="ghost-button" onClick={() => removeAndUncheck(item.id)}
           aria-label={`Verwijder uit lijst: ${item.name} bij ${item.store}`}>Verwijder</button>
       </div>)}
     </div>}
     {selectedUnknown.length > 0 && <div className="hifi-picked-demo" aria-label="Oude productselecties die niet meer in de catalogus staan">
       <h4>Oude productselecties</h4>
       <p className="disclaimer">Deze product-ID's horen niet bij de huidige catalogus. Ze blijven bewaard totdat je ze verwijdert; er wordt geen prijs of productmatch afgeleid.</p>
-      {selectedUnknown.map(id => <div className="hifi-demo-list-row" key={id}>
+      {visibleUnknown.map(id => <div className="hifi-demo-list-row" key={id}>
         <div className="hifi-picked-source-logo" aria-hidden="true">?</div>
         <div className="hifi-picked-details"><strong>Product niet beschikbaar</strong><span>Oude product-ID: {id} · prijs onbekend</span></div>
-        <button type="button" className="ghost-button" onClick={() => onRemove(id)} aria-label={`Verwijder oude productselectie: ${id}`}>Verwijder</button>
+        {progressControl(id, 'oude product-ID ' + id)}
+        <button type="button" className="ghost-button" onClick={() => removeAndUncheck(id)} aria-label={`Verwijder oude productselectie: ${id}`}>Verwijder</button>
       </div>)}
     </div>}
     {selectedExamples.length > 0 && <div className="hifi-picked-demo" aria-label="Figma demoproducten">
       <h4>Figma-voorbeelden</h4>
       <p className="disclaimer">Demolijst · geen actuele prijzen. Niet meegenomen in de mandvergelijking.</p>
-      {selectedExamples.map(p => <div className="hifi-demo-list-row" key={p.id}>
+      {visibleExamples.map(p => <div className="hifi-demo-list-row" key={p.id}>
         <FigmaImage asset={p.image} width="40" height="40" alt="" />
         <span>{p.name}</span>
-        <button type="button" className="ghost-button" onClick={() => onRemove(p.id)}
+        {progressControl(p.id, p.name)}
+        <button type="button" className="ghost-button" onClick={() => removeAndUncheck(p.id)}
           aria-label={`Verwijder: ${p.name}`}>Verwijder</button>
       </div>)}
     </div>}
     <button type="button" className="hifi-history-add" onClick={() => downloadSelection(false)}>
       Download mijn ongeprijsde selectie (.txt)
+    </button>
+    <button type="button" className="hifi-history-add"
+      disabled={completedCount === ids.length}
+      onClick={() => downloadSelection(true)}>
+      Download alleen nog te kopen (.txt)
     </button>
     <label className="hifi-picked-copy-label">Kopieer je gekozen productnamen
       <textarea readOnly rows={Math.min(ids.length + 2, 12)}
