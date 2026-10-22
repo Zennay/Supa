@@ -148,7 +148,7 @@ function euroToCents(raw) {
   const match = /^(0|[1-9]\d{0,4})(?:[.,](\d{1,2}))?$/.exec(raw)
   if (!match) throw Error('Voer een gemeten eurobedrag in, bijvoorbeeld 1,49 of 0,99.')
   const cents = BigInt(match[1]) * 100n + BigInt((match[2] || '').padEnd(2, '0'))
-  if (cents > 1000000n) throw Error('De gemeten winkelprijs ligt buiten het ondersteunde bereik.')
+  if (cents <= 0n || cents > 1000000n) throw Error('De gemeten winkelprijs moet positief zijn en binnen het ondersteunde bereik vallen.')
   return String(cents)
 }
 function addRow(store, notify = true) {
