@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react'
-import { exportManualOwnSourceDraft, importManualOwnSourceDraft, MANUAL_DRAFT_MAX_BYTES, type ManualSources } from './manualOwnSourceDraft.ts'
+import { exportManualOwnSourceDraft, importManualOwnSourceDraft, MANUAL_DRAFT_MAX_BYTES, type ManualEntry, type ManualSources } from './manualOwnSourceDraft.ts'
 import type { OfflinePriceSnapshots } from '../../domain/offlineReviewedImport.ts'
+import { readablePlannerDemandAmount, type PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
 import './manualOwnSourceEntry.css'
 
 type Store = 'PLUS' | 'DekaMarkt'
 type Field = 'id' | 'name' | 'packAmount' | 'packUnit' | 'packCount' | 'priceCents' | 'available'
-type Entry = Record<Field, string>
+type Entry = ManualEntry
 type Source = { observedAt: string; products: Entry[] }
 
 const STORES: readonly Store[] = ['PLUS', 'DekaMarkt']
@@ -29,7 +30,7 @@ function serializeManualCapture(sources: Record<Store, Source>): string {
   for (const store of STORES) {
     const source = sources[store]
     const products = source.products.filter(product =>
-      Object.values(product).some(value => value.trim() !== ''))
+      FIELDS.some(field => product[field].trim() !== ''))
     if (source.observedAt.trim() && products.length === 0)
       throw new Error(store + ': voeg ten minste één echt geobserveerd product toe.')
     if (products.length === 0) continue
@@ -48,12 +49,16 @@ function serializeManualCapture(sources: Record<Store, Source>): string {
 
 /** Manual entry is an alternative to preparing a spreadsheet, not an
  * alternative to source rights, original identifiers or user review. */
-export function ManualOwnSourceEntry({ onPreview, busy, template }: {
+export function ManualOwnSourceEntry({ onPreview, busy, template, needs }: {
   onPreview: (raw: string) => void
   busy: boolean
   template: OfflinePriceSnapshots | null
+  needs: readonly PlannerCaptureGuideNeed[]
 }) {
   const [open, setOpen] = useState(false)
+  const [guideStore, setGuideStore] = useState<Store>('PLUS')
+  const [guideNeedId, setGuideNeedId] = useState('')
+  const [guideMessage, setGuideMessage] = useState('')
   const [sources, setSources] = useState<Record<Store, Source>>({
     PLUS: initialSource(), DekaMarkt: initialSource(),
   })
@@ -68,6 +73,7 @@ export function ManualOwnSourceEntry({ onPreview, busy, template }: {
     setPendingDraft(null)
     setPendingTemplate(null)
     setBackupMessage('')
+    setGuideMessage('')
     setAcknowledged(false); setError('')
   }
 
@@ -105,6 +111,37 @@ export function ManualOwnSourceEntry({ onPreview, busy, template }: {
       },
     }))
     invalidateRestore()
+  }
+  // Planner quantities are only reminders for what the household needs.
+  // No original retailer SKU/name, availability, pack size, timestamp or
+  // price is inferred from this week demand or copied into a capture row.
+  function addPlannerNeeds(store: Store, onlyId?: string) {
+    const chosen = needs.filter(need => !onlyId || need.id === onlyId)
+    if (chosen.some(need => need.id.length > 140 || need.label.length > 180)) {
+      setGuideMessage('Een Planner-ingrediënthint is te lang voor dit privéconcept. Gebruik het bestaande weekinvulblad.')
+      return
+    }
+    const existing = sources[store].products
+    const missing = chosen.filter(need => !existing.some(row => row.needHint?.id === need.id))
+    if (missing.length === 0) {
+      setGuideMessage('Deze Planner-ingrediënten staan al in de gekozen winkelinvoer.')
+      return
+    }
+    const empty = (row: Entry) => FIELDS.every(field => !row[field].trim()) && !row.needHint
+    const base = existing.filter(row => !empty(row))
+    if (base.length + missing.length > 30) {
+      setGuideMessage(store + ': onvoldoende plek voor alle gevraagde ingrediënten (maximaal 30 regels). Kies één ingrediënt of gebruik het bestaande week-CSV-blad.')
+      return
+    }
+    const appended = missing.map(need => ({ ...emptyEntry(), needHint: {
+      id: need.id, label: need.label,
+      quantity: readablePlannerDemandAmount(need.amount) + ' ' + need.unit,
+    } }))
+    setSources(previous => ({ ...previous, [store]: {
+      ...previous[store], products: [...base, ...appended],
+    } }))
+    invalidateRestore()
+    setGuideMessage(store + ': ' + appended.length + ' ongevulde invulregels uit de Planner toegevoegd. Vul zelf de echte winkelproducten en actuele waarnemingen in.')
   }
   function stageOriginalIdentifiers() {
     if (!template) return
@@ -200,6 +237,36 @@ export function ManualOwnSourceEntry({ onPreview, busy, template }: {
         originele artikelcodes, verpakkingen, bedragen in eurocenten en echte
         bronmomenten in. Supa vult geen product, prijs of tijd automatisch aan.
         Ook na dit formulier controleer je de originele SKU’s in Vergelijk.</p>
+      {needs.length > 0 && <section className="supa-manual-source__needs">
+        <h4>Vul vanuit je geselecteerde weekmandje in</h4>
+        <p>De Planner kent jouw <strong>fysieke ingrediëntvraag</strong>, maar
+          nog niet het oorspronkelijke artikel van de winkel. Voeg lege
+          invulregels toe om tijdens het winkelen per ingrediënt de echte
+          productcode, naam, verpakking en waargenomen prijs over te nemen.
+          De gevraagde hoeveelheid is een geheugensteun, geen pakinhoud.</p>
+        <div className="supa-manual-source__needs-controls">
+          <label>Winkel waarvoor je wilt opnemen
+            <select value={guideStore} onChange={event => {
+              setGuideStore(event.target.value as Store); setGuideMessage('')
+            }}>
+              {STORES.map(store => <option key={store} value={store}>{store}</option>)}
+            </select>
+          </label>
+          <label>Kies eventueel één weekingrediënt
+            <select value={guideNeedId} onChange={event => setGuideNeedId(event.target.value)}>
+              <option value="">Alle nog niet toegevoegde ingrediënten</option>
+              {needs.map((need, index) => <option key={need.id + ':' + index} value={need.id}>
+                {need.label} · {readablePlannerDemandAmount(need.amount)} {need.unit}
+              </option>)}
+            </select>
+          </label>
+        </div>
+        <button type="button" className="ghost-button" onClick={() =>
+          addPlannerNeeds(guideStore, guideNeedId || undefined)}>
+          + Maak lege {guideStore}-invulregels vanuit de Planner
+        </button>
+        {guideMessage && <p role="status">{guideMessage}</p>}
+      </section>}
       {STORES.map(store => {
         const source = sources[store]
         return <fieldset className="supa-manual-source__store" key={store}>
@@ -214,6 +281,12 @@ export function ManualOwnSourceEntry({ onPreview, busy, template }: {
             vastgelegd. Gebruik anders een apart bronbestand; geen geschat moment.</small>
           {source.products.map((product, index) =>
             <div className="supa-manual-source__product" key={index}>
+              {product.needHint && <p className="supa-manual-source__hint">
+                <strong>Planner-herinnering (geen winkelproduct):</strong>
+                {' '}{product.needHint.label} · nodig: {product.needHint.quantity}.
+                {!needs.some(need => need.id === product.needHint?.id) &&
+                  <em> Deze vraag staat niet meer in de huidige Planner-week.</em>}
+              </p>}
               <div className="supa-manual-source__product-heading">
                 <strong>Origineel artikel {index + 1}</strong>
                 <button type="button" className="ghost-button"

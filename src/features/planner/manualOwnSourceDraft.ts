@@ -1,7 +1,10 @@
 export type ManualStore = 'PLUS' | 'DekaMarkt'
 export type ManualField =
   | 'id' | 'name' | 'packAmount' | 'packUnit' | 'packCount' | 'priceCents' | 'available'
-export type ManualEntry = Record<ManualField, string>
+export type ManualEntry = Record<ManualField, string> & {
+  // Optional Planner checklist hint. Not an original retailer fact or product.
+  needHint?: { id: string; label: string; quantity: string }
+}
 export type ManualSource = { observedAt: string; products: ManualEntry[] }
 export type ManualSources = Record<ManualStore, ManualSource>
 
@@ -18,7 +21,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 /** A draft is only editable input, never an admitted retailer capture. */
 export function exportManualOwnSourceDraft(sources: ManualSources): string {
-  const text = JSON.stringify({ schema: 'supa-manual-source-draft-v1', sources }, null, 2) + '\n'
+  const text = JSON.stringify({ schema: 'supa-manual-source-draft-v2', sources }, null, 2) + '\n'
   if (new TextEncoder().encode(text).length > MANUAL_DRAFT_MAX_BYTES)
     throw new Error('Het concept is te groot voor een veilig lokaal bestand.')
   return text
@@ -32,7 +35,8 @@ export function importManualOwnSourceDraft(raw: string): ManualSources {
   let parsed: unknown
   try { parsed = JSON.parse(raw) }
   catch { throw new Error('Conceptbestand is geen geldige JSON.') }
-  if (!isRecord(parsed) || parsed.schema !== 'supa-manual-source-draft-v1' ||
+  if (!isRecord(parsed) ||
+      !['supa-manual-source-draft-v1', 'supa-manual-source-draft-v2'].includes(parsed.schema as string) ||
       !isRecord(parsed.sources))
     throw new Error('Onbekende conceptversie. Open een eerder Supa-invulconcept.')
   const result = {} as ManualSources
@@ -51,6 +55,16 @@ export function importManualOwnSourceDraft(raw: string): ManualSources {
         if (typeof value !== 'string' || value.length > LIMITS[field])
           throw new Error(store + ': ongeldig of te lang ' + field + '-veld.')
         entry[field] = value
+      }
+      if (parsed.schema === 'supa-manual-source-draft-v2' && row.needHint !== undefined) {
+        if (!isRecord(row.needHint) || typeof row.needHint.id !== 'string' ||
+            row.needHint.id.length > 140 || typeof row.needHint.label !== 'string' ||
+            row.needHint.label.length > 180 || typeof row.needHint.quantity !== 'string' ||
+            row.needHint.quantity.length > 80)
+          throw new Error(store + ': ongeldige Planner-geheugensteun in concept.')
+        entry.needHint = {
+          id: row.needHint.id, label: row.needHint.label, quantity: row.needHint.quantity,
+        }
       }
       products.push(entry)
     }
