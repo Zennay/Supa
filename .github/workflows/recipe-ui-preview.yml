@@ -11,9 +11,13 @@ jobs:
   preview:
     if: ((github.event_name != 'pull_request' && github.event_name != 'pull_request_target') || (github.event.pull_request.head.repo.full_name == github.repository && github.actor == 'Zennay'))
     runs-on: [self-hosted, supa, vps]
+    # Match the host runner UID so this container never leaves root-owned files in the shared checkout.
+    env:
+      HOME: /tmp
+      npm_config_cache: /tmp/supa-recipe-preview-npm-cache
     container:
       image: mcr.microsoft.com/playwright:v1.56.1-noble
-      options: --ipc=host
+      options: --ipc=host --user 1000:1000
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
