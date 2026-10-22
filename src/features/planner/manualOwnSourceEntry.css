@@ -80,3 +80,29 @@
   color: #203428;
   line-height: 1.5;
 }
+.supa-manual-source__coverage { margin: 1rem 0; }
+.supa-manual-source__coverage summary { font-weight: 650; cursor: pointer; }
+.supa-manual-source__coverage-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  margin: 0.8rem 0;
+}
+.supa-manual-source__coverage-list {
+  max-height: 26rem;
+  overflow: auto;
+  display: grid;
+  gap: 0.6rem;
+}
+.supa-manual-source__coverage-row {
+  padding: 0.65rem;
+  border: 1px solid #c6cec8;
+  border-radius: 0.6rem;
+}
+.supa-manual-source__coverage-row > div {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}

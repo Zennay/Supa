@@ -143,6 +143,20 @@ export function ManualOwnSourceEntry({ onPreview, busy, template, needs }: {
     invalidateRestore()
     setGuideMessage(store + ': ' + appended.length + ' ongevulde invulregels uit de Planner toegevoegd. Vul zelf de echte winkelproducten en actuele waarnemingen in.')
   }
+  function statusForNeed(store: Store, id: string) {
+    const index = sources[store].products.findIndex(row => row.needHint?.id === id)
+    if (index < 0) return { index: -1, complete: false }
+    const row = sources[store].products[index]
+    const required: readonly Field[] = row.available === 'false'
+      ? ['id', 'name', 'packUnit', 'available'] : FIELDS
+    return { index, complete: !!sources[store].observedAt.trim() &&
+      required.every(field => !!row[field].trim()) }
+  }
+  function jumpToNeed(store: Store, index: number) {
+    const card = document.getElementById('supa-manual-' + store + '-' + index)
+    card?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    card?.querySelector<HTMLInputElement>('input')?.focus({ preventScroll: true })
+  }
   function stageOriginalIdentifiers() {
     if (!template) return
     const reused = {} as ManualSources
@@ -266,6 +280,41 @@ export function ManualOwnSourceEntry({ onPreview, busy, template, needs }: {
           + Maak lege {guideStore}-invulregels vanuit de Planner
         </button>
         {guideMessage && <p role="status">{guideMessage}</p>}
+        <details className="supa-manual-source__coverage">
+          <summary>Invoervoortgang voor hetzelfde weekmandje bij beide winkels</summary>
+          <p>Alleen handmatig ingevulde velden; nog geen bevestigde
+            productmatch, bronprijs of besparingsbewijs.</p>
+          <div className="supa-manual-source__coverage-counts">
+            {STORES.map(store => <span key={store}>
+              <strong>{store}:</strong> {needs.filter(need =>
+                statusForNeed(store, need.id).complete).length} van {needs.length}
+              {' '}ingevoerd, nog niet beoordeeld
+            </span>)}
+          </div>
+          <div className="supa-manual-source__coverage-list">
+            {needs.slice(0, 30).map((need, index) => <div
+              className="supa-manual-source__coverage-row" key={need.id + ':' + index}>
+              <strong>{need.label}</strong>
+              <small>Nodig: {readablePlannerDemandAmount(need.amount)} {need.unit}</small>
+              {STORES.map(store => {
+                const status = statusForNeed(store, need.id)
+                return <div key={store}>
+                  <span><strong>{store}</strong> · {status.index < 0
+                    ? 'Geen invulregel' : status.complete
+                      ? 'Ingevuld, broncontrole nog nodig'
+                      : 'Originele bronvelden ontbreken'}</span>
+                  {status.index >= 0 && <button type="button" className="ghost-button"
+                    onClick={() => jumpToNeed(store, status.index)}>
+                    Open {store}-invulregel
+                  </button>}
+                </div>
+              })}
+            </div>)}
+            {needs.length > 30 && <small>En {needs.length - 30} andere
+              ingrediënten. Gebruik voor de volledige lijst het
+              bestaande CSV-invulblad.</small>}
+          </div>
+        </details>
       </section>}
       {STORES.map(store => {
         const source = sources[store]
@@ -280,7 +329,7 @@ export function ManualOwnSourceEntry({ onPreview, busy, template, needs }: {
           <small>Alle artikelen hieronder moeten echt op ditzelfde bronmoment zijn
             vastgelegd. Gebruik anders een apart bronbestand; geen geschat moment.</small>
           {source.products.map((product, index) =>
-            <div className="supa-manual-source__product" key={index}>
+            <div className="supa-manual-source__product" id={'supa-manual-' + store + '-' + index} key={index}>
               {product.needHint && <p className="supa-manual-source__hint">
                 <strong>Planner-herinnering (geen winkelproduct):</strong>
                 {' '}{product.needHint.label} · nodig: {product.needHint.quantity}.
