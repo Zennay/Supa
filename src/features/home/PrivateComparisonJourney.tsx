@@ -89,6 +89,17 @@ export function PrivateComparisonJourney({
     setShowAllComplete(false)
   }, [captureKey, reviewed])
 
+  // A newly imported original source or a different Planner week must not
+  // inherit a retailer filter that silently hides newly confirmed price rows.
+  // These are visual preferences only: the stored basket and original source
+  // facts are never mutated.
+  useEffect(() => {
+    setPartialQuery('')
+    setPartialStoreFilter('all')
+    setPartialSort('impact')
+    setShowAllPartial(false)
+  }, [captureKey, progress, reviewed])
+
   useEffect(() => {
     const refresh = () => setNowMs(Date.now())
     const timer = window.setInterval(refresh, 60_000)
