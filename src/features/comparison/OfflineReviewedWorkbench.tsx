@@ -419,6 +419,7 @@ export function OfflineReviewedWorkbench({
   const [tripExportMessage, setTripExportMessage] = useState('')
   const [tripProgressMessage, setTripProgressMessage] = useState('')
   const [coverageMessage, setCoverageMessage] = useState('')
+  const [readableCopyMessage, setReadableCopyMessage] = useState('')
   const [coverageCopyText, setCoverageCopyText] = useState<string | null>(null)
   useEffect(() => setCoverageCopyText(null), [text, planKey])
   const [coverageScope, setCoverageScope] = useState<'all' | 'open' | 'PLUS' | 'DekaMarkt'>('open')
@@ -2416,6 +2417,27 @@ export function OfflineReviewedWorkbench({
         basketPair.comparison.deltaCents!, fullDifferenceRows)
     : null
 
+  async function copyReadableReport() {
+    if (!readableReport || !eligibleComparisonRightNow()) {
+      setReadableCopyMessage('Dit oorspronkelijke bronpaar is niet meer volledig actueel of bevestigd. Geen prijsverschil gekopieerd.')
+      return
+    }
+    const source = currentActiveSource.current
+    const week = captureWeekRef.current
+    const revision = importRevision.current
+    try {
+      if (!navigator.clipboard?.writeText) throw Error('Geen klembord')
+      await navigator.clipboard.writeText(readableReport)
+      setReadableCopyMessage(
+        source === currentActiveSource.current && week === captureWeekRef.current &&
+        revision === importRevision.current && eligibleComparisonRightNow()
+          ? 'Jouw persoonlijk gecontroleerde prijsverschil gekopieerd; dit is geen onafhankelijke winkelprijs.'
+          : 'De bron veranderde tijdens het kopiëren. Gebruik de tekst niet als actuele vergelijking; maak deze opnieuw.')
+    } catch {
+      setReadableCopyMessage('Klembordtoegang niet beschikbaar. Selecteer de leesbare privétekst hieronder handmatig.')
+    }
+  }
+
   function downloadReadableReport() {
     if (!readableReport || !eligibleComparisonRightNow()) {
       setTripExportMessage('Het bronmoment of een productbevestiging is inmiddels verlopen: geen privéverschil meer te downloaden. Neem nieuwe geldige prijzen op.')
@@ -3384,10 +3406,21 @@ export function OfflineReviewedWorkbench({
                   <button type="button" className="ghost-button" onClick={downloadReadableReport}>
                     Download leesbare vergelijking (TXT)
                   </button>
+                  <button type="button" className="ghost-button"
+                    onClick={() => void copyReadableReport()}>
+                    Kopieer volledig bevestigd prijsverschil
+                  </button>
+                  {readableCopyMessage && <p role="status" aria-live="polite">{readableCopyMessage}</p>}
                   <label>Zelf kopiëren, zonder klembordtoestemming
                     <textarea readOnly rows={12} spellCheck={false}
                       aria-label="Leesbare privévergelijking"
-                      value={readableReport} onFocus={event => event.currentTarget.select()} />
+                      value={readableReport} onFocus={event => {
+                        if (eligibleComparisonRightNow()) event.currentTarget.select()
+                        else {
+                          event.currentTarget.blur()
+                          setReadableCopyMessage('Deze bron is verlopen of herzien. Maak eerst een nieuwe bevestigde vergelijking.')
+                        }
+                      }} />
                   </label>
                 </details>
               )}
