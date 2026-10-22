@@ -1069,6 +1069,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       window.localStorage.setItem(PRIVATE_SHOPPING_TEMPLATE_KEY, raw)
       setRepeatRaw(raw)
       setRepeatPreview(null)
+      setRepeatFilePreview(null)
       setRepeatMessage(selectedVisible.length + ' zichtbare geselecteerde eigen artikelen als herhaalronde bewaard, zonder vinkjes of prijzen.')
     } catch (error) {
       // An invalid draft name is editable; never lock the user's UI simply
@@ -1198,6 +1199,7 @@ export function ManualShoppingNotes({ notes, setNotes }: {
       setRepeatRaw(null)
       setRepeatProtected(false)
       setRepeatPreview(null)
+      setRepeatFilePreview(null)
       setRepeatMessage('Alleen je bewaarde herhaalronde verwijderd. Je actieve privéboodschappen blijven staan.')
     } catch (error) {
       setRepeatMessage(error instanceof Error ? error.message : 'Sjabloon kon niet worden verwijderd.')
