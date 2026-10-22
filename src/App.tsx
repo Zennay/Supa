@@ -71,6 +71,8 @@ const ObservationView = lazy(async () => {
 })
 import { IdentityAvatar } from './components/IdentityAvatar.tsx'
 import { HiFiHome, HiFiDemoList } from './features/home/HiFiHome'
+import { clearUnpricedShoppingProduct } from './features/home/unpricedShoppingProgress'
+import { clearUnpricedShoppingDetails } from './features/home/unpricedShoppingDetails'
 // Actual-source comparison is a separate, lazy Home route, never historical demo pricing.
 const PrivateComparisonJourney = lazy(async () => {
   const module = await import('./features/home/PrivateComparisonJourney.tsx')
@@ -288,6 +290,11 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
     return () => window.cancelAnimationFrame(frame)
   }, [tab, ownPriceImportSignal])
   const toggleDesignProduct = (id: string) => {
+    // A removed discovery item is a new task if added again; do not resurrect old private details.
+    if (designProductIds.includes(id)) {
+      clearUnpricedShoppingProduct(id)
+      clearUnpricedShoppingDetails(id)
+    }
     setDesignProductIds(current => current.includes(id) ? current.filter(item => item !== id) : current.length < 100 ? [...current, id] : current)
     setProductSelectionTouched(true)
   }
@@ -1236,12 +1243,12 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
                     <p className="disclaimer">Deze selectie is door jou gemaakt in Producten.
                       Historische gegevens en Figma-voorbeelden zijn geen geverifieerde prijzen
                       en doen niet mee in een eigen winkelmandvergelijking.</p>
-                    <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
+                    <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} onAdd={toggleDesignProduct} />
                     <Suspense fallback={<p role="status">Voorbeeldlijst wordt geladen…</p>}><ShoppingListView basket={basket} /></Suspense>
                   </section>
                 : <details className="demo-comparison-disclosure">
-                    <summary>Toon oude voorbeeldboodschappen (geen actuele winkelprijzen)</summary>
-                    <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
+                    <summary>Herstel mijn productselectie of bekijk voorbeelden (geen actuele prijzen)</summary>
+                    <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} onAdd={toggleDesignProduct} />
                     <Suspense fallback={<p role="status">Voorbeeldlijst wordt geladen…</p>}><ShoppingListView basket={basket} /></Suspense>
                   </details>)}
             </section>
@@ -1296,7 +1303,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             <p className="disclaimer">Jouw losse Producten-selectie is apart bewaard.
               Historische artikelen en Figma-voorbeelden zijn geen nieuwe bronprijzen,
               volledige verpakkingsmatches of besparingsbewijs.</p>
-            <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
+            <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} onAdd={toggleDesignProduct} />
           </section>
         )}
         {tab === 'list' && (
