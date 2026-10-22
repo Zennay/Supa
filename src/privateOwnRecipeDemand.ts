@@ -58,9 +58,9 @@ function renderReviewNeeded(recipes: SavedRecipe[]) {
   heading.textContent = 'Recepten die nog controle nodig hebben (' + recipes.length + ')'
   const intro = document.createElement('p')
   intro.textContent = 'Deze recepten worden niet naar een boodschappenmand omgezet totdat de aangegeven hoeveelheden, porties of reviewpunten zijn opgelost. Open Supa → Recepten, corrigeer het recept en laad deze lijst opnieuw.'
-  const list = document.createElement('div')
-  list.style.display = 'grid'
-  list.style.gap = '8px'
+  const listContainer = document.createElement('div')
+  listContainer.style.display = 'grid'
+  listContainer.style.gap = '8px'
   for (const recipe of recipes.slice(0, 100)) {
     const details = document.createElement('details')
     details.style.border = '1px solid #e2d1b2'
@@ -71,17 +71,17 @@ function renderReviewNeeded(recipes: SavedRecipe[]) {
     summary.style.fontWeight = '650'
     const reasons = reviewReasons(recipe)
     summary.textContent = recipe.title + ' · ' + reasons.length + ' controlepunt(en)'
-    const list = document.createElement('ul')
-    list.style.paddingLeft = '22px'
+    const reasonsList = document.createElement('ul')
+    reasonsList.style.paddingLeft = '22px'
     for (const reason of reasons) {
       const item = document.createElement('li')
       item.textContent = reason
-      list.append(item)
+      reasonsList.append(item)
     }
-    details.append(summary, list)
-    list.append(details)
+    details.append(summary, reasonsList)
+    listContainer.append(details)
   }
-  reviewNeeded.append(heading, intro, list)
+  reviewNeeded.append(heading, intro, listContainer)
 }
 
 let loaded: SavedRecipe[] = []
