@@ -2593,14 +2593,20 @@ export function OfflineReviewedWorkbench({
                 </p>
               )}
               {currentPreview.stores.map(store => {
-                const query = capturePreviewSearch[store.retailer]
-                  .normalize('NFC').trim().toLocaleLowerCase('nl-NL')
+                // Preview the same accent-insensitive, multiword source
+                // discovery as the final SKU chooser. No search result is an
+                // accepted match, price or permission claim.
+                const queryTerms = searchableSourceText(capturePreviewSearch[store.retailer])
+                  .split(/\s+/u).filter(Boolean)
                 const filteredProducts = store.previewProducts.filter(product => {
-                  if (!query) return true
-                  const searchable = [product.name, product.id, product.packAmount, product.packUnit]
-                    .map(value => String(value ?? '')).join(' ')
-                    .normalize('NFC').toLocaleLowerCase('nl-NL')
-                  return searchable.includes(query)
+                  if (!queryTerms.length) return true
+                  const amount = product.packAmount === null ? '' : String(product.packAmount)
+                  const pack = amount ? amount + product.packUnit : ''
+                  const count = product.packCount === null ? '' : String(product.packCount) + 'x'
+                  const searchable = searchableSourceText([
+                    product.name, product.id, amount, product.packUnit, pack, count,
+                  ].join(' '))
+                  return queryTerms.every(term => searchable.includes(term))
                 })
                 const sort = capturePreviewSort[store.retailer]
                 const visibleProducts = [...filteredProducts].sort((a, b) => {
@@ -2622,10 +2628,10 @@ export function OfflineReviewedWorkbench({
                     {' '}({store.unavailableProducts} zonder bruikbare pakprijs)</summary>
                   <p>Oorspronkelijk ingevoerd bronmoment:
                     {' '}<time>{store.observedAt}</time>. Nog géén match- of herkomstbevestiging.</p>
-                  <label>Zoek in originele producten op naam, broncode of verpakking
+                  <label>Zoek met meerdere woorden in originele naam, broncode, verpakking en multipack
                     <input type="search" maxLength={100}
                       value={capturePreviewSearch[store.retailer]}
-                      placeholder="Bijv. tomaten of SKU"
+                      placeholder="Bijv. tomaten 500 g"
                       onChange={event => {
                         const value = event.currentTarget.value
                         setCapturePreviewSearch(current => ({
@@ -2648,6 +2654,17 @@ export function OfflineReviewedWorkbench({
                       <option value="unknown">Onbekende pakprijs eerst</option>
                     </select>
                   </label>
+                  {Boolean(capturePreviewSearch[store.retailer] ||
+                    capturePreviewSort[store.retailer] !== 'source') && (
+                    <button type="button" className="ghost-button"
+                      onClick={() => {
+                        setCapturePreviewSearch(current => ({ ...current, [store.retailer]: '' }))
+                        setCapturePreviewSort(current => ({ ...current, [store.retailer]: 'source' }))
+                        setCapturePreviewShown(current => ({ ...current, [store.retailer]: 20 }))
+                      }}>
+                      Wis {store.retailer}-zoekopdracht en sortering
+                    </button>
+                  )}
                   <p role="status">{visibleProducts.length} van {store.previewProducts.length} originele artikelen gevonden.
                     {' '}Zoeken verandert bronprijzen of productmatches niet.</p>
                   <ul>
