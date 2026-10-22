@@ -2973,18 +2973,47 @@ export function OfflineReviewedWorkbench({
                       onChange={event => setPairedOnlyMissing(event.currentTarget.checked)} />
                     {' '}Toon alleen ingrediënten zonder bruikbaar matchvoorstel bij één of beide winkels
                   </label>
+                  <label>Filter voorlopige hele-pak-prijsverschillen
+                    <select value={pairedPriceFilter}
+                      onChange={event => setPairedPriceFilter(event.currentTarget.value as
+                        'all' | 'plus' | 'deka' | 'equal' | 'unknown')}>
+                      <option value="all">Alle fysieke ingrediënten</option>
+                      <option value="plus" disabled={!pairedPreviewComparable}>Voorlopig goedkoper bij PLUS</option>
+                      <option value="deka" disabled={!pairedPreviewComparable}>Voorlopig goedkoper bij DekaMarkt</option>
+                      <option value="equal" disabled={!pairedPreviewComparable}>Voorlopig gelijke hele-pak-kosten</option>
+                      <option value="unknown">Prijsverschil nog onbekend</option>
+                    </select>
+                  </label>
+                  <label>Sorteer voorgestelde fysieke prijsregels
+                    <select value={pairedPriceSort}
+                      onChange={event => setPairedPriceSort(event.currentTarget.value as 'plan' | 'difference')}>
+                      <option value="plan">Volgorde uit Planner</option>
+                      <option value="difference" disabled={!pairedPreviewComparable}>
+                        Grootste voorlopige regelverschil eerst
+                      </option>
+                    </select>
+                  </label>
+                  <button type="button" className="ghost-button"
+                    disabled={!pairedOnlyMissing && pairedPriceFilter === 'all' && pairedPriceSort === 'plan'}
+                    onClick={() => {
+                      setPairedOnlyMissing(false)
+                      setPairedPriceFilter('all')
+                      setPairedPriceSort('plan')
+                    }}>
+                    Wis alle twee-winkelfilters
+                  </button>
+                  <p role="status">{pairedPreviewDisplayed.length} van {pairedPreviewRows.length}
+                    {' '}fysieke ingrediënten zichtbaar. Voorlopige prijsverschillen
+                    zijn nooit een goedgekeurde besparingsclaim.</p>
                   {pairedOnlyMissing &&
                     pairedPreviewRows.every(row => row.plusCode && row.dekaCode) && (
                     <p role="status">Voor ieder ingrediënt is in beide winkels een
                       voorstel gevonden. Controleer beide oorspronkelijke artikelen alsnog.</p>
                   )}
                   <ul>
-                    {pairedPreviewRows.filter(row =>
-                      !pairedOnlyMissing || !row.plusCode || !row.dekaCode).map(row => {
-                      const pairedCents = pairedPreviewComparable && row.plusCode && row.dekaCode &&
-                        row.plusCents !== null && row.dekaCents !== null &&
-                        row.plusPacks !== null && row.dekaPacks !== null
-                      const delta = pairedCents ? row.dekaCents! - row.plusCents! : null
+                    {pairedPreviewDisplayed.map(row => {
+                      const pairedCents = row.deltaCents !== null
+                      const delta = row.deltaCents
                       return <li key={row.id}>
                         <strong>{row.label}</strong>
                         {' '}· {row.amount ?? 'hoeveelheid onbekend'} {row.unit}
