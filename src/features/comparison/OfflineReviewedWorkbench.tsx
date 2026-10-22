@@ -99,7 +99,8 @@ type CapturePreviewStore = {
       amount: number | null; unit: string
       product: string | null; originalSku: string | null
       packs: number | null; lineTotalCents: number | null
-      unitRate: string | null; reasons: string[] }[]
+      unitRate: string | null; unitCents: number | null
+      unitFamily: 'kg' | 'liter' | 'stuk' | null; reasons: string[] }[]
   }
   observedAt: string; observedNs?: bigint; unavailableProducts: number
   previewProducts: {
@@ -661,6 +662,14 @@ export function OfflineReviewedWorkbench({
             packs: line.status === 'matched' ? line.packs : null,
             lineTotalCents: line.status === 'matched' ? line.lineTotalCents : null,
             unitRate: line.status === 'matched' ? privateUnitPrice(line) : null,
+            unitCents: line.status === 'matched' ? privatePackUnitRate({
+              amount: line.pack.amount, unit: line.pack.unit, count: line.pack.count,
+              priceCents: line.pricePerPackCents,
+            })?.roundedCentsPerUnit ?? null : null,
+            unitFamily: line.status === 'matched' ? privatePackUnitRate({
+              amount: line.pack.amount, unit: line.pack.unit, count: line.pack.count,
+              priceCents: line.pricePerPackCents,
+            })?.unit ?? null : null,
             reasons: line.reasons,
           })),
         }
