@@ -10,7 +10,7 @@ export type OfflineAvailabilityLabel = 'available' | 'unavailable' | 'unknown'
 export type OfflineSourceKind = 'product' | 'catalog' | 'offers'
 export type OfflineStoreProduct = StoreProduct & {
   sourcePriceCents?: number | null
-  sourceAvailable?: boolean | null
+  sourceAvailable?: boolean
   availabilityLabel?: OfflineAvailabilityLabel
   sourceUrl?: string
   sourceSha256?: string
@@ -117,8 +117,7 @@ function parseProduct(raw: unknown, retailer: OfflineRetailer): OfflineStoreProd
       (raw.packCount !== undefined && (!Number.isSafeInteger(raw.packCount) ||
         (raw.packCount as number) < 1 || (raw.packCount as number) > 1000)) ||
       typeof raw.available !== 'boolean' ||
-      (raw.sourceAvailable !== undefined && raw.sourceAvailable !== null &&
-        typeof raw.sourceAvailable !== 'boolean') ||
+      (raw.sourceAvailable !== undefined && typeof raw.sourceAvailable !== 'boolean') ||
       (raw.availabilityLabel !== undefined &&
         !['available', 'unavailable', 'unknown'].includes(raw.availabilityLabel as string)) ||
       !validProductSourceProvenance(raw, retailer) ||
@@ -140,7 +139,8 @@ function parseProduct(raw: unknown, retailer: OfflineRetailer): OfflineStoreProd
     // the user's private UI, without loosening the strict CSV/JSON importer.
     sourcePriceCents: raw.priceCents as number | null,
     sourceAvailable: raw.sourceAvailable === undefined
-      ? raw.available : raw.sourceAvailable as boolean | null,
+      ? (raw.availabilityLabel === 'unknown' ? undefined : raw.available)
+      : raw.sourceAvailable as boolean,
     availabilityLabel: raw.availabilityLabel as OfflineAvailabilityLabel | undefined,
     sourceUrl: raw.sourceUrl as string | undefined,
     sourceSha256: raw.sourceSha256 as string | undefined,
