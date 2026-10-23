@@ -83,4 +83,6 @@ jobs:
           retention-days: 7
       - run: node --experimental-strip-types --test tests/m3-observation-sheet.test.mjs tests/m3-build-observed-study.test.mjs tests/m3-observed-study-report.test.mjs tests/m3-savings-attribution.test.mjs tests/m3-workflow-contract.test.mjs
       - run: npm test
+        env:
+          NODE_OPTIONS: --max-old-space-size=1024
       - run: npm run build
