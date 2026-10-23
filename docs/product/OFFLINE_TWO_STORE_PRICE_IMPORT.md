@@ -287,6 +287,17 @@ negenkoloms-CSV openen. Voor één winkel heet het JSON-schema
 `convertOwnStoreCsv` uit `public/offline-two-store-csv.mjs` verzorgt
 dezelfde strikte lokale CSV-conversie als de uitgebreide privéwerkbank.
 
+Ook één lokaal JSON-object in het bestaande `RawProductObservation`-formaat van
+de Schema.org-productadapter kan via de JSON-import of het hoofdscherm-plakveld
+worden aangeleverd. Ruwe Schema.org JSON-LD wordt niet rechtstreeks als prijs
+geaccepteerd: de bestaande adapter moet eerst een gevalideerde observatie leveren.
+Supa zet die observatie lokaal om naar hetzelfde privé-opnameschema en valideert
+opnieuw de retailer, UTC-Z-bronmoment, originele productcode, fysieke verpakking,
+HTTPS-bron-URL en SHA-256. De URL, hash, brontype en expliciete/ onbekende
+beschikbaarheid blijven per product bewaard. Er is geen netwerkrequest en de
+import bewijst geen bronrechten of menselijke veldwaarneming; onzekere prijs,
+beschikbaarheid of verpakking wordt niet ingevuld.
+
 Na één import verschijnt alleen de waargenomen winkel met originele
 artikel-ID's, verpakking, waarnemingstijd, eenheidsprijs en de hele
 verpakkingsberekening. De tweede winkel toont expliciet **geen bronopname**.
