@@ -57,5 +57,5 @@ jobs:
       - run: npm ci
       - run: npm test
         env:
-          NODE_OPTIONS: --test-concurrency=1
+          NODE_OPTIONS: --max-old-space-size=1024
       - run: npm run build
