@@ -44,6 +44,12 @@ test('Figma Planner 3359:4896 meal rows and total card keep real state and make 
     assert.match(html, /Prijs onbekend/)
     assert.match(html, /<summary>Bekijk berekening<\/summary>/)
     assert.match(html, /id="weekbudget-title"/)
+    // Week strip shows the same original photo for the planned curated day.
+    assert.equal((html.match(/hifi-planner-day-number with-photo/g) ?? []).length, 1)
+    // Overlap strip names shared ingredients and days, never an amount.
+    const strip = html.match(/<p class="hifi-reuse-strip"[\s\S]*?<\/p>/)?.[0] ?? ''
+    assert.match(strip, /in combinatie: /)
+    assert.doesNotMatch(strip, /€|bespaar/i)
     assert.doesNotMatch(html, /Potentiele besparing|Potentiële besparing|Supavoordeel|bespaar tot/i)
   } finally {
     await vite.close()

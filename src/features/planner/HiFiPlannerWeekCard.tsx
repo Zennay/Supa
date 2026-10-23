@@ -1,4 +1,5 @@
 import type { PlannedMeal } from '../../domain/types'
+import { FigmaImage } from '../../components/FigmaImage'
 import './hifiPlannerWeek.css'
 
 export const weekdayNames: Record<string, string> = {
@@ -25,10 +26,13 @@ export function HiFiPlannerWeekCard({
   plannedMeals,
   activeDays,
   onToggleDay,
+  dayImages = {},
 }: {
   plannedMeals: PlannedMeal[]
   activeDays: string[]
   onToggleDay: (day: string) => void
+  /** Original Figma photo of the recipe planned on a day, when one exists. */
+  dayImages?: Record<string, string>
 }) {
   const today = new Date()
 
@@ -52,7 +56,10 @@ export function HiFiPlannerWeekCard({
               onClick={() => onToggleDay(day)}
             >
               <span className="hifi-planner-day-label">{day.slice(0, 1)}</span>
-              <span className="hifi-planner-day-number">{date.getDate()}</span>
+              <span className={active && dayImages[day] ? 'hifi-planner-day-number with-photo' : 'hifi-planner-day-number'}>
+                {active && dayImages[day] && <FigmaImage asset={dayImages[day]} alt="" />}
+                <span>{date.getDate()}</span>
+              </span>
             </button>
           )
         })}

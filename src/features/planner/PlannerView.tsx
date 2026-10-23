@@ -3,6 +3,7 @@ import type { PlannedMeal, Recipe } from '../../domain/types'
 import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../domain/basket.ts'
 import { buildIngredientReuseInsight } from '../../domain/ingredientReuse.ts'
 import { IngredientReuseCard } from './IngredientReuseCard.tsx'
+import { HiFiReuseStrip } from './HiFiReuseStrip.tsx'
 // Previewing a proposed replacement is optional: do not pull its entire
 // physical shopping and retailer capture-sheet toolchain into app startup.
 const RecipeReusePreviewPanel = lazy(() => import('./RecipeReusePreviewPanel.tsx')
@@ -161,6 +162,11 @@ export function PlannerView({
     ? buildIngredientReuseInsight({ plan: plannedMeals, recipes: ingredientRecipes, activeDays })
     : null, [hasIngredientData, plannedMeals, ingredientRecipes, activeDays])
 
+  const dayImages = useMemo(() => Object.fromEntries(plannedMeals.flatMap(meal => {
+    const image = figmaRecipeImages[meal.recipeId]
+    return image ? [[meal.day, image]] : []
+  })), [plannedMeals])
+
   return (
     <section className="screen hifi-planner-screen" data-figma-node="3359:4896">
       <div className="section-heading">
@@ -175,7 +181,10 @@ export function PlannerView({
         plannedMeals={plannedMeals}
         activeDays={activeDays}
         onToggleDay={onToggleDay}
+        dayImages={dayImages}
       />
+
+      {hasIngredientData && <HiFiReuseStrip insight={reuseInsight} />}
 
       <div className="day-grid" aria-label="Geplande maaltijden">
         {plannedMeals.map((item) => {

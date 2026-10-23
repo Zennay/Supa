@@ -54,4 +54,7 @@ The M2 Firefox workflow enters Planner from the new Home before replaying all ex
 - Alleen de zes SUPA-recepten krijgen hun originele Figma-foto (`figmaRecipeImages`); overige recepten tonen een neutraal monogram in plaats van een niet-bijbehorende foto.
 - De budgetkaart volgt de Figma-totaalkaart: "Totaal" met uitsluitend een eigen, gecontroleerd mandbedrag (anders "Prijs onbekend"), scheidingslijn, "Weekbudget" in plaats van de onbewezen "Potentiële besparing", en een grijze "Bekijk berekening"-uitklap met budgetkeuzes en toelichting. Geen besparingsclaim toegevoegd.
 - Horizontale overflow van het Planner-scherm op 320–440px opgelost (grid-kolommen `minmax(0, 1fr)` voor `.screen`, bronimport en weekback-up).
-- Nog open: exacte Figma-maten/assets uit designcontext (chevron-, plus- en klok-exports), de vijfde dag in de weekstrip en een visuele diff zodra de Figma-limiet het toelaat.
+- Weekstrip: een geplande dag met een SUPA-recept toont de originele receptfoto achter de datum, zoals in Figma.
+- De Figma-strip tussen weekkaart en rijen ("… in combinatie: Ma 20") toont echte gedeelde ingrediënten en dagen uit de huidige planning; het Figma-bedrag "Bespaart €2.85" is bewust weggelaten.
+- **Kapotte assets:** `recipes/d982c.png` (Thai red curry) en `recipes/51c5a.png` (Quesadillas) zijn afgekapte PNG's (beide ±768 KiB, decoderen niet volledig). Ze staan niet meer in `figmaRecipeImages`; die recepten tonen een monogram/groene kaart tot ze opnieuw uit Figma zijn geëxporteerd.
+- Nog open: exacte Figma-maten/assets uit designcontext (chevron-, plus- en klok-exports), de vijfde dag in de weekstrip, herexport van de twee kapotte receptfoto's en een visuele diff zodra de Figma-limiet het toelaat.
