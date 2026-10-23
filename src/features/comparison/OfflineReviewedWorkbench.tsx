@@ -2317,6 +2317,12 @@ export function OfflineReviewedWorkbench({
         nowNs - capture.observedNs <= 604_800_000_000_000n
       if (complete && fresh) verified[store] = {
         basket, observedAt: capture.observedAt, capturedMs: capture.observedMs,
+        sourceProducts: capture.products.map(product => ({
+          id: product.id,
+          sourceUrl: product.sourceUrl,
+          sourceSha256: product.sourceSha256,
+          sourceKind: product.sourceKind,
+        })),
       }
     }
     return Object.keys(verified).length > 0 ? { planKey, stores: verified } : null
