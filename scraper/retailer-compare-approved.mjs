@@ -31,13 +31,17 @@ const physicalPackKey = ({pack_amount, pack_unit, pack_count, pack_text}) => {
  * never overrides conflicting brand or product-identity numbers (0% vs 100%).
  */
 function productIdentityEvidence(row) {
+  if (typeof row.brand !== 'string' || typeof row.name !== 'string') return null
   const brandKey = foldText(row.brand)
   const nameKey = foldText(row.name)
   if (!brandKey || !nameKey) return null
   const gtins = typeof row.gtins === 'string'
     ? [...new Set(row.gtins.split(',').map(normalizeGtin).filter(gtin => gtin && isGlobalGtin(gtin)))]
     : []
-  return { brandKey, nameKey, identityNumbers: nameNumbers(row.name), gtins }
+  // Multipack notation is physical-pack metadata, not a flavour/variant
+  // number. The pack guard already checks count and amount independently.
+  const identityName = row.name.replace(/\b\d+\s*[x×*]\s*(?=\d)/giu, ' ')
+  return { brandKey, nameKey, identityNumbers: nameNumbers(identityName), gtins }
 }
 
 function sameProductIdentity(left, right) {
