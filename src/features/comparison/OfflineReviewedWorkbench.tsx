@@ -1895,8 +1895,8 @@ export function OfflineReviewedWorkbench({
     setPendingReplacement(null)
     setBusy(true)
     try {
-      if (files.length < 3 || files.length > 24) {
-        throw new Error('Selecteer 3 tot 24 originele JSON-productbestanden per batch.')
+      if (files.length < 2 || files.length > 24) {
+        throw new Error('Selecteer 2 tot 24 originele JSON-productbestanden per batch.')
       }
       const byStore = new Map<'plus' | 'dekamarkt', unknown[]>()
       let combinedBytes = 0
@@ -1970,6 +1970,31 @@ export function OfflineReviewedWorkbench({
     if (files.length > 2) {
       await loadRawObservationFiles(files, selectedForPlan)
       return
+    }
+    if (files.length === 2 && files.every(file => file.size > 0 &&
+      file.size <= 256000 && /\.json$/i.test(file.name))) {
+      // Two independent adapter JSON files may belong to the SAME store.
+      // The ordinary two-capture path rejects these as duplicate retailers.
+      // Detect only that narrow case and delegate the full source admission
+      // to the same multi-file converter; canonical two-store JSON stays on
+      // the existing path.
+      const texts = await Promise.all(files.map(file => readOwnSourceTextFile(file)))
+      const observations = texts.map(text => {
+        try {
+          const parsed: unknown = JSON.parse(text)
+          const entries = Array.isArray(parsed) ? parsed : [parsed]
+          return entries.length > 0 && entries.every(isRawProductObservationShape)
+            ? entries : []
+        } catch {
+          return []
+        }
+      })
+      const originals = observations.flat()
+      if (observations.every(batch => batch.length > 0) &&
+          new Set(originals.map(entry => entry.supermarket)).size === 1) {
+        await loadRawObservationFiles(files, selectedForPlan)
+        return
+      }
     }
     if (files.length === 1) {
       await stageSelectedSource(files[0], selectedForPlan)
@@ -3837,7 +3862,7 @@ export function OfflineReviewedWorkbench({
           }}>
           <strong>{dropActive ? 'Laat je eigen bestanden los om ze lokaal te openen' :
             'Sleep eigen PLUS-/Deka-prijsbestanden hierheen'}</strong>
-          <label>Open winkelopnames (maximaal twee CSV/JSON), of selecteer 3–24 losse JSON-productobservaties tegelijk
+          <label>Open winkelopnames (maximaal twee CSV/JSON), of selecteer 2–24 losse JSON-productobservaties tegelijk
             <input type="file" accept=".csv,.tsv,.json,.txt,text/csv,text/plain,text/tab-separated-values,application/json" multiple disabled={busy}
               onChange={event => {
                 const files = Array.from(event.currentTarget.files ?? [])
