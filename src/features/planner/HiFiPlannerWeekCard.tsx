@@ -18,10 +18,14 @@ export function HiFiPlannerWeekCard({
   plannedMeals,
   activeDays,
   onToggleDay,
+  focusedDay,
+  onFocusDay,
 }: {
   plannedMeals: PlannedMeal[]
   activeDays: string[]
   onToggleDay: (day: string) => void
+  focusedDay?: string
+  onFocusDay?: (day: string) => void
 }) {
   const today = new Date()
   const monday = new Date(today.getFullYear(), today.getMonth(), today.getDate())
@@ -43,9 +47,13 @@ export function HiFiPlannerWeekCard({
               key={day}
               type="button"
               className={active ? 'hifi-planner-day selected' : 'hifi-planner-day'}
+              data-focused={focusedDay === day ? 'true' : undefined}
               aria-label={`${weekdayNames[day] ?? day} ${date.getDate()} ${active ? 'uit planning halen' : 'aan planning toevoegen'}`}
               aria-pressed={active}
-              onClick={() => onToggleDay(day)}
+              onClick={() => {
+                onFocusDay?.(day)
+                onToggleDay(day)
+              }}
             >
               <span className="hifi-planner-day-label">{day.slice(0, 1)}</span>
               <span className="hifi-planner-day-number">{date.getDate()}</span>
