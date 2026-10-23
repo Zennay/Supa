@@ -363,17 +363,19 @@ function extractPack(product: JsonObject): RawPack {
     if (!weightKey || !sizeKey || weightKey !== sizeKey) return unknownPack()
   }
 
-  // RawPack stores the quantity for the payable whole package, not the
-  // per-item amount inside a multipack. The schema has no separate count field.
-  const amount = weight.amount * weight.count
-  if (!Number.isFinite(amount) || amount <= 0) return unknownPack()
-  return { rawText: weight.rawText, amount, unit: weight.unit }
+  // RawPack's established amount is the per-item quantity; rawText retains
+  // the original multipack count because the schema has no count field.
+  return { rawText: weight.rawText, amount: weight.amount, unit: weight.unit }
 }
 
 function rawPackSignature(pack: RawPack): string | null {
-  if (pack.amount === null || pack.unit === 'unknown') return null
-  const unitText = pack.unit === 'piece' ? 'st' : pack.unit
-  const normalized = normalizePackText(String(pack.amount) + ' ' + unitText)
+  if (pack.amount === null || pack.unit === 'unknown' ||
+      typeof pack.rawText !== 'string' || !pack.rawText.trim()) return null
+  // RawPack has no separate count field; preserve the parser's established
+  // per-item amount and recover the full-package count from its raw text.
+  const normalized = normalizePackText(pack.rawText)
+  if (normalized.amount === null || normalized.unit === 'unknown' ||
+      normalized.amount !== pack.amount || normalized.unit !== pack.unit) return null
   return physicalPackSignature(normalized)
 }
 
