@@ -11,6 +11,21 @@ import { privateTwoStoreReviewCsv } from './privateTwoStoreReviewCsv.ts'
 function labelQuantity(line: PreviewMatchLine): string {
   return readablePlannerDemandAmount(line.amount) + ' ' + line.unit
 }
+function sourceProvenance(line: PreviewMatchLine | null) {
+  if (!line || !(line.sourceUrl || line.sourceSha256 || line.sourceKind)) return null
+  return <details className="offline-price-workbench__source-provenance">
+    <summary>Herkomst van dit bronartikel</summary>
+    {line.sourceKind && <p>Bronsoort: {line.sourceKind === 'product'
+      ? 'productpagina' : line.sourceKind === 'catalog'
+        ? 'catalogus' : 'aanbiedingen'}.</p>}
+    {line.sourceUrl && <p>Originele bronpagina:{' '}
+      <a href={line.sourceUrl} target="_blank" rel="noopener noreferrer">{line.sourceUrl}</a>
+    </p>}
+    {line.sourceSha256 && <p>Snapshot SHA-256: <code>{line.sourceSha256}</code></p>}
+    <small>De hash identificeert de aangeleverde snapshot; dit bewijst op zichzelf
+      geen bronrechten, prijsactualiteit of productgelijkwaardigheid.</small>
+  </details>
+}
 function localOffer(line: PreviewMatchLine | null,
   describeReason: (value: string) => string, usable: boolean) {
   if (!usable) return <span>
@@ -19,6 +34,7 @@ function localOffer(line: PreviewMatchLine | null,
     {line?.originalSku && <small style={{ display: 'block' }}>Oorspronkelijke SKU {line.originalSku}</small>}
     <small>Verlopen of oudste winkelbron buiten het 24-uursvenster.
       De oude bedragen worden niet als prijsvoorstel getoond.</small>
+    {sourceProvenance(line)}
   </span>
   if (!completePreviewProposal(line)) {
     return <span><strong>Bronmatch onvolledig. Prijs onbekend.</strong>
@@ -41,6 +57,7 @@ function localOffer(line: PreviewMatchLine | null,
       </small>}
       <small>Onvolledige prijzen, hele-pakregels en eenheidsprijzen worden niet getoond.
         Een origineel artikelnummer is nog geen bevestigde match.</small>
+      {sourceProvenance(line)}
     </span>
   }
   return <span>
@@ -55,6 +72,7 @@ function localOffer(line: PreviewMatchLine | null,
       <strong>{euro.formatCents(line.lineTotalCents)}</strong>
     </span>
     <small>Indicatief {line.unitPrice ?? 'eenheidsprijs onbekend'}; niet bevestigd</small>
+    {sourceProvenance(line)}
   </span>
 }
 
