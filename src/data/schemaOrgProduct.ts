@@ -353,6 +353,12 @@ export function parseSchemaOrgProduct(
   }
 
   const offers = offerCandidates(product.offers)
+  // AggregateOffer describes a catalogue/range, not one observed checkout
+  // amount for this physical pack. Do not infer a price from lowPrice, even
+  // when a concrete Offer appears beside it or the range bounds happen to match.
+  if (offers.some((offer) => hasType(offer, 'AggregateOffer'))) {
+    return { type: 'abstain', reason: 'AggregateOffer does not certify one physical unit price' }
+  }
   if (malformedDeclaredOfferPrice(offers)) {
     return { type: 'abstain', reason: 'malformed declared Offer or PriceSpecification amount' }
   }
