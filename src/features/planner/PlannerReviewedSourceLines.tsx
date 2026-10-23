@@ -2,6 +2,7 @@ import { euro as exactEuro } from '../../lib/money.ts'
 import { productSearchText } from '../products/productSearchText.ts'
 import { useRef, useState } from 'react'
 import { observedInstant } from '../../domain/offlineReviewedImport.ts'
+import { privateProgressProductRows, privateProgressPricePairs } from '../products/privateProgressProductRows.ts'
 import { recentOwnCaptureInstant, type OwnStore, type PrivateCaptureProgress } from '../comparison/privateReviewedBasketBridge.ts'
 import './plannerReviewedSourceLines.css'
 
@@ -24,11 +25,10 @@ export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient,
   const latestEvidence = useRef(progress)
   latestEvidence.current = progress
   if (!progress) return null
-  const entries = shops.flatMap(store => {
-    const source = progress.stores[store]
-    if (!source?.fresh || !recentOwnCaptureInstant(source.observedAt, now)) return []
-    return (source.confirmedSourceLines ?? []).map(line => ({ store, line }))
-  })
+  // Planner and Producten now display the SAME individually admitted SKU
+  // facts and original physical demand; no parallel price inference.
+  const entries = privateProgressProductRows(progress, now)
+    .map(row => ({ store: row.store, line: row.line }))
   const plus = progress.stores.PLUS
   const deka = progress.stores.DekaMarkt
   const expiredStoreNames = shops.filter(store => {
@@ -47,18 +47,9 @@ export function PlannerReviewedSourceLines({ progress, now, onReviewIngredient,
   const bothFresh = !!plus?.fresh && !!deka?.fresh &&
     recentOwnCaptureInstant(plus.observedAt, now) &&
     recentOwnCaptureInstant(deka.observedAt, now)
-  const right = new Map((deka?.confirmedSourceLines ?? []).map(line => [line.ingredientId, line]))
-  const pairs = !hasCompleteComparison && pairedTime && bothFresh &&
-    entries.some(entry => entry.store === 'PLUS') &&
-    entries.some(entry => entry.store === 'DekaMarkt')
-    ? (plus?.confirmedSourceLines ?? []).flatMap(one => {
-      const other = right.get(one.ingredientId)
-      if (!other || one.requiredAmount !== other.requiredAmount ||
-          one.requiredUnit !== other.requiredUnit ||
-          one.ingredientLabel !== other.ingredientLabel) return []
-      const difference = other.lineTotalCents - one.lineTotalCents
-      return Number.isSafeInteger(difference) ? [{ one, other, difference }] : []
-    }).sort((a, b) => Math.abs(b.difference) - Math.abs(a.difference))
+  const pairs = !hasCompleteComparison && pairedTime && bothFresh
+    ? privateProgressPricePairs(progress, now)
+      .sort((a, b) => Math.abs(b.difference) - Math.abs(a.difference))
     : []
   const pairCopy = pairCopyFallback?.source === progress && bothFresh && pairs.length > 0
     ? pairCopyFallback.csv : null

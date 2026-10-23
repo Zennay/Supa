@@ -34,11 +34,12 @@ const exactEuro = (cents: number): string => {
 const sourceDate = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
 
 /** Unconfirmed, read-only candidate hints. Canonical Workbench approves totals. */
-export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, onRecapture }: {
+export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, onRecapture, onOpenRecipes }: {
   needs: readonly PlannerCaptureGuideNeed[]
   source: OfflinePriceSnapshots
   onReviewIngredient?: (store: 'PLUS' | 'DekaMarkt', ingredientId: string) => void
   onRecapture?: (store: 'PLUS' | 'DekaMarkt') => void
+  onOpenRecipes?: () => void
 }) {
   // An open Planner tab may outlive a source capture's seven-day validity.
   // Recompute proposed SKUs on the real clock, not only on source-file edits.
@@ -80,10 +81,20 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
       const suggestions = {} as Record<OfflineRetailer, Suggestion>
       const unpricedHints = { PLUS: null, DekaMarkt: null } as Record<OfflineRetailer, UnpricedHint>
       const manualReview = { PLUS: false, DekaMarkt: false }
+      const measurementReview = !units.has(need.unit) ||
+        typeof need.amount !== 'number' || !Number.isFinite(need.amount) ||
+        need.amount <= 0 || need.amount > 1_000_000 ||
+        (need.unit === 'piece' && !Number.isSafeInteger(need.amount))
       for (const store of stores) {
+        if (measurementReview) {
+          suggestions[store] = null
+          continue
+        }
         const capture = source.captures[store]
-        if (!capture || olderPairedStore === store ||
-            !recentOwnCaptureInstant(capture.observedAt, clock) ||
+        // A real original source can still inform an individual shop even
+        // when its paired capture window has expired. The paired delta below
+        // remains explicitly suppressed until BOTH clocks are comparable.
+        if (!capture || !recentOwnCaptureInstant(capture.observedAt, clock) ||
             need.amount === null || !Number.isFinite(need.amount) ||
             need.amount <= 0 || !units.has(need.unit)) {
           suggestions[store] = null
@@ -97,7 +108,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
           product.available === true &&
           typeof product.sourcePriceCents === 'number' &&
           Number.isSafeInteger(product.sourcePriceCents) &&
-          product.sourcePriceCents >= 0 &&
+          product.sourcePriceCents > 0 &&
           product.packAmount !== null && product.packAmount > 0 &&
           family(product.packUnit) === family(need.unit))
         const requirement = {
@@ -114,7 +125,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
           // unknown packaging may be shown only as an unpriced identity hint.
           if (productFamily !== null && productFamily !== family(need.unit)) return false
           const priceValid = typeof product.sourcePriceCents === 'number' &&
-            Number.isSafeInteger(product.sourcePriceCents) && product.sourcePriceCents >= 0
+            Number.isSafeInteger(product.sourcePriceCents) && product.sourcePriceCents > 0
           const packValid = product.packAmount !== null && product.packAmount > 0 &&
             productFamily === family(need.unit)
           return !product.available || !priceValid || !packValid
@@ -138,7 +149,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
               found.packAmount === null || found.packAmount <= 0 ||
                 family(found.packUnit) === null ? 'verpakking of maateenheid ontbreekt' : null,
               typeof found.sourcePriceCents !== 'number' ||
-                !Number.isSafeInteger(found.sourcePriceCents) || found.sourcePriceCents < 0
+                !Number.isSafeInteger(found.sourcePriceCents) || found.sourcePriceCents <= 0
                 ? 'pakprijs ontbreekt of is ongeldig' : null,
             ].filter((reason): reason is string => !!reason)
             unpricedHints[store] = {
@@ -148,18 +159,25 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
             }
           }
         }
-        // An ambiguous source already contains several valid original SKUs.
-        // The user must pick one in Vergelijk, not re-observe a made-up new
-        // product or silently treat the first result as a match.
-        manualReview[store] = choice.type === 'abstain' &&
-          choice.reasons.includes('top candidates too close')
+        // Ambiguous candidates and meaningful extra product descriptors both
+        // require human SKU review. Do not route these known source products to
+        // a new capture sheet or silently promote the first plausible variant.
+        const requiresManualSourceReview = choice.reasons.some(reason =>
+          reason === 'top candidates too close' ||
+          reason.includes('additional product descriptor(s) require review') ||
+          reason === 'candidate piece pack amount must be a whole number' ||
+          reason === 'invalid pack count' ||
+          reason === 'candidate effective pack amount invalid' ||
+          reason === 'candidate normalized pack amount invalid'
+        )
+        manualReview[store] = choice.type === 'abstain' && requiresManualSourceReview
         const match = choice.type === 'match' ? products[store].get(choice.productId) : null
         // The fuzzy matcher can rank an attractive name even if the source
         // package belongs to a different physical unit family. Never present
         // e.g. ml rice as a viable candidate for a gram-based rice demand.
         suggestions[store] = match && match.available &&
           typeof match.sourcePriceCents === 'number' &&
-          Number.isSafeInteger(match.sourcePriceCents) && match.sourcePriceCents >= 0 &&
+          Number.isSafeInteger(match.sourcePriceCents) && match.sourcePriceCents > 0 &&
           match.packAmount !== null && family(match.packUnit) === family(need.unit)
           ? (() => {
               const count = match.packCount ?? 1
@@ -184,28 +202,37 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
                 packsNeeded, lineCents: packsNeeded * match.sourcePriceCents }
             })() : null
       }
-      return { need, suggestions, manualReview, unpricedHints }
+      return { need, suggestions, manualReview, unpricedHints, measurementReview }
     })
   }, [needs, source, olderPairedStore, clock])
   if (!coverage.length) return null
   const suggested = stores.map(store => coverage.filter(line => line.suggestions[store]).length)
-  const paired = coverage.filter(line => line.suggestions.PLUS && line.suggestions.DekaMarkt).length
-  const missing = coverage.filter(line => !line.suggestions.PLUS || !line.suggestions.DekaMarkt)
+  const paired = source.pairedWithin24h ? coverage.filter(line =>
+    line.suggestions.PLUS && line.suggestions.DekaMarkt).length : 0
+  // "Only missing" means missing FOR A TWO-SHOP COMPARISON. Two individually
+  // valid product hints with incompatible clocks are not paired evidence.
+  const missing = coverage.filter(line => !source.pairedWithin24h ||
+    !line.suggestions.PLUS || !line.suggestions.DekaMarkt)
   const requiringChoice = stores.map(store =>
     coverage.filter(line => line.manualReview[store]).length)
   const sourceKnownButUnpriced = stores.map(store =>
     coverage.filter(line => !!line.unpricedHints[store]).length)
-  // Review ambiguous existing SKUs before asking for new source capture.
+  // Review uncertain existing SKUs before asking for new source capture.
   const priority = (line: typeof coverage[number]) =>
-    stores.some(store => line.manualReview[store]) ? 0 :
-    stores.some(store => line.unpricedHints[store]) ? 1 :
-    stores.some(store => !line.suggestions[store]) ? 2 : 3
+    line.measurementReview ? 0 :
+    stores.some(store => line.manualReview[store]) ? 1 :
+    stores.some(store => line.unpricedHints[store]) ? 2 :
+    stores.some(store => !line.suggestions[store]) ? 3 : 4
   const candidateLineGap = (line: typeof coverage[number]) =>
     source.pairedWithin24h && line.suggestions.PLUS && line.suggestions.DekaMarkt
       ? line.suggestions.DekaMarkt.lineCents - line.suggestions.PLUS.lineCents : null
   // Explain precisely why a physical week ingredient cannot yet be compared.
   // A local uploaded source is not proof that either retailer authorized reuse.
   const noLineGapReason = (line: typeof coverage[number]): string | null => {
+    if (line.measurementReview)
+      return line.need.unit === 'piece'
+        ? line.need.label + ': het aantal stuks moet positief en heel zijn; controleer eerst Recepten.'
+        : line.need.label + ': hoeveelheid of maateenheid ontbreekt of is ongeldig; controleer eerst Recepten.'
     if (candidateLineGap(line) !== null) return null
     if (olderPairedStore) return 'Bronmomenten meer dan 24 uur uiteen: vernieuw ' +
       olderPairedStore + ' met een echte waarneming.'
@@ -215,7 +242,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
       if (!recentOwnCaptureInstant(capture.observedAt, clock))
         return store + ': opname is verlopen of komt uit de toekomst.'
       if (line.manualReview[store])
-        return store + ': kies handmatig één van de meerdere passende originele SKU’s.'
+        return store + ': controleer de oorspronkelijke SKU handmatig; de automatische match is niet eenduidig.'
       if (line.unpricedHints[store])
         return store + ': bestaande mogelijke SKU ' + line.unpricedHints[store]!.sku +
           ' heeft geen bruikbare brondata (' + line.unpricedHints[store]!.reason + ').'
@@ -247,10 +274,11 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
     if (actionFilter === 'choose-sku') return selectedStores.some(store => line.manualReview[store])
     if (actionFilter === 'fix-source') return selectedStores.some(store =>
       !!line.unpricedHints[store])
-    if (actionFilter === 'capture') return selectedStores.some(store =>
+    if (actionFilter === 'capture') return !line.measurementReview && selectedStores.some(store =>
       !line.suggestions[store] && !line.manualReview[store] &&
       !line.unpricedHints[store])
-    if (actionFilter === 'paired') return stores.every(store => !!line.suggestions[store])
+    if (actionFilter === 'paired') return source.pairedWithin24h &&
+      stores.every(store => !!line.suggestions[store])
     return storeFilter === 'both' || selectedStores.some(store =>
       !line.suggestions[store] || line.manualReview[store])
   }).sort((a, b) => {
@@ -274,8 +302,12 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
       const capture = source.captures[store]
       if (capture && !recentOwnCaptureInstant(capture.observedAt, Date.now()))
         return 'Bronopname verlopen of toekomstig · werkelijke winkelbron opnieuw opnemen'
-      if (olderPairedStore === store)
-        return 'Bronpaar meer dan 24 uur uiteen · oudste winkel opnieuw opnemen'
+      if (olderPairedStore === store) {
+        const candidate = line.suggestions[store]
+        return 'Origineel bronpaar meer dan 24 uur uiteen · oudste winkel opnieuw opnemen' +
+          (candidate ? ' · individueel onbevestigd bronvoorstel SKU ' + candidate.sku +
+            ' blijft zichtbaar, niet geldig als gepaarde prijs' : '')
+      }
       if (line.manualReview[store]) return 'Kies zelf bestaande originele SKU in Vergelijk'
       const incomplete = line.unpricedHints[store]
       if (incomplete) return 'Originele mogelijke SKU ' + incomplete.sku +
@@ -356,8 +388,8 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
     // even if its candidate list looks complete in isolation.
     if (!capture || !recentOwnCaptureInstant(capture.observedAt, nowMs) ||
         olderPairedStore === store) return [...needs]
-    return missing.filter(({ suggestions, manualReview }) =>
-      !suggestions[store] && !manualReview[store]).map(({ need }) => need)
+    return missing.filter(({ suggestions, manualReview, measurementReview }) =>
+      !measurementReview && !suggestions[store] && !manualReview[store]).map(({ need }) => need)
   }
   const pendingPlus = needsForNewSource('PLUS', clock).length
   const pendingDeka = needsForNewSource('DekaMarkt', clock).length
@@ -365,11 +397,11 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
   // suggestions. Never approve an SKU here; only navigate to the canonical
   // review workbench or to a deliberately empty real-source capture sheet.
   const nextReview = coverage.flatMap(line => stores.flatMap(store =>
-    line.manualReview[store] ? [{ store, need: line.need, ambiguous: true }] : [],
+    line.manualReview[store] ? [{ store, need: line.need, manualReview: true }] : [],
   ))[0] ?? coverage.flatMap(line => stores.flatMap(store =>
-    line.unpricedHints[store] ? [{ store, need: line.need, ambiguous: false, incomplete: true }] : [],
+    line.unpricedHints[store] ? [{ store, need: line.need, manualReview: false, incomplete: true }] : [],
   ))[0] ?? coverage.flatMap(line => stores.flatMap(store =>
-    line.suggestions[store] ? [{ store, need: line.need, ambiguous: false, incomplete: false }] : [],
+    line.suggestions[store] ? [{ store, need: line.need, manualReview: false, incomplete: false }] : [],
   ))[0]
   const nextCapture = pendingPlus ? 'PLUS' : pendingDeka ? 'DekaMarkt' : null
   const firstIncompleteStore = (stores as readonly ('PLUS' | 'DekaMarkt')[])
@@ -446,11 +478,17 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
       {source.captures.PLUS && source.captures.DekaMarkt &&
         !source.pairedWithin24h && <p><strong>Niet gelijktijdig vergelijkbaar:</strong>
           {' '}de twee oorspronkelijke opnames liggen meer dan 24 uur uit elkaar.
-          Nieuwe echte opnames zijn nodig voor een actuele twee-winkeldelta.</p>}
+          De individuele SKU-voorstellen uit actuele originele opnames blijven
+          zichtbaar voor winkelcontrole; dit zijn geen gepaarde prijzen of
+          besparingen. Neem de oudere winkel opnieuw op voor een echte twee-winkeldelta.</p>}
     </div>
     <p>{coverage.length} fysieke ingrediënten: PLUS {suggested[0]} mogelijke kandidaten,
       DekaMarkt {suggested[1]}. Voor {paired} ingrediënten is er voorlopig een
-      kandidaat bij beide winkels.</p>
+      {source.pairedWithin24h
+        ? ' kandidaat bij beide winkels binnen dezelfde 24-uurs bronperiode.'
+        : olderPairedStore
+          ? ' vergelijkbaar kandidaatpaar: de originele winkelmomenten liggen meer dan 24 uur uiteen.'
+          : ' vergelijkbaar kandidaatpaar: beide huidige oorspronkelijke winkelopnames zijn vereist.'}</p>
     {previewRows.length > 0 && <p className="supa-planner-source-matches__tentative-summary">
       <strong>Alleen voorlopige SKU-regels uit je twee oorspronkelijke bronnen:</strong>
       {' '}{provisionalLower.PLUS} ingrediëntregels met lagere PLUS-hele-pakkenregel,
@@ -498,12 +536,13 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
         {nextReview && onReviewIngredient && <button type="button" className="ghost-button"
           onClick={() => {
             const capture = source.captures[nextReview.store]
-            if (olderPairedStore !== nextReview.store && capture &&
-                recentOwnCaptureInstant(capture.observedAt, Date.now()))
+            // Individual SKU review is still useful; it never creates a
+            // paired timestamp or automatically approves a basket total.
+            if (capture && recentOwnCaptureInstant(capture.observedAt, Date.now()))
               onReviewIngredient(nextReview.store, nextReview.need.id)
           }}>
           {nextCapture ? '2.' : '1.'} Beoordeel {nextReview.need.label} bij {nextReview.store}
-          {nextReview.ambiguous ? ' (meerdere SKU’s)' :
+          {nextReview.manualReview ? ' (menselijke controle)' :
             'incomplete' in nextReview && nextReview.incomplete
               ? ' (bestaande SKU mist brondata)' : ' (bron-SKU nog onbevestigd)'}
         </button>}
@@ -574,10 +613,19 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
         <strong role="columnheader">PLUS</strong>
         <strong role="columnheader">DekaMarkt</strong>
       </div>
-      {shown.map(({ need, suggestions, manualReview, unpricedHints }) => <div className="supa-planner-source-matches__row"
+      {shown.map(({ need, suggestions, manualReview, unpricedHints, measurementReview }) => <div className="supa-planner-source-matches__row"
         role="row" key={need.id}>
         <span role="cell" data-store="Fysieke behoefte"><strong>{need.label}</strong>
           <small>{need.amount ?? 'Onbekend'} {need.unit}</small>
+          {measurementReview && <div>
+            <small className="supa-planner-source-matches__missing-delta">
+              {need.unit === 'piece'
+                ? 'Dit aantal stuks is geen positief geheel getal. Beoordeel de hoeveelheid eerst in Recepten.'
+                : 'De hoeveelheid of maateenheid ontbreekt of is ongeldig. Beoordeel deze behoefte eerst in Recepten.'}
+            </small>
+            {onOpenRecipes && <button type="button" className="ghost-button"
+              onClick={onOpenRecipes}>Open Recepten om aantallen te controleren</button>}
+          </div>}
           {source.pairedWithin24h && suggestions.PLUS && suggestions.DekaMarkt &&
             (() => {
               // Exact source-derived line arithmetic for the SAME physical
@@ -596,14 +644,19 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
                 </small>
               </span>
             })()}
-          {noLineGapReason({ need, suggestions, manualReview, unpricedHints }) &&
+          {noLineGapReason({ need, suggestions, manualReview, unpricedHints, measurementReview }) &&
             <small className="supa-planner-source-matches__missing-delta">
               Prijsverschil onbekend:
-              {' '}{noLineGapReason({ need, suggestions, manualReview, unpricedHints })}
+              {' '}{noLineGapReason({ need, suggestions, manualReview, unpricedHints, measurementReview })}
             </small>}</span>
         {stores.map(store => <span role="cell" data-store={store} key={store}>
           {suggestions[store] ? <>Kandidaat: {suggestions[store]!.name}
             <small>SKU {suggestions[store]!.sku} · niet bevestigd</small>
+            {olderPairedStore === store && <small className="supa-planner-source-matches__missing-delta">
+              Alleen deze originele winkelopname: ouder dan de andere bron met
+              meer dan 24 uur. De producten mogen afzonderlijk worden bekeken,
+              maar leveren geen twee-winkelprijsverschil op.
+            </small>}
             <small>{suggestions[store]!.packCount} × {suggestions[store]!.packAmount}
               {' '}{suggestions[store]!.packUnit} · opgenomen bronpakprijs
               {' '}{exactEuro(suggestions[store]!.packCents)}
@@ -615,13 +668,15 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
               {' '}{exactEuro(suggestions[store]!.lineCents)}
               {' '}volgens exacte metrische behoefte;
               {' '}niet bevestigd, gedeelde producten pas in Vergelijk samenvoegen.</small></>
+            : measurementReview
+              ? 'Controleer eerst de hoeveelheid en eenheid in Recepten; dit is geen ontbrekende winkelbron'
             : source.captures[store] &&
               !recentOwnCaptureInstant(source.captures[store]!.observedAt, clock)
               ? 'Verlopen of toekomstige bron: geen actueel geprijsd voorstel; leg een echte nieuwe opname vast'
             : olderPairedStore === store
               ? 'Bronpaar >24 uur uiteen: neem deze oudste winkel opnieuw op voordat je prijzen vergelijkt'
             : manualReview[store]
-              ? 'Meerdere geschikte SKU’s: kies de juiste originele verpakking zelf in Vergelijk'
+              ? 'Automatische match onzeker: controleer de juiste originele SKU en verpakking zelf in Vergelijk'
               : unpricedHints[store]
                 ? <>Mogelijke bestaande originele SKU: {unpricedHints[store]!.sku}
                   <small>{unpricedHints[store]!.name} · {unpricedHints[store]!.reason}.
@@ -638,7 +693,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
                 ? 'Bekijk bestaande maar ongeprijsde ' + store + '-SKU in Vergelijk'
                 : 'Controleer deze ' + store + '-SKU in Vergelijk'}
             </button>}
-          {onRecapture && !suggestions[store] && !manualReview[store] &&
+          {onRecapture && !measurementReview && !suggestions[store] && !manualReview[store] &&
             <button type="button" className="ghost-button"
               onClick={() => onRecapture(store)}>
               Open leeg {store}-opnameblad

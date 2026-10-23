@@ -3,15 +3,20 @@ import { useState } from 'react'
 import type { BasketTraceLine, OneStoreBasket } from '../../domain/basket.ts'
 import { compareFullBaskets } from '../../domain/basketComparison.ts'
 import { privateUnitPrice } from './privateUnitPrice.ts'
+import { privateMatchedUnitPriceGap } from '../products/privateProgressProductRows.ts'
+import { samePrivatePhysicalDemand } from './samePrivatePhysicalDemand.ts'
+import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
 
 const COLUMNS = [
   'plusObservedAt', 'dekaObservedAt', 'comparisonStatus',
   'ingredientId', 'ingredient', 'requiredAmount', 'requiredUnit',
-  'plusStatus', 'plusProduct', 'plusPacks', 'plusPackAmount', 'plusPackUnit',
-  'plusPackCount', 'plusPackPriceCents', 'plusLineCents',
-  'dekaStatus', 'dekaProduct', 'dekaPacks', 'dekaPackAmount', 'dekaPackUnit',
-  'dekaPackCount', 'dekaPackPriceCents', 'dekaLineCents',
+  'plusStatus', 'plusProduct', 'plusProductId', 'plusPacks', 'plusPackAmount', 'plusPackUnit',
+  'plusPackCount', 'plusPackPriceCents', 'plusUnitPrice', 'plusLineCents',
+  'dekaStatus', 'dekaProduct', 'dekaProductId', 'dekaPacks', 'dekaPackAmount', 'dekaPackUnit',
+  'dekaPackCount', 'dekaPackPriceCents', 'dekaUnitPrice', 'dekaLineCents',
   'deltaCentsDekaMinusPlus',
+  'plusOriginalRequiredAmount', 'plusOriginalRequiredUnit',
+  'dekaOriginalRequiredAmount', 'dekaOriginalRequiredUnit',
 ]
 
 function cell(value: string | number): string {
@@ -35,15 +40,23 @@ function cell(value: string | number): string {
   return '"' + text.replace(/"/g, '""') + '"'
 }
 
-function lineFields(line: BasketTraceLine): (string | number)[] {
+function lineFields(line: BasketTraceLine, monetaryAllowed: boolean): (string | number)[] {
+  // Ten fields per store, even when no source product or price is known.
+  // A short row shifts the next store's columns into the wrong money fields.
   if (line.status !== 'matched') return [
-    'niet gekoppeld', '', '', '', '', '', '', '',
+    // All ten store fields, including the last line-total cents cell, must
+    // remain present. Otherwise a partial two-store export shifts the next
+    // shop's columns and can present source values under the wrong headers.
+    'niet gekoppeld', '', '', '', '', '', '', '', '', '',
   ]
   return [
     line.reasons.includes('explicit local user selection; not an automatic or verified retailer match')
       ? 'door gebruiker gekoppeld' : 'automatisch gekoppeld',
-    line.productName, line.packs, line.pack.amount,
-    line.pack.unit, line.pack.count, line.pricePerPackCents, line.lineTotalCents,
+    line.productName, line.productId, line.packs, line.pack.amount,
+    line.pack.unit, line.pack.count,
+    monetaryAllowed ? line.pricePerPackCents : '',
+    monetaryAllowed ? privateUnitPrice(line) ?? 'eenheidsprijs onbekend' : 'prijs onbekend; bron herzien',
+    monetaryAllowed ? line.lineTotalCents : '',
   ]
 }
 
@@ -64,8 +77,8 @@ function physicalLedgerValid(basket: OneStoreBasket): boolean {
       ids.add(item.id)
       if (item.status === 'unresolved') { unresolved++; continue }
       if (item.status !== 'matched' || !Number.isSafeInteger(item.packs) || item.packs <= 0 ||
-          !Number.isSafeInteger(item.pricePerPackCents) || item.pricePerPackCents < 0 ||
-          !Number.isSafeInteger(item.lineTotalCents) || item.lineTotalCents < 0 ||
+          !Number.isSafeInteger(item.pricePerPackCents) || item.pricePerPackCents <= 0 ||
+          !Number.isSafeInteger(item.lineTotalCents) || item.lineTotalCents <= 0 ||
           item.lineTotalCents !== item.packs * item.pricePerPackCents) return false
       matched++
       sum += item.lineTotalCents
@@ -101,20 +114,38 @@ function buildCsv(plus: OneStoreBasket, deka: OneStoreBasket,
     'geen volledig of actueel vergelijkbaar prijsverschil'
   const rows = plus.lines.map(plusLine => {
     const dekaLine = dekaById.get(plusLine.id)!
-    const sameDemand = plusLine.requirement.amount === dekaLine.requirement.amount &&
+    const sameDemand = samePrivatePhysicalDemand(
+      plusLine.requirement, dekaLine.requirement)
+    // Both unpriced and unresolved 'unknown' demands are still useful in a
+    // local missing-items printout. Preserve that original workflow without
+    // treating unknown quantities as a physically comparable priced basket.
+    const bothUnknown = plusLine.status === 'unresolved' &&
+      dekaLine.status === 'unresolved' &&
+      plusLine.requirement.amount === null &&
+      dekaLine.requirement.amount === null &&
       plusLine.requirement.unit === dekaLine.requirement.unit
-    if (!sameDemand) throw new Error('De fysieke ingrediëntbehoefte verschilt tussen winkels.')
+    if (!sameDemand && !bothUnknown) {
+      throw new Error('De fysieke ingrediëntbehoefte verschilt tussen winkels.')
+    }
     return [
       plusObservedAt, dekaObservedAt, state,
       plusLine.id, plusLine.ingredientLabel, plusLine.requirement.amount ?? '',
       plusLine.requirement.unit,
-      ...lineFields(plusLine), ...lineFields(dekaLine),
+      ...lineFields(plusLine, showMoneyDifference),
+      ...lineFields(dekaLine, showMoneyDifference),
       showMoneyDifference && plusLine.status === 'matched' && dekaLine.status === 'matched'
         ? dekaLine.lineTotalCents - plusLine.lineTotalCents : '',
+      plusLine.requirement.amount ?? '', plusLine.requirement.unit,
+      dekaLine.requirement.amount ?? '', dekaLine.requirement.unit,
     ]
   })
   const header = COLUMNS.map(cell).join(',')
-  const csvLines = rows.map(values => values.map(cell).join(','))
+  const csvLines = rows.map(values => {
+    if (values.length !== COLUMNS.length) {
+      throw new Error('De privévergelijking bevat onvolledige CSV-kolommen.')
+    }
+    return values.map(cell).join(',')
+  })
   return '\uFEFF' + [header, ...csvLines].join('\r\n') + '\r\n'
 }
 
@@ -145,12 +176,16 @@ export function privateComparisonHtml(
   const dekaLines = new Map(deka.lines.map(line => [line.id, line] as const))
   function product(line: BasketTraceLine) {
     if (line.status === 'unresolved') return '<strong>Niet gekoppeld</strong><br><small>Prijs onbekend — handmatig kiezen</small>'
-    return '<strong>' + clean(line.productName) + '</strong><br>' +
-      clean(line.packs) + ' × ' + clean(money(line.pricePerPackCents)) +
-      ' · ' + clean(line.pack.count) + ' × ' + clean(line.pack.amount) + ' ' +
-      clean(line.pack.unit) + ' per verpakking<br><small>' +
+    const physical = '<strong>' + clean(line.productName) + '</strong><br>' +
+      '<small>Originele broncode: ' + clean(line.productId) + '</small><br>' +
+      clean(line.packs) + ' hele pakken · ' + clean(line.pack.count) + ' × ' +
+      clean(readablePlannerDemandAmount(line.pack.amount)) + ' ' +
+      clean(line.pack.unit) + ' per verpakking<br>'
+    return showDifference ? physical +
+      '<small>Pakprijs: ' + clean(money(line.pricePerPackCents)) + ' · ' +
       clean(privateUnitPrice(line) ?? 'Eenheidsprijs onbekend') + '</small><br><b>' +
-      clean(money(line.lineTotalCents)) + '</b>'
+      clean(money(line.lineTotalCents)) + '</b>' : physical +
+      '<small>Prijs onbekend — bron verouderd, onvolledig of niet volledig bevestigd.</small>'
   }
   const rows = plus.lines.map(line => {
     const other = dekaLines.get(line.id)
@@ -160,10 +195,20 @@ export function privateComparisonHtml(
     const outcome = delta === null ? 'Niet vergelijkbaar' : delta === 0 ? 'Gelijk' :
       money(Math.abs(delta)) + (delta > 0 ? ' · PLUS lager' : ' · DekaMarkt lager')
     const required = line.requirement.amount === null ? 'hoeveelheid onbekend' :
-      String(line.requirement.amount).replace('.', ',') + ' ' + line.requirement.unit
+      readablePlannerDemandAmount(line.requirement.amount) + ' ' + line.requirement.unit
+    const otherRequired = other.requirement.amount === null ? 'hoeveelheid onbekend' :
+      readablePlannerDemandAmount(other.requirement.amount) + ' ' + other.requirement.unit
+    const alias = required !== otherRequired &&
+      samePrivatePhysicalDemand(line.requirement, other.requirement)
+    const unitGap = bothKnown && line.status === 'matched' && other.status === 'matched'
+      ? privateMatchedUnitPriceGap(line, other) : null
     return '<tr><th scope="row">' + clean(line.ingredientLabel) +
-      '<small>Benodigd: ' + clean(required) + '</small></th><td>' + product(line) +
-      '</td><td>' + product(other) + '</td><td>' + clean(outcome) + '</td></tr>'
+      '<small>Benodigd: ' + clean(required) +
+      (alias ? ' = ' + clean(otherRequired) + ' (dezelfde fysieke hoeveelheid)' : '') +
+      '</small></th><td>' + product(line) +
+      '</td><td>' + product(other) + '</td><td>' + clean(outcome) +
+      (unitGap ? '<small>Per gelijke hoeveelheid: ' + clean(unitGap) + '</small>' : '') +
+      '</td></tr>'
   }).join('\n')
   const totals = showDifference ? '<section class="totals"><div><span>PLUS</span><strong>' +
     clean(money(plus.totalCents)) + '</strong></div><div><span>DekaMarkt</span><strong>' +
@@ -172,8 +217,9 @@ export function privateComparisonHtml(
     '</strong><small>' + (deka.totalCents === plus.totalCents ? 'Gelijk' :
       deka.totalCents > plus.totalCents ? 'PLUS is lager' : 'DekaMarkt is lager') +
     '</small></div></section>' :
-    '<p class="notice">Geen volledig en actueel vergelijkbare mandprijzen. Bekende afzonderlijke ' +
-    'productbedragen zijn alleen ter controle zichtbaar; ontbrekende prijzen zijn nooit € 0,00.</p>'
+    '<p class="notice">Geen volledig en actueel vergelijkbare mandprijzen. Originele ' +
+    'SKU’s en verpakkingen blijven zichtbaar; prijs- en eenheidsbedragen zijn verborgen ' +
+    'tot de bron en beide mandjes opnieuw zijn bevestigd. Onbekend is nooit € 0,00.</p>'
   return '<!doctype html><html lang="nl"><head><meta charset="utf-8">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1">' +
     '<meta name="referrer" content="no-referrer">' +
@@ -278,10 +324,12 @@ export function PrivateBasketComparisonExport({
     <p className="disclaimer">Het afdrukbare overzicht werkt volledig offline, toont de twee
       winkelopnames naast elkaar en laat een winnaar of totaalverschil weg zolang prijzen
       ontbreken, verouderd zijn of de mandjes niet gelijkwaardig zijn.</p>
-    <p className="disclaimer">Per ingrediënt: benodigde hoeveelheid, gekoppeld of onbekend,
-      verpakking en hele eurocenten voor beide winkels. Bij ontbrekende of verlopen prijzen
-      staan er geen prijsverschillen in het bestand. Alle gegevens zijn afkomstig uit jouw eigen
-      lokale invoer; dit is geen officieel prijsbewijs of besparingsonderzoek.</p>
+    <p className="disclaimer">Per ingrediënt blijven de oorspronkelijke PLUS- en
+      Deka-hoeveelheden, SKU’s en verpakkingen beschikbaar. Alleen wanneer beide winkelmandjes
+      volledig, actueel en persoonlijk bevestigd zijn toont deze export hele eurocenten,
+      eenheidsprijzen of verschillen; anders staat er expliciet prijs onbekend.
+      Alle gegevens komen uit jouw eigen lokale invoer, niet uit een officiële winkelprijsbron
+      of onafhankelijk besparingsonderzoek.</p>
     {message && <p role="status" aria-live="polite">{message}</p>}
   </div>
 }

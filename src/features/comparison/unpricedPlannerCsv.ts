@@ -1,5 +1,6 @@
 import { literalCsv } from '../../privateBasketComparisonCsv.ts'
 import type { aggregatePlanIngredients } from '../../domain/basket.ts'
+import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
 
 type Line = ReturnType<typeof aggregatePlanIngredients>[number]
 const lineKey = (line: Line) => JSON.stringify([line.id, line.label, line.amount, line.unit])
@@ -19,8 +20,12 @@ export function exportUnpricedPlannerCsv(
     csvRow(['Ingrediënt-ID', 'Ingrediënt', 'Fysieke hoeveelheid', 'Eenheid',
       'Status', 'Afgevinkt', 'Winkelproduct', 'Winkelprijs']),
     ...rows.map(line => csvRow([
-      line.id, line.label, line.amount === null ? '' : String(line.amount), line.unit,
-      line.amount === null || line.unit === 'unknown'
+      line.id, line.label,
+      readablePlannerDemandAmount(line.amount) === 'hoeveelheid nog controleren'
+        ? '' : readablePlannerDemandAmount(line.amount),
+      line.unit,
+      readablePlannerDemandAmount(line.amount) === 'hoeveelheid nog controleren' ||
+      line.unit === 'unknown'
         ? 'Hoeveelheid controleren' : 'Ongeprijsde Planner-vraag',
       checked[lineKey(line)] === true ? 'ja' : 'nee', 'Niet gekoppeld', 'Onbekend',
     ])),

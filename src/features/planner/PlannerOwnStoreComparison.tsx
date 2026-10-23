@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { freshReviewedBaskets, recentOwnCaptureInstant, type PrivateReviewedBaskets, type PrivateCaptureProgress, type OwnStore, type PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
 import { privatePriceAgeNotice } from '../comparison/privatePriceAgeNotice.ts'
 import { currentPrivateRouteChoice } from '../comparison/privateRouteChoice.ts'
@@ -9,6 +9,8 @@ import { ownStoreWeekComparison } from './ownStoreBudgetComparison.ts'
 import { printableOwnStoreComparison } from './downloadOwnStoreComparison.ts'
 // Price deltas only exist after both sources are fully reviewed; defer these
 // heavier presentational modules so the everyday Planner loads sooner.
+const PlannerKnownLinePrices = lazy(() => import('./PlannerKnownLinePrices.tsx')
+  .then(module => ({ default: module.PlannerKnownLinePrices })))
 const PlannerOwnProductDeltas = lazy(() => import('./PlannerOwnProductDeltas.tsx')
   .then(module => ({ default: module.PlannerOwnProductDeltas })))
 const PlannerTwoStoreCoverage = lazy(() => import('./PlannerTwoStoreCoverage.tsx')
@@ -24,19 +26,25 @@ const PlannerReviewedSourceLines = lazy(() => import('./PlannerReviewedSourceLin
 const PlannerQuickSourcePaste = lazy(() => import('./PlannerQuickSourcePaste.tsx')
   .then(module => ({ default: module.PlannerQuickSourcePaste })))
 import type { CaptureStore } from '../comparison/plannerPriceCaptureSheet.ts'
-import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
+import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../domain/basket.ts'
+import type { PlannedMeal } from '../../domain/types.ts'
 import { validCustomWeekBudgetEuros } from './customWeekBudget.ts'
 import { euro as exactEuro } from '../../lib/money.ts'
 import { confirmedPartialBasket } from './confirmedPartialBasket.ts'
+import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
+import { privateMatchedUnitPriceGap } from '../products/privateProgressProductRows.ts'
 import './plannerOwnStoreComparison.css'
 
 const stores = ['PLUS', 'DekaMarkt'] as const
 
 /** Exact own-source totals only. No fixture or unreviewed prices. */
-export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred, hasDemand, budget, onSelect, onOpenComparison, onImportSourceFiles, onReviewIngredient, onOpenList, onOpenMixedRoute, onChooseRouteLine, captureNeeds }: {
+export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred, hasDemand, budget, onSelect, onOpenComparison, onImportSourceFiles, onReviewIngredient, onOpenRecipes, onOpenList, onOpenMixedRoute, onChooseRouteLine, plannedMeals, ingredientRecipes, activeDays, hasIngredientData }: {
   reviewed: PrivateReviewedBaskets | null
   captureProgress: PrivateCaptureProgress | null
-  captureNeeds: readonly PlannerCaptureGuideNeed[]
+  plannedMeals: PlannedMeal[]
+  ingredientRecipes: RecipeWithIngredients[]
+  activeDays: string[]
+  hasIngredientData: boolean
   preferred: OwnStore
   hasDemand: boolean
   budget: number
@@ -44,11 +52,23 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
   onOpenComparison: () => void
   onImportSourceFiles: (files: File[]) => void
   onReviewIngredient: (store: OwnStore, ingredientId: string) => void
+  onOpenRecipes: () => void
   onOpenList: () => void
   onOpenMixedRoute: (extraCostRaw?: string) => void
   onChooseRouteLine: (choice: Omit<PrivateRouteChoice, 'serial'>) => void
 }) {
+  // Keep the heavyweight basket/matching graph inside this lazy comparison
+  // panel, not in PlannerView's ordinary budget interaction path.
+  const captureNeeds = useMemo(() => {
+    if (!hasIngredientData) return []
+    try { return aggregatePlanIngredients(plannedMeals, ingredientRecipes, activeDays) }
+    catch { return [] }
+  }, [hasIngredientData, plannedMeals, ingredientRecipes, activeDays])
   const [downloadMessage, setDownloadMessage] = useState('')
+  // Do not authorize an asynchronous copy/download against a source object
+  // that another render (e.g. another tab's replacement) has already removed.
+  const currentReviewedRef = useRef(reviewed)
+  currentReviewedRef.current = reviewed
   const [copyableStore, setCopyableStore] = useState<{
     store: OwnStore
     receipt: NonNullable<PrivateReviewedBaskets['stores'][OwnStore]>
@@ -63,6 +83,12 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
   } | null>(null)
   const [directImportMessage, setDirectImportMessage] = useState('')
   const [directDropActive, setDirectDropActive] = useState(false)
+  const [filteredCopy, setFilteredCopy] = useState<{
+    planKey: string
+    plus: NonNullable<PrivateReviewedBaskets['stores']['PLUS']>
+    deka: NonNullable<PrivateReviewedBaskets['stores']['DekaMarkt']>
+    text: string
+  } | null>(null)
   function takeOwnSourceFiles(files: File[]) {
     // Early UX-only guards: these never verify the store, its rights or SKU.
     // All original bytes still pass the canonical import in Vergelijk.
@@ -454,6 +480,165 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
     }
   }
 
+  async function downloadSelectedProductPrices(ids: string[], action: 'download' | 'copy' | 'csv' | 'print') {
+    // Export the actual current reviewed pair, never stale rows held by a
+    // filtered child view. A filtered selection is NOT a full basket total.
+    const current = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
+    const paired = ownStoreWeekComparison(current)
+    if (paired.status !== 'comparable' || !current?.stores.PLUS || !current.stores.DekaMarkt) {
+      setDownloadMessage('De twee winkelbronnen zijn verlopen of niet meer vergelijkbaar. Herzie de bron in Vergelijk.')
+      return
+    }
+    const byId = new Map(paired.lines.map(line => [line.id, line]))
+    const unique = [...new Set(ids)]
+    if (!unique.length || unique.some(id => !byId.has(id))) {
+      setDownloadMessage('Je productselectie is veranderd. Controleer de filters en probeer opnieuw.')
+      return
+    }
+    const selected = unique.map(id => byId.get(id)!)
+    // Product and ingredient names may originate in pasted personal data;
+    // preserve content but never let embedded line breaks forge extra lines.
+    const oneLine = (value: string) => value.replace(/[\r\n\u2028\u2029]/gu, ' ')
+    const priceLine = (shop: OwnStore, line: typeof selected[number]['plus']) =>
+      shop + ': ' + oneLine(line.productName) + ' · SKU ' + oneLine(line.productId) +
+      ' · ' + line.packs + ' hele verpakkingen · ' +
+      line.pack.amount + ' ' + line.pack.unit + ' × ' + line.pack.count +
+      ' per pak · ' + exactEuro.formatCents(line.pricePerPackCents) + '/pak · ' +
+      (line.packs + ' × ' + exactEuro.formatCents(line.pricePerPackCents)) +
+      ' = ' + exactEuro.formatCents(line.lineTotalCents)
+    const content = [
+      'SUPA · eigen gecontroleerde productprijsselectie',
+      'Dit is een FILTERSELECTIE, niet het hele mandje of een onafhankelijke besparingsclaim.',
+      'De bedragen komen uitsluitend uit de twee persoonlijk bevestigde, nog actuele bronopnames.',
+      'PLUS bronmoment: ' + current.stores.PLUS.observedAt,
+      'DekaMarkt bronmoment: ' + current.stores.DekaMarkt.observedAt,
+      'Geselecteerde ingrediënten: ' + selected.length + ' van ' + paired.lines.length,
+      '',
+      ...selected.flatMap(line => [
+        oneLine(line.ingredientLabel) + ' · benodigde hoeveelheid: ' +
+          String(line.plus.requirement.amount) + ' ' + line.plus.requirement.unit,
+        priceLine('PLUS', line.plus),
+        'PLUS indicatieve eenheidsprijs: ' + (privateUnitPrice(line.plus) ?? 'onbekend'),
+        priceLine('DekaMarkt', line.deka),
+        'DekaMarkt indicatieve eenheidsprijs: ' + (privateUnitPrice(line.deka) ?? 'onbekend'),
+        'Indicatief eenheidsprijsverschil: ' + privateMatchedUnitPriceGap(line.plus, line.deka),
+        line.deltaCents === 0 ? 'Regelprijs: gelijk' :
+          'Regelprijsverschil: ' + exactEuro.formatCents(Math.abs(line.deltaCents)) +
+          ' lager bij ' + (line.deltaCents > 0 ? 'PLUS' : 'DekaMarkt'),
+        '',
+      ]),
+      'Voor een betrouwbaar HEEL-MANDTOTAAL gebruik je de volledige vergelijking, niet deze selectie.',
+      '',
+    ].join('\n')
+    const originalPlus = current.stores.PLUS
+    const originalDeka = current.stores.DekaMarkt
+    const sameSources = () => {
+      const currentlyRendered = currentReviewedRef.current
+      const latest = freshReviewedBaskets(
+        currentlyRendered, currentlyRendered?.planKey ?? '', Date.now())
+      return !!latest && latest.planKey === current.planKey &&
+        latest.stores.PLUS === originalPlus && latest.stores.DekaMarkt === originalDeka &&
+        ownStoreWeekComparison(latest).status === 'comparable'
+    }
+    if (action === 'print') {
+      try {
+        const { selectedOwnPricePrintHtml } = await import('./selectedOwnPricePrintHtml.ts')
+        if (!sameSources()) throw Error('De originele winkelbronnen zijn veranderd of verlopen.')
+        const html = selectedOwnPricePrintHtml({
+          lines: selected, totalOriginalLines: paired.lines.length,
+          plusObservedAt: originalPlus.observedAt,
+          dekaObservedAt: originalDeka.observedAt,
+        })
+        if (!sameSources()) throw Error('De originele winkelbronnen zijn veranderd of verlopen.')
+        const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
+        try {
+          const link = document.createElement('a')
+          link.href = url
+          link.download = 'supa-eigen-geselecteerde-productprijzen-afdruk.html'
+          document.body.append(link)
+          try { link.click() } finally { link.remove() }
+        } finally {
+          window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+        }
+        setFilteredCopy(null)
+        setDownloadMessage(selected.length + ' gecontroleerde productprijskaarten privé opgeslagen als afdrukbaar HTML-bestand. Geen mandtotaal.')
+      } catch (error) {
+        setFilteredCopy(null)
+        setDownloadMessage(error instanceof Error ? error.message :
+          'De gefilterde privéprijskaarten konden niet veilig worden opgeslagen.')
+      }
+      return
+    }
+    if (action === 'csv') {
+      try {
+        // CSV code can load separately; an expired/replaced source may NOT
+        // survive that await as an authorized spreadsheet price.
+        const { selectedOwnPriceCsv } = await import('./selectedOwnPriceCsv.ts')
+        if (!sameSources()) throw Error('De originele winkelbronnen zijn veranderd of verlopen.')
+        const csv = selectedOwnPriceCsv({
+          lines: selected, totalOriginalLines: paired.lines.length,
+          plusObservedAt: originalPlus.observedAt,
+          dekaObservedAt: originalDeka.observedAt,
+        })
+        if (!sameSources()) throw Error('De originele winkelbronnen zijn veranderd of verlopen.')
+        const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+        try {
+          const link = document.createElement('a')
+          link.href = url
+          link.download = 'supa-eigen-geselecteerde-productprijzen.csv'
+          document.body.append(link)
+          try { link.click() } finally { link.remove() }
+        } finally {
+          window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+        }
+        setFilteredCopy(null)
+        setDownloadMessage(selected.length + ' oorspronkelijke productprijsregels als privé-CSV bewaard. Geen volledig mandtotaal.')
+      } catch (error) {
+        setFilteredCopy(null)
+        setDownloadMessage(error instanceof Error ? error.message :
+          'Het privéprijsblad kon niet veilig worden opgeslagen.')
+      }
+      return
+    }
+    if (action === 'copy') {
+      try {
+        if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable')
+        await navigator.clipboard.writeText(content)
+        if (!sameSources()) {
+          setDownloadMessage('De winkelopnames zijn intussen verlopen of veranderd. Kopieer opnieuw na herziening.')
+          setFilteredCopy(null)
+          return
+        }
+        setFilteredCopy(null)
+        setDownloadMessage(selected.length + ' gefilterde eigen prijsregels gekopieerd. Dit is geen volledig mandtotaal.')
+      } catch {
+        if (!sameSources()) {
+          setFilteredCopy(null)
+          setDownloadMessage('De bron is veranderd tijdens het kopiëren. Herzie de gegevens.')
+          return
+        }
+        setFilteredCopy({ planKey: current.planKey, plus: originalPlus, deka: originalDeka, text: content })
+        setDownloadMessage('Klembordtoegang ontbreekt. Selecteer de gefilterde privétekst hieronder om handmatig te kopiëren.')
+      }
+      return
+    }
+    if (!sameSources()) {
+      setDownloadMessage('De bron is gewijzigd of verlopen voordat de selectie kon worden bewaard.')
+      return
+    }
+    const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }))
+    try {
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'supa-eigen-geselecteerde-productprijzen.txt'
+      document.body.append(link)
+      try { link.click() } finally { link.remove() }
+      setDownloadMessage(selected.length + ' originele productprijsregels lokaal bewaard, zonder gefilterd mandtotaal.')
+    } finally {
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    }
+  }
+
   function chooseConfirmedLine(id: string, store: OwnStore) {
     const choice = currentPrivateRouteChoice(reviewed, id, store, Date.now())
     if (!choice) {
@@ -541,6 +726,10 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
               : summary.status === 'different-moments'
                 ? 'De originele winkelmomenten liggen meer dan 24 uur uiteen.'
                 : 'De fysieke mandjes zijn nog niet aantoonbaar gelijkwaardig.'}</p>
+          {captureProgress && <Suspense fallback={<p role="status">Oorspronkelijke losse winkelprijzen laden…</p>}>
+            <PlannerKnownLinePrices progress={captureProgress} reviewed={reviewed}
+              now={now} onReviewIngredient={onReviewIngredient} />
+          </Suspense>}
           {summary.available.length > 0 && <div className="own-store-planner__overview-totals"
             aria-label="Losse complete eigen winkelmandjes, geen prijsvergelijking">
             {stores.map(store => {
@@ -613,6 +802,7 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
     {hasDemand && <Suspense fallback={<p role="status">Lokale plakimport laden…</p>}>
       <PlannerQuickSourcePaste onImport={onImportSourceFiles} hasDemand={hasDemand}
         needs={captureNeeds} onReviewIngredient={onReviewIngredient}
+        onOpenRecipes={onOpenRecipes}
         onRecapture={store => {
           setCaptureTarget(store)
           window.requestAnimationFrame(() =>
@@ -904,7 +1094,20 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
               Open mijn gecombineerde winkelroute in Lijst
             </button>
           </div>}
-          <Suspense fallback={<p role="status">Winkelprijsregels laden…</p>}><PlannerOwnProductDeltas lines={summary.lines} onChooseLine={chooseConfirmedLine} /></Suspense>
+          <Suspense fallback={<p role="status">Winkelprijsregels laden…</p>}><PlannerOwnProductDeltas lines={summary.lines} onChooseLine={chooseConfirmedLine} onExportSelection={downloadSelectedProductPrices} /></Suspense>
+          {filteredCopy && filteredCopy.planKey === currentSources?.planKey &&
+            filteredCopy.plus === currentSources?.stores.PLUS &&
+            filteredCopy.deka === currentSources?.stores.DekaMarkt &&
+            <label className="own-store-planner__copy-fallback">
+              Alleen eerder geselecteerde eigen productprijsregels. Selecteer tekst om handmatig te kopiëren.
+              <textarea readOnly rows={10} value={filteredCopy.text}
+                onFocus={() => {
+                  const latest = freshReviewedBaskets(reviewed, reviewed?.planKey ?? '', Date.now())
+                  if (latest?.stores.PLUS !== filteredCopy.plus ||
+                      latest?.stores.DekaMarkt !== filteredCopy.deka)
+                    setFilteredCopy(null)
+                }} />
+            </label>}
         </div>
       : summary.available.length > 0 ? <div className="own-store-planner__result" role="status">
           <strong>Geen betrouwbaar twee-winkelprijsverschil</strong>

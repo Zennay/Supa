@@ -1,0 +1,171 @@
+.supa-manual-source {
+  margin: 1rem 0;
+  padding: 0.9rem;
+  border: 1px solid var(--color-border, #cdd1cc);
+  border-radius: 1rem;
+  background: var(--color-surface, #fff);
+}
+.supa-manual-source > summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+.supa-manual-source > p { line-height: 1.55; }
+.supa-manual-source__store {
+  min-width: 0;
+  margin: 1rem 0;
+  padding: 0.85rem;
+  border: 1px solid #bbb;
+  border-radius: 0.8rem;
+}
+.supa-manual-source__store legend { padding: 0 0.4rem; font-weight: 700; }
+.supa-manual-source label { display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; }
+.supa-manual-source label input:not([type="checkbox"]),
+.supa-manual-source select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 2.8rem;
+  padding: 0.6rem;
+  border: 1px solid #858585;
+  border-radius: 0.5rem;
+  background: white;
+  color: #18221c;
+}
+.supa-manual-source small { display: block; margin: 0.4rem 0 0.75rem; }
+.supa-manual-source__product {
+  margin: 1rem 0;
+  padding: 0.85rem;
+  border: 1px solid #ddd;
+  border-radius: 0.65rem;
+}
+.supa-manual-source__product-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+.supa-manual-source__fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: 0.85rem;
+}
+.supa-manual-source__confirmation {
+  flex-direction: row !important;
+  align-items: flex-start;
+  margin: 1rem 0;
+}
+.supa-manual-source__confirmation input { margin: 0.3rem 0.5rem 0 0; flex: none; }
+.supa-manual-source button:disabled { cursor: not-allowed; opacity: 0.65; }
+@media (max-width: 480px) {
+  .supa-manual-source, .supa-manual-source__store { padding: 0.65rem; }
+  .supa-manual-source__fields { grid-template-columns: 1fr; }
+}
+.supa-manual-source__needs {
+  margin: 1rem 0;
+  padding: 0.85rem;
+  border: 1px solid #afc3b5;
+  border-radius: 0.8rem;
+}
+.supa-manual-source__needs-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: 0.85rem;
+  margin: 0.85rem 0;
+}
+.supa-manual-source__hint {
+  padding: 0.7rem;
+  border-radius: 0.5rem;
+  background: #edf5ed;
+  color: #203428;
+  line-height: 1.5;
+}
+.supa-manual-source__coverage { margin: 1rem 0; }
+.supa-manual-source__coverage summary { font-weight: 650; cursor: pointer; }
+.supa-manual-source__coverage-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  margin: 0.8rem 0;
+}
+.supa-manual-source__coverage-list {
+  max-height: 26rem;
+  overflow: auto;
+  display: grid;
+  gap: 0.6rem;
+}
+.supa-manual-source__coverage-row {
+  padding: 0.65rem;
+  border: 1px solid #c6cec8;
+  border-radius: 0.6rem;
+}
+.supa-manual-source__coverage-row > div {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.supa-manual-source__scanner {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 0.65rem;
+  justify-items: start;
+}
+.supa-manual-source__scan-confirm {
+  width: min(100%, 34rem);
+  display: grid;
+  gap: .6rem;
+  padding: .8rem;
+  border: 1px solid #afc3b5;
+  border-radius: .7rem;
+  background: #edf5ed;
+}
+.supa-manual-source__scan-confirm strong {
+  overflow-wrap: anywhere;
+}
+.supa-manual-source__scan-confirm label {
+  display: flex;
+  flex-direction: row;
+  gap: .55rem;
+  align-items: flex-start;
+}
+.supa-manual-source__scan-confirm input[type="checkbox"] {
+  flex: 0 0 auto;
+  margin: .3rem .2rem 0 0;
+}
+.supa-manual-source__unit-rate {
+  border-left: 4px solid #446f4c;
+  padding: .75rem;
+  background: #edf5ed;
+  line-height: 1.5;
+}
+.supa-manual-source__duplicate {
+  padding: .75rem;
+  border: 1px solid #9d362e;
+  border-radius: .5rem;
+  background: #fff1ec;
+  color: #7e2922;
+}
+.supa-manual-source__need-link {
+  margin-bottom: .85rem;
+  max-width: 100%;
+}
+.supa-manual-source__need-link small {
+  font-size: .84rem;
+}
+.supa-manual-source__old-week {
+  padding: .8rem;
+  margin: 1rem 0;
+  border: 1px solid #a48d43;
+  border-radius: .6rem;
+  background: #fff9e9;
+}
+.supa-manual-source__product.is-invalid {
+  border: 2px solid #a32f26;
+  box-shadow: 0 0 0 2px rgba(163, 47, 38, 0.12);
+}
+.supa-manual-source__product.is-invalid:focus-within {
+  outline: 2px solid #a32f26;
+  outline-offset: 3px;
+}

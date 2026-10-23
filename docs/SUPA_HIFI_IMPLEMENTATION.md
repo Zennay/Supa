@@ -46,3 +46,48 @@ The M2 Firefox workflow enters Planner from the new Home before replaying all ex
 - Oorspronkelijke Producten-icons voor filter, zoekveld, weekknop, sortering en 5-vaks navigatie gebruikt, inclusief ongewijzigde SVG-intrinsieke maten. De Home-productcatalogus is bewust onveranderd.
 - Code-build `npm run build -- --base=/supa/` is geslaagd op exacte productiebron-HEAD `34393e9`; er zijn geen QA- of regressiesuites toegevoegd of uitgevoerd.
 - **Nog open richting exact 1:1:** individuele Figma-productteksten, ontbrekende voorbeeldprijzen, exacte schermscreenshotvergelijking en specifieke Lijst-productfoto's. Figma MCP Starter limiet blokkeert nu nieuwe screenshots; geen volledige visuele acceptatie claimen tot de bron weer beschikbaar is. De originele lokale afbeeldingen zijn geen bewijs van actuele supermarktprijzen.
+
+## Product discovery search follow-up (2026-10-21)
+
+- Product search uses the existing accent-insensitive normalizer and matches the displayed product name, retailer, package/unit, demo price text and product ID. Historical price-free source identities also match their retailer, package, capture timestamp, source URL and source ID.
+- Multi-term search treats each word as a separate constraint across metadata and search-normalizes Dutch decimal commas, number/unit spacing, written metric quantities (`500 gram` ↔ `500g`, `1,5 liter` ↔ `1.5L`), and multipacks (`6 × 330 ml` ↔ `6x330ml`). Unit words are abbreviated only when attached to a numeric quantity to avoid broad single-letter false positives; captured source values, SKUs, prices and physical identity remain untouched. The same normalizer is shared by the Figma discovery catalog, historical source archive and private source search. Visible result counts announce updates to assistive technology.
+- Switching between historical identities and Figma examples preserves the typed search query but clears source-specific filters, so a favorites-only selection from one catalog cannot silently make the other catalog appear empty.
+- The product-source selector appears once in the Products flow (not duplicated inside the optional filter panel) and exposes its two mutually exclusive choices as an accessible control group.
+- Empty results in recipes, historical products and Figma examples now offer a direct accessible reset action that clears the search and source-specific filters; users do not have to reopen the filter panel to recover the catalog.
+- Favorites persist across Home/Producten unmounts in a versioned local record; malformed/future records and cross-tab changes are protected from silent overwrite, and storage denial is surfaced as session-only behavior.
+- The favorites view follows valid changes from another browser tab through the storage event; conflicting or future-format records remain protected rather than being replaced.
+- Old product IDs from a previous catalog version remain visible as explicitly unrecognized, unpriced list entries with a user-controlled remove action instead of disappearing from the list while still inflating its count.
+- Entering Products from another tab clears recipe-only favorites and source-specific filters because recipe and product IDs are separate domains; this prevents an unrelated favorites selection from hiding the entire catalog.
+- Planner and the manual Meten/observation screen are route-level lazy chunks with explicit loading announcements, so the initial Home/Producten bundle does not eagerly load those full workflows.
+- The personal-source list, unpriced planner checklist and demo shopping list are also split into on-demand chunks with loading announcements, while keeping their existing mount/storage contracts.
+- Planner week-recovery controls and the optional share-text editor are also lazy-loaded; the share editor chunk is fetched only when the user requests copy text.
+- This is discovery-only behavior: it does not add current retailer prices, change source rights, or feed demo values into the private reviewed-basket calculator.
+
+
+## Private Producten selection transfer (2026-10-22)
+
+- Producten now supports selecting the currently visible catalog identities into a separate unpriced shortlist, with a hard cap of 100 items and a count of visible/already-selected items. This shortlist remains separate from the planner demand and reviewed basket comparator.
+- A portable JSON export/import carries only known version-1 catalog IDs. The import rejects unknown keys, unknown/stale IDs, duplicates, unsupported schema versions and files above 16 KiB, then previews and adds only after an explicit user click. It never carries recipes, prices, retailer rights, or SKU matches; legacy unknown IDs stay local and are not exported. The Lijst view also offers a plain-text checklist download that labels historical/demo entries as unpriced and keeps unavailable legacy IDs visible for manual removal.
+- The interface exposes these actions on mobile with wrapped controls and announces selection/import status. No current price, source permission or saving claim is inferred from a selected catalog identity.
+
+
+## Eigen winkelbron doorzoeken vanaf historische productkaart (22 oktober 2026)
+
+Een historische PLUS- of DekaMarkt-kaart gebruikt **Zoek in eigen bron** uitsluitend als winkelgericht, ongeprijsd zoekverzoek. De zichtbare productnaam en gekozen winkel worden doorgegeven aan de bestaande, lokaal beoordeelde complete én gedeeltelijke broncatalogus. Dit filtert dezelfde winkel, zodat een identiek artikel bij een andere winkel niet als impliciete match verschijnt. De kop boven de eigen broncatalogus meldt expliciet dat een historisch voorbeeld geen actuele SKU-match, bronautorisatie, prijs of beschikbaarheidsclaim is. Bij nul eigen prijsdata blijven de bestaande lokale bronimport en vergelijking bereikbaar. De normale algemene productzoekopdracht zoekt zoals voorheen in beide winkels. Niets schrijft naar bronopnames, bestaande productkeuzes of de rekenkundige volledige-mandvergelijking.
+
+Als de zoekterm uit een historische kaart geen eigen product oplevert, toont zowel de complete als de gedeeltelijk gecontroleerde broncatalogus nu een directe herstelkeuze: alle originele artikelen van de betreffende winkel bekijken, vrijwillig beide winkels doorzoeken of direct eigen bronproducten controleren in Vergelijk. Alle filters worden dan alleen voor de zichtbare lokale productzoekresultaten gewist, zonder oorspronkelijke artikelen, bronrechten, winkeltotalen of afvinkingen te wijzigen. Een ontbrekend resultaat wordt nooit automatisch een productmatch of een prijs van nul.
+
+
+## Persoonlijke ongeprijsde Lijst: aantallen, notities en voortgang (22 oktober 2026)
+
+- De afzonderlijke Producten-selectie in Lijst ondersteunt nu eigen aantallen (1–99), een korte persoonlijke notitie per artikel en een afvinkstatus. De status wordt lokaal per browser opgeslagen; opslagwijzigingen uit een ander tabblad worden opnieuw ingelezen.
+- De afvinkvoortgang heeft een totaal, een voortgangsbalk, een filter voor alleen nog te kopen, een expliciete resetactie en één-klik kopiëren/downloaden voor de volledige of resterende lijst. De klembordactie waarschuwt als de lijst tijdens het kopiëren verandert. Bij ongeldige of toekomstige opslagformaten blijven bestaande gegevens behouden en worden bewerken/afvinken uitgeschakeld.
+- Het tekstexportbestand bevat status, aantallen en notities. Historische productwaarnemingen en Figma-voorbeelden blijven duidelijk ongeprijsd; afvinken is geen aankoopbewijs en deze selectie voedt niet de Planner, bronmatching of winkelmandvergelijking.
+- Bij verwijderen worden geldige lokale vinkjes en persoonlijke details eerst opgeruimd, zodat opnieuw toevoegen niet stilzwijgend een oude vinkstatus terughaalt. Als opslag door een ander tabblad is gewijzigd, blijft de regel staan totdat de conflictmelding is opgelost.
+
+## Persoonlijke ongeprijsde boodschappenlijst: veilige JSON-back-up en herstel (22 oktober 2026)
+
+- De aparte Producten-selectie kan worden geëxporteerd als versiegebonden JSON van maximaal 32 KiB UTF-8. Alleen bekende lokale productidentiteiten, eigen aantallen (1–99), notities (maximaal 120 tekens) en handmatige afvinkstatus worden meegenomen.
+- Import valideert eerst de volledige structuur, toegestane catalogus-ID's, unieke regels, veldset, aantallen, notities en capaciteit (maximaal 100 items). De gebruiker ziet een voorbeeld en bevestigt daarna alleen nieuwe items; bestaande keuzes worden niet overschreven.
+- De back-up bevat geen prijzen, actuele voorraad, SKU-matches, retailerbrondata of rechtenbewijs en voedt de geprijsde Planner/mandvergelijking niet.
+- Bij onbekende of gewijzigde browseropslag wordt import geweigerd; twee lokale opslagblokken gebruiken compare-and-set en bij mislukte voortgangsopslag wordt een rollback geprobeerd. Verwijderen uit Producten ruimt de eigen vinkjes en notities op, zodat opnieuw toevoegen geen oude status herstelt.

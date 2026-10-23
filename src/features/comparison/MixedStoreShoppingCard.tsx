@@ -7,11 +7,14 @@ import { createMixedStoreShoppingPlan, formatMixedStoreShoppingPlan } from './mi
 import { MixedTripBackupControls } from './MixedTripBackupControls.tsx'
 import { PrivateRouteExtraGroceries } from './PrivateRouteExtraGroceries.tsx'
 import { MixedStoreUnitBreakdown } from './MixedStoreUnitBreakdown.tsx'
+import { privateMixedStoreUnitPrice } from './privateUnitPrice.ts'
 import { exportMixedStoreRouteCsv } from './mixedStoreRouteCsv.ts'
+import { appendManualUnpricedNotesToMixedRouteCsv } from './mixedStoreWithExtrasCsv.ts'
 import { printMixedStoreRouteHtml } from './mixedStorePrintHtml.ts'
 import { validCustomWeekBudgetEuros } from '../planner/customWeekBudget.ts'
 import { parsePrivateExtraVisitCostCents, type PrivateExtraVisitCostIntent } from './privateExtraVisitCost.ts'
 import type { PrivateRouteChoice } from './privateReviewedBasketBridge.ts'
+import type { UnpricedShoppingNote } from '../shopping-list/ManualShoppingNotes.tsx'
 const stores: MixedStore[] = ['PLUS', 'DekaMarkt']
 
 /** Renders only a reviewed, timely, same-demand comparison. Never loads
@@ -20,7 +23,7 @@ const stores: MixedStore[] = ['PLUS', 'DekaMarkt']
  */
 export function MixedStoreShoppingCard({
   mixed, single, plus, deka, captured, eligibleNow, weekBudget,
-  plannerPlan, plannerRecipes, plannerActiveDays, privatePlanKey, isSingleCheckedOnRoute, routeChoice, routeCostIntent,
+  plannerPlan, plannerRecipes, plannerActiveDays, privatePlanKey, isSingleCheckedOnRoute, routeChoice, routeCostIntent, manualNotes = [], onToggleManualNote,
 }: {
   mixed: MixedStoreShoppingPlan
   single: MixedStoreShoppingPlan
@@ -36,11 +39,16 @@ export function MixedStoreShoppingCard({
   isSingleCheckedOnRoute?: (line: MixedStoreLine) => boolean
   routeChoice?: PrivateRouteChoice | null
   routeCostIntent?: PrivateExtraVisitCostIntent | null
+  manualNotes?: readonly UnpricedShoppingNote[]
+  onToggleManualNote?: (note: UnpricedShoppingNote) => void
 }) {
   const [checked, setChecked] = useState<Record<string, boolean>>({})
   const [onlyOpen, setOnlyOpen] = useState(false)
   const [extraCount, setExtraCount] = useState(0)
   const [showText, setShowText] = useState(false)
+  const [stopCopy, setStopCopy] = useState<{
+    store: MixedStore; fingerprint: string; text: string
+  } | null>(null)
   const [combinedCopy, setCombinedCopy] = useState<{ fingerprint: string; text: string } | null>(null)
   const [message, setMessage] = useState('')
   const [extraVisitCost, setExtraVisitCost] = useState('')
@@ -147,7 +155,26 @@ export function MixedStoreShoppingCard({
   }>
   const remainingProductCents = stores.reduce(
     (sum, store) => sum + perStoreProgress[store].remainingCents, 0n)
-  const printable = formatMixedStoreShoppingPlan(plan, captured, progress, appliedCostCents, onlyOpen)
+  const validManualNotes = manualNotes.filter(note => note &&
+    ['Algemeen', 'PLUS', 'DekaMarkt'].includes(note.store) &&
+    typeof note.label === 'string' && note.label.length > 0 &&
+    note.label.length <= 140 && typeof note.done === 'boolean')
+  const visitedStores = new Set(plan.lines.map(line => line.store))
+  const offRouteManualNotes = validManualNotes.filter(note =>
+    note.store !== 'Algemeen' && !visitedStores.has(note.store))
+  const visibleManualNotes = onlyOpen ? validManualNotes.filter(note => !note.done) : validManualNotes
+  const personalText = [
+    'PERSOONLIJKE BOODSCHAPPEN — GEEN SKU, BRONMOMENT OF PRIJS',
+    ...visibleManualNotes.map(note => (note.done ? '☑ ' : '☐ ') +
+      '[' + note.store + '] ' +
+      note.label.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim() +
+      (note.store !== 'Algemeen' && !visitedStores.has(note.store)
+        ? ' · BUITEN deze gekozen route · prijs onbekend'
+        : ' · prijs onbekend')),
+    'Deze eigen regels tellen niet mee voor productkosten, winkelwinnaar of besparing.',
+  ].join('\n')
+  const printable = formatMixedStoreShoppingPlan(plan, captured, progress, appliedCostCents, onlyOpen) +
+    (visibleManualNotes.length ? '\n\n' + personalText : '')
   const block = costInvalid && !chooseSingle
 
   function importSingleStoreChecks() {
@@ -240,6 +267,135 @@ export function MixedStoreShoppingCard({
     }
   }
 
+  /** Single source of truth for the selected shop's offline copy and share. */
+  function personalStoreStopText(store: MixedStore): string {
+    const lines = plan.lines.filter(line => line.store === store)
+    if (!lines.length)
+      throw Error(store + ' is geen onderdeel van de geselecteerde winkelroute.')
+    const myNotes = validManualNotes.filter(note =>
+      note.store === store || note.store === 'Algemeen')
+    const clean = (value: string) => value
+      .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim()
+    const text = [
+      'Supa · mijn persoonlijke winkelstop bij ' + store,
+      'Oorspronkelijk privaat bronmoment: ' + captured[store],
+      'Bekende productkosten in deze stop: ' +
+        exactEuro.formatCents(perStoreProgress[store].totalCents),
+      'Nog openstaande geprijsde artikelen: ' +
+        exactEuro.formatCents(perStoreProgress[store].remainingCents),
+      'Vinkjes zijn geen betaalbewijs.', '',
+      ...lines.filter(line => !onlyOpen || !done(line.key)).map(line =>
+        (done(line.key) ? '☑ ' : '☐ ') + clean(line.ingredientLabel) +
+        ': ' + line.packs + ' × ' + clean(line.productName) +
+        ' [SKU ' + clean(line.productId) + '] · ' +
+        exactEuro.formatCents(line.pricePerPackCents) + '/pak · ' +
+        (privateMixedStoreUnitPrice(line) ?? 'eenheidsprijs onbekend') +
+        ' · ' + exactEuro.formatCents(line.lineTotalCents)),
+      '', 'Eigen ongeprijsde boodschappen bij deze winkel:',
+      ...(myNotes.length
+        ? myNotes.filter(note => !onlyOpen || !note.done).map(note =>
+          (note.done ? '☑ ' : '☐ ') + clean(note.label) + ' [' + note.store + '] · prijs onbekend')
+        : ['Geen persoonlijke notities bij deze winkel.']),
+      ...(myNotes.some(note => note.store === 'Algemeen')
+        ? ['Algemene notities zijn NIET aan een winkel toegewezen; kies zelf waar je ze koopt.']
+        : []),
+      myNotes.length ? 'Het echte uitgavenbedrag inclusief ongeprijsde notities is onbekend.' :
+        'Alleen hierboven bekende, persoonlijk gecontroleerde productprijzen.',
+      'Geen onafhankelijke retailerprijs, bronrecht, kassagarantie of besparingsclaim.',
+    ].join('\n')
+    if (new TextEncoder().encode(text).length > 128000)
+      throw Error('Deze winkelstop is te groot om offline te bewaren of te delen.')
+    return text
+  }
+
+  function downloadStoreStopTxt(store: MixedStore) {
+    if (block || !eligibleNow()) {
+      setMessage('Controleer eerst de actuele eigen bronopnames en extra kosten.')
+      return
+    }
+    try {
+      const text = personalStoreStopText(store)
+      if (!eligibleNow()) throw Error('De originele bronopnames zijn veranderd.')
+      const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-mijn-' + store.toLowerCase() + '-winkelstop-prive.txt'
+        document.body.appendChild(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setMessage('Eigen ' + store + '-winkelstop offline bewaard; alleen oorspronkelijke gecontroleerde pakken geprijsd.')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Winkelstop kon niet worden bewaard.')
+    }
+  }
+
+  async function shareStoreStop(store: MixedStore) {
+    if (block || !eligibleNow()) {
+      setMessage('Controleer eerst de actuele eigen bronopnames en extra kosten.')
+      return
+    }
+    let text: string
+    try { text = personalStoreStopText(store) }
+    catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Winkelstop niet beschikbaar.')
+      return
+    }
+    const fingerprint = copyFingerprint
+    try {
+      if (typeof navigator.share === 'function') {
+        await navigator.share({ title: 'Supa · ' + store + ' winkelstop', text })
+        setMessage(store + '-winkelstop gedeeld via de door jou gekozen app.')
+        return
+      }
+      if (navigator.clipboard?.writeText) {
+        if (!eligibleNow() || fingerprint !== currentCopyFingerprint.current)
+          throw Error('De gekozen winkelroute is gewijzigd.')
+        await navigator.clipboard.writeText(text)
+        setMessage(store + '-winkelstop gekopieerd met eigen ongeprijsde regels.')
+        return
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return
+    }
+    if (!eligibleNow() || fingerprint !== currentCopyFingerprint.current) {
+      setMessage('De gekozen winkelroute is veranderd. Open de actuele winkelstop opnieuw.')
+      return
+    }
+    setStopCopy({ store, fingerprint, text })
+    setMessage('Kopiëren is niet beschikbaar; selecteer de winkelstop hieronder handmatig.')
+  }
+
+  async function sharePersonalRoute() {
+    if (block || !eligibleNow()) {
+      setMessage('Controleer eerst je actuele eigen bronprijzen en de extra bezoekkosten.')
+      return
+    }
+    const text = printable
+    if (new TextEncoder().encode(text).length > 128000) {
+      setShowText(true)
+      setMessage('Deze route is te groot voor mobiel delen. Kopieer de getoonde tekst lokaal.')
+      return
+    }
+    try {
+      if (typeof navigator.share === 'function') {
+        await navigator.share({ title: 'Supa · mijn persoonlijke winkelroute', text })
+        setMessage('Je eigen route is gedeeld via de door jou gekozen app; geen kassagarantie.')
+        return
+      }
+      if (navigator.clipboard?.writeText) {
+        if (!eligibleNow()) throw Error('Je originele prijsopnames zijn verlopen.')
+        await navigator.clipboard.writeText(text)
+        setMessage('De gekozen privéroute is gekopieerd, inclusief ongeprijsde eigen regels.')
+        return
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return
+    }
+    setShowText(true)
+    setMessage('Delen is niet beschikbaar; selecteer hieronder zelf de privéroute.')
+  }
+
   const copyFingerprint = JSON.stringify([privatePlanKey, printable, captured, mode, onlyOpen])
   const currentCopyFingerprint = useRef(copyFingerprint)
   currentCopyFingerprint.current = copyFingerprint
@@ -255,18 +411,20 @@ export function MixedStoreShoppingCard({
       throw Error('Controleer eerst alle originele bronartikelen en eventuele extra bezoekkosten.')
     const { readSavedExtrasForPlan } = await import('./ownExtraGroceriesStorage.ts')
     const saved = readSavedExtrasForPlan(privatePlanKey)
-    if (!saved.available || !saved.items.length)
-      throw Error('Bewaar eerst de eigen extra boodschappen voor deze exacte Planner-week.')
+    if (!saved.available)
+      throw Error('De bewaarde extra boodschappen zijn niet leesbaar. Controleer je privégegevens in de Lijst.')
+    if (!saved.items.length && !validManualNotes.length)
+      throw Error('Voeg eerst eigen ongeprijsde boodschappen toe in de Lijst.')
     const visible = onlyOpen ? saved.items.filter(item => !item.done) : saved.items
     const clean = (value: string) => value.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim()
-    const complete = [printable, '',
+    const complete = saved.items.length ? [printable, '',
       'EIGEN EXTRA BOODSCHAPPEN (' + saved.items.length + ' apart bewaard)',
       'Geen gekoppelde winkel, bronprijs, pakprijs of bijdrage aan bovenstaand prijsverschil.',
       ...visible.map(item => (item.done ? '☑ ' : '☐ ') + clean(item.name) +
         ' · ' + item.quantity + ' ' + (item.unit === 'piece' ? 'stuks' : item.unit) +
         ' · prijs onbekend'),
       'Bovenstaande bedragen omvatten uitsluitend het geprijsde Planner-weekmandje.',
-    ].join('\n')
+    ].join('\n') : printable
     if (new TextEncoder().encode(complete).length > 128000 || !eligibleNow())
       throw Error('Bron of privélijst is gewijzigd of verlopen.')
     return complete
@@ -292,7 +450,7 @@ export function MixedStoreShoppingCard({
       if (original !== currentCopyFingerprint.current || !eligibleNow())
         throw Error('De bron of gekozen route is gewijzigd. Open de complete lijst opnieuw.')
       setCombinedCopy({ fingerprint: original, text })
-      setMessage('Je kunt de volledige gekozen route plus ongeprijsde extras hieronder selecteren en kopiëren.')
+      setMessage('Je kunt jouw gekozen route met eigen ongeprijsde boodschappen hieronder selecteren en kopiëren.')
     } catch (error) {
       setCombinedCopy(null)
       setMessage(error instanceof Error ? error.message : 'Kopieerbare volledige route niet beschikbaar.')
@@ -305,11 +463,12 @@ export function MixedStoreShoppingCard({
       return
     }
     try {
-      const csv = exportMixedStoreRouteCsv({
+      const csv = appendManualUnpricedNotesToMixedRouteCsv(exportMixedStoreRouteCsv({
         plus, deka, route: plan, captured,
         checked: new Set(plan.lines.filter(line => done(line.key)).map(line => line.key)),
         extraVisitCostCents: appliedCostCents, strategy: mode,
-      })
+      }), validManualNotes, [...visitedStores])
+      if (!eligibleNow()) throw Error('De bronopnames zijn inmiddels verlopen.')
       const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
       try {
         const link = document.createElement('a')
@@ -317,7 +476,7 @@ export function MixedStoreShoppingCard({
         link.download = 'supa-mijn-gekozen-winkelroute-prive.csv'
         document.body.appendChild(link)
         try { link.click() } finally { link.remove() }
-        setMessage('De gekozen winkelroute is met beide originele productprijzen als veilige lokale CSV bewaard.')
+        setMessage('Je gekozen route is als lokale CSV bewaard; eigen ongeprijsde regels staan zonder winkelprijs onderaan.')
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Deze privéwinkelroute kan niet worden geëxporteerd.')
@@ -336,8 +495,10 @@ export function MixedStoreShoppingCard({
           import('./mixedStoreWithExtrasCsv.ts'),
         ])
       const saved = readSavedExtrasForPlan(privatePlanKey)
-      if (!saved.available || !saved.items.length) {
-        setMessage('Bewaar eerst je eigen extra boodschappen in deze tab om ze aan de route-CSV toe te voegen.')
+      if (!saved.available)
+        throw Error('De bewaarde extra boodschappen zijn niet leesbaar.')
+      if (!saved.items.length && !validManualNotes.length) {
+        setMessage('Voeg eerst eigen ongeprijsde boodschappen toe in je Lijst.')
         return
       }
       if (!eligibleNow()) throw Error('Originele opnames zijn verlopen.')
@@ -346,33 +507,39 @@ export function MixedStoreShoppingCard({
         checked: new Set(plan.lines.filter(line => done(line.key)).map(line => line.key)),
         extraVisitCostCents: appliedCostCents, strategy: mode,
       })
-      const csv = appendUnpricedExtrasToMixedRouteCsv(reviewedCsv, saved.items)
+      const withExtras = saved.items.length
+        ? appendUnpricedExtrasToMixedRouteCsv(reviewedCsv, saved.items) : reviewedCsv
+      const csv = appendManualUnpricedNotesToMixedRouteCsv(withExtras, validManualNotes, [...visitedStores])
       if (!eligibleNow()) throw Error('Bronopnames zijn intussen verlopen.')
       const url = URL.createObjectURL(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' }))
       try {
         const link = document.createElement('a'); link.href = url
         link.download = 'supa-gekozen-winkelroute-met-ongeprijsde-extra-boodschappen.csv'
         document.body.append(link); try { link.click() } finally { link.remove() }
-        setMessage('28-koloms CSV gedownload: gecontroleerde routebedragen en losse ongeprijsde extras; zonder bedragen voor extras.')
+        setMessage('28-koloms route-CSV gedownload: originele prijsregels en aparte ongeprijsde eigen boodschappen zonder eurobedragen.')
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
     } catch {
       setMessage('Kon de samengestelde route-CSV niet veilig maken. Herzie de bronnen en extra boodschappen.')
     }
   }
 
-  async function downloadPrintHtml(includeExtras = false) {
+  async function downloadPrintHtml(includeExtras = false, stop?: MixedStore) {
     if (block || !eligibleNow()) {
       setMessage('Controleer je huidige originele winkelprijzen en extra bezoekkosten voordat je een afdruk bewaart.')
       return
     }
     try {
+      if (stop && (!plan.lines.some(line => line.store === stop) || includeExtras))
+        throw Error('Deze winkelstop is niet beschikbaar in de gekozen route.')
       let extras: import('./ownExtraGroceriesStorage.ts').Item[] | undefined
       if (includeExtras) {
         if (!privatePlanKey) throw Error('Geen huidig Planner-weekmandje beschikbaar.')
         const { readSavedExtrasForPlan } = await import('./ownExtraGroceriesStorage.ts')
         const saved = readSavedExtrasForPlan(privatePlanKey)
-        if (!saved.available || !saved.items.length)
-          throw Error('Bewaar eerst je eigen extra boodschappen in de Lijst-tab.')
+        if (!saved.available)
+          throw Error('Opgeslagen extra boodschappen zijn niet leesbaar.')
+        if (!saved.items.length && !validManualNotes.length)
+          throw Error('Voeg eerst eigen ongeprijsde boodschappen toe in de Lijst-tab.')
         extras = saved.items
       }
       if (!eligibleNow()) throw Error('De oorspronkelijke bronopnames zijn verlopen.')
@@ -380,19 +547,23 @@ export function MixedStoreShoppingCard({
         plus, deka, route: plan, captured,
         checked: new Set(plan.lines.filter(line => done(line.key)).map(line => line.key)),
         extraVisitCostCents: appliedCostCents, strategy: mode,
-        extras,
+        extras, manualNotes: validManualNotes, stop,
+        onlyOpen: !!stop && onlyOpen,
       })
       if (!eligibleNow()) throw Error('Deze opnames zijn inmiddels verlopen.')
       const url = URL.createObjectURL(new Blob([page], { type: 'text/html;charset=utf-8' }))
       try {
         const link = document.createElement('a')
         link.href = url
-        link.download = includeExtras
-          ? 'supa-mijn-winkelroute-en-ongeprijsde-extras.html'
-          : 'supa-mijn-winkelroute-prive.html'
+        link.download = stop
+          ? 'supa-mijn-' + stop.toLowerCase() + '-winkelstop-prive.html'
+          : includeExtras
+            ? 'supa-mijn-winkelroute-en-ongeprijsde-extras.html'
+            : 'supa-mijn-winkelroute-prive.html'
         document.body.appendChild(link)
         try { link.click() } finally { link.remove() }
-        setMessage('Afdrukbaar privéoverzicht opgeslagen. Open het HTML-bestand lokaal en kies Afdrukken in je browser.')
+        setMessage((stop ? stop + '-winkelstop' : 'Volledige route') +
+          ' offline opgeslagen. Open het HTML-bestand lokaal en kies Afdrukken in je browser.')
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Deze route kan nu niet veilig worden afgedrukt.')
@@ -415,6 +586,23 @@ export function MixedStoreShoppingCard({
       <div><strong>DekaMarkt volledig</strong><p>{exactEuro.formatCents(mixed.dekaWholeCents)}</p></div>
       <div><strong>Mijn gekozen route</strong><p>{exactEuro.formatCents(plan.totalCents)}</p></div>
     </div>
+    {offRouteManualNotes.length > 0 && <p role="status"
+      className="mixed-store-route__budget">
+      <strong>{offRouteManualNotes.length} eigen ongeprijsde {offRouteManualNotes.length === 1
+        ? 'boodschap hoort' : 'boodschappen horen'} bij een winkel buiten jouw gekozen route.</strong>
+      {' '}Supa voegt die winkel niet stilzwijgend als stop toe. Kies zelf een andere
+      winkelroute of pas de winkelgroep aan in je persoonlijke Lijst.
+      <button type="button" className="ghost-button" onClick={() =>
+        document.getElementById('supa-manual-shopping-notes')?.scrollIntoView({
+          behavior: 'smooth', block: 'start',
+        })}>Open mijn persoonlijke winkelgroepen</button>
+    </p>}
+    {validManualNotes.length > 0 && <p role="status" className="mixed-store-route__budget">
+      Daarnaast staan {validManualNotes.length} eigen ongeprijsde boodschappen op deze route,
+      waarvan {validManualNotes.filter(note => !note.done).length} open.
+      <strong> De daadwerkelijke uitgaven zijn onbekend.</strong> Bovenstaande eurobedragen
+      zijn alleen de gecontroleerde Planner-producten, nooit deze extra regels.
+    </p>}
     <p role="status">Een route met de goedkoopste artikelen kan vóór extra bezoekkosten
       maximaal <strong>{exactEuro.formatCents(mixed.additionalDifferenceCents)}</strong>
       {' '}lager uitkomen dan het goedkoopste complete mandje bij één winkel.
@@ -434,9 +622,9 @@ export function MixedStoreShoppingCard({
         ? 'PLUS én DekaMarkt'
         : plan.lines[0]?.store ?? 'Geen winkel'} ·
         {' '}{exactEuro.formatCents(plan.totalCents)} aan winkelproducten.</p>
-      {weekBudgetCents !== null && extraCount > 0 && <p role="status"
+      {weekBudgetCents !== null && (extraCount > 0 || validManualNotes.length > 0) && <p role="status"
         className="mixed-store-route__budget">
-        Je hebt ook {extraCount} eigen extra boodschappen zonder bronprijs. De werkelijke totale
+        Je hebt ook {extraCount} extra boodschappen en {validManualNotes.length} eigen lijstregels zonder bronprijs. De werkelijke totale
         weekuitgaven en resterende budgetruimte zijn daarom <strong>onbekend</strong>.
         Vergelijk het weekbudget hieronder uitsluitend met de bekende geprijsde Planner-producten.
       </p>}
@@ -495,7 +683,8 @@ export function MixedStoreShoppingCard({
         })}
       </div>
     </details>
-    <MixedStoreUnitBreakdown plus={plus} deka={deka} route={plan} />
+    <MixedStoreUnitBreakdown plus={plus} deka={deka} route={plan}
+      captured={captured} eligibleNow={eligibleNow} />
     {canEditSecondStop && <div className="offline-price-workbench__actions">
       <label>Extra kosten van de tweede stop (€)
         <input type="text" inputMode="decimal" value={extraVisitCost} maxLength={9}
@@ -543,23 +732,27 @@ export function MixedStoreShoppingCard({
         Toon kopieerbare route + extra boodschappen
       </button>}
       <button type="button" className="ghost-button" onClick={download}>Download gekozen weergave (TXT)</button>
+      <button type="button" className="ghost-button"
+        onClick={() => { void sharePersonalRoute() }}>
+        Deel gekozen privéroute (mobiel)
+      </button>
       {privatePlanKey && <button type="button" className="ghost-button"
         onClick={() => { void downloadRouteWithExtras() }}>
         Download gekozen winkelroute + bewaarde ongeprijsde extras (TXT)
       </button>}
       <button type="button" className="ghost-button" onClick={downloadRouteCsv}>
-        Download volledige route met beide winkelprijzen (CSV)
+        Download route: bronprijzen + eigen ongeprijsde regels (CSV)
       </button>
       {privatePlanKey && <button type="button" className="ghost-button"
         onClick={() => { void downloadRouteCsvWithExtras() }}>
-        Download gecontroleerde route + ongeprijsde extras (CSV)
+        Download route + alle eigen ongeprijsde boodschappen (CSV)
       </button>}
       <button type="button" className="ghost-button" onClick={() => { void downloadPrintHtml(false) }}>
-        Bewaar / print volledige route (HTML)
+        Bewaar / print route inclusief eigen ongeprijsde regels (HTML)
       </button>
       {privatePlanKey && <button type="button" className="ghost-button"
         onClick={() => { void downloadPrintHtml(true) }}>
-        Print gekozen route én bewaarde extra boodschappen (HTML)
+        Print route met alle eigen ongeprijsde boodschappen (HTML)
       </button>}
       <button type="button" className="ghost-button" onClick={() => {
         if (block) { setMessage('Corrigeer eerst je extra kosten.'); return }
@@ -571,14 +764,28 @@ export function MixedStoreShoppingCard({
       boodschappen van exact deze Planner-week. Extra kosten zijn onbekend en
       niet in de winkelvergelijking opgeteld.</small>
     <small>TXT en kopieerweergave volgen 'Alleen nog te kopen'. CSV en printbare
-      HTML bewaren steeds de volledige gecontroleerde route inclusief vinkjes,
-      originele SKU’s, pakprijzen en bronmomenten.</small>
+      HTML bewaren de volledige gecontroleerde route inclusief vinkjes, originele
+      SKU’s, pakprijzen en bronmomenten. Persoonlijke ongeprijsde herinneringen
+      staan daarbij in een aparte sectie zonder gekozen bronproduct of eurobedrag.</small>
     <div className="offline-price-workbench__dates mixed-store-route__shops">
       {stores.map(store => {
         const all = plan.lines.filter(item => item.store === store)
         const visible = all.filter(item => !onlyOpen || !done(item.key))
         return <section key={store}>
           <h4>{store} · {exactEuro.formatCents(perStoreProgress[store].totalCents)}</h4>
+          <button type="button" className="ghost-button" disabled={!all.length}
+            onClick={() => { void shareStoreStop(store) }}>
+            Deel of kopieer alleen mijn {store}-winkelstop
+          </button>
+          <button type="button" className="ghost-button" disabled={!all.length}
+            onClick={() => downloadStoreStopTxt(store)}>
+            Bewaar mijn {store}-winkelstop (TXT)
+          </button>
+          <button type="button" className="ghost-button" disabled={!all.length}
+            onClick={() => { void downloadPrintHtml(false, store) }}>
+            {onlyOpen ? 'Print alleen openstaande' : 'Bewaar / print volledige'} {' '}
+            {store}-winkelstop (HTML)
+          </button>
           <p><strong>{perStoreProgress[store].done} van {perStoreProgress[store].count}</strong>
             {' '}ingrediënten afgevinkt. Nog op de lijst bij deze winkel:{' '}
             <strong>{exactEuro.formatCents(perStoreProgress[store].remainingCents)}</strong>.</p>
@@ -623,6 +830,36 @@ export function MixedStoreShoppingCard({
         </section>
       })}
     </div>
+    {validManualNotes.length > 0 && <section className="mixed-store-route__manual"
+      aria-label="Eigen ongeprijsde boodschappen in mijn winkelroute">
+      <h4>Eigen boodschappen · nog zonder prijs</h4>
+      <p>Alleen jouw persoonlijke lijst: {validManualNotes.filter(note => !note.done).length}
+        {' '}van {validManualNotes.length} open. Vinkjes worden ook zichtbaar in je gewone Lijst;
+        ze beïnvloeden geen SKU-keuze, eurobedrag of winkelwinnaar.</p>
+      {(['PLUS', 'DekaMarkt', 'Algemeen'] as const).map(name => {
+        const rows = visibleManualNotes.filter(note => note.store === name)
+        return rows.length ? <div key={name}>
+          <strong>{name === 'Algemeen' ? 'Algemeen · wijs zelf een winkel toe'
+            : visitedStores.has(name) ? name : name + ' · buiten de gekozen route'}</strong>
+          {onToggleManualNote && <button type="button" className="ghost-button" onClick={() => {
+            const allDone = rows.every(note => note.done)
+            if (!allDone && !window.confirm('Deze ' + rows.length + ' eigen ongeprijsde ' +
+              name + '-artikelen afvinken? Dit bevestigt geen prijs of betaling.')) return
+            rows.filter(note => note.done === allDone).forEach(note => onToggleManualNote(note))
+            setMessage(allDone ? name + ': eigen vinkjes heropend.' :
+              name + ': eigen ongeprijsde boodschappen afgevinkt.')
+          }}>{rows.every(note => note.done)
+            ? 'Heropen eigen ' + name + '-artikelen'
+            : 'Vink zichtbare eigen ' + name + '-artikelen af'}</button>}
+          <ul>{rows.map(note => <li key={note.id}><label>
+            <input type="checkbox" checked={note.done} disabled={!onToggleManualNote}
+              onChange={() => onToggleManualNote?.(note)} />
+            {note.label} <small>· prijs onbekend · geen bron-SKU</small>
+          </label></li>)}</ul>
+        </div> : null
+      })}
+      {visibleManualNotes.length === 0 && <p>Alle persoonlijke lijstregels zijn afgevinkt.</p>}
+    </section>}
     {privatePlanKey && <PrivateRouteExtraGroceries
       identity={privatePlanKey} onlyOpen={onlyOpen} onCount={setExtraCount} />}
     {combinedCopy?.fingerprint === copyFingerprint && <label>
@@ -634,6 +871,14 @@ export function MixedStoreShoppingCard({
             setCombinedCopy(null)
             setMessage('Originele bronopnames zijn verlopen. Controleer de echte prijzen opnieuw.')
           } else event.currentTarget.select()
+        }} />
+    </label>}
+    {stopCopy?.fingerprint === copyFingerprint && <label>
+      Kopieer mijn persoonlijke {stopCopy.store}-winkelstop
+      <textarea readOnly rows={Math.min(18, plan.lines.length + 8)}
+        value={stopCopy.text} onFocus={event => {
+          if (eligibleNow()) event.currentTarget.select()
+          else { setStopCopy(null); setMessage('Originele bronopnames zijn verlopen.') }
         }} />
     </label>}
     {showText && <label>Kopieer mijn private boodschappenroute

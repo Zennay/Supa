@@ -4,7 +4,7 @@ import { figmaAssets as a } from '../home/figmaAssets'
 import { createManualRecipeDraft, importRecipeFromHtml, type UserRecipeDraft } from '../../domain/userRecipeImport'
 import { safeRecipeSourceUrl } from '../../domain/recipeSourceUrl'
 import { RECIPE_LIBRARY_KEY, readRecipeLibrary, saveRecipeLibrary, reviewRecipe, retainUnresolvedRecipeReview, sourceOnlyRecipeWarnings, acknowledgeRecipeSourceWarnings, type LibraryState, type SavedRecipe } from './recipeLibrary.ts'
-import { importRecipeLink } from './importRecipeLink'
+import { importRecipeLink, RecipeLinkImportUnavailableError } from './importRecipeLink'
 import { importRecipeLinksCollection } from './importRecipeLinksCollection'
 import { importPlainTextRecipe } from './importPlainTextRecipe'
 import { importPlainTextRecipeCollection } from './importPlainTextRecipeCollection'
@@ -14,7 +14,7 @@ import { ownRecipeAsMarkdown } from './ownRecipeMarkdown'
 import { prepareRecipeBackupImport, serializeRecipeBackup, type RecipeBackupPreview, RECIPE_BACKUP_MAX_BYTES } from './recipeBackup'
 import { curatedFigmaRecipes } from './curatedFigmaRecipes'
 import { m2InitialPlan } from '../../data/m2Fixture'
-import { ownRecipeShoppingChecklist, formatOwnRecipeChecklist } from './recipeShoppingChecklist'
+import { ownRecipeShoppingChecklist, formatOwnRecipeChecklist, personalRecipeShoppingNoteLabels, readableRecipeShoppingAmount } from './recipeShoppingChecklist'
 import { ImportedRecipeGroceriesPanel } from './ImportedRecipeGroceriesPanel'
 import { exportOwnRecipeChecklistCsv } from './recipeShoppingCsv'
 import { toPlannerRecipe } from './plannerRecipes.ts'
@@ -64,6 +64,49 @@ const examples = curatedFigmaRecipes.map(recipe => ({
 }))
 
 const blank = { title: '', servings: '2', minutes: '20', ingredients: '', steps: '' }
+
+/** Optional attribution must never prevent a local recipe from being imported.
+ * Invalid/credential-bearing links are omitted and explicitly require review;
+ * safe links are normalized using the same policy as recipe storage.
+ */
+function optionalRecipeAttribution(raw: string): { sourceUrl: string | null; warning: string | null } {
+  const value = raw.trim()
+  if (!value) return { sourceUrl: null, warning: null }
+  try {
+    const sourceUrl = safeRecipeSourceUrl(value)
+    const canonicalOriginal = new URL(value)
+    canonicalOriginal.hash = ''
+    return {
+      sourceUrl,
+      warning: sourceUrl !== canonicalOriginal.toString()
+        ? 'De bronlink is veilig opgeschoond; controleer de openbare bronvermelding.'
+        : null,
+    }
+  } catch {
+    return {
+      sourceUrl: null,
+      warning: 'De opgegeven bronlink was ongeldig of niet openbaar HTTPS en is niet bewaard; controleer de bronvermelding.',
+    }
+  }
+}
+
+/** Read local recipe/link files without guessing legacy encodings. UTF-16 is
+ * accepted only when a .txt/.md workflow declares its byte order with a BOM;
+ * HTML and JSON-LD remain strict UTF-8 to avoid silently reinterpreting data. */
+function decodeLocalRecipeCollectionFile(buffer: ArrayBuffer, format: 'plain' | 'jsonld' | 'html' | 'links'): string {
+  const bytes = new Uint8Array(buffer)
+  const allowBomUtf16 = format === 'plain' || format === 'links'
+  const encoding = allowBomUtf16 && bytes.length >= 2
+    ? bytes[0] === 0xff && bytes[1] === 0xfe ? 'utf-16le'
+      : bytes[0] === 0xfe && bytes[1] === 0xff ? 'utf-16be' : 'utf-8'
+    : 'utf-8'
+  try {
+    return new TextDecoder(encoding, { fatal: true }).decode(bytes).replace(/^\uFEFF/u, '').trim()
+  } catch {
+    throw new Error('Bestand bevat geen geldige tekstcodering. Gebruik UTF-8; voor .txt/.md-recept- en linklijsten mag ook UTF-16 met BOM.')
+  }
+}
+
 function initialLibrary(): LibraryState {
   if (typeof window === 'undefined') return { recipes: [], raw: null, error: null }
   try { return readRecipeLibrary(window.localStorage) }
@@ -76,7 +119,10 @@ function initialFavorites(): RecipeFavorites {
   catch { return { ids: [], raw: null, error: 'Favorieten kunnen niet worden geopend in deze browser.' } }
 }
 
-export function RecipeLibrary({ onBack }: { onBack: () => void }) {
+export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
+  onBack: () => void
+  onAddRecipeGroceries?: (labels: readonly string[]) => string | null
+}) {
   const [library, setLibrary] = useState(initialLibrary)
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<'all' | 'own' | 'favorites'>('all')
@@ -463,6 +509,39 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       setMessage(cause instanceof Error ? cause.message : 'Herstellen is niet gelukt; andere recepten zijn onaangeroerd.')
     }
   }
+  function addSingleRecipeToOwnList() {
+    if (!onAddRecipeGroceries || !selected || !('savedAt' in selected) ||
+        !ownShopping?.canCopy) return
+    try {
+      const source = selected
+      const assertCurrent = () => {
+        const latest = readRecipeLibrary(window.localStorage)
+        if (latest.error || !latest.recipes.some(item =>
+          item.id === source.id && JSON.stringify(item) === JSON.stringify(source)))
+          throw Error('Dit originele recept is in een ander tabblad gewijzigd of verwijderd. Open het opnieuw.')
+      }
+      assertCurrent()
+      const remaining = ownShopping.lines.filter(line =>
+        line.needsReview || shoppingChecks[line.key] !== true)
+      // The per-line scaler does not represent *global* import warnings.
+      // Respect the same source-review admission as the combined recipe List:
+      // a not-yet-admitted recipe can only contribute explicitly unreviewed
+      // questions, never seemingly confirmed quantities.
+      const sourceReviewed = !!toPlannerRecipe(source, { usage: 'unpriced-demand' })
+      const labels = personalRecipeShoppingNoteLabels(sourceReviewed ? remaining :
+        remaining.map(line => ({ ...line, needsReview: true })))
+      if (!window.confirm('Voeg ' + labels.length +
+          ' nog openstaande ingrediënten van dit eigen recept toe aan je ongeprijsde Lijst? ' +
+          'De gekozen porties gelden alleen voor deze lijst; je Planner, winkelprijzen en oude vinkjes blijven intact.')) return
+      assertCurrent()
+      const failure = onAddRecipeGroceries(labels)
+      if (failure) setPrivateWeekMessage(failure)
+    } catch (error) {
+      setPrivateWeekMessage(error instanceof Error ? error.message :
+        'De receptboodschappen konden niet veilig worden overgenomen.')
+    }
+  }
+
   function downloadOwnRecipeChecklist() {
     if (!ownShopping?.canCopy) return
     try {
@@ -608,32 +687,45 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     const revision = ++collectionReadVersion.current
     setCollectionError(''); setCollectionMessage(''); setCollectionPreview(null)
     try {
-      if (files.length > 15 || files.some(file => !file.size || file.size > 500_000) ||
-          files.reduce((bytes, file) => bytes + file.size, 0) > 500_000)
-        throw new Error('Kies maximaal 15 gevulde tekstbestanden, samen maximaal 500 kB.')
-      const decoder = new TextDecoder('utf-8', { fatal: true })
+      const maxFiles = format === 'links' ? 8 : 15
+      const maxBytes = format === 'links' ? 32_000 : 500_000
+      if (files.length > maxFiles || files.some(file => !file.size || file.size > maxBytes) ||
+          files.reduce((bytes, file) => bytes + file.size, 0) > maxBytes)
+        throw new Error(format === 'links'
+          ? 'Kies maximaal acht gevulde .txt/.md-linklijsten, samen maximaal 32 kB.'
+          : 'Kies maximaal 15 gevulde tekstbestanden, samen maximaal 500 kB.')
       const sources: string[] = []
       for (const file of files) {
         if (revision !== collectionReadVersion.current) return
-        if (!(format === 'plain' ? /\.(?:txt|md)$/iu : format === 'html' ? /\.html?$/iu : /\.(?:json|jsonld)$/iu).test(file.name))
-          throw new Error(format === 'plain' ? 'Kies alleen .txt- en .md-receptbestanden.' : format === 'html' ? 'Kies alleen .html- en .htm-receptbestanden.' : 'Kies alleen .json- en .jsonld-receptbestanden.')
-        const content = decoder.decode(await file.arrayBuffer()).replace(/^\uFEFF/u, '').trim()
+        const allowedName = format === 'plain' || format === 'links'
+          ? /\.(?:txt|md)$/iu.test(file.name)
+          : format === 'html' ? /\.html?$/iu.test(file.name)
+          : /\.(?:json|jsonld)$/iu.test(file.name)
+        if (!allowedName) {
+          const reason = format === 'links'
+            ? 'Kies alleen .txt- en .md-bestanden met openbare receptlinks.'
+            : format === 'plain' ? 'Kies alleen .txt- en .md-receptbestanden.'
+            : format === 'html' ? 'Kies alleen .html- en .htm-receptbestanden.'
+            : 'Kies alleen .json- en .jsonld-receptbestanden.'
+          throw new Error(reason)
+        }
+        const content = decodeLocalRecipeCollectionFile(await file.arrayBuffer(), format)
         if (!content) throw new Error('Eén van de gekozen receptbestanden is leeg.')
         sources.push(content)
       }
       if (revision !== collectionReadVersion.current) return
       const combined = format === 'plain'
         ? sources.join('\n---\n')
-        : format === 'html' ? sources.join('\n')
+        : format === 'html' || format === 'links' ? sources.join('\n')
         : sources.length === 1 ? sources[0] : JSON.stringify(sources.map(source => {
           try { return JSON.parse(source) }
           catch { throw new Error('Een van de JSON-LD-bestanden bevat ongeldige JSON.') }
         }))
-      if (new TextEncoder().encode(combined).length > 500_000)
-        throw new Error('De verzamelde recepten zijn groter dan 500 kB.')
+      if (new TextEncoder().encode(combined).length > maxBytes)
+        throw new Error(format === 'links' ? 'De linklijsten zijn samen groter dan 32 kB.' : 'De verzamelde recepten zijn groter dan 500 kB.')
       setCollectionFormat(format)
       setCollectionText(combined)
-      setCollectionMessage(files.length + ' lokale ' + (format === 'jsonld' ? 'JSON-LD-' : format === 'html' ? 'HTML-' : 'tekst') + 'bestanden gelezen. Controleer de afzonderlijke recepten en originele hoeveelheden vóór import.')
+      setCollectionMessage(files.length + ' lokale ' + (format === 'jsonld' ? 'JSON-LD-' : format === 'html' ? 'HTML-' : format === 'links' ? 'receptlink-' : 'tekst') + 'bestanden gelezen. Controleer de afzonderlijke recepten en originele hoeveelheden vóór import.')
     } catch (cause) {
       if (revision === collectionReadVersion.current)
         setCollectionError(cause instanceof Error ? cause.message : 'Kon deze receptbestanden niet lezen.')
@@ -659,8 +751,11 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
             })
           : importPlainTextRecipeCollection(collectionText)
       if (revision !== collectionReadVersion.current || controller.signal.aborted) return
+      // Attribution is meaningful recipe metadata. Identical ingredient
+      // text from two different public sources must not silently collapse
+      // into one imported recipe; source links remain sanitized at admission.
       const identity = (item: UserRecipeDraft) => JSON.stringify([
-        item.title, item.servings, item.minutes,
+        item.title, item.source, item.sourceUrl, item.servings, item.minutes,
         item.ingredients.map(part => part.original), item.steps,
       ])
       const known = new Set(library.recipes.map(identity))
@@ -796,7 +891,16 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       const draft = await importRecipeLink(url, controller.signal)
       if (controller.signal.aborted) return
       adoptImportedRecipe(draft, 'Recept opgehaald. Controleer de gegevens en sla het daarna op.')
-    } catch (e) { if (!controller.signal.aborted) setError(e instanceof Error ? e.message : 'Importeren is niet gelukt.') }
+    } catch (e) {
+      if (!controller.signal.aborted) {
+        if (e instanceof RecipeLinkImportUnavailableError) {
+          setMode('paste')
+          setError('Automatische linkimport is op deze website niet beschikbaar. De openbare link blijft behouden als bronvermelding. Open de receptpagina en upload lokaal opgeslagen HTML/JSON-LD of plak de JSON-LD hieronder; Supa verwerkt die lokaal zonder scripts uit te voeren.')
+        } else {
+          setError(e instanceof Error ? e.message : 'Importeren is niet gelukt.')
+        }
+      }
+    }
     finally { if (!controller.signal.aborted) setBusy(false) }
   }
   function adoptImportedRecipe(draft: UserRecipeDraft, messageText: string) {
@@ -845,8 +949,14 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       const html = sourceText.startsWith('{') || sourceText.startsWith('[')
         ? '<script type="application/ld+json">' + sourceText + '</script>'
         : sourceText
-      const draft = importRecipeFromHtml(html, url)
-      adoptImportedRecipe(draft, 'Receptgegevens lokaal herkend. Controleer alle hoeveelheden vóór opslaan.')
+      const attribution = optionalRecipeAttribution(url)
+      const draft = importRecipeFromHtml(html, attribution.sourceUrl)
+      adoptImportedRecipe({
+        ...draft,
+        warnings: attribution.warning
+          ? [...new Set([...draft.warnings, attribution.warning])]
+          : draft.warnings,
+      }, 'Receptgegevens lokaal herkend. Controleer alle hoeveelheden vóór opslaan.')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Kon de geplakte receptgegevens niet verwerken.')
     }
@@ -857,7 +967,23 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     setPreview(null)
     try {
       const draft = importPlainTextRecipe(pastedSource)
-      adoptImportedRecipe(draft, 'Recepttekst lokaal herkend. Controleer hoeveelheden en stappen vóór opslaan.')
+      let sourceUrl = draft.sourceUrl
+      const warnings = [...draft.warnings]
+      // If the user switched from URL import to the offline text fallback,
+      // preserve that explicitly entered source link unless the text itself
+      // supplies a more precise Bron: line. This is attribution only; no fetch.
+      if (!sourceUrl && url.trim()) {
+        const attribution = optionalRecipeAttribution(url)
+        sourceUrl = attribution.sourceUrl
+        if (attribution.warning) warnings.push(attribution.warning)
+      }
+      const attributed = {
+        ...draft,
+        source: sourceUrl ? 'url' as const : 'manual' as const,
+        sourceUrl,
+        warnings: [...new Set(warnings)],
+      }
+      adoptImportedRecipe(attributed, 'Recepttekst lokaal herkend. Controleer hoeveelheden en stappen vóór opslaan.')
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Kon deze recepttekst niet inlezen.')
     }
@@ -937,35 +1063,36 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
         </select>
       </label>
       <p>{collectionFormat === 'plain'
-        ? 'Scheid meerdere recepten met een eigen regel ---. Gebruik titel, Ingrediënten: en Bereiding:.'
+        ? 'Scheid recepten met een losse regel met drie koppeltekens (---), of gebruik Markdown-koppen: # Receptnaam per recept, of # Mijn recepten met ## Receptnaam per recept. Elk recept heeft een eigen Ingrediënten- en Bereiding-sectie. Porties:, Tijd: en Bron: https://… zijn optioneel; Bron is alleen attributie, geen prijsbewijs.'
         : collectionFormat === 'html'
           ? 'Lees schema.org/Recipe uit opgeslagen HTML-webpagina’s, zonder scripts uit te voeren of iets op internet te openen.'
           : collectionFormat === 'links'
-            ? 'Plak maximaal acht openbare HTTPS-receptlinks. Alleen na jouw klik worden ze via de bestaande beveiligde receptimport opgehaald. Bij mislukking blijft de bibliotheek onveranderd.'
+            ? 'Plak of upload maximaal acht openbare HTTPS-receptlinks. Markdown-koppen, scheidingslijnen, directe URL’s en [receptnaam](https://…) werken. Alleen na jouw klik worden ze via de bestaande beveiligde receptimport opgehaald; bij mislukking blijft de bibliotheek onveranderd.'
           : 'Kies 1–15 Recipe-objecten uit een JSON-LD-array of @graph. Bronlinks en winkelprijzen worden niet aangenomen.'}</p>
-      {collectionFormat !== 'links' && <label className="recipe-collection-label">{collectionFormat === 'plain'
+      <label className="recipe-collection-label">{collectionFormat === 'plain'
         ? 'Importeer .txt/.md-bestanden (samen maximaal 500 kB)'
         : collectionFormat === 'html' ? 'Importeer .html/.htm-bestanden (samen maximaal 500 kB)'
+        : collectionFormat === 'links' ? 'Importeer .txt/.md-linklijsten (maximaal 8 bestanden, samen 32 kB)'
         : 'Importeer .json/.jsonld-bestanden (samen maximaal 500 kB)'}
         <input type="file" multiple key={collectionFormat}
-          accept={collectionFormat === 'plain'
+          accept={collectionFormat === 'plain' || collectionFormat === 'links'
             ? '.txt,.md,text/plain,text/markdown'
             : collectionFormat === 'html' ? '.html,.htm,text/html' : '.json,.jsonld,application/json'}
           onChange={event => {
             const files = Array.from(event.currentTarget.files ?? [])
             void loadPlainRecipeCollection(files, collectionFormat); event.currentTarget.value = ''
           }} />
-      </label>}
+      </label>
       <label className="recipe-collection-label">{collectionFormat === 'plain'
         ? 'Recepttekst (titel, Ingrediënten:, Bereiding:)' : collectionFormat === 'html' ? 'HTML-bron van lokaal opgeslagen recepten'
         : collectionFormat === 'links' ? 'Openbare HTTPS-receptlinks (één per regel)'
         : 'JSON-LD receptverzameling'}
-        <textarea rows={8} maxLength={500000} value={collectionText}
+        <textarea rows={8} maxLength={collectionFormat === 'links' ? 32_000 : 500_000} value={collectionText}
           placeholder={collectionFormat === 'plain'
-            ? 'Tomatensoep\nIngrediënten:\n500 g tomaten\nBereiding:\nKook tomaten\n---\nPasta\nIngrediënten:\n200 g pasta\nBereiding:\nKook pasta'
+            ? 'Tomatensoep\nPorties: 2\nBron: https://voorbeeld.nl/recept/soep\nIngrediënten:\n500 g tomaten\nBereiding:\nKook tomaten\n---\nPasta\nIngrediënten:\n200 g pasta\nBereiding:\nKook pasta'
             : collectionFormat === 'html'
               ? '<script type="application/ld+json">{"@type":"Recipe","name":"...","recipeIngredient":["250 g ..."]}</script>'
-              : collectionFormat === 'links' ? 'https://voorbeeld.nl/recept/soep\nhttps://voorbeeld.nl/recept/pasta'
+              : collectionFormat === 'links' ? '# Mijn recepten\n\n- [Tomatensoep](https://voorbeeld.nl/recept/soep)\n- https://voorbeeld.nl/recept/pasta'
               : '{"@context":"https://schema.org","@graph":[{"@type":"Recipe","name":"...","recipeIngredient":["250 g ..."],"recipeInstructions":["..."]}]}'}
           onChange={event => {
             collectionAbort.current?.abort(); setCollectionBusy(false)
@@ -973,15 +1100,21 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
             setCollectionPreview(null); setCollectionError(''); setCollectionMessage('')
           }} />
       </label>
+      {collectionFormat === 'links' && <small>{collectionText.length.toLocaleString('nl-NL')} / 32.000 tekens · maximaal acht unieke HTTPS-receptlinks. Koppen en scheidingslijnen tellen niet mee.</small>}
       <p role="status">{markdownExportable.length} gecontroleerde recepten beschikbaar voor Markdown;
-        {' '}{library.recipes.length - markdownExportable.length} recept(en) met bronvermelding,
-        waarschuwingen of ongeldig exportformaat blijven uitsluitend in de volledige JSON-back-up.</p>
+        {' '}{library.recipes.length - markdownExportable.length} recept(en) met openstaande waarschuwingen
+        of ongeldig exportformaat blijven uitsluitend in de volledige JSON-back-up.
+        Veilige openbare Bron:-links worden in Markdown behouden; prijs- en bronrechtenstatus niet.</p>
       {markdownExportable.length > 15 &&
         <label className="recipe-collection-label">Kies welke 15 recepten je als Markdown meeneemt
           <select value={Math.min(collectionExportBatch, Math.ceil(markdownExportable.length / 15) - 1)}
             onChange={event => { setCollectionExportBatch(Number(event.currentTarget.value)); setCollectionError(''); setCollectionMessage('') }}>
-            {Array.from({ length: Math.ceil(markdownExportable.length / 15) }, (_, index) => <option
-              value={index} key={index}>Recepten {index * 15 + 1} t/m {Math.min(markdownExportable.length, (index + 1) * 15)}</option>)}
+            {Array.from({ length: Math.ceil(markdownExportable.length / 15) }, (_, pageIndex) => ({
+              value: pageIndex,
+              start: pageIndex * 15 + 1,
+              end: Math.min(markdownExportable.length, (pageIndex + 1) * 15),
+            })).map(page => <option
+              key={page.start} value={page.value}>Recepten {page.start} t/m {page.end}</option>)}
           </select>
         </label>}
       <div className="recipe-backup-panel__actions">
@@ -1013,7 +1146,13 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
             <button type="button" onClick={() => setCollectionSelected([])}>Deselecteer alles</button>
           </div>
           <div className="recipe-collection-preview">{collectionPreview.recipes.map((recipe, index) =>
-            <div key={index} className="recipe-collection-preview__item">
+            <div key={JSON.stringify([
+              recipe.sourceUrl, recipe.title,
+              recipe.ingredients.map(ingredient => [
+                ingredient.query, ingredient.label, ingredient.amount, ingredient.unit,
+              ]),
+              recipe.steps,
+            ])} className="recipe-collection-preview__item">
               <label className="recipe-collection-preview__select">
                 <input type="checkbox" checked={collectionSelected.includes(index)}
                   onChange={event => {
@@ -1028,6 +1167,11 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
                 {' '}{recipe.warnings.length ? recipe.warnings.length + ' controlepunten' : 'Geen openstaande importwaarschuwingen'}</summary>
               <p>{recipe.servings ?? '?'} porties · {recipe.minutes ?? '?'} minuten.
                 {' '}Originele hoeveelheden en waarschuwingen blijven bij het recept.</p>
+              {recipe.sourceUrl && <small>Bronvermelding (geen prijsbewijs):{' '}
+                <a href={safeRecipeSourceUrl(recipe.sourceUrl)} target="_blank" rel="noopener noreferrer">
+                  {safeRecipeSourceUrl(recipe.sourceUrl)}
+                </a>
+              </small>}
               <ul>{recipe.ingredients.map((ingredient, itemIndex) => <li key={itemIndex}>
                 <span>{ingredient.original}</span>
                 {ingredient.reviewReason
@@ -1101,9 +1245,10 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
           </button>}
         </div>}
       <small>Download maximaal 15 al gecontroleerde recepten per Markdownbestand. Grotere
-        verzamelingen kun je in opeenvolgende batches exporteren. Recepten met openstaande
-        bron- of hoeveelheidswaarschuwingen of oorspronkelijke bronlinks neem je veilig mee via
-        de volledige JSON-back-up hieronder; zo verdwijnen controlepunten en bronvermeldingen niet ongemerkt.</small>
+        verzamelingen kun je in opeenvolgende batches exporteren. Volledig gecontroleerde recepten
+        behouden hun veilige openbare bronlink als Bron:-regel. Recepten met openstaande bron- of
+        hoeveelheidswaarschuwingen blijven in de volledige JSON-back-up hieronder, zodat geen
+        controlepunt of bronvermelding stilzwijgend verloren gaat.</small>
       {collectionError && <p role="alert" className="recipe-error">{collectionError}</p>}
       {collectionMessage && <p role="status">{collectionMessage}</p>}
     </section>
@@ -1112,6 +1257,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
       <summary>Maak één boodschappenlijst van mijn eigen recepten</summary>
       <ImportedRecipeGroceriesPanel recipes={library.recipes}
         recentIds={lastImportedIds} onEdit={recipe => openSavedRecipeEditor(recipe)}
+        onAddToOwnList={onAddRecipeGroceries}
         onSavePortionVariants={saveBatchPortionVariants} />
     </details>}
     <section className="recipe-backup-panel" aria-label="Eigen recepten meenemen naar een ander apparaat">
@@ -1170,7 +1316,8 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
           <p>Plak een zelf verkregen recept, ook als Markdown uit een notitie of website.
             Nederlandse en Engelse koppen zoals Ingrediënten, Ingredients, Bereiding, Method en Directions worden herkend,
             net als lijstjes en genummerde stappen. Porties en tijd zijn optioneel;
-            ontbrekende of onduidelijke hoeveelheden blijven ter controle staan.
+            een optionele regel Bron: https://… bewaart alleen de openbare bronvermelding.
+            Ontbrekende of onduidelijke hoeveelheden blijven ter controle staan.
             De omzetting blijft lokaal, zonder website- of prijsverzoek.</p>
           <label>Of kies een lokaal tekst- of Markdownbestand (.txt of .md, maximaal 500 kB)
             <input type="file" accept=".txt,.md,text/plain,text/markdown"
@@ -1179,7 +1326,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
           {pasteFileMessage && <p role="status">{pasteFileMessage}</p>}
           <label>Recepttekst (maximaal 500 kB)
             <textarea required rows={12} maxLength={500000}
-              placeholder={'Pasta met spinazie\nPorties: 2\nTijd: 20 minuten\nIngrediënten:\n- 200 g pasta\n- 100 g spinazie\nBereiding:\n1. Kook pasta'}
+              placeholder={'Pasta met spinazie\nPorties: 2\nTijd: 20 minuten\nBron: https://voorbeeld.nl/recept/pasta\nIngrediënten:\n- 200 g pasta\n- 100 g spinazie\nBereiding:\n1. Kook pasta'}
               value={pastedSource} onChange={event => setPastedSource(event.target.value)} />
           </label>
           <button className="recipe-primary" type="submit">Zet tekst om naar receptconcept</button>
@@ -1187,11 +1334,12 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
         </form>
         : mode === 'paste' ? <form className="recipe-form" onSubmit={importPastedRecipe}>
           <p>Importeer je eigen JSON-LD met schema.org/Recipe of lokaal bewaarde HTML.
-            Een oorspronkelijke publieke HTTPS-link is optioneel voor bronvermelding.
-            Zonder link blijft dit een privé, handmatig toegevoegd recept.
-            Supa verwerkt alles lokaal: geen websitebezoek of uitvoering van code.</p>
+            Een openbare HTTPS-link is optioneel en dient alleen als bronvermelding.
+            Een ongeldige link wordt niet opgeslagen en geeft een controlewaarschuwing;
+            de lokale receptimport blijft bruikbaar. Supa bezoekt geen website en voert geen code uit.</p>
           <label>Optionele openbare HTTPS-bronlink (alleen bronvermelding)
-            <input type="url" placeholder="https://…" value={url}
+            <input type="text" inputMode="url" autoCapitalize="none" spellCheck={false}
+              placeholder="https://…" value={url}
               onChange={event => setUrl(event.target.value)} />
           </label>
           <label>Lokaal receptbestand (HTML of JSON-LD, maximaal 500 kB)
@@ -1223,8 +1371,8 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
             blijven ook na opslaan bestaan. Alleen een daadwerkelijke correctie van de
             hoeveelheid of eenheid kan een ingrediëntwaarschuwing opheffen.
             Tot die tijd blijft de Planner- en winkelprijsvergelijking geblokkeerd.</p>
-          <ul>{preview.warnings.map((warning, index) =>
-            <li key={index}>{warning}</li>)}</ul>
+          <ul>{preview.warnings.map(warning =>
+            <li key={warning}>{warning}</li>)}</ul>
         </div>}
         {sourceOnlyRecipeWarnings(preview).length > 0 && <button type="button"
           className="ghost-button" onClick={() => setPreview(current =>
@@ -1243,8 +1391,8 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
           <p>De oorspronkelijke import bevat nog {selected.warnings.length}
             {' '}waarschuwing(en). Supa kan deze ingrediënten nog niet veilig
             in Planner, Boodschappen of Vergelijk gebruiken. Je originele tekst blijft bewaard.</p>
-          <ul>{selected.warnings.map((warning, index) =>
-            <li key={index}>{warning}</li>)}</ul>
+          <ul>{selected.warnings.map(warning =>
+            <li key={warning}>{warning}</li>)}</ul>
           <button type="button" onClick={() => openSavedRecipeEditor(selected)}>
             Corrigeer de oorspronkelijke hoeveelheden
           </button>
@@ -1329,7 +1477,7 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
                 <input type="checkbox" checked={!!shoppingChecks[line.key]}
                   onChange={event => setShoppingChecks(current => ({ ...current, [line.key]: event.currentTarget.checked }))} />
                 <span>{line.needsReview ? `${line.original} — hoeveelheid controleren`
-                  : `${line.amount?.toLocaleString('nl-NL', { maximumFractionDigits: 3 })} ${line.unit === 'piece' ? 'stuks' : line.unit} ${line.label}`}</span>
+                  : `${line.amount === null ? 'hoeveelheid controleren' : readableRecipeShoppingAmount(line.amount)} ${line.unit === 'piece' ? 'stuks' : line.unit} ${line.label}`}</span>
               </label>
             </li>)}</ul>
             {!shoppingVisible.length && <p role="status">Alle boodschappen voor dit recept afgevinkt.</p>}
@@ -1341,6 +1489,10 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
               aria-label="Kopieer mijn ongeprijsde boodschappenlijst"
               value={selectedRecipeShoppingText} onFocus={event => event.currentTarget.select()} />}
             {showShoppingCopy && <button type="button" onClick={() => shoppingCopy.current?.select()}>Selecteer alle tekst</button>}
+            {onAddRecipeGroceries && <button type="button"
+              onClick={addSingleRecipeToOwnList}>
+              Zet openstaande ingrediënten van dit recept op Lijst
+            </button>}
             <button type="button" onClick={downloadOwnRecipeChecklist}>Download ongeprijsde lijst (TXT)</button>
             <button type="button" onClick={downloadOwnRecipeChecklistCsv}>Download ongeprijsde lijst (CSV)</button>
             <button type="button" onClick={downloadForPrivateComparison}>Gebruik dit recept in winkelvergelijker (JSON)</button>

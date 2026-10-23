@@ -48,6 +48,14 @@ button:disabled{background:#b6c6bc;cursor:not-allowed}.secondary{background:#e5e
  #result #next-actions{break-inside:avoid}
 }
 
+.store-coverage{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:14px 0;padding:16px;background:#f7faf6;border:1px solid #d6e0d4;border-radius:12px}
+.coverage-shop{min-width:0;display:grid;gap:8px}
+.coverage-shop label{font-size:14px;line-height:1.4}
+.coverage-shop progress{width:100%;height:16px;accent-color:#17643e}
+.store-coverage>.muted,.coverage-actions{grid-column:1/-1;margin:0}
+.coverage-actions{display:flex;gap:10px 18px;flex-wrap:wrap}
+.coverage-actions a{display:inline-flex;align-items:center;min-height:40px;overflow-wrap:anywhere}
+@media(max-width:650px){.store-coverage{grid-template-columns:1fr}}
 @media(max-width:650px){.grid,.stores{grid-template-columns:1fr}section{padding:15px}.row-actions button{flex:1}}
 .observation-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px}
 .observed-product{padding:16px;border:1px solid #d6e0d4;border-radius:12px;margin:12px 0;background:#fcfefd}
@@ -60,6 +68,18 @@ button:disabled{background:#b6c6bc;cursor:not-allowed}.secondary{background:#e5e
 #trip .trip-line:has(input:checked) span{text-decoration:line-through;color:#698376}
 #trip select{max-width:100%;width:100%;border:1px solid #afc4b6;border-radius:9px;padding:11px;background:white;color:#183b2d}
 #trip .row-actions{display:flex;gap:12px;flex-wrap:wrap}
+.own-recipe-review-needed{border-color:#d4b77e;background:#fff9ed}
+#own-recipe-review-needed[hidden]{display:none!important}
+#own-recipe-review-needed h4{margin:.2rem 0 .6rem}
+#own-recipe-review-needed p{margin:.4rem 0 .8rem}
+#own-recipe-review-needed details{background:#fff;border-color:#e2d1b2}
+#own-recipe-review-needed summary{overflow-wrap:anywhere}
+.own-recipe-backup-picker{display:grid;gap:9px;margin:12px 0;padding:14px;border:1px solid #ccdfd0;border-radius:12px;background:#f7faf6}
+.own-recipe-backup-picker label{margin:0}
+.own-recipe-backup-picker input[type=file]{max-width:100%;width:100%;min-height:44px}
+.own-recipe-backup-picker button{justify-self:start}
+.own-recipe-backup-picker small{line-height:1.5}
+@media(max-width:530px){.own-recipe-backup-picker button{justify-self:stretch}}
 /* Saved recipes become first-class physical inputs on desktop and narrow phones. */
 .own-recipe-pick-card{min-width:0}
 .own-recipe-pick-controls{display:grid;grid-template-columns:repeat(2,minmax(75px,95px));gap:10px}
@@ -93,15 +113,15 @@ Deze pagina leest bestanden alleen in je browser. Ze haalt geen prijzen op, verz
 Onbekende productmatches blijven onbekend. Bekende artikelen zonder prijs of beschikbaarheid kun je wel vastleggen, maar ze tellen nooit mee als geprijsde winkelmandregel.</p></header>
 <section aria-labelledby="source-title">
 <h2 id="source-title">1 · Open je eigen winkelopnames</h2>
-<label for="source">Gecombineerde eigen CSV, of supa-offline-prices-v1 JSON</label>
+<label for="source">Gecombineerde eigen CSV/TSV/TXT, of supa-offline-prices-v1 JSON</label>
 <input id="source" type="file" accept=".csv,.tsv,.json,.txt,text/csv,text/plain,text/tab-separated-values,application/json">
 <div class="stores">
-<div><label for="plus-source">Of: jouw PLUS CSV of eigen JSON (ook zonder DekaMarkt)</label><input id="plus-source" type="file" accept=".csv,.tsv,.txt,.json,text/csv,text/plain,text/tab-separated-values,application/json"></div>
-<div><label for="deka-source">En/of: jouw DekaMarkt CSV of eigen JSON (ook zonder PLUS)</label><input id="deka-source" type="file" accept=".csv,.tsv,.txt,.json,text/csv,text/plain,text/tab-separated-values,application/json"></div>
+<div><label for="plus-source">Of: jouw PLUS CSV/TSV/TXT of eigen JSON (ook zonder DekaMarkt)</label><input id="plus-source" type="file" accept=".csv,.tsv,.txt,.json,text/csv,text/plain,text/tab-separated-values,application/json"></div>
+<div><label for="deka-source">En/of: jouw DekaMarkt CSV/TSV/TXT of eigen JSON (ook zonder PLUS)</label><input id="deka-source" type="file" accept=".csv,.tsv,.txt,.json,text/csv,text/plain,text/tab-separated-values,application/json"></div>
 </div>
-<p class="muted">Kies één eigen CSV-/JSON-bestand met één of twee werkelijke winkelopnames, of aparte CSV-bestanden per winkel.
-Elk afzonderlijk bestand moet de negen kolommen met de volledige CSV-kop bevatten.
-Aangeleverde bronnen worden alleen lokaal verwerkt door de bestaande strikte Supa-converter. Een ontbrekende tweede winkel wordt niet automatisch ingevuld.
+<p class="muted">Kies één eigen CSV/TSV/TXT-bestand met één of twee werkelijke winkelopnames, of aparte bronbestanden per winkel.
+Elk CSV/TSV-bestand moet de negen kolommen met de volledige originele kop bevatten. CSV en JSON blijven UTF-8; Excel/Calc <strong>Unicode Text</strong> wordt alleen voor <code>.txt</code>/<code>.tsv</code> met een expliciete UTF-16 LE/BE-BOM gedecodeerd.
+Aangeleverde bronnen worden lokaal verwerkt door de bestaande strikte Supa-converter. Een ontbrekende tweede winkel wordt niet automatisch ingevuld.
 Productnamen en prijzen komen uitsluitend uit jouw eigen bestanden.</p>
 <div class="row-actions"><button id="edit-owned-source" type="button" class="secondary" disabled>Bewerk mijn geopende eigen winkelopnames</button>
 <button id="download-admitted-sources" type="button" class="secondary" disabled>Bewaar alle toegelaten eigen winkelopnames als JSON</button></div>
@@ -113,6 +133,16 @@ Productnamen en prijzen komen uitsluitend uit jouw eigen bestanden.</p>
 <p>Geen CSV klaar? Vul zelf producten in die je <strong>daadwerkelijk</strong> bij PLUS en/of DekaMarkt hebt waargenomen. Een tweede echte winkelopname kan later aan je eerste worden toegevoegd zonder die eerste opnieuw te verzinnen of in te voeren.
 Dit is een lokale invoerhulp, geen scraper. Laat onbekende prijzen leeg en bevestig alleen werkelijk gecontroleerde beschikbaarheid.
 Tijdstippen en artikel-ID's worden niet automatisch bedacht of ingevuld.</p>
+<aside id="manual-demand-context" class="ingredient" hidden aria-label="Mijn fysieke weekbehoefte tijdens handmatige winkelopname">
+<h3>Mijn gekozen weekboodschappen als geheugensteun</h3>
+<p>Na jouw expliciete Planner-import verschijnt hier de oorspronkelijke fysieke vraag.
+Deze ingrediënten zijn <strong>geen</strong> waargenomen winkelartikelen, productmatches, prijzen of voorraad.
+Vul rechts of hieronder uitsluitend werkelijk gecontroleerde winkelproducten in.</p>
+<label for="manual-demand-query">Zoek ingrediënt in mijn gekozen mandje</label>
+<input id="manual-demand-query" type="search" maxlength="120" autocomplete="off" placeholder="Bijvoorbeeld rijst of paprika">
+<p id="manual-demand-count" class="muted" role="status" aria-live="polite"></p>
+<ol id="manual-demand-items" style="max-height:270px;overflow:auto;padding-left:24px"></ol>
+</aside>
 <label for="manual-store-mode">Van welke winkel(s) heb je werkelijk producten waargenomen?</label>
 <select id="manual-store-mode"><option value="both">PLUS en DekaMarkt</option><option value="PLUS">Alleen PLUS</option><option value="DekaMarkt">Alleen DekaMarkt</option></select>
 <small>Met één winkel kun je al een eigen mand en budget maken. De andere winkel blijft volledig onbekend, zonder fictieve opname.</small>
@@ -140,13 +170,21 @@ dan kan er geen volledig prijsverschil worden berekend. Pas na eigen controle ki
 <div id="own-recipe-import" class="ingredient" style="margin-bottom:16px">
 <h3>Of: gebruik je opgeslagen eigen Supa-recepten</h3>
 <p>Laad bewust jouw eigen recepten van dit apparaat. Alleen volledig gecontroleerde
-metrische hoeveelheden zijn geschikt; recepten met open reviewpunten blijven
-in Mijn recepten totdat je ze daar corrigeert. Selecteer maximaal zeven
-maaltijden, kies desgewenst herhalingen en maak dezelfde ongeprijsde fysieke
-boodschappenbehoefte als een Planner-weekmenu.</p>
+metrische hoeveelheden, hele fysieke stuks en porties zijn geschikt. Een ontbrekende
+bereidingstijd blijft onbekend maar blokkeert de ongeprijsde boodschappenbehoefte niet;
+andere open ingrediënt- of bronwaarschuwingen blijven in Mijn recepten totdat je ze
+daar corrigeert. Selecteer maximaal zeven maaltijden, kies desgewenst herhalingen en
+maak dezelfde ongeprijsde fysieke boodschappenbehoefte als een Planner-weekmenu.</p>
 <button id="load-own-recipes" type="button" class="secondary">Laad mijn eigen recepten op dit apparaat</button>
+<div class="own-recipe-backup-picker">
+<label for="own-recipe-backup-file">Of: open je eigen Supa-receptenback-up van een ander apparaat (JSON, maximaal 2 MB)</label>
+<input id="own-recipe-backup-file" type="file" accept=".json,application/json">
+<button id="load-own-recipe-backup" type="button" class="secondary">Controleer mijn receptenback-up</button>
+<small>Geen account nodig voor dit lokale bestand. Supa controleert de bestaande back-upindeling, toont de beschikbare recepten en bewaart het bestand niet automatisch. De huidige receptenbibliotheek, winkel-SKU’s, prijzen en afvinkingen worden niet gewijzigd.</small>
+</div>
 <div id="own-recipe-status" class="notice" role="status" aria-live="polite">Nog geen toegang tot jouw lokale recepten gevraagd.</div>
 <div id="own-recipe-choices" role="group" aria-label="Kies eigen recepten" style="display:grid;gap:8px"></div>
+<div id="own-recipe-review-needed" class="notice warning own-recipe-review-needed" role="region" aria-live="polite" hidden aria-label="Eigen recepten die nog controle nodig hebben"></div>
 <button id="own-recipes-to-demand" type="button" disabled>Gebruik geselecteerde recepten als mandvraag</button>
 </div>
 <div id="quick-demand" class="ingredient" style="margin-bottom:16px">
@@ -217,6 +255,29 @@ Bewaar desgewenst je <strong>lokale bron- en mandinvoersessie</strong> inclusief
 <section id="result" hidden aria-label="Vergelijking van de eigen winkelmandjes">
 <h2>Jouw mandje · PLUS tegenover DekaMarkt</h2>
 <div id="summary" class="notice" role="status" aria-live="polite"></div>
+<div class="store-coverage" id="store-coverage" aria-label="Dekking van de werkelijke winkelprijsopnames">
+  <div class="coverage-shop">
+    <label for="coverage-plus"><strong>PLUS</strong> · <span id="coverage-plus-text">Nog geen complete eigen prijsregels</span></label>
+    <progress id="coverage-plus" value="0" max="1"></progress>
+  </div>
+  <div class="coverage-shop">
+    <label for="coverage-deka"><strong>DekaMarkt</strong> · <span id="coverage-deka-text">Nog geen complete eigen prijsregels</span></label>
+    <progress id="coverage-deka" value="0" max="1"></progress>
+  </div>
+  <p class="muted">Dit toont alleen hoeveel fysieke regels een recente en volledig bekende eigen prijs hebben. Een winkelwinnaar of besparing verschijnt pas bij twee complete, tijdig gekoppelde opnames.</p>
+  <nav class="coverage-actions" aria-label="Ontbrekende eigen winkelproducten aanvullen">
+    <a href="#source-title">Open eigen CSV/TSV/TXT/JSON-prijsbron</a>
+    <a href="#manual-observations">Voer echt waargenomen winkelprijzen in</a>
+    <a href="#next-actions">Bekijk ontbrekende prijsregels</a>
+  </nav>
+  <div class="coverage-actions">
+    <button id="blank-plus-recapture" type="button" class="secondary">Leeg PLUS-heropnameblad (CSV)</button>
+    <button id="blank-deka-recapture" type="button" class="secondary">Leeg DekaMarkt-heropnameblad (CSV)</button>
+    <button id="guide-plus-recapture" type="button">PLUS-rijgids (TXT)</button>
+    <button id="guide-deka-recapture" type="button">DekaMarkt-rijgids (TXT)</button>
+  </div>
+  <small class="muted" style="grid-column:1/-1">Deze lege bestanden bevatten bewust geen bronproducten, tijden of prijzen. Gebruik ze om een volledige nieuwe waarneming van dezelfde fysieke vraag vast te leggen. Een losse ontbrekende rij is geen nieuwe complete winkelopname.</small>
+</div>
 <div id="budget-panel" style="padding:12px;margin-top:12px;border:1px solid #d6e0d4;border-radius:10px">
 <label id="budget-label" for="budget-euros">Optioneel: eigen budget voor dit hele mandje (€)</label>
 <input id="budget-euros" type="text" inputmode="decimal" placeholder="Bijv. 50,00" maxlength="12" style="width:160px;max-width:100%" autocomplete="off">

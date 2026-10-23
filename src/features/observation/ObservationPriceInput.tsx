@@ -3,7 +3,7 @@ import { observationPriceCents } from './observationCollectionUi.ts'
 
 /** The canonical draft stores integer cents, never partial input or guessed prices. */
 export function observationEditablePriceText(priceCents: number | null): string {
-  if (priceCents === null || !Number.isSafeInteger(priceCents) || priceCents < 0) {
+  if (priceCents === null || !Number.isSafeInteger(priceCents) || priceCents <= 0) {
     return ''
   }
 

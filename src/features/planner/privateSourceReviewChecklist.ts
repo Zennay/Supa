@@ -6,7 +6,7 @@ import { privatePackUnitRate } from '../comparison/privateUnitPrice.ts'
 export function completeOwnSourceProduct(product: OfflineStoreProduct): boolean {
   if (product.sourceAvailable !== true ||
       typeof product.sourcePriceCents !== 'number' ||
-      !Number.isSafeInteger(product.sourcePriceCents) || product.sourcePriceCents < 0 ||
+      !Number.isSafeInteger(product.sourcePriceCents) || product.sourcePriceCents <= 0 ||
       product.packAmount === null || product.packAmount <= 0 ||
       product.packUnit === 'unknown' ||
       !Number.isSafeInteger(product.packCount ?? 1) || (product.packCount ?? 1) <= 0)
@@ -55,7 +55,7 @@ export function privateSourceReviewChecklist(input: {
         !Number.isSafeInteger(product.packCount ?? 1) || (product.packCount ?? 1) <= 0)
       reasons.push('echte verpakking en maateenheid controleren')
     if (typeof product.sourcePriceCents !== 'number' ||
-        !Number.isSafeInteger(product.sourcePriceCents) || product.sourcePriceCents < 0)
+        !Number.isSafeInteger(product.sourcePriceCents) || product.sourcePriceCents <= 0)
       reasons.push('werkelijke pakprijs vastleggen')
     if (stale) reasons.push('nieuw oorspronkelijk winkelmoment nodig')
     if (!reasons.length) continue

@@ -1,8 +1,20 @@
 import { FigmaImage } from './components/FigmaImage'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { PlannerView } from './features/planner/PlannerView'
-import { WeekShareManualCopy } from './features/planner/WeekShareManualCopy'
-import { PlannerPortableWeek } from './features/planner/PlannerPortableWeek.tsx'
+// Planner's full price/budget/editor surface is not needed to open Home.
+const PlannerView = lazy(async () => {
+  const module = await import('./features/planner/PlannerView')
+  return { default: module.PlannerView }
+})
+const PlannerPortableWeek = lazy(async () => {
+  const module = await import('./features/planner/PlannerPortableWeek.tsx')
+  return { default: module.PlannerPortableWeek }
+})
+const WeekShareManualCopy = lazy(async () => {
+  const module = await import('./features/planner/WeekShareManualCopy')
+  return { default: module.WeekShareManualCopy }
+})
+
+
 import { currentWeekSharePreview, formatShareableWeek } from './features/planner/weekPlanShare'
 import type { WeekSharePreview } from './features/planner/weekPlanShare'
 // The private price workbench is sizeable and is not needed for Home, Recipes
@@ -11,8 +23,23 @@ const BasketView = lazy(async () => {
   const module = await import('./features/basket/BasketView')
   return { default: module.BasketView }
 })
-import { ShoppingListView } from './features/shopping-list/ShoppingListView'
-import { PrivateSourceShoppingList } from './features/shopping-list/PrivateSourceShoppingList.tsx'
+const ShoppingListView = lazy(async () => {
+  const module = await import('./features/shopping-list/ShoppingListView')
+  return { default: module.ShoppingListView }
+})
+import type { UnpricedShoppingNote } from './features/shopping-list/ManualShoppingNotes.tsx'
+import { applyPlannerPersonalNotes } from './features/comparison/applyPlannerPersonalNotes.ts'
+import type { PersonalNoteDraft } from './features/comparison/plannerPersonalNotes.ts'
+import { serializePrivateNotes } from './features/shopping-list/manualShoppingNotesBackup.ts'
+const ManualShoppingNotes = lazy(async () => {
+  const module = await import('./features/shopping-list/ManualShoppingNotes.tsx')
+  return { default: module.ManualShoppingNotes }
+})
+// Load the reviewed shopping route only when a real complete source exists.
+const PrivateSourceShoppingList = lazy(async () => {
+  const module = await import('./features/shopping-list/PrivateSourceShoppingList.tsx')
+  return { default: module.PrivateSourceShoppingList }
+})
 import './features/shopping-list/listSourceFilePicker.css'
 const PartialReviewedShoppingList = lazy(async () => {
   const module = await import('./features/shopping-list/PartialReviewedShoppingList.tsx')
@@ -25,7 +52,11 @@ const PrivateReviewedProductCatalog = lazy(async () => {
   const module = await import('./features/products/PrivateReviewedProductCatalog.tsx')
   return { default: module.PrivateReviewedProductCatalog }
 })
-import { UnpricedPlannerChecklist } from './features/comparison/UnpricedPlannerChecklist.tsx'
+// Unpriced checklist is useful without retailer data, but not on Home.
+const UnpricedPlannerChecklist = lazy(async () => {
+  const module = await import('./features/comparison/UnpricedPlannerChecklist.tsx')
+  return { default: module.UnpricedPlannerChecklist }
+})
 const OwnExtraGroceries = lazy(async () => {
   const module = await import('./features/comparison/OwnExtraGroceries.tsx')
   return { default: module.OwnExtraGroceries }
@@ -33,15 +64,25 @@ const OwnExtraGroceries = lazy(async () => {
 import type { PrivateExtraVisitCostIntent } from './features/comparison/privateExtraVisitCost.ts'
 import type { PrivateSourceFileHandoff } from './features/comparison/privateSourceFileHandoff.ts'
 import { parsePrivateExtraVisitCostCents } from './features/comparison/privateExtraVisitCost.ts'
-import { freshReviewedBaskets, type PrivateReviewedBaskets, type PrivateCaptureProgress, type PrivateReviewFocus, type OwnStore, type PrivateRouteChoice } from './features/comparison/privateReviewedBasketBridge.ts'
-import { ObservationView } from './features/observation/ObservationView'
+import { recentOwnCaptureInstant, freshReviewedBaskets, type PrivateReviewedBaskets, type PrivateCaptureProgress, type PrivateReviewFocus, type OwnStore, type PrivateRouteChoice } from './features/comparison/privateReviewedBasketBridge.ts'
+const ObservationView = lazy(async () => {
+  const module = await import('./features/observation/ObservationView')
+  return { default: module.ObservationView }
+})
 import { IdentityAvatar } from './components/IdentityAvatar.tsx'
 import { HiFiHome, HiFiDemoList } from './features/home/HiFiHome'
+import { clearUnpricedShoppingProduct } from './features/home/unpricedShoppingProgress'
+import { clearUnpricedShoppingDetails } from './features/home/unpricedShoppingDetails'
+// Actual-source comparison is a separate, lazy Home route, never historical demo pricing.
+const PrivateComparisonJourney = lazy(async () => {
+  const module = await import('./features/home/PrivateComparisonJourney.tsx')
+  return { default: module.PrivateComparisonJourney }
+})
 import { readRecipeLibrary } from './features/recipes/recipeLibrary'
 import { toPlannerRecipe } from './features/recipes/plannerRecipes'
 import { curatedFigmaRecipes } from './features/recipes/curatedFigmaRecipes'
 import { figmaAssets } from './features/home/figmaAssets'
-import { buildOneStoreBasket } from './domain/basket'
+import { aggregatePlanIngredients, buildOneStoreBasket, type RecipeWithIngredients } from './domain/basket'
 import { compareFullBaskets } from './domain/basketComparison'
 import {
   defaultPlannerPreferences,
@@ -158,6 +199,26 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [ownPriceImportSignal, setOwnPriceImportSignal] = useState(0)
   const [incomingPriceFiles, setIncomingPriceFiles] = useState<PrivateSourceFileHandoff | null>(null)
   const [listSourceFileWarning, setListSourceFileWarning] = useState('')
+  const [ownCatalogSearchIntent, setOwnCatalogSearchIntent] = useState({
+    serial: 0, text: '', store: 'all' as 'all' | 'PLUS' | 'DekaMarkt',
+  })
+  // Separate, explicitly unpriced human notes. Never counted in shop totals.
+  const [manualShoppingNotes, setManualShoppingNotes] = useState<UnpricedShoppingNote[]>([])
+  // Shared by unpriced Planner and a source-reviewed store list: a verified
+  // capture must not make the original unpriced week impossible to transfer.
+  const addPlannerNotes = useCallback((incoming: readonly PersonalNoteDraft[], expected: string): string => {
+    if (serializePrivateNotes(manualShoppingNotes) !== expected) {
+      throw Error('De persoonlijke lijst is intussen veranderd. Er is niets toegevoegd.')
+    }
+    const proposed = applyPlannerPersonalNotes(manualShoppingNotes, incoming, expected)
+    setManualShoppingNotes(current => {
+      // Retain concurrent changes rather than replacing another live copy.
+      try { return serializePrivateNotes(current) === expected ? proposed.notes : current }
+      catch { return current }
+    })
+    return proposed.added + ' Planner-ingrediënten toegevoegd aan je ongeprijsde lijst. ' +
+      'Geen winkelprijs of SKU gekoppeld.'
+  }, [manualShoppingNotes])
   const nextPriceFileSerial = useRef(0)
   const [privateReviewed, setPrivateReviewed] = useState<PrivateReviewedBaskets | null>(null)
   const [privateCaptureProgress, setPrivateCaptureProgress] = useState<PrivateCaptureProgress | null>(null)
@@ -204,6 +265,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [designProductIds, setDesignProductIds] = useState<string[]>(() => initialProductSelection.ids)
   const [savedProductRaw, setSavedProductRaw] = useState(initialProductSelection.raw)
   const [productSelectionTouched, setProductSelectionTouched] = useState(false)
+  const [productSelectionWritable, setProductSelectionWritable] = useState(initialProductSelection.writable)
   const [productSelectionWarning, setProductSelectionWarning] = useState<'protected' | 'unavailable' | null>(
     () => initialProductSelection.writable ? null : (typeof window === 'undefined' ? null : 'protected'),
   )
@@ -219,21 +281,29 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   }
   // Directly reveal the existing local source upload controls, not the
   // unrelated historical demonstration basket above them.
+  const revealOwnPriceImport = useCallback(() => {
+    const target = document.getElementById('supa-own-price-import')
+    if (!target) return
+    target.focus({ preventScroll: true })
+    target.scrollIntoView({ block: 'start', behavior: 'smooth' })
+  }, [])
   useEffect(() => {
     if (tab !== 'basket' || ownPriceImportSignal === 0) return
-    const frame = window.requestAnimationFrame(() =>
-      document.getElementById('supa-own-price-import')?.scrollIntoView({
-        block: 'start', behavior: 'smooth',
-      }))
+    const frame = window.requestAnimationFrame(revealOwnPriceImport)
     return () => window.cancelAnimationFrame(frame)
-  }, [tab, ownPriceImportSignal])
+  }, [tab, ownPriceImportSignal, revealOwnPriceImport])
   const toggleDesignProduct = (id: string) => {
-    setDesignProductIds(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id])
+    // A removed discovery item is a new task if added again; do not resurrect old private details.
+    if (designProductIds.includes(id)) {
+      clearUnpricedShoppingProduct(id)
+      clearUnpricedShoppingDetails(id)
+    }
+    setDesignProductIds(current => current.includes(id) ? current.filter(item => item !== id) : current.length < 100 ? [...current, id] : current)
     setProductSelectionTouched(true)
   }
   useEffect(() => {
     if (!productSelectionTouched || typeof window === 'undefined') return
-    if (!initialProductSelection.writable) {
+    if (!productSelectionWritable) {
       setProductSelectionWarning('protected')
       return
     }
@@ -247,9 +317,43 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       const next = JSON.stringify({ schemaVersion: 1, ids: designProductIds })
       if (actual !== next) window.localStorage.setItem(chosenProductsStorageKey, next)
       setSavedProductRaw(next)
+      setProductSelectionTouched(false)
       setProductSelectionWarning(null)
     } catch { setProductSelectionWarning('unavailable') }
-  }, [designProductIds, productSelectionTouched, savedProductRaw])
+  }, [designProductIds, productSelectionTouched, savedProductRaw, productSelectionWritable])
+  // Adopt changes from another tab only when this tab has no unsaved edits.
+  // Unknown/future records remain untouched, preserving the owner's bytes.
+  useEffect(() => {
+    const syncChosenProducts = (event: StorageEvent) => {
+      if (event.key !== null && event.key !== chosenProductsStorageKey) return
+      let clean = !productSelectionTouched
+      if (productSelectionTouched) {
+        try {
+          const savedIds = savedProductRaw === null ? [] :
+            (JSON.parse(savedProductRaw) as { ids?: unknown }).ids
+          clean = Array.isArray(savedIds) && savedIds.length === designProductIds.length &&
+            savedIds.every((id, index) => id === designProductIds[index])
+        } catch { clean = false }
+      }
+      if (!clean) {
+        setProductSelectionWarning('protected')
+        return
+      }
+      const next = readChosenProducts()
+      if (!next.writable) {
+        setProductSelectionWritable(false)
+        setProductSelectionWarning('protected')
+        return
+      }
+      setDesignProductIds(next.ids)
+      setSavedProductRaw(next.raw)
+      setProductSelectionTouched(false)
+      setProductSelectionWritable(true)
+      setProductSelectionWarning(null)
+    }
+    window.addEventListener('storage', syncChosenProducts)
+    return () => window.removeEventListener('storage', syncChosenProducts)
+  }, [designProductIds, savedProductRaw, productSelectionTouched])
   const [recipes, setRecipes] = useState(availableRecipes)
   const validRecipeIds = recipes.map(recipe => recipe.id)
   useEffect(() => {
@@ -470,6 +574,21 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   // merely adds an unrelated recipe or edits an inactive day. Only changing
   // the ACTUAL selected physical week can invalidate these private receipts.
   const privatePlanKey = privatePhysicalPlanIdentity(plannedMeals, recipes, activeDays)
+  // Share the canonical aggregated physical week with Producten, rather than
+  // inferring missing ingredients from whichever retailer happened to import.
+  const productCaptureNeeds = useMemo(() => {
+    if (tab !== 'products' && tab !== 'home') return []
+    const physical = recipes.filter((recipe): recipe is RecipeWithIngredients =>
+      Array.isArray((recipe as RecipeWithIngredients).ingredients))
+    if (physical.length !== recipes.length) return []
+    try {
+      return aggregatePlanIngredients(plannedMeals, physical, activeDays)
+        .map(need => ({
+          id: need.id, label: need.label, unit: need.unit,
+          amount: need.amount, query: need.query,
+        }))
+    } catch { return [] }
+  }, [tab, plannedMeals, recipes, activeDays])
   // Planner and Lijst share the exact same real-source File handoff. Files
   // stay in this tab until the canonical Vergelijk importer consumes them.
   // No alternate CSV parser or implicit retailer approval is introduced.
@@ -487,6 +606,9 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
     openOwnPriceImport()
   }
   const livePrivateReviewed = freshReviewedBaskets(privateReviewed, privatePlanKey, sourceNowMs)
+  const hasOwnProductCapture = !!livePrivateReviewed ||
+    (privateCaptureProgress?.planKey === privatePlanKey &&
+      (!!privateCaptureProgress.stores.PLUS || !!privateCaptureProgress.stores.DekaMarkt))
   const preferredPrivateBasket = livePrivateReviewed?.stores[preferredOwnStore] ??
     livePrivateReviewed?.stores.PLUS ?? livePrivateReviewed?.stores.DekaMarkt
 
@@ -654,9 +776,99 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             {planRepairMessage && <p role="alert">{planRepairMessage}</p>}
           </section>
         )}
-        {tab === 'products' && <Suspense fallback={<p role="status">Eigen bronproducten openen…</p>}>
+        {tab === 'products' && <div id="supa-real-source-catalog" tabIndex={-1}>
+          <Suspense fallback={<p role="status">Eigen bronproducten openen…</p>}>
           <PrivateReviewedProductCatalog reviewed={livePrivateReviewed} budget={budget}
+            incomingSearch={ownCatalogSearchIntent}
+            captureNeeds={productCaptureNeeds}
+            onAddMissingToOwnList={(shop, ingredients) => {
+              const progress = privateCaptureProgress?.planKey === privatePlanKey
+                ? privateCaptureProgress.stores[shop] : null
+              if (!progress || !progress.fresh ||
+                  !recentOwnCaptureInstant(progress.observedAt, Date.now())) {
+                return 'Deze bronopname is verlopen of vervangen; herzie eerst de originele bron.'
+              }
+              // The exact current private capture, NOT the UI label, decides
+              // which physical demands are genuinely missing a source match.
+              const missing = new Map(progress.missingIngredients.map(row => [row.id, row]))
+              if (!ingredients.length || ingredients.length > 100 ||
+                  ingredients.some(row => missing.get(row.id)?.label !== row.label)) {
+                return 'Deze productmatching is gewijzigd. Open de actuele lijst opnieuw.'
+              }
+              const normalize = (value: string) => value
+                .replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/gu, ' ')
+                .replace(/\s+/gu, ' ').trim()
+              const proposed = ingredients.map(row => {
+                const amount = missing.get(row.id)!
+                const quantity = amount.amount === null || amount.amount === undefined ||
+                  !Number.isFinite(amount.amount) || amount.amount <= 0
+                  ? 'hoeveelheid controleren' : String(amount.amount) + ' ' + (amount.unit ?? '')
+                return normalize(row.label + ' · ' + quantity)
+              })
+              if (proposed.some(label => !label || label.length > 140)) {
+                return 'Een omschrijving is te lang voor de eigen lijst. Bekijk de losse ingrediënten.'
+              }
+              const existing = new Set(manualShoppingNotes.filter(note => note.store === shop)
+                .map(note => note.label.normalize('NFC').toLocaleLowerCase('nl-NL')))
+              const seen = new Set(existing)
+              const additions = proposed.filter(label => {
+                const key = label.normalize('NFC').toLocaleLowerCase('nl-NL')
+                if (seen.has(key)) return false
+                seen.add(key)
+                return true
+              })
+              if (manualShoppingNotes.length + additions.length > 100) {
+                return 'Je eigen lijst heeft maximaal 100 artikelen. Ruim eerst oude artikelen op.'
+              }
+              setManualShoppingNotes(current => {
+                const currentKeys = new Set(current.filter(note => note.store === shop)
+                  .map(note => note.label.normalize('NFC').toLocaleLowerCase('nl-NL')))
+                const safeNew = additions.filter(label =>
+                  !currentKeys.has(label.normalize('NFC').toLocaleLowerCase('nl-NL')))
+                if (current.length + safeNew.length > 100) return current
+                return [...current, ...safeNew.map(label => ({
+                  id: 'own-note-' + crypto.randomUUID(), label, store: shop, done: false,
+                }))]
+              })
+              navigate('list')
+              return null
+            }}
+            progress={privateCaptureProgress?.planKey === privatePlanKey
+              ? privateCaptureProgress : null}
+            onImportSourceFiles={handoffOwnPriceFiles}
+            fileWarning={listSourceFileWarning}
+            onReviewIngredient={(store, ingredientId) => {
+              setPrivateReviewFocus(previous => ({
+                planKey: privatePlanKey, store, ingredientId,
+                serial: (previous?.serial ?? 0) + 1,
+              }))
+              navigate('basket')
+            }}
             checked={privateShoppingTicks}
+            onMarkCheckedBatch={(shop, rows, checkedFlag = true) => {
+              // A bulk physical tick is never a retailer-source approval.
+              // Every original line must still belong to the exact currently
+              // valid source and same current Planner demand at click time.
+              const latest = freshReviewedBaskets(livePrivateReviewed, privatePlanKey, Date.now())
+              const capture = latest?.stores[shop]
+              if (!capture || !Array.isArray(rows) || rows.length < 1 ||
+                  rows.length > 100 || new Set(rows).size !== rows.length ||
+                  rows.some(line => line.status !== 'matched' ||
+                    !capture.basket.lines.includes(line))) {
+                return 'De winkelbron of productselectie is veranderd. Open de actuele originele bron opnieuw.'
+              }
+              const keys = rows.map(line => privatePhysicalShoppingTick(
+                privatePlanKey, shop, capture.basket.store.id, line))
+              if (new Set(keys).size !== keys.length) {
+                return 'Twee producten verwijzen naar dezelfde fysieke winkelregel; niets aangepast.'
+              }
+              setPrivateShoppingTicks(before => {
+                const next = { ...before }
+                for (const key of keys) next[key] = checkedFlag
+                return next
+              })
+              return null
+            }}
             onToggleChecked={(shop, selected) => {
               // No checkout progress can be created from expired or replaced
               // source products. Existing local checkmarks remain untouched.
@@ -679,18 +891,119 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               if (store) setPreferredOwnStore(store)
               navigate('list')
             }} />
+          </Suspense>
+        </div>}
+        {tab === 'home' && <Suspense fallback={<p role="status">Mijn winkelvergelijking laden…</p>}>
+          <PrivateComparisonJourney
+            reviewed={livePrivateReviewed}
+            captureNeeds={productCaptureNeeds}
+            progress={privateCaptureProgress?.planKey === privatePlanKey
+              ? privateCaptureProgress : null}
+            onOpenPlanner={() => navigate('planner')}
+            onOpenImport={openOwnPriceImport}
+            onOpenProducts={() => navigate('products')}
+            onOpenList={shop => {
+              if (shop) {
+                // Home's cheapest-store hint may have expired since render.
+                // Only a still-current own source can select a priced list.
+                const current = freshReviewedBaskets(livePrivateReviewed, privatePlanKey, Date.now())
+                if (!current?.stores[shop]) {
+                  openOwnPriceImport()
+                  return
+                }
+                setPreferredOwnStore(shop)
+              }
+              navigate('list')
+            }}
+            onImportFiles={handoffOwnPriceFiles}
+            fileWarning={listSourceFileWarning}
+            onReview={(store, ingredientId) => {
+              setPrivateReviewFocus(previous => ({
+                planKey: privatePlanKey, store, ingredientId,
+                serial: (previous?.serial ?? 0) + 1,
+              }))
+              navigate('basket')
+            }}
+          />
         </Suspense>}
         {(tab === 'home' || tab === 'recipes') && <HiFiHome view={tab}
-          onNavigate={navigate} activeDays={activeDays}
-          addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />}
-        {tab === 'products' && <details className="supa-product-archive">
-          <summary>Oude ontwerpvoorbeelden en historische bronkaarten tonen (geen actuele prijzen)</summary>
-          <p>Alleen de persoonlijk bevestigde bronartikelen hierboven tellen mee in
-            de prijsvergelijking, budgetten en winkelroute. Deze voorbeelden zijn
-            geen supermarktvoorraad of actuele aanbiedingen.</p>
-          <HiFiHome view="products" onNavigate={navigate} activeDays={activeDays}
-            addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />
-        </details>}
+          onNavigate={navigate} onOpenOwnPriceImport={openOwnPriceImport} activeDays={activeDays}
+          addedProducts={designProductIds} onToggleProduct={toggleDesignProduct}
+          onAddRecipeGroceries={labels => {
+            // Only transient private, unpriced notes. The parent never transfers
+            // original recipe source warnings into price evidence or SKUs.
+            if (!Array.isArray(labels) || labels.length < 1 || labels.length > 100 ||
+                labels.some(label => typeof label !== 'string' || !label.trim() ||
+                  label.length > 140 || label !== label.trim() ||
+                  /[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/u.test(label))) {
+              return 'De gekozen receptboodschappen zijn gewijzigd of ongeldig; open de actuele receptenlijst.'
+            }
+            const identity = (label: string) => label.normalize('NFC').toLocaleLowerCase('nl-NL')
+            const known = new Set(manualShoppingNotes.filter(note => note.store === 'Algemeen')
+              .map(note => identity(note.label)))
+            const additions = labels.filter(label => {
+              const key = identity(label)
+              if (known.has(key)) return false
+              known.add(key)
+              return true
+            })
+            if (manualShoppingNotes.length + additions.length > 100) {
+              return 'Je persoonlijke Lijst kan maximaal 100 eigen artikelen bevatten. Ruim eerst eerdere boodschappen op.'
+            }
+            setManualShoppingNotes(current => {
+              const latest = new Set(current.filter(note => note.store === 'Algemeen')
+                .map(note => identity(note.label)))
+              const next = additions.filter(label => {
+                const key = identity(label)
+                if (latest.has(key)) return false
+                latest.add(key)
+                return true
+              })
+              if (current.length + next.length > 100) return current
+              return [...current, ...next.map(label => ({
+                id: 'own-recipe-note-' + crypto.randomUUID(),
+                label, store: 'Algemeen' as const, done: false,
+              }))]
+            })
+            navigate('list')
+            return null
+          }} />}
+        {tab === 'products' && (hasOwnProductCapture
+          ? <details className="supa-product-archive">
+              <summary>Oude Figma-voorbeelden bekijken · prijzen zijn demo</summary>
+              <p>Deze ontwerpen zijn geen actuele winkelprijzen of geautoriseerde aanbiedingen.
+                Alleen jouw hierboven persoonlijk bevestigde bronregels tellen mee.</p>
+              <HiFiHome view="products" onNavigate={navigate} onOpenOwnPriceImport={openOwnPriceImport} activeDays={activeDays}
+                onOpenOwnSources={(term, store) => {
+                  setOwnCatalogSearchIntent(previous => ({
+                    serial: previous.serial + 1, text: term.slice(0, 120),
+                    store: store ?? 'all',
+                  }))
+                  const source = document.getElementById('supa-real-source-catalog')
+                  source?.focus({ preventScroll: true })
+                  source?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                }}
+                addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />
+            </details>
+          : <section className="supa-product-archive supa-product-archive--visible"
+              aria-label="Figma-productoverzicht zonder actuele prijzen">
+              <h2>Producten ontdekken · ontwerpvoorbeelden</h2>
+              <p>Er is nog geen eigen gecontroleerde winkelbron. Je kunt hier het originele
+                Supa-productontwerp verkennen, zoeken, sorteren en artikelen ongeprijsd
+                aan Lijst toevoegen. Voor actuele prijzen gebruik je de bronimport hierboven.
+                Alle getoonde voorbeeldprijzen en aanbiedingen zijn demo, geen live data.</p>
+              <HiFiHome view="products" onNavigate={navigate} onOpenOwnPriceImport={openOwnPriceImport} activeDays={activeDays}
+                onOpenOwnSources={(term, store) => {
+                  setOwnCatalogSearchIntent(previous => ({
+                    serial: previous.serial + 1, text: term.slice(0, 120),
+                    store: store ?? 'all',
+                  }))
+                  const source = document.getElementById('supa-real-source-catalog')
+                  source?.focus({ preventScroll: true })
+                  source?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                }}
+                addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />
+            </section>)}
         {!isHiFiView && <nav className="hifi-utilities" aria-label="Vergelijken en meten"><button onClick={() => navigate('basket')}>Mand</button><button onClick={() => navigate('observe')}>Meten</button></nav>}
 
         {productSelectionWarning && (tab === 'list' || tab === 'products') && (
@@ -707,7 +1020,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               : 'Je weekbudget en maaltijdkeuzes zijn tijdelijk en niet opgeslagen omdat browseropslag niet beschikbaar is.'}
           </p>
         )}
-        {tab === 'planner' && (
+        {tab === 'planner' && <Suspense fallback={<section className="screen" role="status" aria-live="polite">Planner wordt geladen…</section>}>
           <PlannerView
             budget={budget}
             activeDays={activeDays}
@@ -774,19 +1087,21 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             onRecipeChange={changeRecipe}
             onReset={resetPlan}
           />
-        )}
-        {tab === 'planner' && <PlannerPortableWeek
-          preferences={preferences}
-          days={m2InitialPlan.map(meal => meal.day)}
-          recipeIds={recipes.map(recipe => recipe.id)}
-          recipeNames={Object.fromEntries(recipes.map(recipe => [recipe.id, recipe.title]))}
-          storageProtected={persistenceWarning !== null}
-          onRestore={next => {
-            setPreferences(next)
-            setManualWeekCopy(null)
-            setWeekCopyMessage('Weekplanning hersteld; controleer de nieuwe ingrediënten en prijsbronnen.')
-          }}
-        />}
+        </Suspense>}
+        {tab === 'planner' && <Suspense fallback={<p role="status">Weekherstelopties worden geladen…</p>}>
+          <PlannerPortableWeek
+            preferences={preferences}
+            days={m2InitialPlan.map(meal => meal.day)}
+            recipeIds={recipes.map(recipe => recipe.id)}
+            recipeNames={Object.fromEntries(recipes.map(recipe => [recipe.id, recipe.title]))}
+            storageProtected={persistenceWarning !== null}
+            onRestore={next => {
+              setPreferences(next)
+              setManualWeekCopy(null)
+              setWeekCopyMessage('Weekplanning hersteld; controleer de nieuwe ingrediënten en prijsbronnen.')
+            }}
+          />
+        </Suspense>}
         {tab === 'planner' && (
           <section className="week-share-panel" aria-label="Weekmenu delen">
             <div className="week-share-actions">
@@ -820,12 +1135,9 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               Bereidingstijd en porties opnemen
             </label>
             <p role="status" aria-live="polite">{weekCopyMessage}</p>
-            {currentManualCopy !== null && (
-              <WeekShareManualCopy
-                text={currentManualCopy}
-                rows={Math.min(activeDays.length + 6, 14)}
-              />
-            )}
+            {currentManualCopy !== null && <Suspense fallback={<p role="status">Kopieertekst wordt geladen…</p>}>
+              <WeekShareManualCopy text={currentManualCopy} rows={Math.min(activeDays.length + 6, 14)} />
+            </Suspense>}
           </section>
         )}
         {visitedBasket && (
@@ -839,9 +1151,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               // may fire before the price import node exists. The mount
               // callback runs after the workbench DOM is present.
               if (tab === 'basket' && ownPriceImportSignal > 0) {
-                document.getElementById('supa-own-price-import')?.scrollIntoView({
-                  block: 'start', behavior: 'smooth',
-                })
+                revealOwnPriceImport()
               }
             }}
             basket={basket}
@@ -864,6 +1174,12 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         )}
         {tab === 'list' && (
           <nav className="screen" aria-label="Snelle acties voor je boodschappenlijst">
+            <button type="button" className="ghost-button" onClick={() =>
+              document.getElementById('supa-manual-shopping-notes')?.scrollIntoView({
+                behavior: 'smooth', block: 'start',
+              })}>
+              Zelf losse boodschappen toevoegen ({manualShoppingNotes.length})
+            </button>
             <button type="button" className="ghost-button" onClick={() =>
               document.getElementById('supa-own-extra-groceries')?.scrollIntoView({
                 behavior: 'smooth', block: 'start',
@@ -889,39 +1205,6 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               <p role="alert" className="supa-list-source-upload__error">{listSourceFileWarning}</p>}
           </nav>
         )}
-        {visitedList && !livePrivateReviewed && (
-          <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
-            <section className="screen" aria-label="Boodschappenlijst uit mijn eigen weekmenu">
-              <UnpricedPlannerChecklist plan={plannedMeals} recipes={recipes} activeDays={activeDays}
-                onOpenPriceImport={openOwnPriceImport} onOpenRecipes={() => navigate('recipes')} />
-              {tab === 'list' && (designProductIds.length > 0
-                ? <section aria-label="Mijn expliciet toegevoegde producten">
-                    <h3>Mijn toegevoegde producten · apart van receptboodschappen</h3>
-                    <p className="disclaimer">Deze selectie is door jou gemaakt in Producten.
-                      Historische gegevens en Figma-voorbeelden zijn geen geverifieerde prijzen
-                      en doen niet mee in een eigen winkelmandvergelijking.</p>
-                    <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
-                    <ShoppingListView basket={basket} />
-                  </section>
-                : <details className="demo-comparison-disclosure">
-                    <summary>Toon oude voorbeeldboodschappen (geen actuele winkelprijzen)</summary>
-                    <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
-                    <ShoppingListView basket={basket} />
-                  </details>)}
-            </section>
-          </div>
-        )}
-        {livePrivateReviewed && (
-          <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
-            <PrivateSourceShoppingList reviewed={livePrivateReviewed} budget={budget}
-              checked={privateShoppingTicks} setChecked={setPrivateShoppingTicks}
-              plan={plannedMeals} recipes={recipes} activeDays={activeDays}
-              preferred={preferredOwnStore} onChooseStore={setPreferredOwnStore}
-              onOpenComparison={openOwnPriceImport} routeOpenSignal={mixedRouteOpenSignal}
-              routeChoice={privateRouteChoice}
-              routeCostIntent={mixedCostIntent} />
-          </div>
-        )}
         {visitedList && (
           <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
             <Suspense fallback={<p role="status">Eigen gedeeltelijke bronproducten laden…</p>}>
@@ -932,6 +1215,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
                 checked={privateShoppingTicks}
                 setChecked={setPrivateShoppingTicks}
                 onOpenComparison={openOwnPriceImport}
+                onOpenProducts={() => navigate('products')}
                 onReviewIngredient={(store, ingredientId) => {
                   setPrivateReviewFocus(previous => ({
                     planKey: privatePlanKey, store, ingredientId,
@@ -943,13 +1227,84 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             </Suspense>
           </div>
         )}
+        {visitedList && !livePrivateReviewed && (
+          <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
+            <section className="screen" aria-label="Boodschappenlijst uit mijn eigen weekmenu">
+              <Suspense fallback={<p role="status">Mijn Planner-boodschappen laden…</p>}>
+              <UnpricedPlannerChecklist plan={plannedMeals} recipes={recipes} activeDays={activeDays}
+                manualNotes={manualShoppingNotes}
+                onToggleManualNote={id => setManualShoppingNotes(previous => previous.map(note =>
+                  note.id === id ? { ...note, done: !note.done } : note))}
+                onOpenPriceImport={openOwnPriceImport} onOpenRecipes={() => navigate('recipes')}
+                onAddPersonalNotes={addPlannerNotes} />
+              </Suspense>
+              {tab === 'list' && (designProductIds.length > 0
+                ? <section aria-label="Mijn expliciet toegevoegde producten">
+                    <h3>Mijn toegevoegde producten · apart van receptboodschappen</h3>
+                    <p className="disclaimer">Deze selectie is door jou gemaakt in Producten.
+                      Historische gegevens en Figma-voorbeelden zijn geen geverifieerde prijzen
+                      en doen niet mee in een eigen winkelmandvergelijking.</p>
+                    <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} onAdd={toggleDesignProduct} />
+                    <Suspense fallback={<p role="status">Voorbeeldlijst wordt geladen…</p>}><ShoppingListView basket={basket} /></Suspense>
+                  </section>
+                : <details className="demo-comparison-disclosure">
+                    <summary>Herstel mijn productselectie of bekijk voorbeelden (geen actuele prijzen)</summary>
+                    <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} onAdd={toggleDesignProduct} />
+                    <Suspense fallback={<p role="status">Voorbeeldlijst wordt geladen…</p>}><ShoppingListView basket={basket} /></Suspense>
+                  </details>)}
+            </section>
+          </div>
+        )}
+        {livePrivateReviewed && (
+          <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
+            <Suspense fallback={<p role="status">Mijn gecontroleerde winkellijst laden…</p>}>
+            <PrivateSourceShoppingList reviewed={livePrivateReviewed} budget={budget}
+              checked={privateShoppingTicks} setChecked={setPrivateShoppingTicks}
+              plan={plannedMeals} recipes={recipes} activeDays={activeDays}
+              manualNotes={manualShoppingNotes}
+              onToggleManualNote={snapshot => setManualShoppingNotes(current => current.map(note =>
+                note.id === snapshot.id && note.label === snapshot.label &&
+                note.store === snapshot.store && note.done === snapshot.done
+                  ? { ...note, done: !note.done } : note))}
+              preferred={preferredOwnStore} onChooseStore={setPreferredOwnStore}
+              onOpenComparison={openOwnPriceImport} routeOpenSignal={mixedRouteOpenSignal}
+              routeChoice={privateRouteChoice}
+              routeCostIntent={mixedCostIntent} />
+            </Suspense>
+            {visitedList && <details className="demo-comparison-disclosure">
+              <summary>Neem mijn Planner-ingrediënten ook over als ongeprijsde boodschappen</summary>
+              <p className="disclaimer">De gecontroleerde winkelbron en prijsvergelijking blijven
+                ongewijzigd. Je kunt dezelfde fysieke week apart voor PLUS en DekaMarkt
+                als persoonlijke, ongeprijsde controlelijst voorbereiden.</p>
+              <Suspense fallback={<p role="status">Planner-ingrediënten laden…</p>}>
+                <UnpricedPlannerChecklist plan={plannedMeals} recipes={recipes} activeDays={activeDays}
+                  manualNotes={manualShoppingNotes}
+                  onToggleManualNote={id => setManualShoppingNotes(previous => previous.map(note =>
+                    note.id === id ? { ...note, done: !note.done } : note))}
+                  onOpenPriceImport={openOwnPriceImport}
+                  onOpenRecipes={() => navigate('recipes')}
+                  onAddPersonalNotes={addPlannerNotes} />
+              </Suspense>
+            </details>}
+          </div>
+        )}
+        {visitedList && (
+          <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
+            <section id="supa-manual-shopping-notes" className="screen"
+              aria-label="Zelf toegevoegde artikelen zonder winkelprijs">
+              <Suspense fallback={<p role="status">Eigen ongeprijsde boodschappen laden…</p>}>
+                <ManualShoppingNotes notes={manualShoppingNotes} setNotes={setManualShoppingNotes} />
+              </Suspense>
+            </section>
+          </div>
+        )}
         {tab === 'list' && livePrivateReviewed && designProductIds.length > 0 && (
           <section className="screen" aria-label="Extra zelf gekozen producten buiten het prijsmandje">
             <h3>Extra producten · niet meegerekend in jouw supermarktmand</h3>
             <p className="disclaimer">Jouw losse Producten-selectie is apart bewaard.
               Historische artikelen en Figma-voorbeelden zijn geen nieuwe bronprijzen,
               volledige verpakkingsmatches of besparingsbewijs.</p>
-            <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
+            <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} onAdd={toggleDesignProduct} />
           </section>
         )}
         {tab === 'list' && (
@@ -960,7 +1315,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             </Suspense>
           </section>
         )}
-        {tab === 'observe' && <ObservationView />}
+        {tab === 'observe' && <Suspense fallback={<section className="screen" role="status" aria-live="polite">Meten wordt geladen…</section>}><ObservationView /></Suspense>}
       </div>
 
       <nav className="bottom-nav hifi-nav" aria-label="Hoofdnavigatie">

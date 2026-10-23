@@ -1,0 +1,59 @@
+/* An immediately readable, fully source-reviewed price breakdown.
+   Presentation only; never alters imported records, matching or totals. */
+.private-comparison-journey__complete-lines > .disclaimer {
+  margin: .85rem 0;
+  color: #405846;
+  line-height: 1.5;
+}
+.private-comparison-journey__complete-lines > .private-comparison-journey__partial-search {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 225px), 1fr));
+  gap: .75rem;
+  max-width: none;
+  margin: .7rem 0;
+}
+.private-comparison-journey__complete-lines .private-comparison-journey__partial-search label {
+  display: grid;
+  gap: .4rem;
+  min-width: 0;
+}
+.private-comparison-journey__complete-lines select,
+.private-comparison-journey__complete-lines input[type="search"] {
+  font: inherit;
+  color: #213a29;
+  background: white;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: .6rem .65rem;
+  border-radius: 10px;
+  border: 1px solid #9bb4a3;
+}
+.private-comparison-journey__complete-lines select:focus-visible,
+.private-comparison-journey__complete-lines button:focus-visible {
+  outline: 3px solid #cf9738;
+  outline-offset: 2px;
+}
+.private-comparison-journey__complete-lines > button,
+.private-comparison-journey__complete-stores button {
+  min-height: 44px;
+  overflow-wrap: anywhere;
+}
+.private-comparison-journey__complete-stores button {
+  width: 100%;
+  background: #e8f1e9;
+  color: #204a30;
+  text-align: left;
+  align-self: end;
+}
+.private-comparison-journey__complete-lines li > .disclaimer {
+  margin: .65rem 0 .2rem;
+  line-height: 1.5;
+}
+@media (max-width: 630px) {
+  .private-comparison-journey__complete-lines > .private-comparison-journey__partial-search {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .private-comparison-journey__complete-lines > button { width: 100%; }
+}

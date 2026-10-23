@@ -27,3 +27,23 @@ export function quantityUnitLabelNl(unit: unknown, amount: number | null): strin
   if (canonicalUnit !== 'piece') return quantityUnitNameNl(canonicalUnit)
   return amount === 1 ? 'stuk' : 'stuks'
 }
+
+const formatMetricAmount = new Intl.NumberFormat('nl-NL', { maximumFractionDigits: 12 })
+
+/**
+ * Render canonical demand quantities in a compact metric form without changing
+ * the underlying evidence value: large grams/millilitres display as kg/litre.
+ */
+export function quantityAmountLabelNl(amount: number | null, unit: unknown): string {
+  const canonicalUnit = canonicalPresentationUnit(unit)
+  if (amount === null || !Number.isFinite(amount)) {
+    return `? ${quantityUnitLabelNl(canonicalUnit, null)}`
+  }
+  if (canonicalUnit === 'g' && amount >= 1000) {
+    return `${formatMetricAmount.format(amount / 1000)} kg`
+  }
+  if (canonicalUnit === 'ml' && amount >= 1000) {
+    return `${formatMetricAmount.format(amount / 1000)} l`
+  }
+  return `${formatMetricAmount.format(amount)} ${quantityUnitLabelNl(canonicalUnit, amount)}`
+}

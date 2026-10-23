@@ -1,7 +1,15 @@
-import type { OneStoreBasket } from '../../domain/basket.ts'
+import { useState } from 'react'
+import type { OneStoreBasket, BasketTraceLine } from '../../domain/basket.ts'
 import type { OfflineCapture } from '../../domain/offlineReviewedImport.ts'
+import { readablePlannerDemandAmount } from './plannerPriceCaptureGuide.ts'
+import { privateUnitPrice } from './privateUnitPrice.ts'
 
 type StoreId = 'PLUS' | 'DekaMarkt'
+type PendingSourceReview = Extract<BasketTraceLine, { status: 'matched' }>
+
+function singleLine(value: string): string {
+  return value.replace(/[\r\n\t\u0000-\u001f\u007f\u2028\u2029]/gu, ' ').trim().slice(0, 200)
+}
 
 /**
  * An actionable guide for private, already-admitted local price observations.
@@ -9,7 +17,7 @@ type StoreId = 'PLUS' | 'DekaMarkt'
  */
 export function ComparisonReadiness({
   plus, deka, sourceFresh, pairedWithin24h, comparable,
-  captures, nowMs, onOpenPlanner, onReviewMissing, onOpenImport, pendingHumanReview = 0, onReviewFirstPending,
+  captures, nowMs, onOpenPlanner, onReviewMissing, onOpenImport, pendingHumanReview = 0, pendingReviewByStore, onReviewFirstPending,
 }: {
   plus: OneStoreBasket
   deka: OneStoreBasket
@@ -19,31 +27,38 @@ export function ComparisonReadiness({
   captures: { PLUS: OfflineCapture; DekaMarkt: OfflineCapture }
   nowMs: number
   pendingHumanReview?: number
+  pendingReviewByStore?: Readonly<Record<StoreId, readonly PendingSourceReview[]>>
   onReviewFirstPending?: () => void
   onOpenPlanner?: () => void
   onReviewMissing: (store: StoreId, ingredientId: string) => void
   onOpenImport: () => void
 }) {
+  const [exportMessage, setExportMessage] = useState('')
   const sources = (['PLUS', 'DekaMarkt'] as const).map(store => {
     const observation = captures[store]
-    const ageMs = nowMs - observation.observedMs
-    const olderThanWeek = ageMs > 7 * 24 * 60 * 60 * 1000
-    const inFuture = ageMs < -5 * 60 * 1000
-    const readableAge = inFuture ? 'in de toekomst'
-      : ageMs < 0 ? 'zojuist (kleine klokafwijking)'
-        : ageMs < 60 * 60 * 1000 ? Math.max(0, Math.floor(ageMs / 60000)) + ' minuten oud'
-          : ageMs < 24 * 60 * 60 * 1000
-            ? (ageMs / (60 * 60 * 1000)).toLocaleString('nl-NL', { maximumFractionDigits: 1 }) + ' uur oud'
-            : (ageMs / (24 * 60 * 60 * 1000)).toLocaleString('nl-NL', { maximumFractionDigits: 1 }) + ' dagen oud'
-    return { store, at: observation.observedAt, olderThanWeek, inFuture, readableAge }
+    const ageValid = Number.isFinite(nowMs) && Number.isFinite(observation.observedMs)
+    const ageMs = ageValid ? nowMs - observation.observedMs : Number.NaN
+    const olderThanWeek = !ageValid || ageMs > 7 * 24 * 60 * 60 * 1000
+    const inFuture = ageValid && ageMs < -5 * 60 * 1000
+    const readableAge = !ageValid ? 'ouderdom onbekend'
+      : inFuture ? 'in de toekomst'
+        : ageMs < 0 ? 'zojuist (kleine klokafwijking)'
+          : ageMs < 60 * 60 * 1000 ? Math.max(0, Math.floor(ageMs / 60000)) + ' minuten oud'
+            : ageMs < 24 * 60 * 60 * 1000
+              ? (ageMs / (60 * 60 * 1000)).toLocaleString('nl-NL', { maximumFractionDigits: 1 }) + ' uur oud'
+              : (ageMs / (24 * 60 * 60 * 1000)).toLocaleString('nl-NL', { maximumFractionDigits: 1 }) + ' dagen oud'
+    return { store, at: observation.observedAt, ageValid, olderThanWeek, inFuture, readableAge }
   })
   // The imported pair is already canonical-admitted with nanosecond timestamps.
   // Show which source is older without altering its evidence timestamp.
   const plusInstant = captures.PLUS.observedNs
   const dekaInstant = captures.DekaMarkt.observedNs
   const refreshStore = plusInstant <= dekaInstant ? 'PLUS' : 'DekaMarkt'
-  const observationGapHours = Number(plusInstant >= dekaInstant
-    ? plusInstant - dekaInstant : dekaInstant - plusInstant) / 3_600_000_000_000
+  const observationGapNs = plusInstant >= dekaInstant
+    ? plusInstant - dekaInstant : dekaInstant - plusInstant
+  const observationGapHours = Number(observationGapNs) / 3_600_000_000_000
+  const pairWithin24h = pairedWithin24h && observationGapNs <= 86_400_000_000_000n
+  const sourcesFresh = sourceFresh && sources.every(item => item.ageValid && !item.olderThanWeek && !item.inFuture)
   const gapText = observationGapHours.toLocaleString('nl-NL', { maximumFractionDigits: 1 })
 
   const hasDemand = plus.selectedMealCount > 0 && deka.selectedMealCount > 0 &&
@@ -61,8 +76,78 @@ export function ComparisonReadiness({
       onSecondaryClick: onOpenImport,
     }] : []
   })
-  const needsSource = !sourceFresh || !pairedWithin24h
-  const isReady = comparable && hasDemand && !needsSource && incomplete.length === 0
+  // Re-check the actual capture timestamps here; stale props must not
+  // make an old/future source pair look ready after the evidence has aged.
+  const needsSource = !sourcesFresh || !pairWithin24h
+  const pendingByStoreCount =
+    (pendingReviewByStore?.PLUS?.length ?? 0) +
+    (pendingReviewByStore?.DekaMarkt?.length ?? 0)
+  const pendingCountValid = Number.isSafeInteger(pendingHumanReview) && pendingHumanReview >= 0
+  const pendingDetailValid = pendingReviewByStore === undefined ||
+    (Array.isArray(pendingReviewByStore.PLUS) && Array.isArray(pendingReviewByStore.DekaMarkt))
+  const pendingEvidenceValid = pendingCountValid && pendingDetailValid
+  // Both the aggregate count and per-store detail are evidence. A stale zero
+  // aggregate or malformed detail object must not mark the comparison ready.
+  const pendingReviewCount = pendingCountValid
+    ? Math.max(pendingHumanReview, pendingByStoreCount)
+    : pendingByStoreCount
+  const hasPendingHumanReview = !pendingEvidenceValid || pendingReviewCount > 0
+  const isReady = comparable && hasDemand && !needsSource &&
+    incomplete.length === 0 && !hasPendingHumanReview
+  // One portable, strictly unpriced follow-up round for BOTH retailers. This
+  // preserves the original store and capture timestamp but never invents an
+  // EAN/SKU, a comparable price or an independently observed source.
+  const captureWorklist = [
+    'Supa · mijn eigen twee-winkel broncontrole',
+    'Alleen privé ingevoerde bronmomenten; geen actuele retailerclaim of besparing.',
+    `PLUS: ${captures.PLUS.observedAt} (${sources[0].readableAge})`,
+    `DekaMarkt: ${captures.DekaMarkt.observedAt} (${sources[1].readableAge})`,
+    !sourcesFresh ? 'ACTIE: vernieuw verlopen, toekomstige of onbekende bronmomenten.' : '',
+    !pairWithin24h ? `ACTIE: vernieuw ${refreshStore}; bronmomenten verschillen ${gapText} uur.` : '',
+    !hasDemand ? 'ACTIE: kies eerst een weekmenu in Planner.' : '',
+    ...(['PLUS', 'DekaMarkt'] as const).flatMap(store => {
+      const basket = store === 'PLUS' ? plus : deka
+      const unresolved = basket.lines.filter(line => line.status === 'unresolved')
+      const sourceRows = pendingReviewByStore?.[store]
+      const pendingRows: readonly PendingSourceReview[] = Array.isArray(sourceRows) ? sourceRows : []
+      return [
+        '', `${store} · ${unresolved.length} nog niet gekoppelde ingrediënten`,
+        ...unresolved.map(line => `☐ ${singleLine(line.ingredientLabel)} · ${readablePlannerDemandAmount(line.requirement.amount)} ${line.requirement.unit} · ${singleLine(line.id)} · prijs en match onbekend`),
+        ...(pendingRows.length
+          ? [`${pendingRows.length} voorgestelde bronartikelregels wachten op jouw controle:`,
+              ...pendingRows.map(item =>
+                `☐ ${singleLine(item.ingredientLabel)} · ${singleLine(item.productName)} · originele SKU ${singleLine(item.productId)}` +
+                ` · ${item.pack.count} × ${readablePlannerDemandAmount(item.pack.amount)} ${item.pack.unit} per pak` +
+                ` · ${new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(item.pricePerPackCents / 100)} ingevoerde pakprijs` +
+                ` · ${privateUnitPrice(item) ?? 'eenheidsprijs nog niet berekenbaar'} · NIET bevestigd`)]
+          : []),
+        ...(unresolved.length === 0 ? ['Geen onopgeloste productkoppelingen in dit mandje.'] : []),
+      ]
+    }),
+    pendingReviewCount > 0
+      ? `ACTIE: controleer nog ${pendingReviewCount} voorgestelde bronartikelregels handmatig (SKU, verpakking en prijs).`
+      : !pendingEvidenceValid
+        ? 'ACTIE: de bronreviewstatus is ongeldig; laad de broncontrole opnieuw.'
+        : '',
+    '', 'Vul ontbrekende artikelen uitsluitend aan met jouw eigen toegestane waarnemingen.',
+    'Controleer fysieke hoeveelheden en echte pakprijzen opnieuw vóór vergelijking.',
+  ].filter(Boolean).join('\n')
+  function downloadCaptureWorklist() {
+    const blob = new Blob([captureWorklist + '\n'], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    try {
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'supa-openstaande-plus-deka-broncontrole.txt'
+      link.click()
+      setExportMessage('Privéwerkblad voor beide winkels lokaal gedownload. Geen prijzen overgenomen.')
+    } catch {
+      setExportMessage('Download niet beschikbaar. Selecteer en kopieer de tekst hieronder.')
+    } finally {
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    }
+  }
+
   const steps: Array<{ id: string; heading: string; detail: string;
     action?: string; onClick?: () => void;
     secondaryAction?: string; onSecondaryClick?: () => void }> = []
@@ -72,15 +157,15 @@ export function ComparisonReadiness({
     detail: 'Een leeg weekmenu is geen vergelijkbaar boodschappenmandje.',
     action: onOpenPlanner ? 'Open Planner' : undefined, onClick: onOpenPlanner,
   })
-  if (!sourceFresh) steps.push({
+  if (!sourcesFresh) steps.push({
     id: 'fresh',
     heading: 'Laad recente prijsopnames',
-    detail: sources.filter(item => item.olderThanWeek || item.inFuture)
-      .map(item => item.store + ': ' + (item.olderThanWeek ? 'ouder dan 7 dagen' : 'tijdstip in de toekomst'))
+    detail: sources.filter(item => !item.ageValid || item.olderThanWeek || item.inFuture)
+      .map(item => item.store + ': ' + (!item.ageValid ? 'tijdstip onbekend' : item.olderThanWeek ? 'ouder dan 7 dagen' : 'tijdstip in de toekomst'))
       .join('; ') || 'Een of beide bronmomenten vallen buiten het toegestane zeven-dagenvenster.',
     action: 'Naar bronimport', onClick: onOpenImport,
   })
-  if (!pairedWithin24h) steps.push({
+  if (!pairWithin24h) steps.push({
     id: 'gap',
     heading: 'PLUS en DekaMarkt binnen 24 uur observeren',
     detail: 'De bronmomenten verschillen ' + gapText + ' uur. ' + refreshStore +
@@ -89,10 +174,14 @@ export function ComparisonReadiness({
     action: 'Vervang de verouderde winkelopname', onClick: onOpenImport,
   })
   if (hasDemand) steps.push(...incomplete)
-  if (hasDemand && pendingHumanReview > 0) steps.push({
+  if (hasDemand && hasPendingHumanReview) steps.push({
     id: 'human-review',
-    heading: 'Controleer nog ' + pendingHumanReview + ' bronproductregels',
-    detail: 'Controleer originele artikelcode, verpakking en prijs. Dit is geen bewijs van productidentiteit.',
+    heading: pendingReviewCount > 0
+      ? 'Controleer nog ' + pendingReviewCount + ' bronproductregels'
+      : 'Controleer open bronproductregels',
+    detail: pendingEvidenceValid
+      ? 'Controleer originele artikelcode, verpakking en prijs. Dit is geen bewijs van productidentiteit.'
+      : 'De open-reviewtelling of per-winkel reviewlijst is ongeldig. Herlaad de broncontrole en controleer de onbevestigde artikelen.',
     action: onReviewFirstPending ? 'Open eerste onbevestigde artikel' : undefined,
     onClick: onReviewFirstPending,
   })
@@ -115,6 +204,20 @@ export function ComparisonReadiness({
             'zichtbaar, maar is geen volledige besparing.'}
       </p>
     </div>
+    {!isReady && <details className="offline-readiness__worklist">
+      <summary>Bewaar alle open PLUS- en Deka-controles voor je volgende winkelronde</summary>
+      <p>Een gecombineerde, ongeprijsde actielijst met originele bronmomenten, open
+        ingrediënten en handmatige controles. Hiermee kun je offline verder, zonder
+        dat Supa ontbrekende prijzen of matches invult.</p>
+      <button type="button" onClick={downloadCaptureWorklist}>
+        Download beide winkels als TXT
+      </button>
+      {exportMessage && <p role="status">{exportMessage}</p>}
+      <label>Of selecteer en kopieer de actielijst
+        <textarea rows={10} readOnly spellCheck={false} value={captureWorklist}
+          onFocus={event => event.currentTarget.select()} />
+      </label>
+    </details>}
     <div className="offline-readiness__source-times" aria-label="Ouderdom van privébronnen">
       {sources.map(item => <div key={item.store}>
         <strong>{item.store}</strong>
@@ -125,7 +228,7 @@ export function ComparisonReadiness({
           'Lokale leeftijd binnen 7 dagen; geen externe prijsverificatie'}</small>
       </div>)}
     </div>
-    {!pairedWithin24h && <p className="disclaimer">
+    {!pairWithin24h && <p className="disclaimer">
       De twee eigen bronmomenten liggen meer dan 24 uur uiteen.
       Er wordt geen volledig prijsverschil berekend totdat ze tijdsvergelijkbaar zijn.
     </p>}

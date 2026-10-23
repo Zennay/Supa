@@ -19,7 +19,7 @@ export type HistoricalScope = {
 export type HistoricalReceiptResult =
   | { status: 'unavailable'; reason: string }
   | { status: 'ready'; older: SavedReceipt; later: SavedReceipt;
-      rows: HistoricalRow[]; excluded: { ingredient: string; reason: string }[];
+      rows: HistoricalRow[]; excluded: { ingredientId: string; ingredient: string; reason: string }[];
       stores: Record<ReceiptStore, HistoricalScope>; entirePairComparable: boolean }
 
 const STORES: readonly ReceiptStore[] = ['PLUS', 'DekaMarkt']
@@ -64,7 +64,7 @@ export function comparePrivateReceiptHistory(
     if (!current || previous.ingredient !== current.ingredient ||
         previous.demand.amount !== current.demand.amount ||
         previous.demand.unit !== current.demand.unit) {
-      excluded.push({ ingredient: previous.ingredient, reason: 'Andere of ontbrekende fysieke hoeveelheid' })
+      excluded.push({ ingredientId: previous.ingredientId, ingredient: previous.ingredient, reason: 'Andere of ontbrekende fysieke hoeveelheid' })
       continue
     }
     const changes: Record<ReceiptStore, number | null> = {
@@ -74,14 +74,14 @@ export function comparePrivateReceiptHistory(
         ? current.DekaMarkt.totalWholePackagesCents - previous.DekaMarkt.totalWholePackagesCents : null,
     }
     if (changes.PLUS === null && changes.DekaMarkt === null) {
-      excluded.push({ ingredient: previous.ingredient, reason: 'Bij beide winkels andere SKU of verpakking' })
+      excluded.push({ ingredientId: previous.ingredientId, ingredient: previous.ingredient, reason: 'Bij beide winkels andere SKU of verpakking' })
       continue
     }
     rows.push({ ingredientId: previous.ingredientId,
       ingredient: previous.ingredient, old: previous, later: current, changeCents: changes })
   }
   for (const current of later.lines) if (!oldById.has(current.ingredientId))
-    excluded.push({ ingredient: current.ingredient, reason: 'Extra ingrediënt in het latere rapport' })
+    excluded.push({ ingredientId: current.ingredientId, ingredient: current.ingredient, reason: 'Extra ingrediënt in het latere rapport' })
 
   const stores = {} as Record<ReceiptStore, HistoricalScope>
   for (const store of STORES) {

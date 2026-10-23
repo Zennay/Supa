@@ -11,6 +11,7 @@ import { calculateDecimalPackCount } from './domain/decimalPackArithmetic.ts'
 import { privateBasketMissingReason } from './domain/privateBasketMissingReason.ts'
 import type { BasketTraceLine, OneStoreBasket } from './domain/basket.ts'
 import type { MatchUnit } from './domain/matching.ts'
+import { readOwnSourceTextFile } from './features/comparison/readLocalCaptureDraftFiles.ts'
 
 type StoreName = 'PLUS' | 'DekaMarkt'
 type ObservedProduct = {
@@ -49,6 +50,22 @@ const compare = document.querySelector<HTMLButtonElement>('#compare')!
 const status = document.querySelector<HTMLDivElement>('#price-status')!
 const result = document.querySelector<HTMLElement>('#result')!
 const summary = document.querySelector<HTMLDivElement>('#summary')!
+const coverageMeters = {
+  PLUS: document.querySelector<HTMLProgressElement>('#coverage-plus')!,
+  DekaMarkt: document.querySelector<HTMLProgressElement>('#coverage-deka')!,
+}
+const coverageLabels = {
+  PLUS: document.querySelector<HTMLElement>('#coverage-plus-text')!,
+  DekaMarkt: document.querySelector<HTMLElement>('#coverage-deka-text')!,
+}
+const recaptureButtons = {
+  PLUS: document.querySelector<HTMLButtonElement>('#blank-plus-recapture')!,
+  DekaMarkt: document.querySelector<HTMLButtonElement>('#blank-deka-recapture')!,
+}
+const recaptureGuides = {
+  PLUS: document.querySelector<HTMLButtonElement>('#guide-plus-recapture')!,
+  DekaMarkt: document.querySelector<HTMLButtonElement>('#guide-deka-recapture')!,
+}
 const budgetInput = document.querySelector<HTMLInputElement>('#budget-euros')!
 const budgetStatus = document.querySelector<HTMLDivElement>('#budget-status')!
 let budgetTotals: Record<StoreName, number | null> | null = null
@@ -134,7 +151,7 @@ function sourceFrom(value: unknown): Source {
           !(p.packAmount === null || (typeof p.packAmount === 'number' &&
             Number.isFinite(p.packAmount) && p.packAmount > 0 && p.packAmount <= 100000)) ||
           !(p.priceCents === null || (Number.isSafeInteger(p.priceCents) &&
-            (p.priceCents as number) >= 0 && (p.priceCents as number) <= 1000000)) ||
+            (p.priceCents as number) > 0 && (p.priceCents as number) <= 1000000)) ||
           !(p.packCount === undefined || (Number.isSafeInteger(p.packCount) &&
             (p.packCount as number) > 0 && (p.packCount as number) <= 1000)) ||
           typeof p.available !== 'boolean' ||
@@ -197,7 +214,10 @@ function demandFrom(value: unknown): Demand {
 
 async function readSource(file: File): Promise<string> {
   if (!file.size || file.size > limit) throw Error('Bronbestand is te groot of leeg')
-  return new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+  // Keep the standalone comparison workbench on the same strict file decoder as
+  // Planner and the React Vergelijk UI. Excel Unicode Text (.txt/.tsv) is decoded
+  // only when its UTF-16 LE/BE BOM is explicit; CSV/JSON remain strict UTF-8.
+  return readOwnSourceTextFile(file)
 }
 function parseOneOwnSource(raw: string, convertOwnStoreCsv: (csv: string) => string): Source {
   // Supa's existing standalone source validator handles user-saved JSON;
@@ -328,7 +348,7 @@ function storeBasket(store: StoreName, capture: Capture | undefined, demand: Dem
     )
     const cents = packs === null ? NaN : packs * p.priceCents
     if (!Number.isSafeInteger(packs) || packs! < 1 ||
-        !Number.isSafeInteger(cents) || cents < 0 ||
+        !Number.isSafeInteger(cents) || cents <= 0 ||
         !Number.isSafeInteger(totalCents + cents)) {
       lines.push(unresolved(d, 'Geen veilig passend aantal volledige verpakkingen'))
       unresolvedLineCount++
@@ -348,6 +368,86 @@ function storeBasket(store: StoreName, capture: Capture | undefined, demand: Dem
     store: { id: store, name: store }, selectedMealCount: demand.selectedMealCount,
     lines, totalCents, matchedLineCount, unresolvedLineCount,
   }
+}
+
+// A new individual capture must cover the SAME complete physical demand.
+// Do not make a misleading 'missing only' retailer file: importing that as
+// a replacement store capture could silently drop previously priced products.
+for (const store of stores) {
+  recaptureButtons[store].addEventListener('click', async () => {
+    if (result.hidden || !lastPrivateDemand) return
+    const demand = lastPrivateDemand
+    const button = recaptureButtons[store]
+    button.disabled = true
+    try {
+      const { makeBlankPlannerCaptureCsv } =
+        await import('./features/comparison/plannerPriceCaptureSheet.ts')
+      if (result.hidden || lastPrivateDemand !== demand)
+        throw Error('De fysieke mandvraag is gewijzigd. Open de nieuwe vergelijking.')
+      const csv = makeBlankPlannerCaptureCsv(
+        demand.ingredients.map(item => ({
+          id: item.id, label: item.label, unit: item.unit,
+        })), [store], ';')
+      if (result.hidden || lastPrivateDemand !== demand)
+        throw Error('De oorspronkelijke fysieke mandvraag is gewijzigd.')
+      const url = URL.createObjectURL(new Blob(['\uFEFF' + csv], {
+        type: 'text/csv;charset=utf-8',
+      }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-' + store.toLowerCase() + '-nieuw-volledig-waarneemblad.csv'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setStatus('Leeg volledig ' + store + '-heropnameblad gedownload voor exact dezelfde ' +
+        demand.ingredients.length + ' fysieke ingrediënten. Alleen echte originele winkel-SKU’s, ' +
+        'waarnemingstijd, verpakkingen en prijzen mogen worden ingevuld. De huidige prijsbron is ' +
+        'niet gewijzigd. Een leeg product heeft nooit een bekende prijs.')
+    } catch (cause) {
+      setStatus(cause instanceof Error ? cause.message :
+        'Het lege lokale heropnameblad is niet beschikbaar.', true)
+    } finally {
+      button.disabled = false
+    }
+  })
+}
+
+// The nine-column blank CSV intentionally contains no original ingredient
+// names, since those are not observed retailer names. The separate human
+// guide maps every physical need back to its precise source CSV row number.
+for (const store of stores) {
+  recaptureGuides[store].addEventListener('click', async () => {
+    if (result.hidden || !lastPrivateDemand) return
+    const demand = lastPrivateDemand
+    const button = recaptureGuides[store]
+    button.disabled = true
+    try {
+      const { makePlannerCaptureGuide } =
+        await import('./features/comparison/plannerPriceCaptureGuide.ts')
+      if (result.hidden || lastPrivateDemand !== demand)
+        throw Error('De fysieke mandvraag is tussentijds veranderd.')
+      const content = makePlannerCaptureGuide(demand.ingredients.map(item => ({
+        id: item.id, label: item.label, unit: item.unit, amount: item.amount,
+      })), [store])
+      if (result.hidden || lastPrivateDemand !== demand)
+        throw Error('De fysieke mandvraag is veranderd; maak de rijgids opnieuw.')
+      const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }))
+      try {
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'supa-' + store.toLowerCase() + '-nieuw-volledig-waarneemblad-rijgids.txt'
+        document.body.append(link)
+        try { link.click() } finally { link.remove() }
+      } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
+      setStatus('De lege ' + store + '-CSV en deze rijgids horen bij hetzelfde volledige fysieke mandje. ' +
+        'Originele winkelproductnamen, bronmoment en echte pakprijzen zijn niet ingevuld.')
+    } catch (cause) {
+      setStatus(cause instanceof Error ? cause.message : 'De rijgids kan niet worden gemaakt.', true)
+    } finally {
+      button.disabled = false
+    }
+  })
 }
 
 function nanoseconds(raw: string): bigint {
@@ -830,6 +930,28 @@ function show(source: Source, demand: Demand): void {
   comparisonValidThroughNs = complete && start !== null && end !== null
     ? (start <= end ? start : end) + weekNs : null
   result.hidden = false
+  // A native progress meter is honest only if the original store capture is
+  // itself recent and its individual SKUs have trusted whole-pack prices.
+  // In particular, a stale capture must show ZERO usable price coverage,
+  // not a visually convincing full green bar based on historical matches.
+  for (const [store, basket, age] of [
+    ['PLUS', left, firstAge], ['DekaMarkt', right, secondAge],
+  ] as const) {
+    const meter = coverageMeters[store]
+    const validAge = age >= 0n && age <= weekNs
+    const count = validAge ? basket.matchedLineCount : 0
+    meter.max = demand.ingredients.length
+    meter.value = count
+    const state = !captures[store]
+      ? 'Nog geen eigen winkelopname'
+      : !validAge
+        ? 'Opname is toekomstig of ouder dan 7 dagen; geen bruikbare prijzen'
+        : count === demand.ingredients.length
+          ? 'Alle ' + count + ' fysieke regels geprijsd uit eigen recente bron'
+          : count + ' van ' + demand.ingredients.length + ' fysieke regels geprijsd uit eigen recente bron'
+    coverageLabels[store].textContent = state
+    meter.setAttribute('aria-label', store + ': ' + state)
+  }
   renderBudget()
   loadTrip(left, right, demand,
     { PLUS: firstAge, DekaMarkt: secondAge },
@@ -1036,6 +1158,10 @@ function clearComparisonTextPreview(): void {
   comparisonTextPreview.value = ''
   comparisonTextPreview.hidden = true
 }
+function currentCoverageText(): string {
+  return stores.map(store => store + ' prijsdekking: ' +
+    coverageLabels[store].textContent).join(' · ')
+}
 function privateComparisonText(): string | null {
   if (result.hidden) return null
   const tableLines = Array.from(rows.querySelectorAll('tr')).map(row => {
@@ -1055,6 +1181,7 @@ function privateComparisonText(): string | null {
     '',
     summary.textContent ?? 'Geen volledig prijsverschil bekend.',
     capturesLabel.textContent ?? 'Bronmomenten onbekend.',
+    currentCoverageText(),
     ...budget,
     '',
     'Ingrediënt en fysieke behoefte | PLUS | DekaMarkt | Verschil',
@@ -1132,7 +1259,7 @@ document.querySelector<HTMLButtonElement>('#download-html')!.addEventListener('c
     })
     const html = renderPrivateBasketSnapshot({
       capturedAt: new Date().toISOString(),
-      summary: (summary.textContent ?? '') +
+      summary: (summary.textContent ?? '') + '\n' + currentCoverageText() +
         (budgetInCents(budgetInput.value.trim()) !== null && budgetTotals
           ? ' Eigen budget: ' + (budgetStatus.textContent ?? '') : ''),
       sourceMoments: capturesLabel.textContent ?? '',

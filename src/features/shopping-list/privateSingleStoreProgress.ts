@@ -22,8 +22,8 @@ function sourceIdentity(planKey: string, store: OwnStore, capture: PrivateReview
     const item: Matched = line
     if (!item.id || seen.has(item.id) ||
         !Number.isSafeInteger(item.packs) || item.packs <= 0 ||
-        !Number.isSafeInteger(item.pricePerPackCents) || item.pricePerPackCents < 0 ||
-        !Number.isSafeInteger(item.lineTotalCents) ||
+        !Number.isSafeInteger(item.pricePerPackCents) || item.pricePerPackCents <= 0 ||
+        !Number.isSafeInteger(item.lineTotalCents) || item.lineTotalCents <= 0 ||
         item.lineTotalCents !== item.packs * item.pricePerPackCents) {
       throw Error('De originele winkelmandregels zijn niet consistent.')
     }

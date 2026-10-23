@@ -1,5 +1,6 @@
 import type { BasketTraceLine, OneStoreBasket } from './basket.ts'
 import { calculateDecimalPackCount } from './decimalPackArithmetic.ts'
+import type { MatchUnit } from './matching.ts'
 
 type MatchedBasketLine = Extract<BasketTraceLine, { status: 'matched' }>
 
@@ -48,7 +49,9 @@ function baseQuantity(
       : null
   }
   if (unit === 'ml') return { amount, family: 'volume' }
-  if (unit === 'piece') return { amount, family: 'piece' }
+  // Do not price half an indivisible item without an explicit human review.
+  if (unit === 'piece') return Number.isSafeInteger(amount)
+    ? { amount, family: 'piece' } : null
   return null
 }
 
@@ -60,13 +63,17 @@ function canonicalStoreIdentity(value: unknown): value is string {
   return validIdentity(value) && value === value.trim()
 }
 
-function supportedBasketLine(line: unknown): line is BasketTraceLine {
-  if (line === null || typeof line !== 'object' || !('status' in line)) {
-    return false
-  }
+function isObjectContainer(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
 
-  const status = (line as { status?: unknown }).status
-  return status === 'matched' || status === 'unresolved'
+function supportedBasketLine(line: unknown): line is BasketTraceLine {
+  if (!isObjectContainer(line) || !('status' in line)) return false
+  if (line.status === 'unresolved') return true
+  if (line.status !== 'matched') return false
+  // Original physical quantity and package must exist before economics
+  // accesses their fields. A malformed imported record is NOT a priced row.
+  return isObjectContainer(line.requirement) && isObjectContainer(line.pack)
 }
 
 function basketLines(basket: OneStoreBasket): BasketTraceLine[] {
@@ -84,6 +91,10 @@ function invalidMatchedLineIdentity(line: MatchedBasketLine): boolean {
 }
 
 function invalidMatchedLineEconomics(line: MatchedBasketLine): boolean {
+  // Keep populated zero-total baskets distinct from empty baskets. A zero-cent
+  // observation is not a savings signal by itself; source admission and line
+  // identity remain separate gates, while the comparison uses matched demand
+  // and exact line arithmetic rather than requiring a positive basket total.
   const effectivePackAmount = line.pack.amount * line.pack.count
   const required = baseQuantity(line.requirement.amount, line.requirement.unit)
   const pack = baseQuantity(effectivePackAmount, line.pack.unit)
@@ -260,22 +271,47 @@ function unknownComparison(
 
 // Compare the exact physical quantity rather than a display-unit spelling.
 // Bidirectional exact ceiling=1 refuses even the tiniest true discrepancy.
-function samePhysicalDemand(
-  left: MatchedBasketLine['requirement'],
-  right: MatchedBasketLine['requirement'],
-): boolean {
-  if (left.amount === right.amount && left.unit === right.unit) return true
-  return calculateDecimalPackCount([left], { amount: right.amount, unit: right.unit }) === 1 &&
-    calculateDecimalPackCount([right], { amount: left.amount, unit: left.unit }) === 1
+function physicalUnit(unit: string): unit is MatchUnit {
+  return unit === 'g' || unit === 'kg' || unit === 'ml' ||
+    unit === 'l' || unit === 'piece'
 }
 
-export function compareFullBaskets({
-  baseline,
-  candidate,
-}: {
-  baseline: OneStoreBasket
-  candidate: OneStoreBasket
-}): BasketComparison {
+/** Share canonical physical demand across preview, review and export. */
+export function samePhysicalDemand(
+  left: { amount: number | null; unit: string },
+  right: { amount: number | null; unit: string },
+): boolean {
+  if (left.amount === null || right.amount === null ||
+      !Number.isFinite(left.amount) || left.amount <= 0 ||
+      !Number.isFinite(right.amount) || right.amount <= 0 ||
+      !physicalUnit(left.unit) || !physicalUnit(right.unit) ||
+      (left.unit === 'piece' && !Number.isSafeInteger(left.amount)) ||
+      (right.unit === 'piece' && !Number.isSafeInteger(right.amount))) return false
+  if (left.amount === right.amount && left.unit === right.unit) return true
+  return calculateDecimalPackCount(
+    [{ amount: left.amount, unit: left.unit }],
+    { amount: right.amount, unit: right.unit },
+  ) === 1 && calculateDecimalPackCount(
+    [{ amount: right.amount, unit: right.unit }],
+    { amount: left.amount, unit: left.unit },
+  ) === 1
+}
+
+/** Reuse the validated source-only container guard from #419 (#417/#420).
+ * Explicit SUPA errors for invalid request containers; valid but inconsistent
+ * physical/economic rows still yield the canonical unknown/no-savings result.
+ */
+function requiredBasket(value: unknown, label: 'baseline' | 'candidate'): OneStoreBasket {
+  if (!isObjectContainer(value)) throw new Error(label + ' basket container invalid')
+  if (!isObjectContainer(value.store)) throw new Error(label + ' basket store container invalid')
+  // The container and store have been checked above; inspectBasket performs the full line/economic validation immediately after.
+  return value as OneStoreBasket
+}
+
+export function compareFullBaskets(input: unknown): BasketComparison {
+  if (!isObjectContainer(input)) throw new Error('Basket comparison input invalid')
+  const baseline = requiredBasket(input.baseline, 'baseline')
+  const candidate = requiredBasket(input.candidate, 'candidate')
   const reasons = [
     ...inspectBasket('baseline', baseline),
     ...inspectBasket('candidate', candidate),

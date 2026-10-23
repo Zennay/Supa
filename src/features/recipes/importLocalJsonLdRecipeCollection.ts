@@ -37,6 +37,11 @@ export function importLocalJsonLdRecipeCollection(raw: string): UserRecipeDraft[
       } else {
         if (value['@graph'] !== undefined) collect(value['@graph'], depth + 1)
         if (value.mainEntity !== undefined) collect(value.mainEntity, depth + 1)
+        // Recipe collections are often wrapped as schema.org ItemList → ListItem → item.
+        // Traverse only known JSON-LD container fields; the canonical Recipe type
+        // check above remains the only route into the import preview.
+        if (value.itemListElement !== undefined) collect(value.itemListElement, depth + 1)
+        if (value.item !== undefined) collect(value.item, depth + 1)
       }
     }
   }

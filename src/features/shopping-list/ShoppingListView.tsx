@@ -1,10 +1,10 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import type { OneStoreBasket, RecipeWithIngredients } from '../../domain/basket'
 import type { PlannedMeal } from '../../domain/types'
-import { quantityUnitLabelNl } from '../../lib/quantityPresentation'
-import { euro } from '../../lib/money'
+import { quantityAmountLabelNl } from '../../lib/quantityPresentation'
 import { ShoppingListCompletionBanner } from './ShoppingListCompletionBanner'
 import { ShoppingListCopyButton } from './ShoppingListCopyButton'
+import { ShoppingListCsvExport } from './ShoppingListCsvExport.tsx'
 import { PrintableShoppingChecklist } from './PrintableShoppingChecklist'
 import {
   restoreShoppingListProgress,
@@ -49,11 +49,11 @@ export function shoppingVisibleLines(
 
 function shoppingQuantity(line: OneStoreBasket['lines'][number]) {
   if (line.status === 'unresolved') {
-    return `${line.requirement.amount ?? '?'} ${quantityUnitLabelNl(line.requirement.unit, line.requirement.amount)} · handmatig kiezen`
+    return `${quantityAmountLabelNl(line.requirement.amount, line.requirement.unit)} · handmatig kiezen`
   }
 
   const packPrefix = line.pack.count > 1 ? `${line.pack.count} × ` : ''
-  return `${line.packs} × ${packPrefix}${line.pack.amount} ${quantityUnitLabelNl(line.pack.unit, line.pack.amount)}`
+  return `${line.packs} × ${packPrefix}${quantityAmountLabelNl(line.pack.amount, line.pack.unit)}`
 }
 
 function readStoredProgress(basket: OneStoreBasket) {
@@ -265,6 +265,7 @@ export function ShoppingListView({ basket, plan, recipes, activeDays }: {
         <summary>Deel of print je lijst</summary>
         <div className="hifi-shoplist-tool-actions">
           <ShoppingListCopyButton basket={basket} doneLineIds={done} />
+          <ShoppingListCsvExport basket={basket} doneLineIds={done} />
           <PrintableShoppingChecklist basket={basket} doneLineIds={done} />
         </div>
       </details>
@@ -342,8 +343,8 @@ export function ShoppingListView({ basket, plan, recipes, activeDays }: {
                 <strong>{label}</strong>
                 <small>{shoppingQuantity(line)}</small>
               </span>
-              <span className="hifi-shopping-price" aria-label={line.status === 'matched' ? `Voorbeeldprijs ${euro.formatCents(line.lineTotalCents)}` : 'Prijs nog onbekend'}>
-                {line.status === 'matched' ? euro.formatCents(line.lineTotalCents) : '—'}
+              <span className="hifi-shopping-price" aria-label="Prijs onbekend">
+                —
               </span>
             </button>
             </Fragment>
@@ -353,13 +354,15 @@ export function ShoppingListView({ basket, plan, recipes, activeDays }: {
       {basket.lines.length > 0 && (
         <section className="hifi-shoplist-total" aria-label="Overzicht boodschappen">
           <div className="hifi-shoplist-total__line">
-            <span>{basket.unresolvedLineCount > 0 ? 'Bekend minimum' : 'Totaal'}</span>
-            <strong>{euro.formatCents(basket.totalCents)}</strong>
+            <span>Producten op je lijst</span>
+            <strong>{basket.lines.length}</strong>
           </div>
           {basket.unresolvedLineCount > 0 && (
-            <p>{basket.unresolvedLineCount} productkeuzes zijn nog niet meegeteld.</p>
+            <p>{basket.unresolvedLineCount} productkeuzes moeten nog handmatig gecontroleerd worden.</p>
           )}
-          <p>Voorbeeldprijzen uit de lokale planning; geen actuele kassaprijzen.</p>
+          <p>Prijs onbekend. Deze voorbeeldlijst toont geen fictieve bedragen.
+            Open Vergelijk voor je eigen, gecontroleerde winkelprijzen en een volledig mandbedrag.
+          </p>
           <ShoppingListCompletionBanner basket={basket} doneLineIds={done} />
         </section>
       )}

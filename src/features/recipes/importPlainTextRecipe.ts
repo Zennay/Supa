@@ -1,4 +1,5 @@
 import { createManualRecipeDraft, type UserRecipeDraft } from '../../domain/userRecipeImport'
+import { safeRecipeSourceUrl } from '../../domain/recipeSourceUrl.ts'
 
 const maxBytes = 500_000
 const headingPrefix = /^#{1,6}\s+/u
@@ -6,8 +7,17 @@ const markdownStrong = /^\*\*(.+?)\*\*:?$/u
 const bulletPrefix = /^(?:[-*•]\s+|\d{1,3}[.)]\s+)/u
 const checkboxPrefix = /^(?:[-*•]\s*)?\[[ xX]\]\s+/u
 
+/** Accept common Markdown metadata such as **Porties:** 2 or
+ * **Bron**: https://… without stripping the original source value. */
+function metadataText(line: string): string {
+  return line.replace(headingPrefix, '')
+    .replace(/^\*\*([^*\r\n:]{1,60}):\*\*\s*/u, '$1: ')
+    .replace(/^\*\*([^*\r\n:]{1,60})\*\*\s*:\s*/u, '$1: ')
+    .trim()
+}
+
 function headingText(line: string): string {
-  return line.replace(headingPrefix, '').replace(markdownStrong, '$1')
+  return metadataText(line).replace(markdownStrong, '$1')
     .replace(/:$/u, '').trim()
 }
 
@@ -47,6 +57,11 @@ export function importPlainTextRecipe(raw: string): UserRecipeDraft {
   }
 
   let title = ''
+  let sourceUrl: string | null = null
+  // Keep a separate flag: an invalid optional attribution must not allow a
+  // second Bron: line to silently replace the user's first source identity.
+  let sawSourceLine = false
+  const sourceWarnings: string[] = []
   let servings: number | null = null
   let minutes: number | null = null
   let section: 'header' | 'ingredients' | 'steps' = 'header'
@@ -73,6 +88,35 @@ export function importPlainTextRecipe(raw: string): UserRecipeDraft {
     }
 
     if (section === 'header') {
+      // Preserve a sanitized public attribution when a recipe is shared as
+      // Markdown/plain text. This is metadata only: it never fetches the URL
+      // or turns the recipe into a verified retailer product or price.
+      const sourceLine = /^(?:bron(?:link|url)?|source(?:\s+url)?)\s*:\s*(.*)$/iu.exec(metadataText(original))
+      if (sourceLine) {
+        if (sawSourceLine) throw new Error('Gebruik maximaal één Bron:-regel per recept.')
+        sawSourceLine = true
+        const candidate = sourceLine[1].trim()
+        const markdownLink = /^\[[^\]\r\n]{1,180}\]\((https:\/\/[^()\s]+)\)$/iu.exec(candidate)
+        const autolink = /^<([^<>\s]+)>$/u.exec(candidate)
+        const rawSource = markdownLink?.[1] ?? autolink?.[1] ?? candidate
+        // Attribution is optional. Discard unsafe/broken links with an
+        // explicit review warning instead of losing an otherwise usable
+        // recipe; never persist the rejected URL or attempt to fetch it.
+        try {
+          sourceUrl = safeRecipeSourceUrl(rawSource)
+          const canonicalOriginal = new URL(rawSource)
+          canonicalOriginal.hash = ''
+          // Harmless URL serialization is not a warning. Removing sensitive
+          // query parameters is, so the shopper can review attribution.
+          if (sourceUrl !== canonicalOriginal.toString()) sourceWarnings.push(
+            'De bronlink is veilig opgeschoond; controleer de openbare bronvermelding.')
+        } catch {
+          sourceUrl = null
+          sourceWarnings.push(
+            'De optionele Bron:-link was ongeldig of niet openbaar HTTPS en is niet bewaard; controleer de bronvermelding.')
+        }
+        continue
+      }
       const named = /^(?:recept|recipe|titel|title|naam)\s*:\s*(.+)$/iu.exec(headingText(original))
       const count = headerNumber(original, 'servings')
       const duration = headerNumber(original, 'minutes')
@@ -94,5 +138,11 @@ export function importPlainTextRecipe(raw: string): UserRecipeDraft {
   if (!title || !ingredients.length || ingredients.length > 80 || steps.length > 100) {
     throw new Error('Een titel en 1–80 regels onder Ingrediënten: zijn vereist.')
   }
-  return createManualRecipeDraft({ title, servings, minutes, ingredients, steps })
+  const draft = createManualRecipeDraft({ title, servings, minutes, ingredients, steps })
+  return {
+    ...draft,
+    source: sourceUrl ? 'url' : 'manual',
+    sourceUrl,
+    warnings: [...draft.warnings, ...sourceWarnings],
+  }
 }

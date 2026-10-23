@@ -17,7 +17,7 @@ export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
   const [paste, setPaste] = useState('')
   const [openOnly, setOpenOnly] = useState(false)
   const [reuse, setReuse] = useState<ReusableExtraList[]>([])
-  const [pendingPaste, setPendingPaste] = useState<Item[] | null>(null)
+  const [pendingPaste, setPendingPaste] = useState<{ identity: string; items: Item[] } | null>(null)
   const currentIdentity = useRef(identity)
   currentIdentity.current = identity
   const [preparedCopy, setPreparedCopy] = useState<{
@@ -40,9 +40,14 @@ export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
   }, [identity])
   async function openPasteFile(file?: File) {
     if (!file) return
+    const originalIdentity = identity
     try {
       if (!file.size || file.size > 20000) throw Error('Selecteer een tekstbestand van maximaal 20 kB.')
       const text = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer())
+      if (currentIdentity.current !== originalIdentity) {
+        setNotice('Het weekmenu veranderde tijdens het lezen. Kies het bestand opnieuw.')
+        return
+      }
       if (new TextEncoder().encode(text).length > 20000) throw Error('Tekstbestand te groot.')
       setPaste(text)
       setPendingPaste(null)
@@ -129,24 +134,45 @@ export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
         setNotice('Gebruik één artikel per regel of artikel; hoeveelheid; stuks/g/ml.')
         return
       }
-      const next: Item = { id: 'preview', name, quantity, unit, done }
+      const previewId = new Uint32Array(4)
+      try { window.crypto.getRandomValues(previewId) } catch {
+        setNotice('Deze browser kan geen veilige voorbeeld-ID maken.')
+        return
+      }
+      const next: Item = {
+        id: Array.from(previewId, value => value.toString(16).padStart(8, '0')).join('-'),
+        name, quantity, unit, done,
+      }
       if (!valid(next)) {
         setNotice('Een van de regels bevat een ongeldig artikel of een ongeldige hoeveelheid.')
         return
       }
       preview.push(next)
     }
-    setPendingPaste(preview)
+    if (currentIdentity.current !== identity || data.identity !== identity) {
+      setNotice('Het weekmenu wordt bijgewerkt. Bekijk de plaklijst opnieuw voordat je toevoegt.')
+      return
+    }
+    setPendingPaste({ identity, items: preview })
     setNotice('Controleer de voorbeeldregels voordat je ze toevoegt. Er zijn nog geen artikelen gewijzigd.')
   }
   function acceptPaste() {
-    if (!pendingPaste || items.length + pendingPaste.length > 100 || data.locked) return
-    const values = new Uint32Array(pendingPaste.length * 4)
+    const pending = pendingPaste
+    // A preview belongs to the exact week that was visible when it was reviewed.
+    // The effect that clears stale state runs after render, so guard the action
+    // synchronously as well; a week switch must never move old rows into a new list.
+    if (!pending || pending.identity !== identity ||
+        currentIdentity.current !== identity || data.identity !== identity ||
+        items.length + pending.items.length > 100 || data.locked) {
+      if (pending && pending.identity !== identity) setPendingPaste(null)
+      return
+    }
+    const values = new Uint32Array(pending.items.length * 4)
     try { window.crypto.getRandomValues(values) } catch {
       setNotice('Deze browser kan geen veilige artikel-ID maken.')
       return
     }
-    const imported = pendingPaste.map((item, index) => ({ ...item,
+    const imported = pending.items.map((item, index) => ({ ...item,
       id: Array.from(values.slice(index * 4, index * 4 + 4), n =>
         n.toString(16).padStart(8, '0')).join('-'),
     }))
@@ -154,7 +180,13 @@ export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
       setNotice('Unieke artikel-ID kon niet worden toegekend. Probeer opnieuw.')
       return
     }
-    setData(prev => ({ ...prev, identity, items: [...items, ...imported] }))
+    if (currentIdentity.current !== identity || data.identity !== identity) {
+      setNotice('Het weekmenu veranderde tijdens het toevoegen. Controleer de lijst opnieuw.')
+      return
+    }
+    setData(prev => prev.identity === identity && currentIdentity.current === identity
+      ? { ...prev, identity, items: [...items, ...imported] }
+      : prev)
     setPendingPaste(null)
     setPaste('')
     setNotice(`${imported.length} ongeprijsde boodschappen toegevoegd. Bewaar ze desgewenst in deze tab.`)
@@ -387,9 +419,9 @@ export function OwnExtraGroceries({ identity, plan, recipes, activeDays }: {
       </label>
       <button type="submit" disabled={!paste.trim() || data.locked}>Bekijk plaklijst</button>
     </form>
-    {pendingPaste && <div className="unpriced-planner-checklist__paste-preview">
-      <h4>Controleer {pendingPaste.length} extra boodschappen zonder winkelprijzen</h4>
-      <ul>{pendingPaste.map((row, index) => <li key={index}>
+    {pendingPaste?.identity === identity && <div className="unpriced-planner-checklist__paste-preview">
+      <h4>Controleer {pendingPaste.items.length} extra boodschappen zonder winkelprijzen</h4>
+      <ul>{pendingPaste.items.map(row => <li key={row.id}>
         {row.done ? '☑' : '☐'} {row.quantity} {row.unit === 'piece' ? 'stuks' : row.unit} {row.name}
       </li>)}</ul>
       <button type="button" onClick={acceptPaste}>Voeg alle artikelen toe</button>

@@ -239,6 +239,27 @@
 .mixed-store-route__backup h4,.mixed-store-route__backup p { margin:.2rem 0; }
 .mixed-store-route__backup input[type=file] { width:100%; max-width:100%; min-width:0; }
 
+/* Personal comparison discovery controls; never recalculate original totals. */
+.mixed-store-route__unit-controls {
+  display:grid;gap:.7rem;padding:.8rem 1rem;margin:.8rem 0;
+  border:1px solid #d2dfd4;border-radius:12px;background:#f3f8f3;
+}
+.mixed-store-route__unit-controls label {display:grid;gap:.35rem;min-width:0;}
+.mixed-store-route__unit-controls label:has(input[type=checkbox]) {
+  display:flex;align-items:center;gap:.6rem;
+}
+.mixed-store-route__unit-controls input[type=checkbox] {width:20px;height:20px;flex-shrink:0;}
+.mixed-store-route__unit-controls select,
+.mixed-store-route__unit-controls input[type=search] {
+  min-height:44px;max-width:100%;width:100%;box-sizing:border-box;
+  padding:.65rem;border:1px solid #849e89;border-radius:9px;background:white;
+  color:#203f2b;font:inherit;
+}
+.mixed-store-route__unit-controls p {margin:.15rem 0;font-size:.93rem;line-height:1.4;}
+.mixed-store-route__unit-controls :is(input,select):focus-visible {
+  outline:3px solid #226f52;outline-offset:3px;
+}
+
 /* Personal side-by-side unit/whole-pack prices, still legible on narrow phones. */
 .mixed-store-route__unit-breakdown { background:#fff; }
 .mixed-store-route__unit-rows { display:grid; gap:.8rem; }
@@ -344,6 +365,44 @@ border-radius:10px;padding:.65rem;scroll-margin-top:1.25rem}
 .offline-manual-editor__pair-provisional > strong { font-size: .97rem; }
 @media(max-width:620px) { .offline-manual-editor__pair-row { grid-template-columns:1fr; gap:.35rem; } }
 
+
+/* Original private retailer CSV preview: readable on small phones without
+   concealing a long user-entered SKU or mistaking a quote for trusted money. */
+.offline-price-workbench__capture-review {
+  background: #f5faf5; border-color: #b9d3be;
+  padding: clamp(.8rem, 2vw, 1.15rem);
+}
+.offline-price-workbench__capture-preview { display: grid; gap: .7rem; min-width: 0; }
+.offline-price-workbench__capture-preview > strong { overflow-wrap: anywhere; }
+.offline-price-workbench__capture-preview details {
+  background: #fff; border: 1px solid #d5e1d5; border-radius: 10px;
+  padding: .5rem .75rem; min-width: 0;
+}
+.offline-price-workbench__capture-preview summary {
+  cursor: pointer; font-weight: 700; min-height: 44px; overflow-wrap: anywhere;
+}
+.offline-price-workbench__capture-preview summary:focus-visible {
+  outline: 3px solid #226f52; outline-offset: 3px;
+}
+.offline-price-workbench__capture-preview ul {
+  padding-left: 1.3rem; margin: .6rem 0; min-width: 0;
+}
+.offline-price-workbench__capture-preview li {
+  padding: .6rem 0; border-bottom: 1px solid #e5ebe4;
+  overflow-wrap: anywhere; line-height: 1.5;
+}
+.offline-price-workbench__capture-preview button { min-height: 44px; }
+@media (max-width: 640px) {
+  .offline-price-workbench__capture-preview button { width: 100%; }
+}
+
+
+.offline-price-workbench__capture-alert {
+  padding: .75rem .9rem; margin: .25rem 0;
+  background: #fff6e5; color: #644211; border-left: 3px solid #af7326;
+  border-radius: 6px; font-weight: 650; overflow-wrap: anywhere;
+}
+
 .mixed-store-route__extras { margin-top:1rem; padding:1rem; border:1px solid #bdd3bd; border-radius:.7rem; background:#f9fcf8; }
 .mixed-store-route__extras ul { padding:0; list-style:none; margin:.7rem 0; }
 .mixed-store-route__extras li { border-top:1px solid #e1eae0; padding:.75rem 0; }
@@ -382,4 +441,198 @@ border-radius:10px;padding:.65rem;scroll-margin-top:1.25rem}
 .offline-price-workbench__recapture-both button:focus-visible {
   outline: 3px solid #226f52;
   outline-offset: 3px;
+}
+
+.offline-price-workbench__capture-followup {
+  display:grid; gap:.7rem; padding:.9rem; min-width:0;
+  border:1px solid #c5d9c9; border-radius:10px; background:#f6faf7;
+}
+.offline-price-workbench__capture-followup p { margin:0; line-height:1.5; }
+.offline-price-workbench__capture-followup-row {
+  display:flex; flex-wrap:wrap; gap:.55rem; align-items:center;
+  border-top:1px solid #dce7dc; padding-top:.6rem;
+}
+.offline-price-workbench__capture-followup-row > span { flex:1 1 100%; overflow-wrap:anywhere; }
+.offline-price-workbench__capture-followup-row button { min-height:44px; }
+
+/* Search and completion filters for the user's own two-store product coverage. */
+.offline-price-workbench__coverage-filters { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.8rem; margin:1rem 0; align-items:end; }
+.offline-price-workbench__coverage-filters label { display:grid; gap:.35rem; font-weight:650; font-size:.9rem; min-width:0; }
+.offline-price-workbench__coverage-filters :is(select,input) { box-sizing:border-box; min-width:0; width:100%; min-height:44px; padding:.55rem; border:1px solid #9fa9a4; border-radius:9px; background:#fff; color:#232323; font:inherit; }
+.offline-price-workbench__coverage-filters :is(select,input):focus-visible { outline:3px solid #226f52; outline-offset:2px; }
+.offline-price-workbench__coverage-filters p { grid-column:1 / -1; margin:0; color:#4d5c53; font-size:.86rem; }
+@media(max-width:640px) { .offline-price-workbench__coverage-filters { grid-template-columns:minmax(0,1fr); } }
+
+.offline-price-workbench__confirmed-unit { display:block; margin-top:.45rem; font-weight:650; color:#27543a; line-height:1.4; }
+
+/* One actionable lane per store; this never promotes partial prices to totals. */
+.offline-price-workbench__store-progress { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.9rem; margin:1rem 0; }
+.offline-price-workbench__store-progress section { min-width:0; border:1px solid #bdd2c4; border-radius:12px; padding:1rem; background:#f6faf7; display:grid; gap:.65rem; align-content:start; }
+.offline-price-workbench__store-progress h5 { margin:0; font-size:1rem; }
+.offline-price-workbench__store-progress progress { display:block; width:100%; height:14px; accent-color:#1e714c; }
+.offline-price-workbench__store-progress p { margin:0; font-size:.9rem; line-height:1.4; }
+.offline-price-workbench__store-progress-actions { display:flex; gap:.55rem; flex-wrap:wrap; }
+.offline-price-workbench__store-progress-actions button { min-height:44px; flex:1; }
+@media(max-width:650px) { .offline-price-workbench__store-progress { grid-template-columns:minmax(0,1fr); } }
+
+/* Optional local spreadsheet paste; preserve readable fields on small phones. */
+.offline-price-workbench__capture-paste {
+  margin-block: 1rem;
+  padding: .75rem;
+  border: 1px solid var(--color-border, #cad3ce);
+  border-radius: .75rem;
+}
+.offline-price-workbench__capture-paste label {
+  display: block;
+  margin-block: .75rem;
+}
+.offline-price-workbench__capture-paste textarea {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-height: 6.5rem;
+  margin-top: .35rem;
+  box-sizing: border-box;
+  font: inherit;
+  overflow-wrap: anywhere;
+}
+.offline-price-workbench__capture-paste-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+}
+.offline-price-workbench__capture-paste-actions button {
+  max-width: 100%;
+  white-space: normal;
+}
+
+/* Every pre-import matching result stays discoverable on mobile. */
+.offline-price-workbench__matching-controls { display:flex; flex-wrap:wrap; gap:.75rem 1.5rem; margin-block:.75rem; align-items:flex-end; }
+.offline-price-workbench__matching-controls label:first-child { flex:1 1 16rem; min-width:0; }
+.offline-price-workbench__matching-controls input[type="search"] { display:block; width:100%; max-width:32rem; }
+.offline-price-workbench__matching-actions { display:flex; flex-wrap:wrap; gap:.5rem; margin-block:.5rem; }
+/* Read-only prioritized review of personally entered, unverified store drafts. */
+.offline-manual-editor__review-priority { border:1px solid #a8c9ae; border-radius:12px;
+  background:#f8fcf7; padding:1rem; display:grid; gap:.6rem; }
+.offline-manual-editor__review-priority h5,.offline-manual-editor__review-priority p {
+  margin:0; }
+.offline-manual-editor__review-priority ol { display:grid; gap:.5rem; padding-left:1.4rem;
+  margin:0; }
+.offline-manual-editor__review-priority li { padding:.55rem; border-bottom:1px solid #d1ddd1;
+  overflow-wrap:anywhere; }
+.offline-manual-editor__review-priority li > span { display:block; margin:.2rem 0; }
+.offline-manual-editor__review-actions { display:flex; flex-wrap:wrap; gap:.45rem; }
+.offline-manual-editor__review-actions button { min-height:44px; white-space:normal; }
+
+
+/* Keep user-entered source lookup fast without treating drafts as priced catalog. */
+.offline-manual-editor__pair-filters {
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:.65rem; padding:.8rem; border:1px solid #ceddce; border-radius:.8rem;
+  background:#fff; min-width:0;
+}
+.offline-manual-editor__pair-filters label { display:grid; gap:.3rem; min-width:0; }
+.offline-manual-editor__pair-filters input,
+.offline-manual-editor__pair-filters select {
+  box-sizing:border-box; padding:.55rem; min-height:44px; max-width:100%; width:100%;
+}
+.offline-manual-editor__pair-filters > small { grid-column:1/-1; color:#4e6253; }
+.offline-manual-editor__pair-unpaired {
+  grid-column:1/-1; display:grid; gap:.3rem; min-width:0;
+  border:1px solid #e1d4ad; background:#fffcf5; border-radius:.65rem;
+  padding:.65rem .8rem; overflow-wrap:anywhere; font-size:.87rem;
+}
+.offline-manual-editor__pair-unpaired small { color:#695633; line-height:1.45; }
+
+.offline-manual-editor__source-conflicts {
+  border:2px solid #b87845; border-radius:.8rem; padding:.85rem;
+  background:#fff8f0; display:grid; gap:.4rem; overflow-wrap:anywhere;
+}
+.offline-manual-editor__source-conflicts p { margin:0; }
+.offline-manual-editor__source-conflicts ul { margin:0; padding-left:1.5rem; }
+.offline-manual-editor__source-conflicts li { margin:.5rem 0; }
+
+/* Mobile first: each self-observed SKU is an expandable, touch-friendly card.
+   No synthetic offers or dates are implied by the physical Planner hint. */
+.offline-price-workbench__local-editor {
+  min-width:0; margin:.85rem 0; border:1px solid #a8c4b1;
+  background:#f5faf5; border-radius:14px; padding:clamp(.8rem,2vw,1.2rem);
+  overflow-wrap:anywhere;
+}
+.offline-price-workbench__local-editor > summary {
+  font-weight:750; line-height:1.45; cursor:pointer; min-height:44px;
+  padding:.4rem .2rem;
+}
+.offline-price-workbench__local-editor fieldset {
+  box-sizing:border-box; min-width:0; border:1px solid #d2dfd4;
+  border-radius:12px; margin:1rem 0; padding:.9rem;
+  background:white; display:grid; gap:.65rem;
+}
+.offline-price-workbench__local-editor legend {font-weight:700; padding:0 .4rem;}
+.offline-price-workbench__local-editor fieldset > details {
+  min-width:0; border:1px solid #d8e4d9; border-radius:10px;
+  padding:.65rem; background:#fafdf9;
+}
+.offline-price-workbench__local-editor fieldset > details > summary {
+  cursor:pointer; font-weight:650; line-height:1.45; min-height:44px;
+  padding:.25rem 0;
+}
+.offline-price-workbench__local-editor label {
+  display:grid; gap:.3rem; min-width:0; margin:.5rem 0; font-weight:600;
+}
+.offline-price-workbench__local-editor :is(input,select) {
+  box-sizing:border-box; width:100%; max-width:100%; min-width:0;
+  min-height:44px; border:1px solid #98a9a0; border-radius:9px;
+  padding:.55rem .65rem; background:#fff; color:#1e3327; font:inherit;
+}
+.offline-price-workbench__local-editor small {line-height:1.45; color:#516358;}
+.offline-price-workbench__local-editor :is(button,input,select,summary):focus-visible {
+  outline:3px solid #236d4d; outline-offset:3px;
+}
+@media(max-width:640px){
+  .offline-price-workbench__local-editor fieldset {padding:.55rem;}
+  .offline-price-workbench__local-editor .offline-price-workbench__actions {display:grid;}
+  .offline-price-workbench__local-editor .offline-price-workbench__actions > * {
+    width:100%; box-sizing:border-box; min-width:0;
+  }
+}
+
+.offline-price-workbench__copy-fallback {
+  display: grid; gap: .55rem; min-width: 0; margin: 1rem 0;
+}
+.offline-price-workbench__copy-fallback textarea {
+  width: 100%; max-width: 100%; box-sizing: border-box;
+  resize: vertical; overflow-wrap: anywhere; font: inherit;
+}
+.offline-price-workbench__copy-fallback :is(textarea, button):focus-visible {
+  outline: 3px solid #276e55; outline-offset: 2px;
+}
+
+.offline-price-workbench__paired-summary {
+  display: grid; gap: .35rem; min-width: 0;
+  margin: .8rem 0; padding: clamp(.8rem, 2.5vw, 1.1rem);
+  border: 1px solid #c8d8cd; border-radius: 12px; background: #f7fbf8;
+}
+
+/* Source provenance is available per matched product without triggering a fetch. */
+.offline-price-workbench__source-provenance {
+  margin-block: .5rem;
+  padding: .55rem .7rem;
+  border: 1px solid #ceddce;
+  border-radius: .65rem;
+  overflow-wrap: anywhere;
+}
+.offline-price-workbench__source-provenance summary {
+  cursor: pointer;
+  min-height: 2rem;
+  display: flex;
+  align-items: center;
+}
+.offline-price-workbench__source-provenance p {
+  margin: .35rem 0;
+  overflow-wrap: anywhere;
+}
+.offline-price-workbench__source-provenance code {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }

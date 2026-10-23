@@ -1,13 +1,22 @@
 import { observedInstant } from '../../domain/offlineReviewedImport.ts'
-import { isCoherentPricedBasket } from '../../domain/basketComparison.ts'
-import type { OneStoreBasket } from '../../domain/basket.ts'
+import { isCoherentPricedBasket, samePhysicalDemand } from '../../domain/basketComparison.ts'
+import type { BasketTraceLine, OneStoreBasket } from '../../domain/basket.ts'
 
 /** Transient, human-reviewed own-source baskets. No storage, no retailer rights. */
 export type OwnStore = 'PLUS' | 'DekaMarkt'
+export type PrivateSourceProvenance = {
+  id: string
+  sourceUrl?: string
+  sourceSha256?: string
+  sourceKind?: 'product' | 'catalog' | 'offers'
+}
 export type PrivateReviewedBasket = {
   basket: OneStoreBasket
   observedAt: string
   capturedMs: number
+  // Ephemeral source references for the final private price view. These are
+  // not persisted as permission, approval or independent field evidence.
+  sourceProducts?: readonly PrivateSourceProvenance[]
 }
 export type PrivateReviewedBaskets = {
   planKey: string
@@ -27,6 +36,38 @@ export function privateReviewedPairWithin24Hours(
       right.ms !== second.capturedMs) return false
   const elapsed = left.ns >= right.ns ? left.ns - right.ns : right.ns - left.ns
   return elapsed <= 86_400_000_000_000n
+}
+
+/** Preserve the exact physical week identity before even an individual
+ * partial price comparison. This grants NO complete basket or savings claim.
+ */
+export function samePartialPhysicalDemand(left: OneStoreBasket, right: OneStoreBasket): boolean {
+  if (!left.lines.length || left.lines.length !== right.lines.length ||
+      left.selectedMealCount !== right.selectedMealCount) return false
+  const byId = new Map(right.lines.map(line => [line.id, line]))
+  return byId.size === right.lines.length && left.lines.every(line => {
+    const other = byId.get(line.id)
+    return !!other && line.ingredientLabel === other.ingredientLabel &&
+      (samePhysicalDemand(line.requirement, other.requirement) ||
+        (line.requirement.amount === null && other.requirement.amount === null &&
+          line.requirement.unit === other.requirement.unit))
+  })
+}
+
+type ConfirmedLine = Extract<BasketTraceLine, { status: 'matched' }>
+/** Read-only per-ingredient prices from already-admitted private captures. */
+export function partialReviewedLinePairs(
+  plus: PrivateReviewedBasket | undefined,
+  deka: PrivateReviewedBasket | undefined,
+): { plus: ConfirmedLine; deka: ConfirmedLine }[] {
+  if (!plus || !deka || !privateReviewedPairWithin24Hours(plus, deka) ||
+      !samePartialPhysicalDemand(plus.basket, deka.basket)) return []
+  const dekaById = new Map(deka.basket.lines.map(line => [line.id, line]))
+  return plus.basket.lines.flatMap(line => {
+    const other = dekaById.get(line.id)
+    return line.status === 'matched' && other?.status === 'matched'
+      ? [{ plus: line, deka: other }] : []
+  })
 }
 
 /** Only admitted, fully matched source product lines for local display.

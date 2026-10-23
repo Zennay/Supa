@@ -5,6 +5,10 @@ import { replacePrivateStoreCapture } from './replacePrivateStoreCapture.ts'
 type SourceProduct = {
   id: string; name: string; packAmount: number | null; packUnit: string
   packCount?: number; priceCents: number | null; available: boolean
+  sourcePriceCents?: number | null; sourceAvailable?: boolean
+  availabilityLabel?: 'available' | 'unavailable' | 'unknown'
+  sourceUrl?: string; sourceSha256?: string
+  sourceKind?: 'product' | 'catalog' | 'offers'
 }
 type SourceCapture = { retailer: OfflineRetailer; observedAt: string; products: SourceProduct[] }
 
@@ -40,7 +44,13 @@ export function describePrivateStoreCaptureChange(
       prior.packUnit !== item.packUnit ||
       (prior.packCount ?? 1) !== (item.packCount ?? 1) ||
       prior.available !== item.available ||
-      prior.priceCents !== item.priceCents
+      prior.priceCents !== item.priceCents ||
+      prior.sourcePriceCents !== item.sourcePriceCents ||
+      prior.sourceAvailable !== item.sourceAvailable ||
+      prior.availabilityLabel !== item.availabilityLabel ||
+      prior.sourceUrl !== item.sourceUrl ||
+      prior.sourceSha256 !== item.sourceSha256 ||
+      prior.sourceKind !== item.sourceKind
     )
   }).length
   const formatCents = (item: SourceProduct): string => {
@@ -55,13 +65,48 @@ export function describePrivateStoreCaptureChange(
         before: formatCents(previous), after: formatCents(item) }]
       : []
   }).slice(0, 8)
+  const sourceExamples = newCapture.products.flatMap(item => {
+    const previous = original.get(item.id)
+    if (!previous || (
+      previous.sourceUrl === item.sourceUrl &&
+      previous.sourceSha256 === item.sourceSha256 &&
+      previous.sourceKind === item.sourceKind &&
+      previous.sourceAvailable === item.sourceAvailable &&
+      previous.availabilityLabel === item.availabilityLabel
+    )) return []
+    const sourceLabel = (source: SourceProduct) => {
+      const url = source.sourceUrl
+        ? source.sourceUrl.slice(0, 180) + (source.sourceUrl.length > 180 ? '…' : '')
+        : 'bron-URL ontbreekt'
+      const hash = source.sourceSha256
+        ? 'SHA-256 ' + source.sourceSha256.slice(0, 12)
+        : 'snapshot-hash ontbreekt'
+      const availability = source.sourceAvailable === undefined
+        ? 'bronbeschikbaarheid onbekend'
+        : source.sourceAvailable ? 'bron beschikbaar' : 'bron niet beschikbaar'
+      return [
+        source.sourceKind ?? 'brontype onbekend',
+        url,
+        hash,
+        availability,
+        source.availabilityLabel ? 'bronsignaal ' + source.availabilityLabel : '',
+      ].filter(Boolean).join(' · ')
+    }
+    return [{
+      name: item.name,
+      sourceId: item.id,
+      before: sourceLabel(previous),
+      after: sourceLabel(item),
+    }]
+  }).slice(0, 8)
+
   return {
     store,
     previousObservedAt: oldCapture.observedAt,
     nextObservedAt: newCapture.observedAt,
     previousCount: oldCapture.products.length,
     nextCount: newCapture.products.length,
-    added, removed, changed, priceExamples,
+    added, removed, changed, priceExamples, sourceExamples,
     otherStore: store === 'PLUS' ? 'DekaMarkt' : 'PLUS',
     pairedWithin24h: merged.captured.pairedWithin24h,
     currentEnough: merged.captured.currentEnough,

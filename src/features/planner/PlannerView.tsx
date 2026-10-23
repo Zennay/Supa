@@ -1,6 +1,6 @@
 import { lazy, Suspense, useMemo, useState, type FormEvent } from 'react'
 import type { PlannedMeal, Recipe } from '../../domain/types'
-import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../domain/basket.ts'
+import type { RecipeWithIngredients } from '../../domain/basket.ts'
 import { buildIngredientReuseInsight } from '../../domain/ingredientReuse.ts'
 import { IngredientReuseCard } from './IngredientReuseCard.tsx'
 // Previewing a proposed replacement is optional: do not pull its entire
@@ -131,24 +131,19 @@ export function PlannerView({
   ), [recipes])
   const hasIngredientData = ingredientRecipes.length > 0 &&
     ingredientRecipes.length === recipes.length
-  // The source-match preview can inspect up to 200 physical requirements
-  // against two local price files. Keep that exact Planner demand stable
-  // while users change unrelated UI controls such as budget or filters.
-  const captureNeeds = useMemo(() => {
-    if (!hasIngredientData) return []
-    try { return aggregatePlanIngredients(plannedMeals, ingredientRecipes, activeDays) }
-    catch { return [] }
-  }, [hasIngredientData, plannedMeals, ingredientRecipes, activeDays])
-  const pieceReviewLabels = useMemo(() => {
+  const measurementReviewLabels = useMemo(() => {
     const byId = new Map(ingredientRecipes.map(recipe => [recipe.id, recipe]))
     const active = new Set(activeDays)
     const labels = new Map<string, string>()
+    const supportedUnits = new Set(['g', 'kg', 'ml', 'l', 'piece'])
     for (const meal of plannedMeals) {
       if (!active.has(meal.day)) continue
       for (const item of byId.get(meal.recipeId)?.ingredients ?? []) {
-        if (item.unit !== 'piece' || item.amount === null ||
-            typeof item.amount !== 'number' ||
-            (Number.isSafeInteger(item.amount) && item.amount > 0)) continue
+        const amountValid = typeof item.amount === 'number' &&
+          Number.isFinite(item.amount) && item.amount > 0 && item.amount <= 1_000_000
+        const pieceValid = item.unit !== 'piece' ||
+          (typeof item.amount === 'number' && Number.isSafeInteger(item.amount) && item.amount > 0)
+        if (supportedUnits.has(item.unit) && amountValid && pieceValid) continue
         if (typeof item.id === 'string' && typeof item.label === 'string')
           labels.set(item.id, item.label)
       }
@@ -194,11 +189,18 @@ export function PlannerView({
                   value={item.recipeId}
                   onChange={(event) => onRecipeChange(item.day, event.target.value)}
                 >
-                  {recipes.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.title}
-                    </option>
-                  ))}
+                  {recipes.some(option => !option.tags?.includes('Eigen recept')) &&
+                    <optgroup label="Voorbeeldrecepten">
+                      {recipes.filter(option => !option.tags?.includes('Eigen recept')).map(option => (
+                        <option key={option.id} value={option.id}>{option.title}</option>
+                      ))}
+                    </optgroup>}
+                  {recipes.some(option => option.tags?.includes('Eigen recept')) &&
+                    <optgroup label="Mijn eigen recepten">
+                      {recipes.filter(option => option.tags?.includes('Eigen recept')).map(option => (
+                        <option key={option.id} value={option.id}>{option.title}</option>
+                      ))}
+                    </optgroup>}
                 </select>
                 <small>{recipe.minutes} min</small>
                 <RecipePriceExplanation estimatedCost={recipe.estimatedCost} />
@@ -344,7 +346,7 @@ export function PlannerView({
         {trustedCents !== null && ownSource && <p className="disclaimer" role="status">
           Privécontrole: {ownSource.store} · eigen winkelopname {ownSource.observedAt}.
           Het getoonde budgetbedrag gebruikt jouw volledige, persoonlijk bevestigde winkelmand
-          in plaats van de Supa-voorbeeldprijzen. Geen kassagarantie of publieke besparingsclaim.
+          in plaats van de Supa-voorbeeldprijzen. Bedragen zijn indicatief; de kassaprijs kan afwijken.
         </p>}
         {trustedCents === null && <p className="disclaimer" role="status">
           Je weekbudget is ingesteld, maar de werkelijke mandprijs is onbekend.
@@ -368,25 +370,27 @@ export function PlannerView({
         </p>}
       </section>
 
-      {pieceReviewLabels.length > 0 && <div className="attention-card" role="status">
-        <strong>{pieceReviewLabels.length} ingrediënt(en) hebben een gedeeltelijk of ongeldig aantal stuks</strong>
-        <p>Voor {pieceReviewLabels.join(', ')} kan Supa nog geen betrouwbaar
+      {measurementReviewLabels.length > 0 && <div className="attention-card" role="status">
+        <strong>{measurementReviewLabels.length} ingrediënt(en) hebben een hoeveelheid of maateenheid die controle nodig heeft</strong>
+        <p>Voor {measurementReviewLabels.join(', ')} kan Supa nog geen betrouwbaar
           winkelproduct of volledig mandtotaal kiezen. Controleer eerst in Recepten
-          hoeveel hele stuks je wilt kopen; de rest van je boodschappenlijst blijft bruikbaar.</p>
+          de hoeveelheid en eenheid; stuks moeten een positief heel aantal zijn.
+          De rest van je boodschappenlijst blijft bruikbaar.</p>
         <button type="button" className="ghost-button" onClick={onOpenRecipes}>
-          Open Recepten om aantallen te controleren
+          Open Recepten om hoeveelheden te controleren
         </button>
       </div>}
 
       <Suspense fallback={<p role="status" aria-live="polite">Eigen PLUS/Deka-winkelvergelijking laden…</p>}>
       <PlannerOwnStoreComparison reviewed={ownReviewed ?? null} captureProgress={captureProgress ?? null}
         preferred={preferredOwnStore}
-        captureNeeds={captureNeeds}
+        plannedMeals={plannedMeals} ingredientRecipes={ingredientRecipes}
+        activeDays={activeDays} hasIngredientData={hasIngredientData}
         hasDemand={activeDays.length > 0} budget={budget}
         onSelect={onOwnSourceChange}
         onOpenComparison={onOpenComparison}
         onImportSourceFiles={onImportSourceFiles} onReviewIngredient={onReviewIngredient}
-        onOpenList={onOpenShoppingList}
+        onOpenRecipes={onOpenRecipes} onOpenList={onOpenShoppingList}
         onOpenMixedRoute={onOpenMixedRoute} onChooseRouteLine={onChooseRouteLine} />
       </Suspense>
 

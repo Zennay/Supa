@@ -59,9 +59,10 @@ function UnitPriceGap({ item }: { item: ComparedOwnLine }) {
  * Filtering and sorting must never change priced basket totals, store choice,
  * sources, original SKU reviews or the derived mixed-store route.
  */
-export function PlannerOwnProductDeltas({ lines, onChooseLine }: {
+export function PlannerOwnProductDeltas({ lines, onChooseLine, onExportSelection }: {
   lines: ComparedOwnLine[]
   onChooseLine: (ingredientId: string, store: OwnStore) => void
+  onExportSelection: (ingredientIds: string[], action: 'download' | 'copy' | 'csv' | 'print') => void
 }) {
   const [filter, setFilter] = useState<DifferenceFilter>('all')
   const [unitFamily, setUnitFamily] = useState<'all' | 'kg' | 'liter' | 'stuk'>('all')
@@ -174,6 +175,31 @@ export function PlannerOwnProductDeltas({ lines, onChooseLine }: {
       {visibleLines.length} van {lines.length} gecontroleerde ingrediënten zichtbaar.
       {visibleLines.length < lines.length ? ' De volledige mandtotalen hierboven blijven ongewijzigd.' : ''}
     </p>
+    <div className="own-store-breakdown__export">
+      <button type="button" className="ghost-button"
+        disabled={visibleLines.length === 0}
+        onClick={() => onExportSelection(visibleLines.map(line => line.id), 'download')}>
+        Bewaar deze {visibleLines.length} prijsregels als privé-TXT
+      </button>
+      <button type="button" className="ghost-button"
+        disabled={visibleLines.length === 0}
+        onClick={() => onExportSelection(visibleLines.map(line => line.id), 'copy')}>
+        Kopieer deze {visibleLines.length} privéprijsregels
+      </button>
+      <button type="button" className="ghost-button"
+        disabled={visibleLines.length === 0}
+        onClick={() => onExportSelection(visibleLines.map(line => line.id), 'csv')}>
+        Bewaar deze {visibleLines.length} prijsregels als spreadsheet-CSV
+      </button>
+      <button type="button" className="ghost-button"
+        disabled={visibleLines.length === 0}
+        onClick={() => onExportSelection(visibleLines.map(line => line.id), 'print')}>
+        Afdrukbaar overzicht van deze {visibleLines.length} prijsregels
+      </button>
+      <small>Bevat uitsluitend zichtbare, bevestigde producten met oorspronkelijke
+        SKU, pakprijzen, eenheidsprijzen, regelverschillen en bronmomenten. De CSV
+        gebruikt Nederlandse puntkomma-kolommen. Het afdrukbare HTML-overzicht werkt offline; geen volledig mandtotaal.</small>
+    </div>
     {visibleLines.length > 0
       ? <>
         <div className="own-store-planner__scroll" role="region"
@@ -183,8 +209,8 @@ export function PlannerOwnProductDeltas({ lines, onChooseLine }: {
               <th scope="col">DekaMarkt</th><th scope="col">Verschil</th></tr></thead>
             <tbody>{visibleLines.map(item => <tr key={item.id}>
               <th scope="row">{item.ingredientLabel}</th>
-              {([item.plus, item.deka] as const).map((line, index) =>
-                <td key={index}><PriceEvidence line={line} /></td>)}
+              {([{ store: 'PLUS', line: item.plus }, { store: 'DekaMarkt', line: item.deka }] as const)
+                .map(({ store, line }) => <td key={store}><PriceEvidence line={line} /></td>)}
               <td><strong>{item.deltaCents === 0 ? 'Gelijk' : exactEuro.formatCents(Math.abs(item.deltaCents))}</strong>
                 <small>{item.deltaCents > 0 ? 'PLUS lager' : item.deltaCents < 0 ? 'DekaMarkt lager' : 'Geen verschil'}</small>
                 <UnitPriceGap item={item} />

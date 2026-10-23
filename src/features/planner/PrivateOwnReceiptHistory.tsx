@@ -288,8 +288,8 @@ export function PrivateOwnReceiptHistory({ reviewed }: {
       </div>
       {!!ready.excluded.length && <details>
         <summary>{ready.excluded.length} niet-vergelijkbare ingrediënten</summary>
-        <ul>{ready.excluded.map((row, index) =>
-          <li key={index}>{row.ingredient}: {row.reason}</li>)}</ul>
+        <ul>{ready.excluded.map(row =>
+          <li key={row.ingredientId}>{row.ingredient}: {row.reason}</li>)}</ul>
       </details>}
       <button className="ghost-button" type="button" onClick={() =>
         downloadText(privateHistoryText(ready))}>Download historische privévergelijking (TXT)</button>

@@ -11,7 +11,7 @@ import type { PrivateSourceFileHandoff } from '../comparison/privateSourceFileHa
 import { ListingBasketPreview } from '../comparison/ListingBasketPreview'
 import type { BasketComparison } from '../../domain/basketComparison'
 import { euro } from '../../lib/money'
-import { quantityUnitLabelNl } from '../../lib/quantityPresentation'
+import { quantityAmountLabelNl } from '../../lib/quantityPresentation'
 import {
   basketComparisonCanShowMoney,
   basketComparisonHeadline,
@@ -25,8 +25,7 @@ import { StatPill } from '../../components/StatPill'
 import { comparisonLineHighlights, comparisonLineHighlightCopy, comparisonMatchesVisibleBaskets } from './comparisonLineHighlights.ts'
 
 function quantity(amount: number | null, unit: string) {
-  const label = quantityUnitLabelNl(unit, amount)
-  return amount === null ? `? ${label}` : `${amount} ${label}`
+  return quantityAmountLabelNl(amount, unit)
 }
 
 export function BasketView({
@@ -125,9 +124,10 @@ export function BasketView({
             Deze oudere rekenhulp werkt uitsluitend met losse, door jou ingetypte bedragen;
             er is geen bronmoment, SKU-bewijs of overgang naar geverifieerde winkelmandjes.</p>
           {openedManualFallback && <Suspense fallback={<p role="status">Rekenhulp openen…</p>}>
+            {/* Keep the component mounted across Planner changes. Its own strict
+                demand signature quarantines old entries and offers a private
+                export; a demand-derived React key previously discarded them. */}
             <ManualStoreComparison
-              key={JSON.stringify([manualPlan, manualActiveDays,
-                manualRecipes.map(recipe => [recipe.id, recipe.ingredients])])}
               plan={manualPlan}
               recipes={manualRecipes}
               activeDays={manualActiveDays}

@@ -81,6 +81,32 @@ function compatibleDemandUnits(left: MatchUnit, right: MatchUnit): boolean {
   )
 }
 
+/** Stable output units keep equivalent demand independent of recipe order. */
+function canonicalDemandUnit(unit: MatchUnit): MatchUnit {
+  // Keep canonical shopping demand in human-usable base metric units. This
+  // remains order-independent for mixed kg/g and l/ml recipes while preserving
+  // the established grams/millilitres contract used by the Planner and M3
+  // field worksheet; matching and pack arithmetic still compare unit families.
+  if (unit === 'kg') return 'g'
+  if (unit === 'l') return 'ml'
+  return unit
+}
+
+function canonicalIngredient(ingredient: AggregatedIngredient): AggregatedIngredient {
+  const unit = canonicalDemandUnit(ingredient.unit)
+  if (ingredient.amount === null || unit === ingredient.unit) {
+    return { ...ingredient, unit }
+  }
+  return {
+    ...ingredient,
+    amount: sumDecimalDemandUnits(
+      [{ amount: ingredient.amount, unit: ingredient.unit }],
+      unit,
+    ),
+    unit,
+  }
+}
+
 export function aggregatePlanIngredients(
   plan: PlannedMeal[],
   recipes: RecipeWithIngredients[],
@@ -140,7 +166,7 @@ export function aggregatePlanIngredients(
           ? null : ingredient.amount
       const current = aggregated.get(ingredient.id)
       if (!current) {
-        aggregated.set(ingredient.id, { ...ingredient, amount: physicalAmount })
+        aggregated.set(ingredient.id, canonicalIngredient({ ...ingredient, amount: physicalAmount }))
         continue
       }
 
@@ -301,7 +327,7 @@ export function buildOneStoreBasket({
       !pack ||
       required.family !== pack.family ||
       !Number.isSafeInteger(product.priceCents) ||
-      product.priceCents < 0
+      product.priceCents <= 0
     ) {
       return {
         id: ingredient.id,

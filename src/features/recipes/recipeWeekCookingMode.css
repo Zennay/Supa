@@ -1,0 +1,22 @@
+.recipe-week-cooking{margin-block:1.5rem;padding:1.25rem;border:1px solid var(--border-color,#d8e1df);border-radius:18px;background:var(--surface,#fff)}
+.recipe-week-cooking h4{margin:0 0 .6rem}
+.recipe-week-cooking h5{font-size:1.1rem;margin:.5rem 0}
+.recipe-week-cooking__days{display:flex;gap:.45rem;overflow-x:auto;padding:.5rem 0 1rem;scrollbar-width:thin}
+.recipe-week-cooking__days button{flex:0 0 auto;border:1px solid #b7c9c4;border-radius:99px;background:transparent;padding:.65rem .9rem;min-height:44px}
+.recipe-week-cooking__days button.active{background:#123d32;color:white;border-color:#123d32}
+.recipe-week-cooking__intro{margin-block:.4rem 1.1rem}
+.recipe-week-cooking__intro p{margin:.2rem 0}
+.recipe-week-cooking__intro [role=status]{font-weight:600}
+.recipe-week-cooking__detail details{border:1px solid #d7e1dc;padding:.85rem;border-radius:12px;margin-bottom:1.2rem}
+.recipe-week-cooking__detail details summary{cursor:pointer;font-weight:600}
+.recipe-week-cooking__detail details ul{list-style:none;padding:0;margin:.5rem 0}
+.recipe-week-cooking__detail details li{padding:.5rem 0;border-bottom:1px solid #e4ebe8}
+.recipe-week-cooking__detail label{display:flex;align-items:flex-start;gap:.8rem;cursor:pointer}
+.recipe-week-cooking__detail input[type=checkbox]{min-width:20px;width:20px;height:20px;margin-top:.1rem;accent-color:#165f4a}
+.recipe-week-cooking__steps{padding-left:1.5rem;margin:0 0 1rem}
+.recipe-week-cooking__steps li{border-bottom:1px solid #dde6e1;padding:.85rem .2rem}
+.recipe-week-cooking__steps li.done span{text-decoration:line-through;opacity:.64}
+.recipe-week-cooking__steps li strong{display:block;margin-bottom:.15rem}
+.recipe-week-cooking__actions{display:flex;gap:.65rem;flex-wrap:wrap}
+.recipe-week-cooking__actions button{min-height:44px}
+@media(max-width:540px){.recipe-week-cooking{padding:.85rem}.recipe-week-cooking__days button{padding:.5rem .7rem}.recipe-week-cooking__actions button{flex:1 1 100%}}

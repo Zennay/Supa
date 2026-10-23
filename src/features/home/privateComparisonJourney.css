@@ -1,0 +1,183 @@
+.private-comparison-journey{max-width:1100px;margin:1rem auto 2rem;padding:clamp(1rem,3vw,1.75rem);background:#fff;border:1px solid #dce7de;border-radius:22px;box-shadow:0 12px 30px rgba(25,60,40,.07);color:#233c2a}
+.private-comparison-journey__heading{display:flex;gap:1.25rem;justify-content:space-between;align-items:center;flex-wrap:wrap}
+.private-comparison-journey__heading h2{margin:.2rem 0 .45rem;font-size:clamp(1.3rem,2.7vw,1.7rem);line-height:1.2}
+.private-comparison-journey__heading p{max-width:65ch;margin:.35rem 0;color:#415746;line-height:1.5}
+.private-comparison-journey__eyebrow{font-size:.72rem;letter-spacing:.1em;font-weight:800;color:#426548}
+.private-comparison-journey button{border:0;border-radius:12px;padding:.7rem 1rem;min-height:44px;cursor:pointer;background:#244d31;color:#fff;font:inherit;font-weight:700}
+.private-comparison-journey button:focus-visible{outline:3px solid #cf9738;outline-offset:3px}
+.private-comparison-journey__shops{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin:1.25rem 0}
+.private-comparison-journey__shop{border:1px solid #d7e5d9;border-radius:14px;padding:1rem;display:flex;flex-direction:column;align-items:flex-start;gap:.45rem;min-width:0}
+.private-comparison-journey__shop strong{font-size:1.15rem}
+.private-comparison-journey__shop span,.private-comparison-journey__shop small{color:#4c6251;line-height:1.4}
+.private-comparison-journey__shop progress{width:100%;height:10px;accent-color:#357e46}
+.private-comparison-journey button.private-comparison-journey__link{background:#e8f1e9;color:#204a30;padding:.6rem .8rem;margin-top:auto}
+.private-comparison-journey__result{padding:1rem 1.1rem;background:#f4f8f3;border-radius:14px;display:flex;flex-direction:column;gap:.3rem}
+.private-comparison-journey__result span{font-size:.84rem;color:#415e49}
+.private-comparison-journey__result strong{font-size:1.2rem;overflow-wrap:anywhere}
+.private-comparison-journey__result p{margin:.2rem 0;color:#405846;line-height:1.5}
+.private-comparison-journey__actions{display:flex;flex-wrap:wrap;gap:.65rem;margin:1.1rem 0}
+.private-comparison-journey__actions button:not(:first-child){background:#e8f1e9;color:#204a30}
+.private-comparison-journey>small{color:#54685a;line-height:1.5}
+@media(max-width:630px){.private-comparison-journey{margin:1rem .25rem 2rem;border-radius:16px}.private-comparison-journey__shops{grid-template-columns:1fr}.private-comparison-journey__heading>button,.private-comparison-journey__actions button{width:100%}}
+
+.private-comparison-journey__upload{display:flex;flex-direction:column;gap:.5rem;background:#f5f9f5;border:1px dashed #b7cbb9;border-radius:14px;padding:1rem;margin:1rem 0;color:#294832}
+.private-comparison-journey__upload span{font-size:.92rem;line-height:1.45;color:#48614d}
+.private-comparison-journey__upload input{width:100%;max-width:100%;min-height:44px;font:inherit}
+.private-comparison-journey__error{color:#8a2525;font-weight:600}
+
+/* Visible partial source rows never become a total-savings authority. */
+.private-comparison-journey__partial{display:grid;gap:.75rem;margin:1rem 0;
+  padding:1rem;border:1px solid #d7e5d9;border-radius:14px;background:#f9fbf8}
+.private-comparison-journey__partial h3{font-size:1.08rem;margin:0}
+.private-comparison-journey__partial p{margin:0;line-height:1.5}
+.private-comparison-journey__partial ul{display:grid;gap:.65rem;list-style:none;
+  margin:0;padding:0;grid-template-columns:repeat(auto-fit,minmax(min(100%,245px),1fr))}
+.private-comparison-journey__partial li{display:grid;gap:.35rem;padding:.75rem;
+  background:#fff;border:1px solid #dce9de;border-radius:10px;overflow-wrap:anywhere}
+.private-comparison-journey__partial li span,.private-comparison-journey__partial small{
+  color:#425a47;line-height:1.4}
+.private-comparison-journey__partial button{justify-self:start}
+@media(max-width:630px){.private-comparison-journey__partial button{width:100%}}
+
+/* The canonical full-basket breakdown is collapsed until explicitly opened. */
+.private-comparison-journey__complete-lines{margin:1rem 0;padding:1rem;
+  background:#f8fbf7;border:1px solid #d6e5d7;border-radius:14px;min-width:0}
+.private-comparison-journey__complete-head{display:flex;align-items:center;
+  justify-content:space-between;gap:.85rem;flex-wrap:wrap}
+.private-comparison-journey__complete-head h3{margin:0;font-size:1.1rem}
+.private-comparison-journey__complete-head p{margin:.35rem 0;line-height:1.5;color:#455f4c}
+.private-comparison-journey__complete-lines details{margin-top:.75rem}
+.private-comparison-journey__complete-lines summary{cursor:pointer;padding:.75rem;
+  font-weight:700;border-radius:10px;background:#eaf3eb;min-height:44px}
+.private-comparison-journey__complete-lines ul{list-style:none;padding:0;display:grid;
+  gap:.75rem;margin:.8rem 0;max-height:620px;overflow-y:auto}
+.private-comparison-journey__complete-lines li{padding:.8rem;background:#fff;
+  border:1px solid #dce7de;border-radius:12px;min-width:0;overflow-wrap:anywhere}
+.private-comparison-journey__complete-ingredient{display:grid;gap:.35rem;margin-bottom:.65rem}
+.private-comparison-journey__complete-ingredient strong{font-size:1.05rem}
+.private-comparison-journey__complete-ingredient span{font-weight:700;color:#244d31}
+.private-comparison-journey__complete-stores{display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem}
+.private-comparison-journey__complete-stores>div{display:grid;gap:.35rem;min-width:0;
+  background:#f5f9f5;padding:.65rem;border-radius:9px}
+.private-comparison-journey__complete-stores span{font-weight:700}
+.private-comparison-journey__complete-lines small{line-height:1.4;color:#455f4c}
+.private-comparison-journey__complete-lines details>p{line-height:1.5}
+@media(max-width:630px){
+ .private-comparison-journey__complete-stores{grid-template-columns:1fr}
+ .private-comparison-journey__complete-head button,
+ .private-comparison-journey__complete-lines details>button{width:100%}
+}
+/* Explicit per-store route avoids opening a stale preferred shop when Home
+   has just compared two original, fully reviewed physical baskets. */
+.private-comparison-journey__store-route-actions{display:flex;flex-wrap:wrap;
+  gap:.6rem;margin-top:.5rem}
+.private-comparison-journey__store-route-actions button{flex:1 1 190px;
+  color:#204a30;background:#e8f1e9}
+@media(max-width:630px){.private-comparison-journey__store-route-actions button{width:100%}}
+/* Home uses the same guarded spreadsheet importer as Planner and Producten. */
+.private-comparison-journey__paste{display:grid;gap:.5rem;padding:1rem;
+  border:1px solid #d7e5d9;border-radius:14px;background:#f8fbf7;min-width:0}
+.private-comparison-journey__paste>button{justify-self:start}
+.private-comparison-journey__paste>small{line-height:1.45;color:#435b49}
+.private-comparison-journey__paste>section{min-width:0}
+@media(max-width:630px){.private-comparison-journey__paste>button{width:100%}}
+.private-comparison-journey__capture-buttons{display:flex;flex-wrap:wrap;gap:.65rem}
+.private-comparison-journey__capture-buttons button{flex:1 1 210px}
+.private-comparison-journey__capture-buttons button:disabled{opacity:.55;cursor:not-allowed}
+.private-comparison-journey__paste p[role=status]{margin:.25rem 0;line-height:1.5;color:#385a3c}
+/* Physical Planner demand stays separate from unobserved retailer fields. */
+.private-comparison-journey__field-guide{min-width:0;border:1px solid #cbdccb;border-radius:12px;background:#fff}
+.private-comparison-journey__field-guide summary{cursor:pointer;padding:.85rem;font-weight:700;min-height:44px}
+.private-comparison-journey__field-guide summary:focus-visible{outline:3px solid #cf9738;outline-offset:2px}
+.private-comparison-journey__field-guide>p{margin:.5rem 1rem 1rem;line-height:1.5;color:#455b4a}
+.private-comparison-journey__field-guide-shops{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;padding:0 1rem 1rem}
+.private-comparison-journey__field-guide-shops section{min-width:0}
+.private-comparison-journey__field-guide-shops h3{margin:.4rem 0;font-size:1.05rem}
+.private-comparison-journey__field-guide-shops ol{margin:.4rem 0 0;padding-left:2.2rem;max-height:360px;overflow-y:auto}
+.private-comparison-journey__field-guide-shops li{padding:.5rem .4rem;overflow-wrap:anywhere}
+.private-comparison-journey__field-guide-shops li+li{border-top:1px solid #e3ebe3}
+.private-comparison-journey__field-guide-shops strong,.private-comparison-journey__field-guide-shops small{display:block}
+.private-comparison-journey__field-guide-shops small{color:#516756;line-height:1.4}
+@media(max-width:630px){.private-comparison-journey__field-guide-shops{grid-template-columns:1fr}}
+.private-comparison-journey__single-store-buttons{display:flex;flex-wrap:wrap;gap:.45rem}
+.private-comparison-journey__single-store-buttons button{flex:1 1 140px;background:#e8f1e9;color:#204a30;padding:.5rem .6rem;font-size:.87rem;min-height:44px}
+/* Full read-only partial source discovery; no incomplete totals. */
+.private-comparison-journey__partial-search{display:grid;gap:.4rem;max-width:650px;font-weight:700}
+.private-comparison-journey__partial-search input{font:inherit;min-height:44px;padding:.65rem;border:1px solid #a8bcae;border-radius:10px;min-width:0}
+.private-comparison-journey__partial-search input:focus-visible{outline:3px solid #cf9738;outline-offset:2px}
+.private-comparison-journey__partial-search label{display:grid;gap:.4rem;min-width:0;font-size:.9rem}
+.private-comparison-journey__partial-search select{font:inherit;min-width:0;width:100%;min-height:44px;padding:.6rem .75rem;border:1px solid #a8bcae;border-radius:10px;background:#fff;color:#204a30}
+.private-comparison-journey__partial-search select:focus-visible{outline:3px solid #cf9738;outline-offset:2px}
+.private-comparison-journey__partial-product{display:grid;gap:.35rem;padding:.65rem;border:1px solid #dce9de;border-radius:10px;background:#f5f9f5;min-width:0}
+.private-comparison-journey__partial-product strong{font-size:.94rem;line-height:1.45;overflow-wrap:anywhere}
+.private-comparison-journey__partial-product small{display:block;overflow-wrap:anywhere}
+.private-comparison-journey__partial-product button{min-height:44px;background:#e8f1e9;color:#204a30;padding:.5rem .7rem}
+@media(max-width:630px){.private-comparison-journey__partial-search{max-width:100%}.private-comparison-journey__partial-product button{width:100%}}
+.private-comparison-journey__partial-review{display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.3rem}
+.private-comparison-journey__partial-review button{flex:1 1 165px;background:#e8f1e9;color:#204a30;padding:.55rem .7rem;font-size:.88rem}
+/* Home review queue is a read-only projection of the existing capture progress. */
+.private-comparison-journey__review-queue{width:100%;min-width:0;border-top:1px solid #dce9de;padding-top:.5rem;margin-top:.35rem}
+.private-comparison-journey__review-queue summary{cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center}
+.private-comparison-journey__review-queue>p{line-height:1.5;font-size:.88rem}
+.private-comparison-journey__review-queue ul{list-style:none;margin:0;padding:0;max-height:330px;overflow-y:auto}
+.private-comparison-journey__review-queue li{display:grid;gap:.5rem;border-top:1px solid #e0eae0;padding:.6rem 0}
+.private-comparison-journey__review-queue li strong,.private-comparison-journey__review-queue li small{display:block;overflow-wrap:anywhere}
+.private-comparison-journey__review-queue li button{justify-self:start;background:#e8f1e9;color:#204a30;padding:.55rem .7rem;font-size:.87rem}
+/* Reuse the original Planner missing-source exporter, including unknown prices. */
+.private-comparison-journey__pending-export{margin:1rem 0;padding:1rem;background:#f8fbf7;border:1px solid #d7e5d9;border-radius:14px;min-width:0}
+.private-comparison-journey__pending-export h3{margin:0 0 .35rem;font-size:1.07rem}
+.private-comparison-journey__pending-export p{margin:.35rem 0 .8rem;line-height:1.5}
+.private-comparison-journey__pending-actions{display:flex;flex-wrap:wrap;gap:.55rem}
+.private-comparison-journey__pending-actions button{flex:1 1 190px}
+.private-comparison-journey__pending-export textarea{display:block;width:100%;max-width:100%;min-height:120px;padding:.7rem;resize:vertical;overflow-wrap:anywhere;border:1px solid #9ab39e;border-radius:10px;background:#fff}
+/* The real, unpriced Planner checklist must not depend on price-source capture. */
+.private-comparison-journey__unpriced-start{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:1rem;margin:1rem 0;padding:1rem 1.1rem;border-radius:14px;border:1px solid #cbdccb;background:#f5f9f5}
+.private-comparison-journey__unpriced-start>div{flex:2 1 360px;min-width:0}
+.private-comparison-journey__unpriced-start h3{margin:0 0 .35rem;font-size:1.08rem}
+.private-comparison-journey__unpriced-start p{margin:0;line-height:1.5;color:#425c49}
+.private-comparison-journey__unpriced-start button{flex:1 1 180px}
+@media(max-width:630px){.private-comparison-journey__unpriced-start button{width:100%}}
+
+/* Reuse the Planner's missing-only source sheet without crowding the Home
+ * overview before a user explicitly opens their next retailer visit. */
+.private-comparison-journey__targeted{margin-block:1rem;padding:1rem;border:1px solid #d7e5db;border-radius:14px;background:#fbfdfb}
+.private-comparison-journey__targeted>strong{display:block;font-size:1.08rem}
+.private-comparison-journey__targeted>p{max-width:70ch;line-height:1.5}
+.private-comparison-journey__targeted>button{min-height:44px}
+
+/* The full Planner matrix may contain 200 ingredients; load it only after
+ * an explicit tap so Home remains useful on small phones. */
+.private-comparison-journey__coverage{margin-block:1rem;padding:1rem;border:1px solid #d7e5db;border-radius:14px;background:#fbfdfb}
+.private-comparison-journey__coverage>strong{display:block;font-size:1.08rem}
+.private-comparison-journey__coverage>p{max-width:70ch;line-height:1.5}
+.private-comparison-journey__coverage>button{min-height:44px}
+
+/* Genuine one-sided prices may remain useful even when the original store
+ * visits fall outside the strict paired comparison window. */
+.private-comparison-journey__source-window{display:grid;gap:.5rem;margin-block:1rem;padding:1rem;border:1px solid #c8ad69;border-radius:14px;background:#fffaf0}
+.private-comparison-journey__source-window>strong{font-size:1.06rem}
+.private-comparison-journey__source-window>p{margin:0;max-width:70ch;line-height:1.5}
+.private-comparison-journey__source-window>small{overflow-wrap:anywhere}
+.private-comparison-journey__source-window>button{justify-self:start;min-height:44px}
+/* Explicitly copied original source records need a readable, selectable
+   mobile fallback; never hide or truncate a price/SKU in a cramped field. */
+.private-comparison-journey__result label,
+.private-comparison-journey__partial>label:has(textarea) {
+  display:grid;gap:.45rem;min-width:0;font-weight:700;line-height:1.4;
+}
+.private-comparison-journey__result textarea,
+.private-comparison-journey__partial textarea {
+  width:100%;max-width:100%;min-width:0;box-sizing:border-box;
+  min-height:150px;padding:.8rem;border-radius:10px;
+  border:1px solid #94b29c;background:#fff;color:#233c2a;
+  font: .86rem/1.55 ui-monospace,monospace;resize:vertical;
+  overflow-wrap:anywhere;
+}
+.private-comparison-journey__result textarea:focus-visible,
+.private-comparison-journey__partial textarea:focus-visible {
+  outline:3px solid #cf9738;outline-offset:2px;
+}
+.private-comparison-journey__result .private-comparison-journey__actions button {
+  flex:1 1 220px;
+}

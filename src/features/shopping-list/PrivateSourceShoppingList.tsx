@@ -4,6 +4,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import type { BasketTraceLine, RecipeWithIngredients } from '../../domain/basket.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
+import type { UnpricedShoppingNote } from './ManualShoppingNotes.tsx'
 import { freshReviewedBaskets, privateReviewedPairWithin24Hours, type OwnStore, type PrivateReviewedBaskets, type PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
 import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
 import { extraGroceriesSavedEvent, readSavedExtrasForPlan } from '../comparison/ownExtraGroceriesStorage.ts'
@@ -20,7 +21,7 @@ const MixedStoreShoppingCard = lazy(async () => {
 })
 
 /** Private owner-reviewed baskets only. No fixture rows, browser storage or APIs. */
-export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChooseStore, onOpenComparison, checked, setChecked, plan, recipes, activeDays, routeChoice, routeCostIntent, routeOpenSignal = 0 }: {
+export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChooseStore, onOpenComparison, checked, setChecked, plan, recipes, activeDays, routeChoice, routeCostIntent, routeOpenSignal = 0, manualNotes = [], onToggleManualNote }: {
   reviewed: PrivateReviewedBaskets
   budget: number
   preferred: OwnStore
@@ -31,6 +32,8 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
   plan: PlannedMeal[]
   recipes: RecipeWithIngredients[]
   activeDays: string[]
+  manualNotes?: readonly UnpricedShoppingNote[]
+  onToggleManualNote?: (note: UnpricedShoppingNote) => void
   routeOpenSignal?: number
   routeChoice?: PrivateRouteChoice | null
   routeCostIntent?: PrivateExtraVisitCostIntent | null
@@ -102,6 +105,13 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
       (privateUnitPrice(line) ?? 'eenheidsprijs onbekend') + ' · ' +
       exactEuro.formatCents(line.lineTotalCents) + ' totaal'
     : line.ingredientLabel + ': product onbekend'
+  // User-added notes are presentation-only, never product matches or euros.
+  const ownNotes = manualNotes.filter(note => note &&
+    (note.store === 'Algemeen' || note.store === store) &&
+    typeof note.label === 'string' && note.label.trim().length > 0 &&
+    note.label.length <= 140 && typeof note.done === 'boolean')
+  const visibleOwnNotes = remainingOnly ? ownNotes.filter(note => !note.done) : ownNotes
+  const ownOpenCount = ownNotes.filter(note => !note.done).length
   const textList = [
     'Supa · ' + store + ' · privé gecontroleerd boodschappenlijstje',
     'Eigen bronopname: ' + readable(capture.observedAt),
@@ -109,7 +119,11 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
       'Volledig eigen winkelmandje, afgevinkte artikelen inbegrepen.',
     'Nog op lijst volgens eigen bron: ' + exactEuro.formatCents(remainingCents),
     ...visibleLines.map(line => (checked[tick(line)] ? '☑ ' : '☐ ') + label(line)),
-    ...(remainingOnly && visibleLines.length === 0 ? ['Alles afgevinkt.'] : []),
+    ...(remainingOnly && visibleLines.length === 0 ? ['Alle geprijsde regels afgevinkt.'] : []),
+    ...(visibleOwnNotes.length ? ['', 'EIGEN EXTRA BOODSCHAPPEN — prijs onbekend, buiten winkelmandtotaal',
+      ...visibleOwnNotes.map(note =>
+        (note.done ? '☑ ' : '☐ ') + readable(note.label) + ' [' + note.store + '] · ongeprijsd'),
+    ] : []),
     'Privébron. Geen actuele kassagarantie of publieke besparingsclaim.',
   ].join('\n')
   const plus = reviewed.stores.PLUS
@@ -242,8 +256,8 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
         setMessage('Extra boodschappen van deze week zijn niet veilig leesbaar. Niets gedownload.')
         return
       }
-      if (!saved.items.length) {
-        setMessage('Voeg onderaan Lijst eerst eigen extra boodschappen toe en klik Bewaar in deze tab. Daarna kun je één gezamenlijke lijst downloaden.')
+      if (!saved.items.length && !ownNotes.length) {
+        setMessage('Voeg eerst eigen ongeprijsde boodschappen toe in de Lijst. Daarna kun je ze samen met je winkelmand downloaden.')
         return
       }
       if (!currentCaptureAvailable()) throw Error('De oorspronkelijke winkelopname is inmiddels verlopen.')
@@ -255,9 +269,11 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
       const all = [
         textList,
         '',
-        'EIGEN EXTRA BOODSCHAPPEN (' + saved.items.length + ', expliciet in deze tab bewaard)',
-        'Niet gekoppeld aan PLUS of DekaMarkt. Buiten alle getoonde eurototalen en besparingen.',
-        ...extraLines,
+        ...(saved.items.length ? [
+          'EIGEN EXTRA BOODSCHAPPEN (' + saved.items.length + ', expliciet in deze tab bewaard)',
+          'Niet gekoppeld aan PLUS of DekaMarkt. Buiten alle getoonde eurototalen en besparingen.',
+          ...extraLines,
+        ] : []),
         '',
         'De winkelbedragen hierboven zijn uitsluitend voor de eigen gecontroleerde',
         'fysieke Planner-producten; deze extra boodschappen hebben onbekende kosten.',
@@ -272,7 +288,7 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
         link.download = 'supa-' + store.toLowerCase() + '-met-eigen-extra-boodschappen.txt'
         document.body.append(link)
         try { link.click() } finally { link.remove() }
-        setMessage('Eigen gecontroleerde ' + store + '-lijst inclusief apart bewaarde ongeprijsde extras gedownload. Je getoonde winkelbedrag is exclusief extras.')
+        setMessage('Eigen ' + store + '-mand en ongeprijsde boodschappen samen gedownload. Deze eigen artikelen blijven buiten de eurototalen.')
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
     } catch {
       setMessage('Gecombineerde export niet beschikbaar: controleer de bron en je opgeslagen extra artikelen.')
@@ -298,9 +314,16 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
             import('./singleStoreWithExtrasCsv.ts'),
           ])
         const saved = readSavedExtrasForPlan(reviewed.planKey)
-        if (!saved.available || !saved.items.length)
-          throw Error('Bewaar eerst je eigen extra boodschappen voor deze week in de Lijst-tab.')
-        csv = appendUnpricedExtrasToSingleStoreCsv(reviewedCsv, saved.items)
+        if (!saved.available)
+          throw Error('Eigen extra boodschappen konden niet worden gelezen.')
+        if (!saved.items.length && !ownNotes.length)
+          throw Error('Voeg eerst eigen ongeprijsde boodschappen toe in de Lijst.')
+        csv = saved.items.length
+          ? appendUnpricedExtrasToSingleStoreCsv(reviewedCsv, saved.items) : reviewedCsv
+        if (manualNotes.length) {
+          const { appendHandwrittenNotesToShoppingCsv } = await import('./manualShoppingNotesBackup.ts')
+          csv = appendHandwrittenNotesToShoppingCsv(csv, manualNotes, store)
+        }
       }
       if (!currentCaptureAvailable()) throw Error('De originele bron is intussen verlopen.')
       const url = URL.createObjectURL(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' }))
@@ -311,7 +334,7 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
           (includeExtras ? '-met-ongeprijsde-extras.csv' : '-eigen-boodschappen.csv')
         document.body.append(link)
         try { link.click() } finally { link.remove() }
-        setMessage('Eigen artikelen, hele verpakkingen en exacte centprijzen lokaal als CSV opgeslagen.')
+        setMessage(includeExtras ? 'Geprijsde originele SKU-regels en eigen ongeprijsde boodschappen staan apart in de privé-CSV. De eurototalen zijn ongewijzigd.' : 'Eigen artikelen, hele verpakkingen en exacte centprijzen lokaal als CSV opgeslagen.')
       } finally { window.setTimeout(() => URL.revokeObjectURL(url), 1000) }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'De privé-CSV kon niet worden gemaakt.')
@@ -328,8 +351,10 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
       if (includeExtras) {
         const { readSavedExtrasForPlan } = await import('../comparison/ownExtraGroceriesStorage.ts')
         const saved = readSavedExtrasForPlan(reviewed.planKey)
-        if (!saved.available || !saved.items.length)
-          throw Error('Bewaar je eigen extra boodschappen in de Lijst-tab voordat je ze print.')
+        if (!saved.available)
+          throw Error('De eigen extra boodschappen konden niet worden gelezen.')
+        if (!saved.items.length && !ownNotes.length)
+          throw Error('Voeg eerst ongeprijsde artikelen aan je lijst toe.')
         extras = saved.items
       }
       if (!currentCaptureAvailable()) throw Error('Verlopen bron')
@@ -337,6 +362,7 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
         basket, observedAt: capture.observedAt,
         done: new Set(basket.lines.filter(line => checked[tick(line)]).map(line => line.id)),
         extras,
+        manualNotes: includeExtras ? manualNotes : undefined,
       })
       if (!currentCaptureAvailable()) throw Error('Verlopen bron tijdens afdruk.')
       const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }))
@@ -432,6 +458,12 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
         </p>}
         {unpricedExtras === null && <p role="status">De opgeslagen extra boodschappen
           zijn niet leesbaar; je uiteindelijke totale budgetruimte is onbekend.</p>}
+        {ownNotes.length > 0 && <p role="status">
+          Voor {store}: {ownNotes.length} handmatig toegevoegde ongeprijsde
+          {ownNotes.length === 1 ? ' boodschap' : ' boodschappen'}, waarvan {ownOpenCount} open.
+          De echte totale uitgaven en budgetruimte blijven <strong>onbekend</strong>.
+          De winkelmandbedragen tonen uitsluitend jouw bevestigde fysieke Planner-artikelen.
+        </p>}
         <small>Alleen hele verpakkingen in eigen bronopname. Geen actuele kassagarantie.</small>
       </div>
       {comparison?.claimable && comparison.deltaCents !== null &&
@@ -440,7 +472,9 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
             : (comparison.deltaCents > 0 ? 'PLUS' : 'DekaMarkt') + ' is ' +
               exactEuro.formatCents(Math.abs(comparison.deltaCents)) +
               ' goedkoper volgens jouw twee lokale, binnen 24 uur waargenomen bronnen.'}
-          <small>Geen onafhankelijk gecontroleerde besparing.</small>
+          <small>Geen onafhankelijk gecontroleerde besparing.
+            {manualNotes.length > 0 ? ' Je handmatig toegevoegde ongeprijsde boodschappen tellen niet mee in dit prijsverschil.' : ''}
+          </small>
         </p>}
       {comparison?.claimable && plus && deka && <div
         className="private-source-shopping__store-switch" aria-label="Vergelijk hele winkelmandjes">
@@ -487,6 +521,7 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
               plannerPlan={plan} plannerRecipes={recipes} plannerActiveDays={activeDays}
               privatePlanKey={reviewed.planKey}
               isSingleCheckedOnRoute={isSingleCheckedOnRoute}
+              manualNotes={manualNotes} onToggleManualNote={onToggleManualNote}
               routeChoice={routeChoice?.planKey === reviewed.planKey ? routeChoice : null}
               routeCostIntent={routeCostIntent?.planKey === reviewed.planKey &&
                 routeCostIntent.observedAt.PLUS === plus.observedAt &&
@@ -524,16 +559,21 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
           Deel of kopieer mijn actuele {store}-winkelmandje
         </button>
         <button type="button" onClick={downloadList}>Download eigen boodschappenlijst (TXT)</button>
+        {ownNotes.length > 0 && <p className="disclaimer" role="status">
+          Deze TXT- en deeltekst bevat {visibleOwnNotes.length} eigen ongeprijsde {visibleOwnNotes.length === 1 ? 'boodschap' : 'boodschappen'}
+          voor {store}{remainingOnly ? ' die nog niet zijn afgevinkt' : ''}.
+          Ze tellen niet mee voor winkelbedragen, besparingen of CSV-/HTML-bronrapporten.
+        </p>}
         <button type="button" onClick={() => { void downloadStoreWithExtras() }}>
-          Download winkelmand + mijn bewaarde extra boodschappen (TXT)
+          Download winkelmand + al mijn ongeprijsde boodschappen (TXT)
         </button>
         <button type="button" onClick={() => { void downloadCsv(false) }}>Download volledig mandje met SKU’s (CSV)</button>
         <button type="button" onClick={() => { void downloadCsv(true) }}>
-          Download dit winkelmandje + ongeprijsde extras (CSV)
+          Download winkelmand + mijn ongeprijsde boodschappen (CSV)
         </button>
         <button type="button" onClick={() => { void downloadPrintable(false) }}>Print volledig eigen mandje (HTML)</button>
         <button type="button" onClick={() => { void downloadPrintable(true) }}>
-          Print dit winkelmandje én mijn extra boodschappen (HTML)
+          Print winkelmand én mijn ongeprijsde boodschappen (HTML)
         </button>
         <button type="button" onClick={() => { void saveProgress() }}>Bewaar vinkjes (JSON)</button>
         <button type="button" onClick={() => progressInputRef.current?.click()}>Herstel vinkjes</button>
@@ -564,8 +604,28 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
             <strong>{line.status === 'matched' ? exactEuro.formatCents(line.lineTotalCents) : 'Onbekend'}</strong>
           </label>
         ))}
-        {visibleLines.length === 0 && <p>Alles voor {store} is afgevinkt.</p>}
+        {visibleLines.length === 0 && <p>Alle getoonde geprijsde winkelregels zijn afgevinkt.</p>}
       </div>
+      {ownNotes.length > 0 && <section className="private-source-shopping__unpriced"
+        aria-label={'Mijn eigen ongeprijsde boodschappen bij ' + store}>
+        <h3>Mijn andere boodschappen · prijs onbekend</h3>
+        <p>Eigen {store}- en algemene boodschappen. De vinkjes zijn gedeeld met je
+          gewone Lijst. Een vinkje bevestigt geen prijs, productmatch of betaling.</p>
+        <p role="status">{ownOpenCount} van {ownNotes.length} nog open.</p>
+        <div className="private-source-shopping__items">
+          {visibleOwnNotes.map(note => <label className="private-source-shopping__item"
+            key={note.id}>
+            <input type="checkbox" checked={note.done} disabled={!onToggleManualNote}
+              onChange={() => onToggleManualNote?.(note)}
+              aria-label={'Eigen ongeprijsde boodschap afvinken: ' + note.label} />
+            <span><strong>{note.label}</strong>
+              <small>{note.store} · zelf toegevoegd · geen SKU, bronmoment of prijs</small>
+            </span>
+            <strong>Onbekend</strong>
+          </label>)}
+          {visibleOwnNotes.length === 0 && <p>Alle eigen artikelen hier zijn afgevinkt.</p>}
+        </div>
+      </section>}
       <details>
         <summary>{remainingOnly ? 'Kopieer alleen nog te kopen artikelen' :
           'Kopieer het volledige eigen winkelmandje'}</summary>
@@ -576,10 +636,11 @@ export function PrivateSourceShoppingList({ reviewed, budget, preferred, onChoos
           }}
           aria-label="Kopieerbare eigen boodschappenlijst" />
       </details>
-      <p className="disclaimer">De gezamenlijke TXT-export bevat uitsluitend de
-        extra boodschappen die je apart hebt bewaard in dit browsertabblad. Niet bewaarde
-        wijzigingen zijn geen onderdeel van die export. Extras blijven ongeprijsd en
-        worden niet bij de gecontroleerde mandbedragen opgeteld.</p>
+      <p className="disclaimer">Je zelf ingevoerde handmatige artikelen verschijnen direct
+        in de TXT- en deeltekst voor de geselecteerde winkel, ook zonder een winkelprijs.
+        Voor afzonderlijke extra artikelen met een hoeveelheid geldt dat ze eerst expliciet
+        in dit browsertabblad bewaard moeten zijn voor de gecombineerde export.
+        Geen van deze ongeprijsde artikelen telt mee in mandbedragen of besparingen.</p>
       <p className="disclaimer">Het TXT-bestand en de kopieerbare lijst volgen de optie
         'Alleen nog te kopen'. CSV en printbare HTML bevatten bewust het volledige
         persoonlijk gecontroleerde mandje, met alle vinkjes en bronbedragen.</p>

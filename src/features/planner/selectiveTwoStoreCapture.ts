@@ -1,5 +1,6 @@
 import { makeBlankPlannerCaptureCsv, type CaptureStore } from '../comparison/plannerPriceCaptureSheet.ts'
-import type { PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
+import { readablePlannerDemandAmount, type PlannerCaptureGuideNeed } from '../comparison/plannerPriceCaptureGuide.ts'
+import { captureWorksheetText } from '../comparison/captureWorksheetText.ts'
 
 export type MissingStoreNeeds = Readonly<Record<CaptureStore, readonly PlannerCaptureGuideNeed[]>>
 const shops: readonly CaptureStore[] = ['PLUS', 'DekaMarkt']
@@ -61,8 +62,7 @@ export function selectiveTwoStoreCaptureGuide(needs: MissingStoreNeeds): string 
   validate(needs)
   // Source workbook is the authoritative row-numbering contract.
   selectiveTwoStoreCaptureCsv(needs)
-  const clean = (value: string) => value
-    .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').trim().slice(0, 160)
+  const clean = (value: string) => captureWorksheetText(value, 160)
   let row = 2
   const output = [
     'SUPA · alleen ontbrekende PLUS en DekaMarkt bronproducten',
@@ -70,14 +70,19 @@ export function selectiveTwoStoreCaptureGuide(needs: MissingStoreNeeds): string 
     'Alleen echt geobserveerde originele SKU, naam, verpakking, prijs in eurocenten,',
     'beschikbaarheid en bronmoment (ISO met UTC-offset) mogen in het CSV-blad.',
     'Niet gevonden blijft leeg. De voorgestelde ingrediënteenheid is GEEN bewezen verpakking.',
+    'Gebruik altijd het echte oorspronkelijke bronmoment van de nieuwe waarneming.',
+    'Alleen echt gelijktijdig waargenomen SKU’s mogen bij één eerder bronmoment worden gevoegd.',
+    'Later geobserveerde producten vereisen een complete nieuwe winkelopname.',
+    'Kopieer nooit een oud bronmoment naar nieuwe winkelprijzen.',
     '',
   ]
   for (const store of shops) {
     output.push(store + ' · ' + needs[store].length + ' ontbrekende bronproducten')
     if (!needs[store].length) output.push('Niets opnieuw opnemen voor deze winkel.')
     for (const item of needs[store]) {
-      const amount = item.amount === null ? 'hoeveelheid onbekend'
-        : String(item.amount) + ' ' + clean(item.unit)
+      const physical = readablePlannerDemandAmount(item.amount)
+      const amount = physical === 'hoeveelheid nog controleren'
+        ? physical : physical + ' ' + clean(item.unit)
       output.push('CSV rij ' + row++ + ' · ' + clean(item.label) +
         ' · Planner-behoefte ' + amount)
     }

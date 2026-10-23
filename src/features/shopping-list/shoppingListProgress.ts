@@ -113,8 +113,8 @@ function projectBasketLine(value: unknown): Record<string, unknown> | null {
     !isPositiveFiniteNumber(packAmount) ||
     !isMatchUnit(packUnit) ||
     !isPositiveSafeInteger(packCount) ||
-    !isNonNegativeSafeInteger(pricePerPackCents) ||
-    !isNonNegativeSafeInteger(lineTotalCents)
+    !isPositiveSafeInteger(pricePerPackCents) ||
+    !isPositiveSafeInteger(lineTotalCents)
   ) return null
 
   // A checked identity must reflect a coherent physical price snapshot.
@@ -195,7 +195,7 @@ function projectShoppingListBasketState(basket: unknown): ShoppingListBasketStat
       continue
     }
     if (line.status !== 'matched' ||
-        !isNonNegativeSafeInteger(line.lineTotalCents)) return null
+        !isPositiveSafeInteger(line.lineTotalCents)) return null
     actualMatched++
     actualCents += line.lineTotalCents
     if (!Number.isSafeInteger(actualCents)) return null

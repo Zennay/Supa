@@ -1,5 +1,5 @@
 import { literalCsv } from '../../privateBasketComparisonCsv.ts'
-import type { OwnRecipeChecklist } from './recipeShoppingChecklist.ts'
+import { readableRecipeShoppingAmount, type OwnRecipeChecklist } from './recipeShoppingChecklist.ts'
 
 /** User-owned, unpriced checklist. Never emit a synthetic product or retail price. */
 export function exportOwnRecipeChecklistCsv(
@@ -17,7 +17,7 @@ export function exportOwnRecipeChecklistCsv(
       String(checklist.recipeCount ?? checklist.portions),
       line.original,
       line.label,
-      line.needsReview || line.amount === null ? '' : String(line.amount),
+      line.needsReview || line.amount === null ? '' : readableRecipeShoppingAmount(line.amount),
       line.needsReview ? '' : line.unit === 'piece' ? 'stuks' : line.unit ?? '',
       line.needsReview ? 'Handmatig beoordelen' : 'Metrisch gecontroleerd',
       checked[line.key] === true ? 'ja' : 'nee',

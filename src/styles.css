@@ -555,3 +555,7 @@ h3, p { margin: 0; }
   padding:.25rem 0;color:#284a37}
 .supa-product-archive>p{line-height:1.5;color:#4e5f53}
 .supa-product-archive[open] .hifi-home{margin-top:1rem}
+
+.supa-product-archive--visible{background:#f3f4f6;border-color:#dce1e3}
+.supa-product-archive--visible h2{margin:0 0 .4rem;font-size:1.1rem}
+.supa-product-archive--visible .hifi-home{margin-top:1rem}

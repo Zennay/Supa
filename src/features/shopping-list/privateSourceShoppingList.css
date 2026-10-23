@@ -42,3 +42,7 @@ border-radius:12px;padding:1rem;background:#f3f8f3;min-width:0}
 .private-source-shopping__store-switch span{font-weight:700;font-size:1.18rem}
 .private-source-shopping__store-switch button:disabled{opacity:.7}
 @media(max-width:600px){.private-source-shopping__store-switch{grid-template-columns:1fr}}
+
+.private-source-shopping__unpriced {display:grid;gap:.7rem;padding:1rem;border:1px dashed #879d8b;border-radius:14px;background:#fbfdfb}
+.private-source-shopping__unpriced h3,.private-source-shopping__unpriced p {margin:0}
+.private-source-shopping__unpriced .private-source-shopping__item {background:#fff}

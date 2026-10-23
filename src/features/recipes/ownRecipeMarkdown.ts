@@ -1,6 +1,7 @@
 import type { SavedRecipe } from './recipeLibrary.ts'
+import { safeRecipeSourceUrl } from '../../domain/recipeSourceUrl.ts'
 
-/** Portable private recipe notes, deliberately without store totals or URL queries.
+/** Portable private recipe notes, deliberately without store totals or URL secrets.
  * The existing local plain-text importer remains the admission/review boundary.
  * A Markdown export is not itself a priced or approved Planner recipe. */
 export function ownRecipeAsMarkdown(recipe: SavedRecipe): string {
@@ -18,11 +19,16 @@ export function ownRecipeAsMarkdown(recipe: SavedRecipe): string {
       recipe.ingredients.some(item => item.reviewReason)) {
     throw new Error('Dit recept heeft openstaande bron- of hoeveelheidscontroles. Gebruik de volledige JSON-back-up om de waarschuwingen te behouden.')
   }
-  // Plain Markdown cannot represent the original public attribution or exact
-  // source-link identity. For sourced recipes, keep the lossless JSON backup.
-  if (recipe.source === 'url' || recipe.sourceUrl !== null) {
-    throw new Error('Dit recept bevat een originele bronlink die Markdown niet kan bewaren. Gebruik de volledige JSON-back-up voor behoud van bronvermelding.')
+  // A single explicit Bron: header is part of our plain-text recipe format.
+  // Keep only the same sanitized public attribution used by recipe storage.
+  if (!['manual', 'url'].includes(recipe.source) ||
+      (recipe.source === 'url' && !recipe.sourceUrl) ||
+      (recipe.source === 'manual' && recipe.sourceUrl !== null)) {
+    throw new Error('De bronvermelding van dit recept is ongeldig. Gebruik de volledige JSON-back-up.')
   }
+  const sourceUrl = recipe.source === 'url'
+    ? safeRecipeSourceUrl(recipe.sourceUrl ?? '')
+    : null
   // Newlines and invisible controls inside an imported field could otherwise
   // create new Markdown sections and an apparent extra physical ingredient.
   const line = (value: string) => {
@@ -38,6 +44,7 @@ export function ownRecipeAsMarkdown(recipe: SavedRecipe): string {
       ? ['Porties: ' + recipe.servings] : []),
     ...(recipe.minutes !== null && Number.isSafeInteger(recipe.minutes) && recipe.minutes > 0
       ? ['Tijd: ' + recipe.minutes + ' minuten'] : []),
+    ...(sourceUrl ? ['Bron: ' + line(sourceUrl)] : []),
     '', '## Ingrediënten',
     ...recipe.ingredients.map(item => '- ' + line(item.original)),
     '', '## Bereiding',

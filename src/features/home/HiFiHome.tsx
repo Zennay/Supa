@@ -9,8 +9,12 @@ const RecipeLibrary = lazy(async () => {
   return { default: module.RecipeLibrary }
 })
 import { curatedFigmaRecipes } from '../recipes/curatedFigmaRecipes'
-import { historicalRetailerProducts, filterHistoricalProducts } from '../products/historicalRetailerProducts'
+import { historicalRetailerProducts, filterHistoricalProducts, historicalPackageEquivalent, type HistoricalPackFilter } from '../products/historicalRetailerProducts'
 import { filterDemoProductsByUnit, orderDemoProductsByUnitPrice, type DemoUnitFilter } from '../products/productUnitPrice'
+import { normalizeProductSearchValue } from '../products/productSearchText'
+import { encodePrivateShoppingList, parsePrivateShoppingList, type PortableShoppingItem } from './privateShoppingListPortable'
+import { readUnpricedShoppingDetails, saveUnpricedShoppingDetails, unpricedShoppingDetailsKey, type ShoppingPick } from './unpricedShoppingDetails'
+import { readUnpricedShoppingProgress, saveUnpricedShoppingProgress, unpricedShoppingProgressKey } from './unpricedShoppingProgress'
 
 export type HiFiTab = 'home' | 'recipes' | 'products'
 export const designProducts = [
@@ -36,12 +40,37 @@ const designRecipes = curatedFigmaRecipes.filter(recipe =>
   image: recipe.id === 'supa-fried-rice' ? a.imgRecepten :
     recipe.id === 'supa-bao' ? a.imgRecepten1 : a.imgRecepten2,
 }))
+const discoveryFavoritesKey = 'supa:hifi-favorites:v1'
+const discoveryFavoriteIds = new Set([...designProducts.map(p => p.id), ...historicalRetailerProducts.map(p => p.id), ...designRecipes.map(r => r.id)])
+// Portable Producten selections contain catalog identities only, never money or SKU matches.
+const portableProductIds = new Set([...designProducts.map(p => p.id), ...historicalRetailerProducts.map(p => p.id)])
+type DiscoveryFavoritesSnapshot = { ids: string[]; raw: string | null; writable: boolean }
+function readDiscoveryFavorites(): DiscoveryFavoritesSnapshot {
+  if (typeof window === 'undefined') return { ids: [], raw: null, writable: false }
+  try {
+    const raw = window.localStorage.getItem(discoveryFavoritesKey)
+    if (raw === null) return { ids: [], raw: null, writable: true }
+    const value: unknown = JSON.parse(raw)
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return { ids: [], raw, writable: false }
+    const record = value as Record<string, unknown>, ids = record.ids
+    if (record.schemaVersion !== 1 || Object.keys(record).some(key => key !== 'schemaVersion' && key !== 'ids') ||
+        !Array.isArray(ids) || ids.length > 100 || !ids.every(id => typeof id === 'string' && id.length > 0 && id.length <= 100) ||
+        new Set(ids).size !== ids.length) return { ids: [], raw, writable: false }
+    return { ids: ids.filter((id): id is string => discoveryFavoriteIds.has(id)), raw, writable: true }
+  } catch { return { ids: [], raw: null, writable: false } }
+}
+
 
 type Props = {
   view: HiFiTab
   onNavigate: (view: HiFiTab | 'planner' | 'list' | 'basket') => void
   addedProducts: string[]
   onToggleProduct: (id: string) => void
+  onAddRecipeGroceries?: (labels: readonly string[]) => string | null
+  /** Jump to the actual own-source importer; Figma/historical cards are demo. */
+  onOpenOwnSources?: (query: string, store?: 'PLUS' | 'DekaMarkt') => void
+  /** Jump to the authorized private source importer instead of the demo basket. */
+  onOpenOwnPriceImport?: () => void
   activeDays?: readonly string[]
 }
 
@@ -50,34 +79,188 @@ export function HiFiHome(props: Props) {
     <section className="hifi-home" role="status" aria-live="polite">
       <p>Je recepten worden geopend…</p>
     </section>
-  }><RecipeLibrary onBack={() => props.onNavigate('home')} /></Suspense>
+  }><RecipeLibrary onBack={() => props.onNavigate('home')}
+    onAddRecipeGroceries={props.onAddRecipeGroceries} /></Suspense>
   return <HiFiDiscovery {...props} />
 }
 
-function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activeDays = [] }: Props) {
+function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct,
+  onOpenOwnSources, onOpenOwnPriceImport, activeDays = [] }: Props) {
   const [query, setQuery] = useState('')
-  const [favorites, setFavorites] = useState<string[]>([])
+  const [portableText, setPortableText] = useState('')
+  const [portablePreview, setPortablePreview] = useState<string[] | null>(null)
+  const [portableMessage, setPortableMessage] = useState('')
+  const [initialFavorites] = useState(readDiscoveryFavorites)
+  const [favorites, setFavorites] = useState<string[]>(initialFavorites.ids)
+  const [favoritesRaw, setFavoritesRaw] = useState(initialFavorites.raw)
+  const [favoritesWritable, setFavoritesWritable] = useState(initialFavorites.writable)
+  useEffect(() => {
+    const syncFavorites = (event: StorageEvent) => {
+      if (event.key !== null && event.key !== discoveryFavoritesKey) return
+      const snapshot = readDiscoveryFavorites()
+      setFavorites(snapshot.ids)
+      setFavoritesRaw(snapshot.raw)
+      setFavoritesWritable(snapshot.writable)
+      if (!snapshot.writable) setMessage('Favorieten zijn elders gewijzigd met gegevens die deze versie niet kan opslaan; de bestaande opslag blijft behouden.')
+    }
+    window.addEventListener('storage', syncFavorites)
+    return () => window.removeEventListener('storage', syncFavorites)
+  }, [])
   const [filterOpen, setFilterOpen] = useState(false)
   const [favoritesOnly, setFavoritesOnly] = useState(false)
+  const [selectedOnly, setSelectedOnly] = useState(false)
   const [selectedRecipe, setSelectedRecipe] = useState<typeof designRecipes[number] | null>(null)
   const [message, setMessage] = useState('')
   const [sortByPrice, setSortByPrice] = useState(false)
   const [unitFilter, setUnitFilter] = useState<DemoUnitFilter>('all')
-  const [productSource, setProductSource] = useState<'history' | 'figma'>('figma')
+  const [productSource, setProductSource] = useState<'history' | 'figma'>('history')
+  const [expandedFigmaExamples, setExpandedFigmaExamples] = useState(false)
   const [storeFilter, setStoreFilter] = useState<'all' | 'PLUS' | 'DekaMarkt'>('all')
+  const [historicalPackFilter, setHistoricalPackFilter] = useState<HistoricalPackFilter>('all')
   const dialog = useRef<HTMLDialogElement>(null)
-  useEffect(() => { setQuery('') }, [view])
-  const matches = (item: { id: string; name: string }) =>
-    item.name.toLocaleLowerCase('nl').includes(query.trim().toLocaleLowerCase('nl')) &&
-    (!favoritesOnly || favorites.includes(item.id))
-  const recipes = designRecipes.filter(recipe => recipe.title.toLocaleLowerCase('nl').includes(query.trim().toLocaleLowerCase('nl')) && (!favoritesOnly || favorites.includes(recipe.id)))
-  const matchingProducts = filterDemoProductsByUnit(designProducts.filter(product => (view === 'products' ? product.id !== 'bananas' : !product.id.startsWith('figma-')) && matches(product)), unitFilter)
-  const products = sortByPrice ? orderDemoProductsByUnitPrice(matchingProducts) :
-    view === 'products' ? [...matchingProducts].sort((left, right) =>
+  useEffect(() => {
+    setQuery('')
+    // Recipe and product favorites have different IDs. Do not carry a
+    // recipe-only favorites filter into Products when the tab changes.
+    if (view === 'products') {
+      setFavoritesOnly(false)
+      setSelectedOnly(false)
+      setUnitFilter('all')
+      setStoreFilter('all')
+      setHistoricalPackFilter('all')
+      setSortByPrice(false)
+    }
+  }, [view])
+  // Search-only aliases are shared with the private source catalog; source
+  // labels, product identity and financial values remain byte-for-byte intact.
+  const normalizeCatalogSearch = normalizeProductSearchValue
+  // Each word is a separate constraint, allowing product + retailer + pack
+  // terms to match across fields without inventing a combined product identity.
+  const queryTerms = normalizeCatalogSearch(query.trim()).split(/\s+/u).filter(Boolean)
+  const includesQuery = (values: readonly (string | null | undefined)[]) =>
+    queryTerms.every(term => values.some(value => typeof value === 'string' &&
+      normalizeCatalogSearch(value).includes(term)))
+  const recipes = designRecipes.filter(recipe =>
+    includesQuery([recipe.title]) && (!favoritesOnly || favorites.includes(recipe.id)))
+  const matchingProducts = filterDemoProductsByUnit(designProducts.filter(product =>
+    (view === 'products' ? product.id !== 'bananas' : !product.id.startsWith('figma-')) &&
+    includesQuery([product.name, product.store, product.unit, product.unitPrice, product.old, product.price, product.id]) &&
+    (!favoritesOnly || favorites.includes(product.id)) &&
+    (!selectedOnly || addedProducts.includes(product.id))), unitFilter)
+  // The four prominent Figma cards are the browsing preview, not the entire
+  // design asset collection. Extra examples remain searchable and can be
+  // expanded explicitly; neither view supplies real retailer prices.
+  const featuredFigmaIds = new Set(['cola-regular', 'cola-zero', 'cola-pack', 'figma-paprika'])
+  // A selected item can come from any Figma example, not just the four
+  // initially featured cards. "Only my selection" must never hide it.
+  const visibleFigmaMatches = expandedFigmaExamples || queryTerms.length > 0 || favoritesOnly || selectedOnly
+    ? matchingProducts
+    : matchingProducts.filter(product => featuredFigmaIds.has(product.id))
+  const products = sortByPrice ? orderDemoProductsByUnitPrice(visibleFigmaMatches) :
+    view === 'products' ? [...visibleFigmaMatches].sort((left, right) =>
       ['cola-regular', 'cola-zero', 'figma-paprika', 'figma-watermelon', 'figma-cola-classic', 'figma-arla-milk', 'figma-heineken', 'figma-pastry', 'figma-muffins', 'figma-peanut-butter', 'figma-fruit', 'figma-ginger', 'cola-pack'].indexOf(left.id) -
-      ['cola-regular', 'cola-zero', 'figma-paprika', 'figma-watermelon', 'figma-cola-classic', 'figma-arla-milk', 'figma-heineken', 'figma-pastry', 'figma-muffins', 'figma-peanut-butter', 'figma-fruit', 'figma-ginger', 'cola-pack'].indexOf(right.id)) : matchingProducts
-  const historical = filterHistoricalProducts(historicalRetailerProducts, query, storeFilter).filter(item => !favoritesOnly || favorites.includes(item.id))
-  const toggleFavorite = (id: string) => setFavorites(current => current.includes(id) ? current.filter(x => x !== id) : [...current, id])
+      ['cola-regular', 'cola-zero', 'figma-paprika', 'figma-watermelon', 'figma-cola-classic', 'figma-arla-milk', 'figma-heineken', 'figma-pastry', 'figma-muffins', 'figma-peanut-butter', 'figma-fruit', 'figma-ginger', 'cola-pack'].indexOf(right.id)) : visibleFigmaMatches
+  const historical = filterHistoricalProducts(historicalRetailerProducts, '', storeFilter, historicalPackFilter).filter(item =>
+    includesQuery([item.name, item.pack, item.store, item.capturedAt, item.sourceUrl, item.id]) &&
+    (!favoritesOnly || favorites.includes(item.id)) &&
+    (!selectedOnly || addedProducts.includes(item.id)))
+  const visibleProductIds = (productSource === 'history' ? historical : products).map(item => item.id)
+  const notYetSelected = visibleProductIds.filter(id => !addedProducts.includes(id))
+  const freeSlots = Math.max(0, 100 - addedProducts.length)
+  const toAdd = notYetSelected.slice(0, freeSlots)
+  const addVisibleToUnpricedList = () => {
+    if (toAdd.length === 0) return
+    for (const id of toAdd) onToggleProduct(id)
+    setMessage(`${toAdd.length} van ${notYetSelected.length} zichtbare producten aan je ongeprijsde lijst toegevoegd. ${toAdd.length < notYetSelected.length ? 'De lijst bevat maximaal 100 items. ' : ''}Er zijn geen winkelprijzen of matches gemaakt.`)
+  }
+  const downloadPortableSelection = () => {
+    const ids = [...new Set(addedProducts.filter(id => portableProductIds.has(id)))]
+    if (typeof document === 'undefined') return
+    const backup = JSON.stringify({ kind: 'supa-unpriced-product-selection', schemaVersion: 1, ids }, null, 2)
+    const url = URL.createObjectURL(new Blob([backup], { type: 'application/json;charset=utf-8' }))
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = 'supa-productselectie-ongeprijsd.json'
+    document.body.appendChild(anchor)
+    try { anchor.click() } finally {
+      anchor.remove()
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    }
+    setPortableMessage(`${ids.length} bekende productidentiteiten lokaal geëxporteerd, zonder prijzen. ${addedProducts.length - ids.length} oude/onbekende ID's blijven alleen op dit apparaat behouden.`)
+  }
+  const previewPortableSelection = () => {
+    setPortablePreview(null)
+    if (portableText.length > 16_384) { setPortableMessage('Bestand te groot (maximaal 16 kB).'); return }
+    try {
+      const parsed: unknown = JSON.parse(portableText)
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw Error('Ongeldig selectiebestand.')
+      const record = parsed as Record<string, unknown>, ids = record.ids
+      if (Object.keys(record).sort().join('|') !== 'ids|kind|schemaVersion' ||
+          record.kind !== 'supa-unpriced-product-selection' || record.schemaVersion !== 1 ||
+          !Array.isArray(ids) || ids.length > 100 ||
+          !ids.every(id => typeof id === 'string' && portableProductIds.has(id)) ||
+          new Set(ids).size !== ids.length) {
+        throw Error('Alleen een origineel identiteitsbestand van deze catalogusversie is toegestaan; retailerprijzen en onbekende velden worden geweigerd.')
+      }
+      setPortablePreview(ids as string[])
+      setPortableMessage(`${ids.length} identiteiten veilig gelezen. Controleer hieronder wat aan jouw bestaande lijst wordt toegevoegd; winkelprijzen blijven onbekend.`)
+    } catch (error) {
+      setPortableMessage(error instanceof Error ? error.message : 'Selectiebestand kon niet worden gelezen.')
+    }
+  }
+  const pendingPortableIds = portablePreview?.filter(id => !addedProducts.includes(id)) ?? []
+  const permittedPortableIds = pendingPortableIds.slice(0, Math.max(0, 100 - addedProducts.length))
+  const importPortableSelection = () => {
+    if (portablePreview === null || permittedPortableIds.length === 0) return
+    for (const id of permittedPortableIds) onToggleProduct(id)
+    setPortableMessage(`${permittedPortableIds.length} bestaande identiteiten toegevoegd als ongeprijsde selectie; ${pendingPortableIds.length - permittedPortableIds.length} passen niet binnen de limiet. Geen winkelprijs of SKU-match overgenomen.`)
+    setPortablePreview(null)
+    setPortableText('')
+  }
+  const toggleFavorite = (id: string) => {
+    if (!discoveryFavoriteIds.has(id)) return
+    const next = favorites.includes(id) ? favorites.filter(item => item !== id) : [...favorites, id]
+    if (typeof window === 'undefined' || !favoritesWritable) {
+      setFavorites(next)
+      setMessage('Favoriet alleen voor deze sessie gewijzigd; bestaande opgeslagen gegevens zijn beschermd.')
+      return
+    }
+    try {
+      if (window.localStorage.getItem(discoveryFavoritesKey) !== favoritesRaw) {
+        setFavoritesWritable(false)
+        setMessage('Favorieten zijn elders gewijzigd. De opgeslagen versie is niet overschreven; laad de pagina om die op te halen.')
+        return
+      }
+      const raw = JSON.stringify({ schemaVersion: 1, ids: next })
+      window.localStorage.setItem(discoveryFavoritesKey, raw)
+      setFavoritesRaw(raw)
+      setFavorites(next)
+    } catch {
+      setFavorites(next)
+      setFavoritesWritable(false)
+      setMessage('Favoriet alleen voor deze sessie gewijzigd; browseropslag is niet beschikbaar.')
+    }
+  }
+  const switchProductSource = (source: 'history' | 'figma') => {
+    setProductSource(source)
+    // Keep the user's search intent while resetting filters that only make
+    // sense for the source being left (retailer, unit price and favorites).
+    setFavoritesOnly(false)
+    setSelectedOnly(false)
+    setUnitFilter('all')
+    setStoreFilter('all')
+    setHistoricalPackFilter('all')
+    setSortByPrice(false)
+  }
+  const clearSearchAndFilters = () => {
+    setQuery('')
+    setFavoritesOnly(false)
+    setSelectedOnly(false)
+    setUnitFilter('all')
+    setStoreFilter('all')
+    setHistoricalPackFilter('all')
+    setSortByPrice(false)
+  }
   const changeView = (next: HiFiTab) => { setQuery(''); setUnitFilter('all'); setSortByPrice(false); onNavigate(next) }
 
 
@@ -92,21 +275,24 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
         <div className="hifi-days">{upcomingHomeWeek().map(({ label, date, plannerDay, fullName, month, year }) => <button key={`${year}-${month}-${date}`} onClick={() => onNavigate('planner')} aria-label={`Open weekplanning voor ${fullName} ${date}`}><span className={activeDays.includes(plannerDay) ? 'hifi-today' : ''}>{label}</span><span>{date}</span></button>)}</div>
         <button className="hifi-plan-button" onClick={() => onNavigate('planner')}><FigmaImage asset={a.imgVector} alt="" />Plan en bespaar</button>
       </section>
-    </> : <header className="hifi-products-heading" data-figma-node="3064:3128"><h1 className="hifi-page-title">Producten</h1><button type="button" className="hifi-go-to-list" onClick={() => onNavigate('list')} aria-label={`Bekijk mijn lijst met ${addedProducts.length} gekozen producten`}>Mijn lijst <span aria-hidden="true">({addedProducts.length})</span> →</button><button className="hifi-icon-button" aria-label="Productfilters" aria-expanded={filterOpen} aria-controls="hifi-filter-panel" onClick={() => setFilterOpen(!filterOpen)}><FigmaImage asset={a.productsFilter} alt="" /></button></header>}
+    </> : <header className="hifi-products-heading" data-figma-node="3064:3128"><h1 className="hifi-page-title">Producten</h1><button type="button" className="hifi-go-to-list" onClick={() => onNavigate('list')} aria-label={`Bekijk mijn lijst met ${addedProducts.length} gekozen producten`}>Mijn lijst <span aria-hidden="true">({addedProducts.length})</span> →</button><button type="button" className="hifi-go-to-own" onClick={() => { if (onOpenOwnSources) onOpenOwnSources(query.trim()); else onNavigate('basket') }}>Mijn echte bronnen ↑</button><button className="hifi-icon-button" aria-label="Filters" aria-expanded={filterOpen} aria-controls="hifi-filter-panel" onClick={() => setFilterOpen(!filterOpen)}><FigmaImage asset={a.productsFilter} alt="" /></button></header>}
 
     <div className="hifi-search-row" data-figma-node={view === 'products' ? '3068:4921' : undefined}>
-      <label className="hifi-search"><FigmaImage asset={view === "products" ? a.productsSearch : a.imgVector1} alt="" /><input type="search" aria-label="Zoek gerechten of producten" placeholder={view === 'products' ? 'Coca Cola' : 'Zoek gerechten of producten'} value={query} onChange={e => setQuery(e.target.value)} /></label>
+      <label className="hifi-search"><FigmaImage asset={view === "products" ? a.productsSearch : a.imgVector1} alt="" /><input type="search" aria-label={view === 'products' ? 'Zoek producten op naam, winkel, verpakking of broncode' : 'Zoek gerechten of producten'} placeholder={view === 'products' ? 'Coca Cola' : 'Zoek gerechten of producten'} value={query} onChange={e => setQuery(e.target.value)} /></label>
       {view === 'products'
         ? <button className="hifi-weekly-link" type="button" aria-label="Ga naar de weekplanning" onClick={() => onNavigate('planner')}><FigmaImage asset={a.productsWeekly} alt="" /></button>
         : <button className="hifi-filter" aria-label="Filters" aria-expanded={filterOpen} aria-controls="hifi-filter-panel" onClick={() => setFilterOpen(!filterOpen)}><FigmaImage asset={a.imgVector2} alt="" /></button>}
     </div>
-    {filterOpen && <div id="hifi-filter-panel" className="hifi-filter-panel"><label><input type="checkbox" checked={favoritesOnly} onChange={e => setFavoritesOnly(e.target.checked)} /> Alleen favorieten</label>{view === 'products' && <div className="hifi-product-source-tabs" role="group" aria-label="Weergave van producten"><button type="button" aria-pressed={productSource === 'figma'} onClick={() => { setProductSource('figma'); setQuery(''); setStoreFilter('all') }}>Ontwerpvoorbeelden</button><button type="button" aria-pressed={productSource === 'history'} onClick={() => { setProductSource('history'); setQuery(''); setUnitFilter('all'); setSortByPrice(false) }}>Bronproducten</button></div>}{view === 'products' && productSource === 'history' && <label>Winkel <select aria-label="Filter historische producten op winkel" value={storeFilter} onChange={e => setStoreFilter(e.target.value as 'all' | 'PLUS' | 'DekaMarkt')}><option value="all">Alle winkels</option><option value="PLUS">PLUS</option><option value="DekaMarkt">DekaMarkt</option></select></label>}{view === 'products' && productSource === 'figma' && <label>Eenheid <select aria-label="Filter producten op eenheid" value={unitFilter} onChange={e => setUnitFilter(e.target.value as DemoUnitFilter)}><option value="all">Alle eenheden</option><option value="l">Per liter</option><option value="kg">Per kilogram</option></select></label>}<button onClick={() => { setQuery(''); setFavoritesOnly(false); setUnitFilter('all'); setStoreFilter('all'); setSortByPrice(false) }}>Wis filters</button></div>}
+    {filterOpen && <div id="hifi-filter-panel" className="hifi-filter-panel"><label><input type="checkbox" checked={favoritesOnly} onChange={e => setFavoritesOnly(e.target.checked)} /> Alleen favorieten</label>{view === 'products' && productSource === 'history' && <>
+      <label>Winkel <select aria-label="Filter historische producten op winkel" value={storeFilter} onChange={e => setStoreFilter(e.target.value as 'all' | 'PLUS' | 'DekaMarkt')}><option value="all">Alle winkels</option><option value="PLUS">PLUS</option><option value="DekaMarkt">DekaMarkt</option></select></label>
+      <label>Verpakking <select aria-label="Filter historische producten op verpakkingssoort" value={historicalPackFilter} onChange={e => setHistoricalPackFilter(e.target.value as HistoricalPackFilter)}><option value="all">Alle verpakkingen</option><option value="mass">Massa (g/kg)</option><option value="volume">Volume (ml/l)</option><option value="other">Overig / onbekend</option></select></label>
+    </>}{view === 'products' && productSource === 'figma' && <label>Eenheid <select aria-label="Filter producten op eenheid" value={unitFilter} onChange={e => setUnitFilter(e.target.value as DemoUnitFilter)}><option value="all">Alle eenheden</option><option value="l">Per liter</option><option value="kg">Per kilogram</option></select></label>}<button type="button" onClick={clearSearchAndFilters}>Wis filters</button></div>}
     {view === 'home' && <p className="hifi-demo-note">Recepten uit de SUPA-planner · voorbeeldproductprijzen en aanbiedingen zijn niet actueel.</p>}
     {view === 'home' && <section className="hifi-section" aria-label="Mijn eigen winkelmand vergelijken">
       <h2>Jouw recepten, jouw winkelmand</h2>
       <p className="hifi-demo-note">Gebruik de actuele Planner-ingrediënten met je eigen PLUS/DekaMarkt-bronbestand.
         De berekening is privé en geeft ontbrekende winkelprijzen eerlijk als onbekend weer.</p>
-      <button type="button" className="hifi-plan-button" onClick={() => onNavigate('basket')}>
+      <button type="button" className="hifi-plan-button" onClick={() => onOpenOwnPriceImport ? onOpenOwnPriceImport() : onNavigate('basket')}>
         Vergelijk mijn winkelmand
       </button>
     </section>}
@@ -118,41 +304,74 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
         <div className="hifi-recipe-top"><span className="hifi-saving">In je planner</span><button className="hifi-favorite" aria-label={`Favoriet: ${recipe.title}`} aria-pressed={favorites.includes(recipe.id)} onClick={() => toggleFavorite(recipe.id)}><FigmaImage asset={a.imgFilter} alt="" /></button></div>
         <div className="hifi-recipe-caption"><h3>{recipe.title}</h3><p><span><FigmaImage asset={a.imgVector4} alt="" />{recipe.minutes}</span><span>{recipe.servings} porties</span></p></div>
       </article>)}</div>
-      {recipes.length === 0 && <p className="hifi-empty">Geen gerechten gevonden. Probeer een andere zoekterm of wis je filters.</p>}
+      {recipes.length === 0 && <div className="hifi-empty-state" role="status"><p className="hifi-empty">Geen gerechten gevonden. Pas je zoekopdracht aan of wis je filters.</p><button type="button" className="hifi-empty-reset" onClick={clearSearchAndFilters}>Wis zoekopdracht en filters</button></div>}
     </section>}
-    {view === 'products' && <div className="hifi-product-source-tabs" aria-label="Productbron"><button type="button" aria-pressed={productSource === 'history'} onClick={() => { setProductSource('history'); setUnitFilter('all'); setSortByPrice(false) }}>Bronwaarnemingen</button><button type="button" aria-pressed={productSource === 'figma'} onClick={() => { setProductSource('figma'); setStoreFilter('all') }}>Figma voorbeelden</button></div>}
+    {view === 'products' && <div className="hifi-product-source-tabs" role="group" aria-label="Productbron"><button type="button" aria-pressed={productSource === 'history'} onClick={() => switchProductSource('history')}>Bronwaarnemingen</button><button type="button" aria-pressed={productSource === 'figma'} onClick={() => switchProductSource('figma')}>Figma voorbeelden</button></div>}
+    {view === 'products' && <div className="hifi-catalog-tools" role="group" aria-label="Producten kiezen voor mijn ongeprijsde lijst">
+      <p role="status" aria-live="polite">{addedProducts.length} gekozen voor mijn lijst · {visibleProductIds.length} zichtbaar uit {productSource === 'history' ? 'historisch brononderzoek' : 'Figma-voorbeelden'}</p>
+      <button type="button" aria-pressed={selectedOnly} onClick={() => setSelectedOnly(!selectedOnly)}>{selectedOnly ? 'Toon ook niet-gekozen producten' : 'Toon alleen mijn selectie'}</button>
+      <button type="button" disabled={toAdd.length === 0} onClick={addVisibleToUnpricedList}>{freeSlots === 0 ? 'Lijst vol (maximaal 100)' : `Voeg ${toAdd.length} van ${notYetSelected.length} zichtbare producten toe`}</button>
+      <button type="button" onClick={() => onNavigate('list')}>Open mijn lijst →</button>
+      <small>Deze keuzes blijven apart en ongeprijsd; geen actuele supermarktprijzen of automatische productmatches.</small>
+    </div>}
+    {view === 'products' && <details className="hifi-product-portable">
+      <summary>Mijn ongeprijsde productselectie overzetten</summary>
+      <p>Exporteer alleen gekozen catalogusidentiteiten. Geen recepten, winkelprijzen, bronrechten of geverifieerde SKU-matches. Import voegt pas na jouw bevestiging toe.</p>
+      <button type="button" onClick={downloadPortableSelection}>Download eigen selectie (.json)</button>
+      <label>Eigen JSON-selectiebestand openen
+        <input type="file" accept=".json,application/json" onChange={async event => {
+          setPortablePreview(null)
+          const input = event.currentTarget, file = input.files?.[0]
+          input.value = ''
+          if (!file) return
+          if (file.size > 16_384) { setPortableMessage('Bestand te groot (maximaal 16 kB).'); return }
+          try { setPortableText(await file.text()); setPortableMessage('Lokale tekst geladen. Kies Voorbeeld controleren vóór toevoegen.') }
+          catch { setPortableMessage('Kon het lokale bestand niet lezen.') }
+        }} />
+      </label>
+      <label>Of plak eigen JSON
+        <textarea value={portableText} maxLength={16_384} rows={4}
+          onChange={event => { setPortableText(event.target.value); setPortablePreview(null); setPortableMessage('') }}
+          placeholder='{"kind":"supa-unpriced-product-selection","schemaVersion":1,"ids":[]}' />
+      </label>
+      <button type="button" disabled={!portableText.trim()} onClick={previewPortableSelection}>Voorbeeld controleren</button>
+      {portablePreview !== null && <p role="status">{portablePreview.length} geldig · {pendingPortableIds.length} nog niet op mijn lijst · {permittedPortableIds.length} kunnen worden toegevoegd.</p>}
+      {portablePreview !== null && <button type="button" disabled={permittedPortableIds.length === 0} onClick={importPortableSelection}>Voeg {permittedPortableIds.length} ongeprijsde producten toe</button>}
+      <p role="status" aria-live="polite">{portableMessage}</p>
+    </details>}
     {view === 'products' && <section className="hifi-section" aria-label="Vergelijk met je eigen werkelijke winkelbron">
       <div className="hifi-section-heading"><h2>Vergelijk jouw eigen winkelprijzen</h2></div>
       <p className="hifi-demo-note">De historische productvoorbeelden hierboven hebben geen vrijgegeven actuele prijzen.
         Met jouw eigen rechtmatig verkregen PLUS- of DekaMarkt-opname koppelt Supa echte
         bronartikelen aan het geselecteerde weekmenu. Zonder volledige broncontrole wordt er
         geen winkelprijs of besparing verzonnen.</p>
-      <button type="button" className="hifi-plan-button" onClick={() => onNavigate('basket')}>
+      <button type="button" className="hifi-plan-button" onClick={() => onOpenOwnPriceImport ? onOpenOwnPriceImport() : onNavigate('basket')}>
         Open Vergelijk · eigen prijzen invoeren
       </button>
     </section>}
     {view === 'products' && productSource === 'history' && <section className="hifi-section" aria-label="Historisch vastgelegde supermarktproducten">
-      <div className="hifi-section-heading"><div><h2>Producten uit brononderzoek</h2><p className="recipe-count">{historical.length} producten · PLUS en DekaMarkt</p></div></div>
+      <div className="hifi-section-heading"><div><h2>Producten uit brononderzoek</h2><p className="recipe-count" role="status" aria-live="polite">{historical.length} producten · PLUS en DekaMarkt</p></div></div>
       <p className="hifi-demo-note hifi-historical-warning">Alleen historische bronwaarnemingen van 4 oktober 2026. Niet actueel, nog niet gelicentieerd voor productie. Geen prijzen, aanbiedingen, besparingen of beschikbaarheidsclaims.</p>
-      <div className="hifi-product-grid">{historical.map(item => <article className="hifi-product-card" key={item.id} data-product-source="historical"><div className="hifi-product-image"><span className="hifi-source-image" aria-hidden="true">{item.name.slice(0, 1)}</span><span className="hifi-store-logo hifi-store-text">{item.store === 'PLUS' ? 'PLUS' : 'Deka'}</span></div><div className="hifi-product-copy"><h3>{item.name}</h3><div className="hifi-product-price"><span>{item.pack}</span></div><span className="hifi-no-price">Prijs niet vrijgegeven</span><small>Bron: {item.store} · {new Date(item.capturedAt).toLocaleDateString('nl-NL')}</small></div><div className="hifi-product-actions"><button className="hifi-product-favorite" aria-label={`Favoriet: ${item.name} bij ${item.store}`} aria-pressed={favorites.includes(item.id)} onClick={() => toggleFavorite(item.id)}><FigmaImage asset={a.imgHeartButton} alt="" /></button><button type="button" className="hifi-history-add" aria-pressed={addedProducts.includes(item.id)}
+      <div className="hifi-product-grid">{historical.map(item => <article className="hifi-product-card" key={item.id} data-product-source="historical"><div className="hifi-product-image"><span className="hifi-source-image" aria-hidden="true">{item.name.slice(0, 1)}</span><span className="hifi-store-logo hifi-store-text">{item.store === 'PLUS' ? 'PLUS' : 'Deka'}</span></div><div className="hifi-product-copy"><h3>{item.name}</h3><div className="hifi-product-price"><span>{item.pack}</span></div>{historicalPackageEquivalent(item.pack) && <button type="button" className="hifi-product-pack-equivalent" aria-label={`Zoek bronwaarnemingen met verpakkingsmaat ${historicalPackageEquivalent(item.pack)} bij beide winkels; geen productmatch bevestigd`} onClick={() => { setQuery(historicalPackageEquivalent(item.pack) ?? ''); setStoreFilter('all'); setHistoricalPackFilter('all'); setFavoritesOnly(false); setSelectedOnly(false) }}>Zoek deze maat bij beide winkels: {historicalPackageEquivalent(item.pack)}</button>}<span className="hifi-no-price">Prijs niet vrijgegeven</span><small>Bron: {item.store} · {new Date(item.capturedAt).toLocaleDateString('nl-NL')}</small></div><div className="hifi-product-actions"><button className="hifi-product-favorite" aria-label={`Favoriet: ${item.name} bij ${item.store}`} aria-pressed={favorites.includes(item.id)} onClick={() => toggleFavorite(item.id)}><FigmaImage asset={a.imgHeartButton} alt="" /></button><button type="button" className="hifi-history-add" aria-pressed={addedProducts.includes(item.id)}
   aria-label={`${addedProducts.includes(item.id) ? 'Verwijder uit lijst' : 'Voeg toe aan lijst'}: ${item.name} bij ${item.store}`}
-  onClick={() => { onToggleProduct(item.id); setMessage(addedProducts.includes(item.id)
+  onClick={() => { if (!addedProducts.includes(item.id) && addedProducts.length >= 100) { setMessage('Je lijst is vol (maximaal 100 producten). Verwijder eerst een keuze via Lijst.'); return } onToggleProduct(item.id); setMessage(addedProducts.includes(item.id)
     ? `${item.name} verwijderd uit je eigen lijst.`
     : `${item.name} toegevoegd zonder prijsclaim. Open Lijst om je keuze te bekijken.`) }}>
   {addedProducts.includes(item.id) ? '✓ In lijst' : '+ Lijst'}
 </button>
-<a className="hifi-source-link" href={item.sourceUrl} target="_blank" rel="noopener noreferrer" aria-label={`Bekijk bronpagina bij ${item.store}: ${item.name}`}>Bron ↗</a></div></article>)}</div>
-      {historical.length === 0 && <p className="hifi-empty">Geen historische productwaarnemingen gevonden.</p>}
+<button type="button" className="hifi-source-match" aria-label={`Zoek ${item.name} in mijn eigen gecontroleerde winkelbron`} onClick={() => { if (onOpenOwnSources) onOpenOwnSources(item.name, item.store); else onNavigate("basket") }}>Zoek in eigen bron →</button><a className="hifi-source-link" href={item.sourceUrl} target="_blank" rel="noopener noreferrer" aria-label={`Bekijk bronpagina bij ${item.store}: ${item.name}`}>Bron ↗</a></div></article>)}</div>
+      {historical.length === 0 && <div className="hifi-empty-state" role="status"><p className="hifi-empty">Geen historische productwaarnemingen gevonden met deze zoekopdracht en filters.</p><button type="button" className="hifi-empty-reset" onClick={clearSearchAndFilters}>Wis zoekopdracht en filters</button></div>}
     </section>}
     {(view === 'home' || (view === 'products' && productSource === 'figma')) && <section className="hifi-section" aria-labelledby="hifi-products-title">
-      <div className="hifi-section-heading" data-figma-node={view === 'products' ? '3064:3181' : undefined}><div><h2 id="hifi-products-title">{view === 'products' ? query.trim() || 'Populaire producten' : 'Productvoorbeelden · demo'}</h2>{view === 'products' && <p className="recipe-count">{products.length} producten</p>}</div>{view === 'home' ? <button onClick={() => changeView('products')}>Bekijk meer <FigmaImage asset={a.imgFrame7159} alt="" /></button> : <button className="hifi-product-sort" aria-pressed={sortByPrice} aria-label="Sorteer voorbeeldproducten op laagste prijs per kg of liter" onClick={() => setSortByPrice(!sortByPrice)}>Laagste prijs per kg / l <FigmaImage asset={a.productsSort} alt="" /></button>}</div>
+      <div className="hifi-section-heading" data-figma-node={view === 'products' ? '3064:3181' : undefined}><div><h2 id="hifi-products-title">{view === 'products' ? query.trim() || 'Populaire producten' : 'Productvoorbeelden · demo'}</h2>{view === 'products' && <p className="recipe-count" role="status" aria-live="polite">{products.length} producten</p>}</div>{view === 'home' ? <button onClick={() => changeView('products')}>Bekijk meer <FigmaImage asset={a.imgFrame7159} alt="" /></button> : <button className="hifi-product-sort" aria-pressed={sortByPrice} aria-label="Sorteer voorbeeldproducten op laagste prijs per kg of liter" onClick={() => setSortByPrice(!sortByPrice)}>Laagste prijs per kg / l <FigmaImage asset={a.productsSort} alt="" /></button>}</div>
       {view === 'products' && <p className="hifi-demo-note">Figma ontwerpvoorbeelden · de getoonde prijzen en aanbiedingen zijn niet actueel.</p>}
       <div className="hifi-product-grid" data-figma-node={view === 'products' ? '3064:3342' : undefined}>{products.map(product => <article className="hifi-product-card" key={product.id}>
         <div className="hifi-product-image"><FigmaImage className="hifi-product-photo" asset={product.image} alt={product.name} />{product.logo && <span className={`hifi-store-logo ${product.crop}`}><FigmaImage asset={product.logo} alt={product.store} /></span>}{product.unitPrice && <span className="hifi-unit-price">{product.unitPrice}</span>}</div>
-        <div className="hifi-product-copy"><h3>{product.name}</h3><div className="hifi-product-price"><span>{product.unit}</span>{product.old && <del>{product.old}</del>}{product.price ? <strong>{product.price}</strong> : <small className="hifi-unpriced">Prijsvoorbeeld ontbreekt</small>}</div></div>
-        <div className="hifi-product-actions"><button className="hifi-product-favorite" aria-label={`Favoriet: ${product.name}`} aria-pressed={favorites.includes(product.id)} onClick={() => toggleFavorite(product.id)}><FigmaImage asset={a.imgHeartButton} alt="" /></button><button aria-label={`${addedProducts.includes(product.id) ? 'Verwijder' : 'Voeg toe'}: ${product.name}`} aria-pressed={addedProducts.includes(product.id)} onClick={() => { onToggleProduct(product.id); setMessage(addedProducts.includes(product.id) ? `${product.name} verwijderd uit je demolijst.` : `${product.name} toegevoegd aan je demolijst.`) }}>{addedProducts.includes(product.id) ? <span className="hifi-added">✓</span> : <FigmaImage asset={a.imgFrame7121} alt="" />}</button></div>
+        <div className="hifi-product-copy"><h3>{product.name}</h3><div className="hifi-product-price"><span>{product.unit}</span>{product.old && <del>{product.old}</del>}{product.price ? <strong>{product.price}</strong> : <small className="hifi-unpriced">Prijsvoorbeeld ontbreekt</small>}</div><small className="hifi-example-only">DEMO · prijs niet actueel of bevestigd</small></div>
+        <div className="hifi-product-actions hifi-figma-actions"><button className="hifi-product-favorite" aria-label={`Favoriet: ${product.name}`} aria-pressed={favorites.includes(product.id)} onClick={() => toggleFavorite(product.id)}><FigmaImage asset={a.imgHeartButton} alt="" /></button><button aria-label={`${addedProducts.includes(product.id) ? 'Verwijder' : 'Voeg toe'}: ${product.name}`} aria-pressed={addedProducts.includes(product.id)} onClick={() => { if (!addedProducts.includes(product.id) && addedProducts.length >= 100) { setMessage('Je lijst is vol (maximaal 100 producten). Verwijder eerst een keuze via Lijst.'); return } onToggleProduct(product.id); setMessage(addedProducts.includes(product.id) ? `${product.name} verwijderd uit je demolijst.` : `${product.name} toegevoegd aan je demolijst.`) }}>{addedProducts.includes(product.id) ? <span className="hifi-added">✓</span> : <FigmaImage asset={a.imgFrame7121} alt="" />}</button>{view === 'products' && <button type="button" className="hifi-figma-own-source" onClick={() => onOpenOwnSources?.(product.name)} aria-label={`Zoek ${product.name} als zoekterm in mijn eigen PLUS- en DekaMarkt-bronnen; de Figma-prijs wordt niet overgenomen`}>Zoek in mijn eigen winkelbronnen →</button>}</div>
       </article>)}</div>
-      {products.length === 0 && <p className="hifi-empty">Geen producten gevonden. Probeer een andere zoekterm of wis je filters.</p>}
+      {view === 'products' && productSource === 'figma' && queryTerms.length === 0 && !favoritesOnly && <button type="button" className="hifi-go-to-own" aria-expanded={expandedFigmaExamples} onClick={() => setExpandedFigmaExamples(open => !open)}>{expandedFigmaExamples ? 'Toon vier uitgelichte voorbeelden' : 'Toon alle Figma-voorbeelden'}</button>}
+      {products.length === 0 && <div className="hifi-empty-state" role="status"><p className="hifi-empty">Geen producten gevonden. Pas je zoekopdracht aan of wis je filters.</p><button type="button" className="hifi-empty-reset" onClick={clearSearchAndFilters}>Wis zoekopdracht en filters</button></div>}
     </section>}
     <p className="hifi-feedback" role="status">{message}</p>
     <dialog className="hifi-dialog" ref={dialog} onClose={() => setSelectedRecipe(null)} aria-labelledby="hifi-detail-title">
@@ -161,46 +380,413 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
   </div>
 }
 
-export function HiFiDemoList({ ids, onRemove }: { ids: string[]; onRemove: (id: string) => void }) {
-  // The standalone user-picked product collection is distinct from the meal-plan
-  // ingredient checklist and never participates in the price comparator.
+export function HiFiDemoList({ ids, onRemove, onAdd }: { ids: string[]; onRemove: (id: string) => void; onAdd?: (id: string) => void }) {
+  // This personal discovery shortlist is deliberately separate from the priced
+  // basket. Its counts, notes and checkmarks never become retailer evidence.
+  const [progress, setProgress] = useState(readUnpricedShoppingProgress)
+  const [details, setDetails] = useState(readUnpricedShoppingDetails)
+  const [progressMessage, setProgressMessage] = useState('')
+  const [detailsMessage, setDetailsMessage] = useState('')
+  const [openOnly, setOpenOnly] = useState(false)
+  const [copyMessage, setCopyMessage] = useState('')
+  const [portableShoppingText, setPortableShoppingText] = useState('')
+  const [portableShoppingPreview, setPortableShoppingPreview] =
+    useState<readonly PortableShoppingItem[] | null>(null)
+  const [portableShoppingMessage, setPortableShoppingMessage] = useState('')
+  const portableShoppingVersion = useRef(0)
+  const currentListRef = useRef(JSON.stringify(ids))
+  currentListRef.current = JSON.stringify(ids)
+
+  useEffect(() => {
+    const sync = (event: StorageEvent) => {
+      if (event.key !== null && event.key !== unpricedShoppingDetailsKey) return
+      setDetails(readUnpricedShoppingDetails())
+      setDetailsMessage('Aantallen en notities uit een andere tab bijgewerkt.')
+    }
+    window.addEventListener('storage', sync)
+    return () => window.removeEventListener('storage', sync)
+  }, [])
+  useEffect(() => {
+    const sync = (event: StorageEvent) => {
+      if (event.key !== null && event.key !== unpricedShoppingProgressKey) return
+      setProgress(readUnpricedShoppingProgress())
+      setProgressMessage('Je ongeprijsde afvinklijst is op dit apparaat bijgewerkt.')
+    }
+    window.addEventListener('storage', sync)
+    return () => window.removeEventListener('storage', sync)
+  }, [])
+
+  const pick = (id: string): ShoppingPick =>
+    details.entries.find(item => item.id === id) ?? { id, count: 1, note: '' }
+  function updatePick(id: string, changes: Partial<Pick<ShoppingPick, 'count' | 'note'>>) {
+    if (!ids.includes(id) || !details.writable) return
+    const next = { ...pick(id), ...changes }
+    if (!Number.isSafeInteger(next.count) || next.count < 1 || next.count > 99 ||
+        next.note.length > 120 || /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(next.note)) {
+      setDetailsMessage('Gebruik 1–99 aantallen en maximaal 120 gewone notitietekens.')
+      return
+    }
+    const entries = details.entries.filter(item => item.id !== id)
+    if (next.count !== 1 || next.note) entries.push(next)
+    const saved = saveUnpricedShoppingDetails(details, entries)
+    if (!saved) {
+      setDetails(readUnpricedShoppingDetails())
+      setDetailsMessage('Niet opgeslagen: een andere tab wijzigde de gegevens of browseropslag is beschermd.')
+      return
+    }
+    setDetails(saved)
+    setDetailsMessage('')
+  }
+  const completed = (id: string) => progress.doneIds.includes(id)
+  const completedCount = ids.filter(completed).length
+  function saveDone(next: readonly string[], success: string): boolean {
+    const saved = saveUnpricedShoppingProgress(progress, next)
+    if (!saved) {
+      setProgress(readUnpricedShoppingProgress())
+      setProgressMessage('Niet opgeslagen: bestaande afvinkgegevens zijn beschermd of in een andere tab gewijzigd.')
+      return false
+    }
+    setProgress(saved)
+    setProgressMessage(success)
+    return true
+  }
+  function toggleDone(id: string) {
+    if (!ids.includes(id)) return
+    const next = completed(id)
+      ? progress.doneIds.filter(value => value !== id)
+      : [...progress.doneIds, id]
+    saveDone(next, completed(id) ? 'Weer te kopen gemarkeerd.' : 'Product afgevinkt op dit apparaat.')
+  }
+  function removeAndClear(id: string) {
+    // Clear persisted state before removing an item, so re-adding it cannot
+    // resurrect an old tick or private note. On a write conflict, keep the row.
+    if (completed(id)) {
+      const next = progress.doneIds.filter(value => value !== id)
+      if (!saveDone(next, 'Afvinkstatus bijgewerkt.')) return
+    }
+    const previousPick = details.entries.find(item => item.id === id)
+    if (previousPick && details.writable) {
+      const saved = saveUnpricedShoppingDetails(details,
+        details.entries.filter(item => item.id !== id))
+      if (!saved) {
+        setDetails(readUnpricedShoppingDetails())
+        setProgressMessage('Afvinkstatus is bijgewerkt, maar notitie/aantal is elders gewijzigd. De productregel blijft staan; probeer opnieuw.')
+        setDetailsMessage('Notitie/aantal is elders gewijzigd. De productregel blijft staan; probeer opnieuw.')
+        return
+      }
+      setDetails(saved)
+    }
+    onRemove(id)
+  }
+
   const selectedHistorical = historicalRetailerProducts.filter(item => ids.includes(item.id))
   const selectedExamples = designProducts.filter(item => ids.includes(item.id))
-  if (!selectedHistorical.length && !selectedExamples.length) return null
+  const recognizedIds = new Set([...selectedHistorical.map(item => item.id), ...selectedExamples.map(item => item.id)])
+  const selectedUnknown = ids.filter(id => !recognizedIds.has(id))
+  const personalDetail = (id: string) => {
+    const item = pick(id)
+    return ' · aantal: ' + item.count + (item.note ? ' · notitie: ' + item.note : '')
+  }
+  const selectedLines = [
+    ...selectedHistorical.map(item => (completed(item.id) ? '☒ ' : '☐ ') +
+      item.name + ' · ' + item.store + ' · ' + item.pack + ' · prijs onbekend (historisch)' + personalDetail(item.id)),
+    ...selectedExamples.map(item => (completed(item.id) ? '☒ ' : '☐ ') +
+      item.name + ' · Figma-demo, geen actuele prijs' + personalDetail(item.id)),
+    ...selectedUnknown.map(id => (completed(id) ? '☒ ' : '☐ ') +
+      'Product niet beschikbaar · oude product-ID ' + id + ' · prijs onbekend' + personalDetail(id)),
+  ]
+  const openSelectionText = selectedLines.filter(line => line.startsWith('☐ ')).join('\n')
+  const selectionText = selectedLines.join('\n')
+  const visibleHistorical = openOnly ? selectedHistorical.filter(item => !completed(item.id)) : selectedHistorical
+  const visibleExamples = openOnly ? selectedExamples.filter(item => !completed(item.id)) : selectedExamples
+  const visibleUnknown = openOnly ? selectedUnknown.filter(id => !completed(id)) : selectedUnknown
+  const progressControl = (id: string, label: string) => (
+    <label className="hifi-picked-tick">
+      <input type="checkbox" checked={completed(id)} onChange={() => toggleDone(id)}
+        disabled={!progress.writable} aria-label={'Afgevinkt: ' + label} />
+      <span>{completed(id) ? 'Gekocht' : 'Nog kopen'}</span>
+    </label>
+  )
+  const detailControls = (id: string, label: string) => {
+    const item = pick(id)
+    return <div className="hifi-picked-edit" role="group" aria-label={'Aantal en notitie voor ' + label}>
+      <label>Aantal (eigen keuze)
+        <input type="number" min={1} max={99} step={1} inputMode="numeric"
+          disabled={!details.writable} aria-label={'Aantal voor ' + label}
+          value={item.count} onChange={event => {
+            const count = event.currentTarget.valueAsNumber
+            if (Number.isSafeInteger(count) && count >= 1 && count <= 99) updatePick(id, { count })
+          }} />
+      </label>
+      <label>Mijn notitie
+        <input type="text" maxLength={120} disabled={!details.writable}
+          aria-label={'Notitie voor ' + label} value={item.note}
+          placeholder="Bijvoorbeeld smaak of formaat"
+          onChange={event => updatePick(id, { note: event.currentTarget.value })} />
+      </label>
+    </div>
+  }
+  const downloadSelection = (onlyOpen = false) => {
+    const selected = onlyOpen ? openSelectionText : selectionText
+    if (typeof document === 'undefined' || !selected) return
+    const note = 'SUPA · eigen productselectie (ongeprijsd)\n' +
+      'Niet meegerekend in Planner, geverifieerde winkelmand of besparing.\n' +
+      'Gekocht = jouw eigen afvinkstatus, geen winkelbewijs.\n\n' + selected + '\n'
+    const url = URL.createObjectURL(new Blob([note], { type: 'text/plain;charset=utf-8' }))
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = onlyOpen ? 'supa-nog-te-kopen-ongeprijsd.txt' : 'supa-eigen-productselectie-ongeprijsd.txt'
+    document.body.appendChild(anchor)
+    try { anchor.click() } finally {
+      anchor.remove()
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    }
+  }
+  async function copySelection(onlyOpen = false) {
+    const selected = onlyOpen ? openSelectionText : selectionText
+    if (!selected) return
+    const idsAtStart = currentListRef.current
+    const progressAtStart = progress.raw
+    const detailsAtStart = details.raw
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Klembord niet beschikbaar')
+      await navigator.clipboard.writeText(
+        (onlyOpen ? 'SUPA · nog te kopen · ongeprijsd\n' : 'SUPA · eigen productselectie · ongeprijsd\n') +
+        selected + '\n',
+      )
+      const unchanged = idsAtStart === currentListRef.current &&
+        progressAtStart === readUnpricedShoppingProgress().raw &&
+        detailsAtStart === readUnpricedShoppingDetails().raw
+      setCopyMessage(unchanged
+        ? 'Lijst gekopieerd, zonder winkelprijzen.'
+        : 'De lijst veranderde tijdens het kopiëren. Controleer de actuele lijst en kopieer opnieuw.')
+    } catch {
+      setCopyMessage('Klembord niet beschikbaar. Selecteer de tekst hieronder om handmatig te kopiëren.')
+    }
+  }
+
+  const missingPortableItems = portableShoppingPreview?.filter(item => !ids.includes(item.id)) ?? []
+  function downloadPortableShoppingList() {
+    try {
+      const text = encodePrivateShoppingList(ids, details, progress, portableProductIds)
+      const url = URL.createObjectURL(new Blob([text], { type: 'application/json;charset=utf-8' }))
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = 'supa-mijn-ongeprijsde-boodschappen.json'
+      document.body.append(anchor)
+      try { anchor.click() } finally {
+        anchor.remove()
+        window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+      }
+      const omitted = ids.filter(id => !portableProductIds.has(id)).length
+      setPortableShoppingMessage('Eigen back-up bewaard. ' + omitted +
+        ' oude onbekende IDs niet overgezet; geen winkelprijs of brongegevens.')
+    } catch (error) {
+      setPortableShoppingMessage(error instanceof Error ? error.message : 'Back-up mislukt.')
+    }
+  }
+  function previewShoppingBackup() {
+    setPortableShoppingPreview(null)
+    try {
+      const loaded = parsePrivateShoppingList(portableShoppingText, portableProductIds)
+      setPortableShoppingPreview(loaded)
+      setPortableShoppingMessage(loaded.length + ' bekende persoonlijke identiteiten gelezen. ' +
+        'Bestaande keuzes worden niet overschreven; bevestig uitsluitend nieuwe artikelen.')
+    } catch (error) {
+      setPortableShoppingMessage(error instanceof Error ? error.message : 'Ongeldig lijstbestand.')
+    }
+  }
+  function restoreShoppingBackup() {
+    if (!onAdd || !portableShoppingPreview || !missingPortableItems.length) return
+    if (ids.length + missingPortableItems.length > 100) {
+      setPortableShoppingMessage('Niet toegevoegd: de gekozen lijst mag maximaal 100 artikelen bevatten.')
+      return
+    }
+    if (!details.writable || !progress.writable) {
+      setPortableShoppingMessage('De bestaande lokale opslag is beschermd. Import is geweigerd.')
+      return
+    }
+    const nextDetails = [
+      ...details.entries,
+      ...missingPortableItems.filter(item => item.count !== 1 || item.note)
+        .map(item => ({ id: item.id, count: item.count, note: item.note })),
+    ]
+    const nextDone = [...new Set([...progress.doneIds,
+      ...missingPortableItems.filter(item => item.done).map(item => item.id)])]
+    const savedDetails = saveUnpricedShoppingDetails(details, nextDetails)
+    if (!savedDetails) {
+      setDetails(readUnpricedShoppingDetails())
+      setPortableShoppingMessage('Aantallen/notities zijn elders gewijzigd. Niets toegevoegd.')
+      return
+    }
+    const savedProgress = saveUnpricedShoppingProgress(progress, nextDone)
+    if (!savedProgress) {
+      saveUnpricedShoppingDetails(savedDetails, details.entries)
+      setDetails(readUnpricedShoppingDetails())
+      setProgress(readUnpricedShoppingProgress())
+      setPortableShoppingMessage('Afvinkgegevens zijn elders gewijzigd. Er zijn geen artikelen toegevoegd.')
+      return
+    }
+    for (const item of missingPortableItems) onAdd(item.id)
+    setDetails(savedDetails)
+    setProgress(savedProgress)
+    setPortableShoppingPreview(null)
+    setPortableShoppingText('')
+    setPortableShoppingMessage(missingPortableItems.length +
+      ' nieuwe ongeprijsde producten met jouw aantallen, notities en vinkjes toegevoegd. Bestaande keuzes behouden.')
+  }
+  // Keep portable restore accessible even on a brand-new device with zero picks.
 
   return <section className="hifi-demo-list" aria-label="Zelf gekozen producten">
     <h3>Jouw gekozen producten</h3>
+    {ids.length === 0 && <p role="status">Je persoonlijke lijst is leeg. Je kunt hier een eerdere eigen back-up terugzetten.</p>}
     <p className="disclaimer">Eigen verzamelijst · niet meegenomen in de berekende maaltijdmand of winkelvergelijking.
       Dit is geen offerte, actuele voorraad of bewijs van besparing.</p>
+    <div className="hifi-picked-progress" role="group" aria-label="Mijn afvinkvoortgang voor ongeprijsde producten">
+      <p role="status" aria-live="polite">{completedCount} van {ids.length} eigen producten afgevinkt · {ids.length - completedCount} nog te kopen.</p>
+      <progress max={Math.max(1, ids.length)} value={completedCount}
+        aria-label="Afgevinkte producten uit mijn ongeprijsde selectie" />
+      <button type="button" className="ghost-button" aria-pressed={openOnly}
+        onClick={() => setOpenOnly(!openOnly)}>
+        {openOnly ? 'Toon ook gekochte producten' : 'Toon alleen nog te kopen'}
+      </button>
+      <button type="button" className="ghost-button"
+        disabled={!progress.writable || completedCount === 0}
+        onClick={() => {
+          if (window.confirm('Alle afvinkingen van deze persoonlijke, ongeprijsde lijst terugzetten op nog te kopen?'))
+            saveDone([], 'Alle productselecties opnieuw als nog te kopen gemarkeerd.')
+        }}>Zet alle vinkjes terug</button>
+    </div>
+    {!progress.writable && <p role="alert">Deze browseropslag is niet beschikbaar of bevat een onbekende versie.
+      Afvinken is uitgeschakeld; bestaande gegevens blijven behouden.</p>}
+    {progressMessage && <p role="status" aria-live="polite">{progressMessage}</p>}
+    {!details.writable && <p role="alert">Aantallen/notities zijn in deze browser beschermd. Supa overschrijft de bestaande opslag niet.</p>}
+    {detailsMessage && <p role="status" aria-live="polite">{detailsMessage}</p>}
+    {openOnly && completedCount === ids.length &&
+      <p role="status">Alles afgevinkt! Toon ook gekochte producten om de lijst terug te zien.</p>}
     {selectedHistorical.length > 0 && <div className="hifi-picked-history" aria-label="Historische bronproducten zonder prijs">
       <h4>Historische bronproducten</h4>
       <p className="disclaimer">Waargenomen op 4 oktober 2026. Geen actuele prijzen of bronrechten voor productie.</p>
-      {selectedHistorical.map(item => <div className="hifi-demo-list-row hifi-picked-history-row" key={item.id}>
+      {visibleHistorical.map(item => <div className="hifi-demo-list-row hifi-picked-history-row" key={item.id}>
         <div className="hifi-picked-source-logo" aria-hidden="true">{item.store === 'PLUS' ? 'P' : 'D'}</div>
-        <div className="hifi-picked-details">
-          <strong>{item.name}</strong>
-          <span>{item.store} · {item.pack} · prijs onbekend</span>
-        </div>
-        <button type="button" className="ghost-button" onClick={() => onRemove(item.id)}
-          aria-label={`Verwijder uit lijst: ${item.name} bij ${item.store}`}>Verwijder</button>
+        <div className="hifi-picked-details"><strong>{item.name}</strong><span>{item.store} · {item.pack} · prijs onbekend</span></div>
+        {progressControl(item.id, item.name)}
+        {detailControls(item.id, item.name)}
+        <button type="button" className="ghost-button" onClick={() => removeAndClear(item.id)}
+          aria-label={'Verwijder uit lijst: ' + item.name + ' bij ' + item.store}>Verwijder</button>
+      </div>)}
+    </div>}
+    {selectedUnknown.length > 0 && <div className="hifi-picked-demo" aria-label="Oude productselecties die niet meer in de catalogus staan">
+      <h4>Oude productselecties</h4>
+      <p className="disclaimer">Deze product-ID's horen niet bij de huidige catalogus. Ze blijven bewaard totdat je ze verwijdert; er wordt geen prijs of productmatch afgeleid.</p>
+      {visibleUnknown.map(id => <div className="hifi-demo-list-row" key={id}>
+        <div className="hifi-picked-source-logo" aria-hidden="true">?</div>
+        <div className="hifi-picked-details"><strong>Product niet beschikbaar</strong><span>Oude product-ID: {id} · prijs onbekend</span></div>
+        {progressControl(id, 'oude product-ID ' + id)}
+        {detailControls(id, 'oude product-ID ' + id)}
+        <button type="button" className="ghost-button" onClick={() => removeAndClear(id)}
+          aria-label={'Verwijder oude productselectie: ' + id}>Verwijder</button>
       </div>)}
     </div>}
     {selectedExamples.length > 0 && <div className="hifi-picked-demo" aria-label="Figma demoproducten">
       <h4>Figma-voorbeelden</h4>
       <p className="disclaimer">Demolijst · geen actuele prijzen. Niet meegenomen in de mandvergelijking.</p>
-      {selectedExamples.map(p => <div className="hifi-demo-list-row" key={p.id}>
-        <FigmaImage asset={p.image} width="40" height="40" alt="" />
-        <span>{p.name}</span>
-        <button type="button" className="ghost-button" onClick={() => onRemove(p.id)}
-          aria-label={`Verwijder: ${p.name}`}>Verwijder</button>
+      {visibleExamples.map(item => <div className="hifi-demo-list-row" key={item.id}>
+        <FigmaImage asset={item.image} width="40" height="40" alt="" />
+        <span>{item.name}</span>
+        {progressControl(item.id, item.name)}
+        {detailControls(item.id, item.name)}
+        <button type="button" className="ghost-button" onClick={() => removeAndClear(item.id)}
+          aria-label={'Verwijder: ' + item.name}>Verwijder</button>
       </div>)}
     </div>}
-    <label className="hifi-picked-copy-label">Kopieer je gekozen productnamen
+    <details className="hifi-picked-portable">
+      <summary>Mijn ongeprijsde boodschappenlijst inclusief aantallen, notities en vinkjes overzetten</summary>
+      <p>Een privé JSON-back-up bevat uitsluitend bekende productidentiteiten, jouw aantallen,
+        eigen notities en handmatige vinkjes. Geen geobserveerde winkelprijzen, actuele voorraad,
+        geverifieerde SKU-matches of bronrechten.</p>
+      <button type="button" className="ghost-button" onClick={downloadPortableShoppingList}>
+        Bewaar persoonlijke boodschappenlijst (.json)
+      </button>
+      <label>Open een eerder persoonlijk boodschappenbestand
+        <input type="file" accept=".json,application/json" onChange={async event => {
+          const version = ++portableShoppingVersion.current
+          setPortableShoppingPreview(null)
+          const input = event.currentTarget
+          const file = input.files?.[0]
+          input.value = ''
+          if (!file) return
+          if (!file.size || file.size > 32768) {
+            setPortableShoppingMessage('Selecteer een gevuld eigen JSON-bestand van maximaal 32 KiB.')
+            return
+          }
+          try {
+            const contents = new TextDecoder('utf-8', { fatal: true })
+              .decode(await file.arrayBuffer())
+            if (version !== portableShoppingVersion.current) return
+            setPortableShoppingText(contents)
+            setPortableShoppingMessage('Bestand lokaal gelezen. Bekijk eerst het importvoorbeeld.')
+          } catch {
+            if (version === portableShoppingVersion.current)
+              setPortableShoppingMessage('Geen geldig UTF-8 JSON-bestand; je keuzes blijven behouden.')
+          }
+        }} />
+      </label>
+      <label>Of plak eigen back-up-JSON
+        <textarea rows={4} maxLength={32768} value={portableShoppingText}
+          onChange={event => {
+            portableShoppingVersion.current += 1
+            setPortableShoppingText(event.currentTarget.value)
+            setPortableShoppingPreview(null)
+            setPortableShoppingMessage('')
+          }} />
+      </label>
+      <button type="button" className="ghost-button" disabled={!portableShoppingText.trim()}
+        onClick={previewShoppingBackup}>Controleer mijn importvoorbeeld</button>
+      {portableShoppingPreview !== null && <p role="status">
+        {portableShoppingPreview.length} bekende artikelen in back-up; {missingPortableItems.length}
+        {' '}nog niet op mijn lijst. Al gekozen artikelen worden niet overschreven.
+      </p>}
+      {portableShoppingPreview !== null && <details className="hifi-picked-portable-preview">
+        <summary>Bekijk de {missingPortableItems.length} nieuwe artikelen vóór toevoegen</summary>
+        {missingPortableItems.length === 0
+          ? <p>Er zijn geen nieuwe artikelen: de bestaande lijst wordt niet overschreven.</p>
+          : <ol>{missingPortableItems.map(item => {
+            const known = historicalRetailerProducts.find(product => product.id === item.id)
+              ?? designProducts.find(product => product.id === item.id)
+            return <li key={item.id}>
+              <strong>{known?.name ?? 'Bekend product'}</strong> · aantal {item.count}
+              {' · '}{item.done ? 'Door jou afgevinkt' : 'Nog te kopen'}
+              {item.note && <small> · eigen notitie: {item.note}</small>}
+              <small> · Alleen jouw ongeprijsde keuze, geen actuele winkelprijs.</small>
+            </li>
+          })}</ol>}
+      </details>}
+      {portableShoppingPreview !== null && <button type="button" className="ghost-button"
+        disabled={!onAdd || missingPortableItems.length === 0 ||
+          ids.length + missingPortableItems.length > 100 ||
+          !details.writable || !progress.writable}
+        onClick={restoreShoppingBackup}>
+        Voeg {missingPortableItems.length} nieuwe artikelen en persoonlijke gegevens toe
+      </button>}
+      <p role="status" aria-live="polite">{portableShoppingMessage}</p>
+    </details>
+    <div className="recipe-backup-panel__actions">
+      <button type="button" className="ghost-button" onClick={() => downloadSelection(false)}
+        disabled={!selectionText}>Download ongeprijsde selectie (.txt)</button>
+      <button type="button" className="ghost-button" onClick={() => downloadSelection(true)}
+        disabled={!openSelectionText}>Download alleen nog te kopen (.txt)</button>
+      <button type="button" className="ghost-button" onClick={() => void copySelection(false)}
+        disabled={!selectionText}>Kopieer hele lijst</button>
+      <button type="button" className="ghost-button" onClick={() => void copySelection(true)}
+        disabled={!openSelectionText}>Kopieer alleen nog te kopen</button>
+    </div>
+    {copyMessage && <p role="status" aria-live="polite">{copyMessage}</p>}
+    <label className="hifi-picked-copy-label">Kopieer je gekozen productnamen, aantallen en notities
       <textarea readOnly rows={Math.min(ids.length + 2, 12)}
         onFocus={event => event.currentTarget.select()}
-        value={[...selectedHistorical.map(item => `☐ ${item.name} · ${item.store} · ${item.pack} · prijs onbekend (historisch)`),
-          ...selectedExamples.map(item => `☐ ${item.name} · Figma-demo, geen actuele prijs`)].join('\n')}
-        aria-label="Kopieerbare gekozen producten, zonder winkelprijzen" />
+        value={selectionText}
+        aria-label="Kopieerbare gekozen producten, aantallen en notities, zonder winkelprijzen" />
     </label>
   </section>
 }
