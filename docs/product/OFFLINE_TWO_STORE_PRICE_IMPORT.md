@@ -302,8 +302,11 @@ expliciete/onbekende beschikbaarheid blijven per product bewaard. Zowel in de
 voorimport-matchingpreview als naast de twee-winkelregelvoorinzage kan elk
 gematcht bronartikel worden opengeklapt via **Herkomst van dit bronartikel** om
 de oorspronkelijke pagina, bronsoort en snapshot-SHA-256 te bekijken; de pagina
-wordt niet automatisch opgehaald. Bij vervanging toont Supa ook wijzigingen in
-bronherkomst en bronsignalen voordat je de nieuwe bron bevestigt. De lokale
+wordt niet automatisch opgehaald. Na persoonlijke bevestiging blijft dezelfde
+herkomst zichtbaar naast de definitieve privémandregels. De herkomstverwijzingen
+blijven tijdelijk in geheugen en verlenen geen bronrechten of extra prijsgoedkeuring.
+Bij vervanging toont Supa ook wijzigingen in bronherkomst en bronsignalen voordat
+je de nieuwe bron bevestigt. De lokale
 CSV voor de twee-winkelcontrole bevat per winkel/product ook de oorspronkelijke
 bron-URL, bronsoort en snapshot-SHA-256 wanneer deze zijn aangeleverd; ontbrekende
 herkomst blijft leeg. De kopieerbare en printbare offline checklist neemt dezelfde
