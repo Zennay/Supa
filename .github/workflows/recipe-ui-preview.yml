@@ -15,6 +15,8 @@ jobs:
     env:
       HOME: /tmp
       npm_config_cache: /tmp/supa-recipe-preview-npm-cache
+      # Bound Node heap on the shared self-hosted runner so concurrent required builds do not trigger host OOM kills.
+      NODE_OPTIONS: --max-old-space-size=2048
     container:
       image: mcr.microsoft.com/playwright:v1.56.1-noble
       options: --ipc=host --user 1000:1000
