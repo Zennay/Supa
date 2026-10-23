@@ -148,13 +148,18 @@ type ExtractedPrice = {
   evidence: 'offer_price' | 'pack_matched_unit_price'
 }
 
-function schemaUnitCode(value: unknown): 'g' | 'kg' | 'ml' | 'l' | null {
+function schemaUnitCode(value: unknown): 'g' | 'kg' | 'ml' | 'l' | 'piece' | null {
   const code = asString(value)?.toUpperCase()
   if (code === 'GRM') return 'g'
   if (code === 'KGM') return 'kg'
   if (code === 'MLT') return 'ml'
   if (code === 'LTR') return 'l'
+  if (code === 'H87') return 'piece'
   return null
+}
+
+function packTextUnit(unit: string): string {
+  return unit === 'piece' ? 'st' : unit
 }
 
 /**
@@ -169,7 +174,7 @@ function unitPriceSpecificationMatchesPack(specification: JsonObject, pack: RawP
   const value = asString(reference.value)
   const unit = schemaUnitCode(reference.unitCode)
   if (!value || !unit) return false
-  const normalized = normalizePackText(value + ' ' + unit)
+  const normalized = normalizePackText(value + ' ' + packTextUnit(unit))
   const referenceKey = physicalPackSignature(normalized)
   const productKey = rawPackSignature(pack)
   return referenceKey !== null && productKey !== null && referenceKey === productKey
@@ -277,12 +282,18 @@ type NormalizedDeclaredPack = ReturnType<typeof normalizePackText>
 
 /** Convert explicit unitText to a canonical unit, refusing descriptive prose. */
 function schemaUnitText(value: unknown): string | null {
-  const raw = asString(value)
+  const raw = asString(value)?.normalize('NFKC').trim().toLocaleLowerCase('en')
   if (!raw) return null
-  const parsed = normalizePackText('1 ' + raw)
-  return parsed.amount === 1 && parsed.count === 1 && parsed.unit !== 'unknown'
-    ? parsed.unit
-    : null
+  const aliases: Record<string, string> = {
+    g: 'g', gr: 'g', gram: 'g', grams: 'g', gramme: 'g', grammes: 'g',
+    kg: 'kg', kilo: 'kg', kilogram: 'kg', kilograms: 'kg',
+    ml: 'ml', milliliter: 'ml', milliliters: 'ml',
+    millilitre: 'ml', millilitres: 'ml',
+    l: 'l', liter: 'l', liters: 'l', litre: 'l', litres: 'l',
+    st: 'piece', stuk: 'piece', stuks: 'piece',
+    piece: 'piece', pieces: 'piece', pcs: 'piece',
+  }
+  return Object.hasOwn(aliases, raw) ? aliases[raw] : null
 }
 
 /** Parse a single declared quantity and require every explicit unit signal to agree. */
@@ -308,7 +319,7 @@ function declaredPack(value: unknown): NormalizedDeclaredPack | null {
   if (parsed.amount === null || parsed.unit === 'unknown') {
     // Numeric-only values need an explicit, recognized unit to be meaningful.
     if (!explicitUnits.length || !/^(?:\d+)(?:[.,]\d+)?$/u.test(raw)) return null
-    parsed = normalizePackText(raw + ' ' + explicitUnits[0])
+    parsed = normalizePackText(raw + ' ' + packTextUnit(explicitUnits[0]))
   } else if (explicitUnits.some(unit => unit !== parsed.unit)) {
     return null
   }
