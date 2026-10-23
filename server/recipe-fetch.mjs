@@ -42,16 +42,21 @@ function privateRecipeQueryKey(key) {
 function privateNestedRecipeQuery(value) {
   let current = value
   for (let depth = 0; depth < 8; depth++) {
-    const marker = current.indexOf('?')
+    // Normalize nested URL syntax before locating '?' or '#': a downstream
+    // URL consumer may canonicalize fullwidth delimiters before decoding.
+    const canonical = current.normalize('NFKC')
+      .replace(/[\p{Default_Ignorable_Code_Point}\p{Mark}]/gu, '')
+    const marker = canonical.indexOf('?')
     if (marker !== -1) {
-      const query = current.slice(marker + 1).split('#', 1)[0]
+      const query = canonical.slice(marker + 1).split('#', 1)[0]
       for (const key of new URLSearchParams(query).keys())
         if (privateRecipeQueryKey(key)) return true
     }
-    if (!/%[0-9a-fA-F]{2}/u.test(current)) return false
+    if (!canonical.includes('%')) return false
+    if (!/%[0-9a-fA-F]{2}/u.test(canonical)) return true
     let decoded
-    try { decoded = decodeURIComponent(current) } catch { return true }
-    if (decoded === current) return false
+    try { decoded = decodeURIComponent(canonical) } catch { return true }
+    if (decoded === canonical) return true
     current = decoded
   }
   return true
