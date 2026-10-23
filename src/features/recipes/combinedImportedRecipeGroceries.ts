@@ -38,6 +38,10 @@ export function combinedImportedRecipeGroceries(
   }
   const lines: OwnRecipeChecklistLine[] = []
   const groups = new Map<string, OwnRecipeChecklistLine>()
+  // Keep an overflowed identity attached to its held line. Otherwise a third
+  // contribution could create a fresh priced-ready row after the earlier pair
+  // overflowed, making an incomplete physical requirement look complete.
+  const blockedGroups = new Set<string>()
   const contributorsByLine: Record<string, GroceryContribution[]> = Object.create(null)
   const heldRecipes: string[] = []
   for (const recipe of recipes) {
@@ -52,7 +56,7 @@ export function combinedImportedRecipeGroceries(
     const ready = validPortions && !!toPlannerRecipe(recipe, { usage: 'unpriced-demand' })
     if (!ready) heldRecipes.push(recipe.title)
     const single = ready ? ownRecipeShoppingChecklist(recipe, portions) : null
-    const sourceLines = single?.canCopy ? single.lines : recipe.ingredients.map((ingredient: SavedRecipe['ingredients'][number], index: number) => ({
+    const sourceLines = single?.canCopy ? single.lines : recipe.ingredients.map((ingredient: SavedRecipe['ingredients'][number], index) => ({
       key: String(index), label: ingredient.label || ingredient.original,
       amount: null, unit: null, original: ingredient.original, needsReview: true,
     } as OwnRecipeChecklistLine))
@@ -73,6 +77,10 @@ export function combinedImportedRecipeGroceries(
       }
       const prior = groupKey ? groups.get(groupKey) : null
       if (prior) contributorsByLine[prior.key].push(contribution)
+      if (prior && blockedGroups.has(groupKey!)) {
+        prior.original += ' + ' + item.original
+        continue
+      }
       if (prior) {
         const total = sumDecimalAmounts([prior.amount!, item.amount!])
         if (total !== null && total <= 1_000_000 &&
@@ -81,10 +89,12 @@ export function combinedImportedRecipeGroceries(
           continue
         }
         // Overflow / fractional pieces are not valid product requirements.
-        // Hold the whole grouped quantity for human review instead.
+        // Hold the whole group and retain later matching rows on this same line.
         prior.original += ' + ' + item.original
-        prior.amount = null; prior.unit = null; prior.needsReview = true
-        groups.delete(groupKey!)
+        prior.amount = null
+        prior.unit = null
+        prior.needsReview = true
+        blockedGroups.add(groupKey!)
         continue
       }
       const line: OwnRecipeChecklistLine = {
