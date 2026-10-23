@@ -1975,25 +1975,28 @@ export function OfflineReviewedWorkbench({
       file.size <= 256000 && /\.json$/i.test(file.name))) {
       // Two independent adapter JSON files may belong to the SAME store.
       // The ordinary two-capture path rejects these as duplicate retailers.
-      // Detect only that narrow case and delegate the full source admission
-      // to the same multi-file converter; canonical two-store JSON stays on
-      // the existing path.
-      const texts = await Promise.all(files.map(file => readOwnSourceTextFile(file)))
-      const observations = texts.map(text => {
-        try {
-          const parsed: unknown = JSON.parse(text)
-          const entries = Array.isArray(parsed) ? parsed : [parsed]
-          return entries.length > 0 && entries.every(isRawProductObservationShape)
-            ? entries : []
-        } catch {
-          return []
+      // Sniff without admitting or mutating anything, then delegate to the
+      // strict multi-file adapter. Bad files still follow canonical admission.
+      try {
+        const texts = await Promise.all(files.map(file => readOwnSourceTextFile(file)))
+        const observations = texts.map(text => {
+          try {
+            const parsed: unknown = JSON.parse(text)
+            const entries = Array.isArray(parsed) ? parsed : [parsed]
+            return entries.length > 0 && entries.every(isRawProductObservationShape)
+              ? entries : []
+          } catch {
+            return []
+          }
+        })
+        const originals = observations.flat().filter(isRawProductObservationShape)
+        if (observations.every(batch => batch.length > 0) &&
+            new Set(originals.map(entry => entry.supermarket)).size === 1) {
+          await loadRawObservationFiles(files, selectedForPlan)
+          return
         }
-      })
-      const originals = observations.flat()
-      if (observations.every(batch => batch.length > 0) &&
-          new Set(originals.map(entry => entry.supermarket)).size === 1) {
-        await loadRawObservationFiles(files, selectedForPlan)
-        return
+      } catch {
+        // Let the established canonical two-file handler report invalid input.
       }
     }
     if (files.length === 1) {
