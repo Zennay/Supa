@@ -65,6 +65,10 @@ export function ownRecipeShoppingChecklist(recipe: SavedRecipe, portions: number
 
   const lines: OwnRecipeChecklistLine[] = []
   const grouped = new Map<string, OwnRecipeChecklistLine>()
+  // Once an exact-identity group exceeds the safe aggregate ceiling, keep the
+  // whole group held. Never split an invalid total into apparently shop-ready
+  // duplicate lines that could pass the downstream basket handoff.
+  const blockedGroups = new Set<string>()
   for (const ingredient of recipe.ingredients) {
     const valid = ingredient.reviewReason === null &&
       typeof ingredient.amount === 'number' && Number.isFinite(ingredient.amount) &&
@@ -81,12 +85,23 @@ export function ownRecipeShoppingChecklist(recipe: SavedRecipe, portions: number
     const label = ingredient.label || ingredient.original
     const groupKey = verified ? JSON.stringify([ingredient.query, ingredient.unit]) : ''
     const previous = groupKey ? grouped.get(groupKey) : undefined
+    if (previous && blockedGroups.has(groupKey)) {
+      previous.original += ' + ' + ingredient.original
+      continue
+    }
     if (previous && previous.amount !== null) {
       const combined = sumDecimalAmounts([previous.amount, scaled!])
       if (combined !== null && combined <= 1_000_000) {
         previous.amount = combined
         continue
       }
+      // Preserve one visible line, but make the entire aggregate unresolved.
+      previous.original += ' + ' + ingredient.original
+      previous.amount = null
+      previous.unit = null
+      previous.needsReview = true
+      blockedGroups.add(groupKey)
+      continue
     }
     const line: OwnRecipeChecklistLine = {
       key: String(lines.length),
