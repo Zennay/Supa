@@ -584,6 +584,52 @@ export function rawProductObservationsToPrivateCaptureJson(raw: unknown): string
   })
 }
 
+/**
+ * Bring explicitly user-provided adapter observations from one OR two shops
+ * into the existing canonical private capture schema. Different retailer
+ * observations must remain in separate original-time captures, never be
+ * averaged, timestamped again or promoted to a public comparison.
+ * The caller must still run parseOfflinePriceSnapshots on the resulting JSON.
+ */
+export function rawProductObservationBundleToPrivateCaptureJson(raw: unknown): string {
+  const items = Array.isArray(raw) ? raw : [raw]
+  if (items.length < 1 || items.length > 2000) {
+    throw new Error('Importeer maximaal 2.000 bronobservaties, met maximaal 1.000 per winkel.')
+  }
+  const byStore: Record<'plus' | 'dekamarkt', unknown[]> = {
+    plus: [], dekamarkt: [],
+  }
+  for (const item of items) {
+    if (item === null || typeof item !== 'object' || Array.isArray(item)) {
+      throw new Error('Iedere bronobservatie moet een geldig JSON-object zijn.')
+    }
+    const retailer = (item as Record<string, unknown>).supermarket
+    if (retailer !== 'plus' && retailer !== 'dekamarkt') {
+      throw new Error('Alleen de bestaande PLUS- of DekaMarkt-adapterobservaties kunnen worden gecombineerd.')
+    }
+    byStore[retailer].push(item)
+  }
+
+  const captures = (Object.values(byStore) as unknown[][])
+    .filter(group => group.length > 0)
+    .map(group => {
+      // Reuse full per-product source/pack/price validation and the strict
+      // same-retailer, exact-same-UTC-instant and unique-SKU constraints.
+      const canonical = JSON.parse(rawProductObservationsToPrivateCaptureJson(group)) as {
+        captures: [{ retailer: 'PLUS' | 'DekaMarkt'; observedAt: string; products: unknown[] }]
+      }
+      return canonical.captures[0]
+    })
+  if (captures.length === 0) {
+    throw new Error('Geen originele winkelobservaties om in te lezen.')
+  }
+  return JSON.stringify({
+    schema: captures.length === 2
+      ? 'supa-offline-prices-v1' : 'supa-private-single-store-prices-v1',
+    captures,
+  })
+}
+
 /** Backwards-compatible singular API; arrays are also admitted by the batch converter. */
 export function rawProductObservationToPrivateCaptureJson(raw: unknown): string {
   return rawProductObservationsToPrivateCaptureJson(raw)
