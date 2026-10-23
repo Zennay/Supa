@@ -291,11 +291,16 @@ Ook één lokaal JSON-object óf een JSON-array met meerdere objecten in het
 bestaande `RawProductObservation`-formaat van de Schema.org-productadapter kan
 via de JSON-import of het hoofdscherm-plakveld worden aangeleverd. Ruwe
 Schema.org JSON-LD wordt niet rechtstreeks als prijs geaccepteerd: de bestaande
-adapter moet eerst gevalideerde observaties leveren. Een batch bevat maximaal
-1.000 unieke originele productcodes en wordt alleen samengevoegd als alle regels
-dezelfde winkel én exact hetzelfde oorspronkelijke UTC-Z-bronmoment hebben.
-Gemengde winkels, verschillende bronmomenten, dubbele productcodes en onvolledige
-fysieke verpakkingen worden geweigerd; Supa verzint geen tijdstempels of SKU's.
+adapter moet eerst gevalideerde observaties leveren. Een geplakte JSON-array
+kan maximaal 2.000 regels bevatten: maximaal 1.000 unieke originele productcodes
+per winkel. De bestaande converter groepeert per PLUS of DekaMarkt; **binnen iedere
+winkel** moeten alle regels exact hetzelfde oorspronkelijke UTC-Z-bronmoment
+hebben. Twee winkelgroepen worden als aparte originele captures in het bestaande
+twee-winkelschema toegelaten. Verschillende bronmomenten binnen een winkel,
+dubbele productcodes, onvolledige fysieke verpakkingen en onbekende winkels worden
+geweigerd; Supa verzint geen tijdstempels, SKU's of bedragen. Zonder een tweede
+winkel en zonder twee werkelijk bruikbare persoonlijke beoordelingen blijft het
+winkelprijsverschil onbekend.
 
 Wanneer productobservaties als **afzonderlijke lokale JSON-bestanden** zijn bewaard,
 kun je via de bestaande bestandskiezer ook 2–24 bestanden tegelijk aanwijzen. Supa
