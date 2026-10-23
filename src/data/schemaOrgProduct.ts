@@ -274,41 +274,90 @@ function unknownPack(): RawPack {
   }
 }
 
-function extractPack(product: JsonObject): RawPack {
-  const weight = isObject(product.weight) ? product.weight : null
-  const rawValue = weight ? asString(weight.value) : null
-  if (!rawValue) return unknownPack()
+type NormalizedDeclaredPack = ReturnType<typeof normalizePackText>
 
-  const parsePack = (text: string): RawPack | null => {
-    const normalized = normalizePackText(text)
-    if (normalized.amount === null || normalized.unit === 'unknown') return null
-    return { rawText: normalized.rawText, amount: normalized.amount, unit: normalized.unit }
-  }
-
-  const direct = parsePack(rawValue)
-  const unitFromCode = weight ? schemaUnitCode(weight.unitCode) : null
-  const unitText = weight ? asString(weight.unitText) : null
-  const fromCode = unitFromCode ? parsePack(rawValue + ' ' + unitFromCode) : null
-  const fromUnitText = unitText
-    ? (parsePack(unitText) ?? parsePack(rawValue + ' ' + unitText))
+/** Convert explicit unitText to a canonical unit, refusing descriptive prose. */
+function schemaUnitText(value: unknown): string | null {
+  const raw = asString(value)
+  if (!raw) return null
+  const parsed = normalizePackText('1 ' + raw)
+  return parsed.amount === 1 && parsed.count === 1 && parsed.unit !== 'unknown'
+    ? parsed.unit
     : null
-  const candidates = [direct, fromCode, fromUnitText].filter(
-    (candidate): candidate is RawPack => candidate !== null,
-  )
-  if (candidates.length === 0) return unknownPack()
+}
 
-  // Contradictory explicit value/unit evidence is not resolved by choosing
-  // whichever field happens to be encountered first.
-  const signatures = new Set(candidates.map(candidate => candidate.amount + ':' + candidate.unit))
-  if (signatures.size !== 1) return unknownPack()
+/** Parse a single declared quantity and require every explicit unit signal to agree. */
+function declaredPack(value: unknown): NormalizedDeclaredPack | null {
+  const object = isObject(value) ? value : null
+  const raw = object ? asString(object.value) : asString(value)
+  if (!raw) return null
 
-  const selected = direct ?? fromCode ?? fromUnitText
-  if (!selected) return unknownPack()
-  return {
-    rawText: direct?.rawText ?? (rawValue + ' ' + (unitText ?? unitFromCode ?? '')),
-    amount: selected.amount,
-    unit: selected.unit,
+  const explicitUnits: string[] = []
+  if (object && object.unitText !== undefined && object.unitText !== null) {
+    const unit = schemaUnitText(object.unitText)
+    if (!unit) return null
+    explicitUnits.push(unit)
   }
+  if (object && object.unitCode !== undefined && object.unitCode !== null) {
+    const unit = schemaUnitCode(object.unitCode)
+    if (!unit) return null
+    explicitUnits.push(unit)
+  }
+  if (new Set(explicitUnits).size > 1) return null
+
+  let parsed = normalizePackText(raw)
+  if (parsed.amount === null || parsed.unit === 'unknown') {
+    // Numeric-only values need an explicit, recognized unit to be meaningful.
+    if (!explicitUnits.length || !/^(?:\d+)(?:[.,]\d+)?$/u.test(raw)) return null
+    parsed = normalizePackText(raw + ' ' + explicitUnits[0])
+  } else if (explicitUnits.some(unit => unit !== parsed.unit)) {
+    return null
+  }
+
+  return parsed.amount !== null && parsed.unit !== 'unknown' ? parsed : null
+}
+
+/** Normalize a full retail pack to a comparable base-unit identity. */
+function physicalPackSignature(pack: NormalizedDeclaredPack): string | null {
+  if (!Number.isFinite(pack.amount) || pack.amount <= 0 ||
+      !Number.isSafeInteger(pack.count) || pack.count <= 0) return null
+  const unit = pack.unit
+  const family = unit === 'g' || unit === 'kg' ? 'mass'
+    : unit === 'ml' || unit === 'l' ? 'volume'
+    : unit === 'piece' ? 'piece' : null
+  const factor = unit === 'kg' || unit === 'l' ? 1000
+    : unit === 'g' || unit === 'ml' || unit === 'piece' ? 1 : null
+  if (!family || factor === null) return null
+  const total = pack.amount * factor * pack.count
+  if (!Number.isFinite(total) || total <= 0 || total > 1e15) return null
+  // Parsed quantities carry at most six decimal places; nine canonical
+  // decimal places preserve those values after kg/l to g/ml conversion.
+  return family + ':' + Number(total.toFixed(9)).toString()
+}
+
+function extractPack(product: JsonObject): RawPack {
+  // Keep the existing contract: weight is the primary package declaration.
+  // A size-only product is not promoted into a measured retail pack.
+  if (!isObject(product.weight)) return unknownPack()
+  const weight = declaredPack(product.weight)
+  if (!weight) return unknownPack()
+
+  // Schema.org size is independent evidence. If present, it must parse and
+  // describe the same whole retail quantity; never ignore a contradictory
+  // weight/size pair merely because one field was historically preferred.
+  if (product.size !== undefined && product.size !== null) {
+    const size = declaredPack(product.size)
+    if (!size) return unknownPack()
+    const weightKey = physicalPackSignature(weight)
+    const sizeKey = physicalPackSignature(size)
+    if (!weightKey || !sizeKey || weightKey !== sizeKey) return unknownPack()
+  }
+
+  // RawPack stores the quantity for the payable whole package, not the
+  // per-item amount inside a multipack. The schema has no separate count field.
+  const amount = weight.amount * weight.count
+  if (!Number.isFinite(amount) || amount <= 0) return unknownPack()
+  return { rawText: weight.rawText, amount, unit: weight.unit }
 }
 
 function buildOffer(offers: JsonObject[], price: ExtractedPrice | null): RawOffer | null {
