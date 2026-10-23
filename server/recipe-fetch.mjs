@@ -22,21 +22,38 @@ export function recipeUrl(input) {
   // URLSearchParams decodes one layer. Repeatedly decoded query keys can be
   // interpreted as credentials by downstream sites; refuse them before DNS/IO.
   const credentialKey = /(?:token|password|secret|oauth|saml|session|signature|authorization|pkce|api.?key|(?:^|[_-])(?:auth|code|verifier|state|sig)(?:$|[_-]))/i
+const URL_CONTROL_OR_DELIMITER = /[&=?#\\u0000-\\u001f\\u007f]/u
+const COMPATIBILITY_NOISE = /[\\p{Default_Ignorable_Code_Point}\\p{Mark}]/gu
   for (const parameter of url.searchParams.keys()) {
     let key = parameter
-    // One decoding layer was already applied by URLSearchParams. Inspect
-    // *every* subsequent layer, not just the final string: otherwise
-    // %25252563ode can reach another decoder as a credentialed "code" key.
-    // Over-encoded or malformed keys fail closed without reflecting secrets.
     let resolved = false
+    // URLSearchParams decodes one layer. Every later layer is inspected after
+    // NFKC and invisible-mark removal, before its separators can be re-parsed.
     for (let depth = 0; depth < 8; depth++) {
-      key = key.normalize('NFKC')
-      if (credentialKey.test(key)) throw new Error('Gebruik een openbare receptlink zonder inloggegevens.')
-      if (!key.includes('%')) { resolved = true; break }
-      try { key = decodeURIComponent(key) }
-      catch { throw new Error('Gebruik een openbare receptlink zonder inloggegevens.') }
+      const canonical = key.normalize('NFKC').replace(COMPATIBILITY_NOISE, '')
+      if (URL_CONTROL_OR_DELIMITER.test(canonical)) {
+        throw new Error('Gebruik een openbare receptlink zonder inloggegevens.')
+      }
+      const folded = canonical.toLocaleLowerCase('en').replace(/[^a-z0-9]/gu, '')
+      if (credentialKey.test(canonical) || credentialKey.test(folded)) {
+        throw new Error('Gebruik een openbare receptlink zonder inloggegevens.')
+      }
+      if (!canonical.includes('%')) { key = canonical; resolved = true; break }
+      if (!/%[0-9a-fA-F]{2}/u.test(canonical)) {
+        throw new Error('Gebruik een openbare receptlink zonder inloggegevens.')
+      }
+      try {
+        const decoded = decodeURIComponent(canonical)
+        if (decoded === canonical) throw new Error('unchanged encoding')
+        key = decoded
+      } catch {
+        throw new Error('Gebruik een openbare receptlink zonder inloggegevens.')
+      }
     }
-    if (!resolved || credentialKey.test(key.normalize('NFKC')) || key.includes('%')) {
+    const finalKey = key.normalize('NFKC').replace(COMPATIBILITY_NOISE, '')
+    const finalFolded = finalKey.toLocaleLowerCase('en').replace(/[^a-z0-9]/gu, '')
+    if (!resolved || URL_CONTROL_OR_DELIMITER.test(finalKey) || credentialKey.test(finalKey) ||
+        credentialKey.test(finalFolded) || finalKey.includes('%')) {
       throw new Error('Gebruik een openbare receptlink zonder inloggegevens.')
     }
   }
