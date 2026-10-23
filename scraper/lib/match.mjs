@@ -2,7 +2,7 @@
 //
 // 1. Exact: products sharing a global GTIN/EAN are the same article.
 // 2. Conservative fuzzy: a product without a usable GTIN joins a cluster only
-//    if the brand is identical, the total pack quantity is identical (±1%),
+//    if the brand and explicit pack count match, total quantity is within ±1%,
 //    the cluster has no product from that retailer yet, and name tokens are
 //    similar enough with a clear winner. Otherwise it stays on its own:
 //    a missed match is cheaper than a wrong price comparison.
@@ -59,17 +59,17 @@ function packKey(p) {
   if (typeof p.pack_amount !== 'number' ||
       !Number.isFinite(p.pack_amount) || p.pack_amount <= 0 ||
       typeof p.pack_unit !== 'string' || !p.pack_unit) return null
-  const count = p.pack_count ?? 1
+  const count = p.pack_count
   if (!Number.isSafeInteger(count) || count < 1) return null
   // Pack texts that do not describe one pack (ranges such as "350-390 g") veto
   // fuzzy matching even if an older parser stored an amount for them.
   if (/\d\s*[-–]\s*\d/.test(p.pack_text ?? '') && parsePack(p.pack_text).amount === null) return null
   const total = p.pack_amount * count
-  return Number.isFinite(total) && total > 0 ? { unit: p.pack_unit, total } : null
+  return Number.isFinite(total) && total > 0 ? { unit: p.pack_unit, total, count } : null
 }
 
 function samePack(a, b) {
-  if (!a || !b || a.unit !== b.unit) return false
+  if (!a || !b || a.unit !== b.unit || a.count !== b.count) return false
   return Math.abs(a.total - b.total) <= Math.max(a.total, b.total) * 0.01
 }
 
@@ -80,8 +80,8 @@ function samePack(a, b) {
  * can have the same weight but are different retail packs for price comparison.
  */
 function sameGtinPhysicalPack(a, b) {
-  const countA = a.pack_count ?? 1
-  const countB = b.pack_count ?? 1
+  const countA = a.pack_count
+  const countB = b.pack_count
   if (!Number.isSafeInteger(countA) || countA < 1 ||
       !Number.isSafeInteger(countB) || countB < 1 ||
       countA !== countB) return false
@@ -157,7 +157,7 @@ export function matchProducts(products) {
 
   const blockKey = (info) =>
     info.brandKey && info.pack
-      ? `${info.brandKey}|${info.pack.unit}|${Math.round(info.pack.total)}`
+      ? `${info.brandKey}|${info.pack.unit}|count:${info.pack.count}|${Math.round(info.pack.total)}`
       : null
   const blocks = new Map()
   const addToBlock = (info, root) => {
