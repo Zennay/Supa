@@ -151,7 +151,7 @@ function sourceFrom(value: unknown): Source {
           !(p.packAmount === null || (typeof p.packAmount === 'number' &&
             Number.isFinite(p.packAmount) && p.packAmount > 0 && p.packAmount <= 100000)) ||
           !(p.priceCents === null || (Number.isSafeInteger(p.priceCents) &&
-            (p.priceCents as number) >= 0 && (p.priceCents as number) <= 1000000)) ||
+            (p.priceCents as number) > 0 && (p.priceCents as number) <= 1000000)) ||
           !(p.packCount === undefined || (Number.isSafeInteger(p.packCount) &&
             (p.packCount as number) > 0 && (p.packCount as number) <= 1000)) ||
           typeof p.available !== 'boolean' ||
@@ -348,7 +348,7 @@ function storeBasket(store: StoreName, capture: Capture | undefined, demand: Dem
     )
     const cents = packs === null ? NaN : packs * p.priceCents
     if (!Number.isSafeInteger(packs) || packs! < 1 ||
-        !Number.isSafeInteger(cents) || cents < 0 ||
+        !Number.isSafeInteger(cents) || cents <= 0 ||
         !Number.isSafeInteger(totalCents + cents)) {
       lines.push(unresolved(d, 'Geen veilig passend aantal volledige verpakkingen'))
       unresolvedLineCount++
