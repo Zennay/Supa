@@ -1063,7 +1063,7 @@ export function RecipeLibrary({ onBack, onAddRecipeGroceries }: {
         </select>
       </label>
       <p>{collectionFormat === 'plain'
-        ? 'Scheid meerdere recepten met een eigen regel ---. Gebruik titel, optioneel Porties:, Tijd: en Bron: https://…, gevolgd door Ingrediënten: en Bereiding:. Bron is alleen attributie, geen prijsbewijs.'
+        ? 'Scheid recepten met een losse ----regel, of gebruik Markdown-koppen: # Receptnaam per recept, of # Mijn recepten met ## Receptnaam per recept. Elk recept heeft een eigen Ingrediënten- en Bereiding-sectie. Porties:, Tijd: en Bron: https://… zijn optioneel; Bron is alleen attributie, geen prijsbewijs.'
         : collectionFormat === 'html'
           ? 'Lees schema.org/Recipe uit opgeslagen HTML-webpagina’s, zonder scripts uit te voeren of iets op internet te openen.'
           : collectionFormat === 'links'
