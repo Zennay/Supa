@@ -1715,11 +1715,14 @@ export function OfflineReviewedWorkbench({
   }
 
   function acceptManualSource(input: string) {
-    input = normalizeRawProductObservationInput(input).content
     ++importRevision.current
     setPendingReplacement(null)
     setBusy(false)
     try {
+      // JSON-array adapter inputs also come from paste, not just files.
+      // Conversion can reject mixed snapshots or malformed provenance; keep
+      // it inside the catch so a rejected batch never crashes the workbench.
+      input = normalizeRawProductObservationInput(input).content
       const next = parseOfflinePriceSnapshots(input, Date.now())
       const shops = Object.keys(next.captures) as (typeof stores[number])[]
       if (imported && shops.length === 1) {
@@ -1768,8 +1771,8 @@ export function OfflineReviewedWorkbench({
   }
 
   function importSnapshots(input: string) {
-    input = normalizeRawProductObservationInput(input).content
     try {
+      input = normalizeRawProductObservationInput(input).content
       // Validate the entire proposed capture before changing the active
       // source, review keys, physical ticks, or any derived basket totals.
       const parsed = parseOfflinePriceSnapshots(input, Date.now())
@@ -1801,7 +1804,14 @@ export function OfflineReviewedWorkbench({
       setMessage('Plak eerst eigen CSV- of JSON-brongegevens.')
       return
     }
-    if (raw.trimStart().startsWith('{')) {
+    // An adapter batch is a JSON array. It must use the same strict
+    // canonical price admission as the object and file-import paths, never
+    // be misrouted to the CSV converter.
+    if (raw.trimStart().startsWith('{') || raw.trimStart().startsWith('[')) {
+      if (pastePlan !== currentlySelectedPlan.current) {
+        setMessage('Je Planner-week veranderde tijdens de import. Plak je bron opnieuw.')
+        return
+      }
       acceptManualSource(raw)
       return
     }
