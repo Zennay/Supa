@@ -105,12 +105,14 @@ export function ComparisonReadiness({
     ...(['PLUS', 'DekaMarkt'] as const).flatMap(store => {
       const basket = store === 'PLUS' ? plus : deka
       const unresolved = basket.lines.filter(line => line.status === 'unresolved')
+      const sourceRows = pendingReviewByStore?.[store]
+      const pendingRows: readonly PendingSourceReview[] = Array.isArray(sourceRows) ? sourceRows : []
       return [
         '', `${store} · ${unresolved.length} nog niet gekoppelde ingrediënten`,
         ...unresolved.map(line => `☐ ${singleLine(line.ingredientLabel)} · ${readablePlannerDemandAmount(line.requirement.amount)} ${line.requirement.unit} · ${singleLine(line.id)} · prijs en match onbekend`),
-        ...(pendingReviewByStore?.[store].length
-          ? [`${pendingReviewByStore[store].length} voorgestelde bronartikelregels wachten op jouw controle:`,
-              ...pendingReviewByStore[store].map(item =>
+        ...(pendingRows.length
+          ? [`${pendingRows.length} voorgestelde bronartikelregels wachten op jouw controle:`,
+              ...pendingRows.map(item =>
                 `☐ ${singleLine(item.ingredientLabel)} · ${singleLine(item.productName)} · originele SKU ${singleLine(item.productId)}` +
                 ` · ${item.pack.count} × ${readablePlannerDemandAmount(item.pack.amount)} ${item.pack.unit} per pak` +
                 ` · ${new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(item.pricePerPackCents / 100)} ingevoerde pakprijs` +
