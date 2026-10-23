@@ -83,3 +83,25 @@
 @media (prefers-reduced-motion: reduce) {
   .hifi-planner-day-number { transition: none; }
 }
+
+/* Seven real weekdays must remain reachable at 320px without shrinking touch
+   targets or pushing the whole Planner beyond the viewport. */
+.hifi-planner-week-days {
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  padding-bottom: 6px;
+}
+.hifi-planner-day {
+  flex: 0 0 50px;
+  scroll-snap-align: start;
+}
+.hifi-planner-day[data-focused='true'] .hifi-planner-day-number {
+  box-shadow: inset 0 0 0 2px #176c50;
+}
+@media (max-width: 375px) {
+  .hifi-planner-week-days { gap: 10px; }
+  .hifi-planner-day { flex-basis: 46px; }
+}
