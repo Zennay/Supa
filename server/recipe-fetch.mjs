@@ -96,9 +96,15 @@ export async function fetchRecipeHtml(input, { resolve = lookup, request = https
         },
       }, res => {
         if ([301, 302, 303, 307, 308].includes(res.statusCode)) {
-          const location = res.headers.location; res.destroy()
+          const location = res.headers.location
+          res.destroy()
           if (!location || redirects >= 3) return reject(new Error('Te veel doorverwijzingen in de receptlink.'))
-          return resolve({ redirect: new URL(location, url).href })
+          // A malformed Location header must reject this fetch, never escape
+          // the async response callback as an uncaught exception.
+          let redirect
+          try { redirect = new URL(location, url).href }
+          catch { return reject(new Error('Ongeldige doorverwijzing in de receptlink.')) }
+          return resolve({ redirect })
         }
         if (res.statusCode !== 200 || !/^(text\/html|application\/xhtml\+xml)(;|$)/i.test(res.headers['content-type'] ?? '')) {
           res.destroy(); return reject(new Error('Deze website geeft geen leesbare receptpagina terug. Vul het recept handmatig in.'))
