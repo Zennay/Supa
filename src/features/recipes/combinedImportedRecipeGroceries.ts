@@ -39,7 +39,7 @@ export function combinedImportedRecipeGroceries(
   const lines: OwnRecipeChecklistLine[] = []
   const groups = new Map<string, OwnRecipeChecklistLine>()
   // Keep an overflowed identity attached to its held line. Otherwise a third
-  // contribution could create a fresh priced-ready row after the earlier pair
+  // contribution could create a fresh shop-ready row after the earlier pair
   // overflowed, making an incomplete physical requirement look complete.
   const blockedGroups = new Set<string>()
   const contributorsByLine: Record<string, GroceryContribution[]> = Object.create(null)
@@ -89,11 +89,12 @@ export function combinedImportedRecipeGroceries(
           continue
         }
         // Overflow / fractional pieces are not valid product requirements.
-        // Hold the whole group and retain later matching rows on this same line.
+        // Keep one held line and expose why it needs human review.
         prior.original += ' + ' + item.original
         prior.amount = null
         prior.unit = null
         prior.needsReview = true
+        prior.holdReason = 'combined_quantity_exceeds_safe_limit'
         blockedGroups.add(groupKey!)
         continue
       }
@@ -104,6 +105,7 @@ export function combinedImportedRecipeGroceries(
         amount: complete ? item.amount : null,
         unit: complete ? item.unit : null,
         needsReview: !complete,
+        holdReason: item.holdReason,
         original: item.original,
       }
       lines.push(line)
