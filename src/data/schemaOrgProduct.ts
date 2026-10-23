@@ -493,9 +493,9 @@ export function parseSchemaOrgProduct(
  * existing private single-store capture format. This is an offline adapter:
  * it never fetches a retailer page and does not grant source permission.
  */
-export function rawProductObservationToPrivateCaptureJson(raw: unknown): string {
+function rawObservationToPrivateCaptureProduct(raw: unknown) {
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
-    throw new Error('De bronobservatie moet een JSON-object zijn.')
+    throw new Error('Elke bronobservatie moet een JSON-object zijn.')
   }
   const observation = validateRawProductObservation(raw as RawProductObservation)
   if (observation.supermarket !== 'plus' && observation.supermarket !== 'dekamarkt') {
@@ -525,26 +525,66 @@ export function rawProductObservationToPrivateCaptureJson(raw: unknown): string 
   const sourceAvailable = observation.availability === 'available'
     ? true
     : observation.availability === 'unavailable' ? false : undefined
-  const capture = {
+  return {
+    retailer,
+    observedAt: observation.provenance.capturedAt,
+    product: {
+      id: observation.sourceProductId,
+      name: observation.name,
+      packAmount: pack.amount,
+      packUnit: pack.unit,
+      packCount: normalizedPack.count,
+      priceCents: observation.currentPriceCents,
+      available: observation.availability === 'available' && observation.currentPriceCents !== null,
+      sourceAvailable,
+      availabilityLabel: observation.availability,
+      sourceUrl: observation.provenance.url,
+      sourceSha256: observation.provenance.sha256,
+      sourceKind: observation.provenance.kind,
+    },
+  }
+}
+
+/**
+ * Convert one or more already validated adapter observations into one local
+ * store capture. Combining is allowed only when every product has the same
+ * retailer and exact original UTC observation instant. Each product retains
+ * its own source URL, snapshot hash and source kind; no timestamp or price is
+ * inferred. The existing canonical capture importer remains the final gate.
+ */
+export function rawProductObservationsToPrivateCaptureJson(raw: unknown): string {
+  const observations = Array.isArray(raw) ? raw : [raw]
+  if (observations.length < 1 || observations.length > 1000) {
+    throw new Error('Importeer per winkelopname 1 tot 1.000 productobservaties.')
+  }
+
+  const converted = observations.map(rawObservationToPrivateCaptureProduct)
+  const first = converted[0]
+  if (!first) {
+    throw new Error('De winkelopname bevat geen productobservaties.')
+  }
+  if (converted.some(item => item.retailer !== first.retailer)) {
+    throw new Error('Combineer geen PLUS- en DekaMarkt-observaties in één winkelopname.')
+  }
+  if (converted.some(item => item.observedAt !== first.observedAt)) {
+    throw new Error('Alle productobservaties moeten exact hetzelfde oorspronkelijke UTC-bronmoment hebben. Splits verschillende momenten in aparte opnames.')
+  }
+  const ids = converted.map(item => item.product.id)
+  if (new Set(ids).size !== ids.length) {
+    throw new Error('Dezelfde originele productcode komt meer dan één keer voor in de bronobservaties.')
+  }
+
+  return JSON.stringify({
     schema: 'supa-private-single-store-prices-v1',
     captures: [{
-      retailer,
-      observedAt: observation.provenance.capturedAt,
-      products: [{
-        id: observation.sourceProductId,
-        name: observation.name,
-        packAmount: pack.amount,
-        packUnit: pack.unit,
-        packCount: normalizedPack.count,
-        priceCents: observation.currentPriceCents,
-        available: observation.availability === 'available' && observation.currentPriceCents !== null,
-        sourceAvailable,
-        availabilityLabel: observation.availability,
-        sourceUrl: observation.provenance.url,
-        sourceSha256: observation.provenance.sha256,
-        sourceKind: observation.provenance.kind,
-      }],
+      retailer: first.retailer,
+      observedAt: first.observedAt,
+      products: converted.map(item => item.product),
     }],
-  }
-  return JSON.stringify(capture)
+  })
+}
+
+/** Backwards-compatible singular API; arrays are also admitted by the batch converter. */
+export function rawProductObservationToPrivateCaptureJson(raw: unknown): string {
+  return rawProductObservationsToPrivateCaptureJson(raw)
 }
