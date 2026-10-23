@@ -532,21 +532,28 @@ export function OfflineReviewedWorkbench({
       proposed: basket.matchedLineCount,
       unresolved: basket.unresolvedLineCount,
       total: basket.lines.length,
-      lines: basket.lines.map(line => ({
-        id: line.id, label: line.ingredientLabel,
-        amount: line.requirement.amount, unit: line.requirement.unit,
-        status: line.status,
-        product: line.status === 'matched' ? line.productName : null,
-        originalSku: line.status === 'matched' ? line.productId : null,
-        packs: line.status === 'matched' ? line.packs : null,
-        packAmount: line.status === 'matched' ? line.pack.amount : null,
-        packUnit: line.status === 'matched' ? line.pack.unit : null,
-        packCount: line.status === 'matched' ? line.pack.count : null,
-        pricePerPackCents: line.status === 'matched' ? line.pricePerPackCents : null,
-        lineTotalCents: line.status === 'matched' ? line.lineTotalCents : null,
-        unitPrice: line.status === 'matched' ? privateUnitPrice(line) : null,
-        reasons: line.reasons,
-      })),
+      lines: basket.lines.map(line => {
+        const source = line.status === 'matched'
+          ? products.find(product => product.id === line.productId) : undefined
+        return {
+          id: line.id, label: line.ingredientLabel,
+          amount: line.requirement.amount, unit: line.requirement.unit,
+          status: line.status,
+          product: line.status === 'matched' ? line.productName : null,
+          originalSku: line.status === 'matched' ? line.productId : null,
+          packs: line.status === 'matched' ? line.packs : null,
+          packAmount: line.status === 'matched' ? line.pack.amount : null,
+          packUnit: line.status === 'matched' ? line.pack.unit : null,
+          packCount: line.status === 'matched' ? line.pack.count : null,
+          pricePerPackCents: line.status === 'matched' ? line.pricePerPackCents : null,
+          lineTotalCents: line.status === 'matched' ? line.lineTotalCents : null,
+          unitPrice: line.status === 'matched' ? privateUnitPrice(line) : null,
+          sourceUrl: source?.sourceUrl ?? null,
+          sourceSha256: source?.sourceSha256 ?? null,
+          sourceKind: source?.sourceKind ?? null,
+          reasons: line.reasons,
+        }
+      }),
     }
   }
 
