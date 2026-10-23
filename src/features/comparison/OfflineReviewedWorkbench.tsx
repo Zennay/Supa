@@ -5,6 +5,7 @@ import { compareFullBaskets, samePhysicalDemand } from '../../domain/basketCompa
 import { calculateDecimalPackCount } from '../../domain/decimalPackArithmetic.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots, type OfflineStoreProduct } from '../../domain/offlineReviewedImport.ts'
+import { rawProductObservationToPrivateCaptureJson } from '../../data/schemaOrgProduct.ts'
 import { combineTwoOwnShopCaptures, splitOwnStorePastedSheets } from './combineOwnStoreCaptures.ts'
 import { LocalTwoStorePriceEditor, type ReviewedRecaptureSeed } from './LocalTwoStorePriceEditor.tsx'
 import { ownPriceCapturesToCsv } from './ownPriceCsvExport.ts'
@@ -43,6 +44,27 @@ import { currentTripKey, loadTripProgress, saveTripProgress } from '../../privat
 import { createPrivateBasketComparisonCsv } from '../../privateBasketComparisonCsv.ts'
 import { UnpricedPlannerChecklist } from './UnpricedPlannerChecklist.tsx'
 import { PrivateCapturePastePreview } from './PrivateCapturePastePreview.tsx'
+
+function normalizeRawProductObservationInput(input: string): { content: string; converted: boolean } {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(input)
+  } catch {
+    return { content: input, converted: false }
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return { content: input, converted: false }
+  }
+  const value = parsed as Record<string, unknown>
+  const has = (key: string) => Object.prototype.hasOwnProperty.call(value, key)
+  // Existing adapter output is distinct from Schema.org JSON-LD itself. Only
+  // convert the already-provenanced RawProductObservation shape; all other
+  // JSON continues through the existing canonical capture parser unchanged.
+  if (!has('supermarket') || !has('provenance') || !has('pack')) {
+    return { content: input, converted: false }
+  }
+  return { content: rawProductObservationToPrivateCaptureJson(value), converted: true }
+}
 import { PortableBlankCapture } from './PortableBlankCapture.tsx'
 import { CaptureMatchingPreview, type PreviewMatchLine } from './CaptureMatchingPreview.tsx'
 import { CapturePairedPreview } from './CapturePairedPreview.tsx'
@@ -1640,6 +1662,7 @@ export function OfflineReviewedWorkbench({
   }
 
   function acceptManualSource(input: string) {
+    input = normalizeRawProductObservationInput(input).content
     ++importRevision.current
     setPendingReplacement(null)
     setBusy(false)
@@ -1692,6 +1715,7 @@ export function OfflineReviewedWorkbench({
   }
 
   function importSnapshots(input: string) {
+    input = normalizeRawProductObservationInput(input).content
     try {
       // Validate the entire proposed capture before changing the active
       // source, review keys, physical ticks, or any derived basket totals.
@@ -1824,6 +1848,8 @@ export function OfflineReviewedWorkbench({
               !('convertOwnStoreCsv' in module) || typeof module.convertOwnStoreCsv !== 'function')
             throw new Error('De bestaande lokale CSV-converter is niet beschikbaar.')
           json = (module.convertOwnStoreCsv as (input: string) => string)(raw)
+        } else {
+          json = normalizeRawProductObservationInput(raw).content
         }
         sources.push(json)
       }
@@ -1890,6 +1916,8 @@ export function OfflineReviewedWorkbench({
             !('convertOwnStoreCsv' in module) || typeof module.convertOwnStoreCsv !== 'function')
           throw new Error('De lokale bron-CSV-converter is niet beschikbaar.')
         source = (module.convertOwnStoreCsv as (input: string) => string)(raw)
+      } else {
+        source = normalizeRawProductObservationInput(raw).content
       }
       if (version !== importRevision.current) return
       const candidate = appendPrivateCaptureProducts(text, source, store, Date.now())
@@ -1939,6 +1967,8 @@ export function OfflineReviewedWorkbench({
             !('convertOwnStoreCsv' in module) || typeof module.convertOwnStoreCsv !== 'function')
           throw new Error('De bestaande lokale CSV-converter is niet beschikbaar.')
         json = (module.convertOwnStoreCsv as (input: string) => string)(raw)
+      } else {
+        json = normalizeRawProductObservationInput(raw).content
       }
       if (version !== importRevision.current) return
       // Stage ONLY: do not touch admitted source or previous checkmarks.
@@ -2023,6 +2053,8 @@ export function OfflineReviewedWorkbench({
           throw new Error('De lokale één-winkel CSV-converter is niet beschikbaar.')
         }
         content = (module.convertOwnStoreCsv as (input: string) => string)(raw)
+      } else {
+        content = normalizeRawProductObservationInput(raw).content
       }
       if (version !== importRevision.current) return
       if (addSecond) {
@@ -3821,10 +3853,27 @@ export function OfflineReviewedWorkbench({
           <div className="offline-price-workbench__dates">
             {stores.map(store => {
               const capture = imported.captures[store]
+              const provenanceProducts = capture?.products.filter(product =>
+                Boolean(product.sourceUrl && product.sourceSha256)) ?? []
+              const productsWithoutProvenance = capture?.products.filter(product =>
+                !product.sourceUrl || !product.sourceSha256).length ?? 0
               return capture
                 ? <div key={store}>
                     <p><strong>{store}</strong> · waargenomen {captureDate(capture.observedMs)}
                       {' '}· {capture.products.length} eigen bronproducten</p>
+                    {provenanceProducts.length > 0 && <details>
+                      <summary>Bronherkomst en SHA-256 ({provenanceProducts.length} product(en))</summary>
+                      <ul>
+                        {provenanceProducts.map(product => <li key={product.id}>
+                          <strong>{product.name}</strong><br />
+                          <code>{product.sourceUrl}</code><br />
+                          <small>Type: {product.sourceKind ?? 'onbekend'} · SHA-256: {product.sourceSha256}</small>
+                        </li>)}
+                      </ul>
+                    </details>}
+                    {productsWithoutProvenance > 0 && <small>
+                      {productsWithoutProvenance} product(en) zonder bron-URL/SHA-256; deze import bewijst geen bronrechten of veldbewijs.
+                    </small>}
                     <button className="ghost-button" type="button" onClick={() => downloadPrivateRecaptureCsv(store)}>
                       Alleen nieuwe prijsopname: oude verpakking als invulhulp behouden (CSV)
                     </button>
