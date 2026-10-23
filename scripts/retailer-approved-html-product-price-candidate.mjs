@@ -26,6 +26,7 @@ function unavailable(reason, captured) {
     source: {
       retailerId: captured.source.retailerId,
       kind: captured.source.kind,
+      url: captured.source.url,
       capturedAt: captured.source.capturedAt,
       sha256: captured.source.sha256,
     },
@@ -126,6 +127,7 @@ export async function captureApprovedProductPriceCandidate(options = {}) {
     source: {
       retailerId: provenance.supermarket,
       kind: provenance.kind,
+      url: provenance.url,
       capturedAt: provenance.capturedAt,
       sha256: provenance.sha256,
     },
