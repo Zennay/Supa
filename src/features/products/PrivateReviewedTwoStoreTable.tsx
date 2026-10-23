@@ -645,7 +645,8 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
         ...(['PLUS', 'DekaMarkt'] as const).flatMap(store =>
           ['status', 'bronmoment', 'productcode', 'product', 'hele_pakken',
             'pakinhoud', 'pakeenheid', 'stuks_per_verpakking', 'pakprijs_cent',
-            'regel_cent', 'eenheidsprijs'].map(field => store + '_' + field)),
+            'regel_cent', 'eenheidsprijs', 'bron_url', 'bronsoort',
+            'snapshot_sha256'].map(field => store + '_' + field)),
         'Deka_minus_PLUS_cent', 'betekenis']
       const rows = [header]
       for (const need of physical) {
@@ -655,14 +656,16 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
           if (!receipt || line?.status !== 'matched') {
             return { price: null as number | null, values: [
               receipt ? 'Geen gecontroleerde prijs' : 'Geen bron',
-              receipt?.observedAt ?? '', ...new Array<string>(9).fill(''),
+              receipt?.observedAt ?? '', ...new Array<string>(12).fill(''),
             ] }
           }
+          const source = receipt.sourceProducts?.find(item => item.id === line.productId)
           return { price: line.lineTotalCents as number | null, values: [
             'Bevestigde eigen bron', receipt.observedAt, line.productId,
             line.productName, String(line.packs), String(line.pack.amount),
             line.pack.unit, String(line.pack.count), String(line.pricePerPackCents),
             String(line.lineTotalCents), privateUnitPrice(line) ?? '',
+            source?.sourceUrl ?? '', source?.sourceKind ?? '', source?.sourceSha256 ?? '',
           ] }
         }
         const a = shopCell('PLUS')
