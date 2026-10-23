@@ -181,6 +181,11 @@ function scoreCandidate(
     return { score: -100, reasons: ['candidate piece pack amount must be a whole number'] }
   }
 
+  // An omitted count retains the legacy single-pack default; an explicit
+  // null means the source says the count is unknown and must not be treated as 1.
+  if (candidate.packCount === null) {
+    return { score: -100, reasons: ['pack count unknown'] }
+  }
   const packCount = candidate.packCount ?? 1
   if (!Number.isSafeInteger(packCount) || packCount <= 0) {
     return { score: -100, reasons: ['invalid pack count'] }
