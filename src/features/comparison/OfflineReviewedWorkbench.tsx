@@ -3759,6 +3759,7 @@ export function OfflineReviewedWorkbench({
             Beschikbaarheid: true/false of ja/nee; prijs uitsluitend in hele eurocenten.
             Deze import gebruikt dezelfde lokale broncontrole als de bestandskiezer:
             ontbrekende prijzen blijven onbekend, en iedere SKU vereist jouw review.</small>
+          <small>Adapterbatch: een JSON-array met maximaal 1.000 RawProductObservation-records kan één winkelopname vullen als alle regels dezelfde winkel en exact hetzelfde oorspronkelijke UTC-Z-bronmoment hebben. Dubbele productcodes, gemengde winkels of verschillende momenten worden geweigerd; elke productregel blijft afzonderlijk te beoordelen.</small>
         </div>
         {imported && Object.keys(imported.captures).length === 1 && (
           <label>Voeg de echte opname van de andere winkel toe (CSV of JSON)
