@@ -26,18 +26,20 @@ const header = [
   'PLUS_pakhoeveelheid', 'PLUS_pakeenheid', 'PLUS_stuks_per_verpakking',
   'PLUS_pakprijs_cent_onbevestigd', 'PLUS_hele_verpakkingen',
   'PLUS_regel_cent_onbevestigd', 'PLUS_eenheidsprijs_indicatief', 'PLUS_matchstatus',
+  'PLUS_bron_url', 'PLUS_bronsoort', 'PLUS_snapshot_sha256',
   'DekaMarkt_bronmoment', 'DekaMarkt_originele_sku', 'DekaMarkt_product',
   'DekaMarkt_pakhoeveelheid', 'DekaMarkt_pakeenheid', 'DekaMarkt_stuks_per_verpakking',
   'DekaMarkt_pakprijs_cent_onbevestigd', 'DekaMarkt_hele_verpakkingen',
   'DekaMarkt_regel_cent_onbevestigd', 'DekaMarkt_eenheidsprijs_indicatief',
-  'DekaMarkt_matchstatus', 'vervolgactie',
+  'DekaMarkt_matchstatus', 'DekaMarkt_bron_url', 'DekaMarkt_bronsoort',
+  'DekaMarkt_snapshot_sha256', 'vervolgactie',
 ] as const
 
 function quantity(line: PreviewMatchLine | undefined): string {
   return line ? readablePlannerDemandAmount(line.amount) + ' ' + line.unit : ''
 }
 function storeColumns(line: PreviewMatchLine | undefined, observedAt: string, fresh: boolean): string[] {
-  if (!line) return [observedAt, ...Array<string>(9).fill(''), 'Ontbrekende bronmatch']
+  if (!line) return [observedAt, ...Array<string>(9).fill(''), 'Ontbrekende bronmatch', '', '', '']
   if (!completePreviewProposal(line)) {
     // Keep identifiable original product facts even if its proposed price is
     // unusable. A blank SKU, package or price must never become invented zero.
@@ -58,14 +60,16 @@ function storeColumns(line: PreviewMatchLine | undefined, observedAt: string, fr
         (line.packCount ?? 0) > 0 ? String(line.packCount) : '',
       '', '', '', '',
       'Nog controleren: ' + (missing.join(', ') || 'fysieke pakdekking / regelberekening') +
-        (line.reasons.length ? '; ' + line.reasons.join('; ') : '')]
+        (line.reasons.length ? '; ' + line.reasons.join('; ') : ''),
+      line.sourceUrl ?? '', line.sourceKind ?? '', line.sourceSha256 ?? '']
   }
   return [observedAt, line.originalSku, line.product,
     readablePlannerDemandAmount(line.packAmount), line.packUnit,
     String(line.packCount), fresh ? String(line.pricePerPackCents) : '',
     String(line.packs), fresh ? String(line.lineTotalCents) : '',
     fresh ? line.unitPrice ?? '' : '',
-    fresh ? 'Onbevestigd bronvoorstel' : 'Oude/onbruikbare bron; prijs opnieuw opnemen']
+    fresh ? 'Onbevestigd bronvoorstel' : 'Oude/onbruikbare bron; prijs opnieuw opnemen',
+    line.sourceUrl ?? '', line.sourceKind ?? '', line.sourceSha256 ?? '']
 }
 
 /** Original candidate money only after canonical arithmetic; never deltas or totals. */
