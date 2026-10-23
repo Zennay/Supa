@@ -160,11 +160,15 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
         // Ambiguous candidates and meaningful extra product descriptors both
         // require human SKU review. Do not route these known source products to
         // a new capture sheet or silently promote the first plausible variant.
-        manualReview[store] = choice.type === 'abstain' && (
-          choice.reasons.includes('top candidates too close') ||
-          choice.reasons.some(reason =>
-            reason.includes('additional product descriptor(s) require review'))
+        const requiresManualSourceReview = choice.reasons.some(reason =>
+          reason === 'top candidates too close' ||
+          reason.includes('additional product descriptor(s) require review') ||
+          reason === 'candidate piece pack amount must be a whole number' ||
+          reason === 'invalid pack count' ||
+          reason === 'candidate effective pack amount invalid' ||
+          reason === 'candidate normalized pack amount invalid'
         )
+        manualReview[store] = choice.type === 'abstain' && requiresManualSourceReview
         const match = choice.type === 'match' ? products[store].get(choice.productId) : null
         // The fuzzy matcher can rank an attractive name even if the source
         // package belongs to a different physical unit family. Never present
