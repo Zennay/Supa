@@ -11,7 +11,7 @@ import type { PrivateSourceFileHandoff } from '../comparison/privateSourceFileHa
 import { ListingBasketPreview } from '../comparison/ListingBasketPreview'
 import type { BasketComparison } from '../../domain/basketComparison'
 import { euro } from '../../lib/money'
-import { quantityUnitLabelNl } from '../../lib/quantityPresentation'
+import { quantityAmountLabelNl } from '../../lib/quantityPresentation'
 import {
   basketComparisonCanShowMoney,
   basketComparisonHeadline,
@@ -25,8 +25,7 @@ import { StatPill } from '../../components/StatPill'
 import { comparisonLineHighlights, comparisonLineHighlightCopy, comparisonMatchesVisibleBaskets } from './comparisonLineHighlights.ts'
 
 function quantity(amount: number | null, unit: string) {
-  const label = quantityUnitLabelNl(unit, amount)
-  return amount === null ? `? ${label}` : `${amount} ${label}`
+  return quantityAmountLabelNl(amount, unit)
 }
 
 export function BasketView({
