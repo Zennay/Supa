@@ -3872,7 +3872,7 @@ export function OfflineReviewedWorkbench({
                         {provenanceProducts.map(product => <li key={product.id}>
                           <strong>{product.name}</strong><br />
                           <code>{product.sourceUrl}</code><br />
-                          <small>Type: {product.sourceKind ?? 'onbekend'} · SHA-256: {product.sourceSha256}</small>
+                          <small>Type: {product.sourceKind ?? 'onbekend'} · Beschikbaarheid: {product.availabilityLabel ?? 'onbekend'} · SHA-256: {product.sourceSha256}</small>
                         </li>)}
                       </ul>
                     </details>}
