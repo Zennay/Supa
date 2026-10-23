@@ -1,7 +1,9 @@
 import { createHash } from 'node:crypto'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, writeFile, readFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 import path from 'node:path'
+
+import { evaluateSourcePermissionGate } from './m1-check-source-permission-gate.mjs'
 
 export const SOURCES = [
   {
@@ -203,6 +205,15 @@ async function captureSource(source, rootDir) {
 
 export async function main() {
   validateSources()
+  // CI, workflow_dispatch and manual invocations share the SAME fail-closed
+  // source permission register. A public HTTPS catalog is never a license.
+  // Validate BEFORE creating artifacts, opening a browser or invoking fetch.
+  const gateFile = new URL('../evidence/m1/source-permission-gate.v1.json', import.meta.url)
+  const gateDocument = JSON.parse(await readFile(gateFile, 'utf8'))
+  const sourceRights = evaluateSourcePermissionGate(gateDocument)
+  if (!sourceRights.productionReady || sourceRights.blockers.length !== 0) {
+    throw new Error('M1 external capture denied: canonical retailer source rights not verified')
+  }
   const startedAt = new Date().toISOString()
   const rootDir = process.env.SUPA_CAPTURE_DIR ||
     path.join('artifacts', 'm1-captures', safeTimestamp(startedAt))

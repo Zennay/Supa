@@ -9,6 +9,15 @@ type ShoppingListProgress = {
 }
 
 const matchUnits = new Set(['g', 'kg', 'ml', 'l', 'piece', 'unknown'])
+// A visible retailer ID and name are necessary even when a basket has rows.
+// Never stamp checkmark identity for Unicode filler or direction-control text.
+const hiddenStoreCharacters = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}\u115F\u1160\u3164\uFFA0\u2800]/u
+function visibleStoreText(value: unknown): value is string {
+  return typeof value === 'string' &&
+    value === value.trim() &&
+    !hiddenStoreCharacters.test(value) &&
+    /[\p{L}\p{N}]/u.test(value)
+}
 
 type ShoppingListBasketState = {
   basketKey: string
@@ -147,7 +156,8 @@ function projectShoppingListBasketState(basket: unknown): ShoppingListBasketStat
   const basketLines = ownFact(basket, 'lines')
   if (!isRecord(store) || !Array.isArray(basketLines)) return null
   const storeId = ownFact(store, 'id')
-  if (!isNonBlankString(storeId)) return null
+  const storeName = ownFact(store, 'name')
+  if (!visibleStoreText(storeId) || !visibleStoreText(storeName)) return null
 
   const validIds = new Set<string>()
   const lines: Record<string, unknown>[] = []
@@ -161,6 +171,38 @@ function projectShoppingListBasketState(basket: unknown): ShoppingListBasketStat
     validIds.add(line.id)
     lines.push(line)
   }
+
+  // The persistent v1 key deliberately stays the same for valid baskets.
+  // The old implementation trusted only nested lines; root totals could lie,
+  // allowing checkmarks or print/copy to survive a mismatched price ledger.
+  const meals = ownFact(basket, 'selectedMealCount')
+  const matchedCount = ownFact(basket, 'matchedLineCount')
+  const unresolvedCount = ownFact(basket, 'unresolvedLineCount')
+  const declaredTotal = ownFact(basket, 'totalCents')
+  if (!isNonNegativeSafeInteger(meals) ||
+      !isNonNegativeSafeInteger(matchedCount) ||
+      !isNonNegativeSafeInteger(unresolvedCount) ||
+      !isNonNegativeSafeInteger(declaredTotal) ||
+      (lines.length > 0 && meals === 0) ||
+      matchedCount + unresolvedCount !== lines.length) return null
+
+  let actualMatched = 0
+  let actualUnresolved = 0
+  let actualCents = 0
+  for (const line of lines) {
+    if (line.status === 'unresolved') {
+      actualUnresolved++
+      continue
+    }
+    if (line.status !== 'matched' ||
+        !isNonNegativeSafeInteger(line.lineTotalCents)) return null
+    actualMatched++
+    actualCents += line.lineTotalCents
+    if (!Number.isSafeInteger(actualCents)) return null
+  }
+  if (actualMatched !== matchedCount ||
+      actualUnresolved !== unresolvedCount ||
+      actualCents !== declaredTotal) return null
 
   return {
     basketKey: JSON.stringify({ storeId, lines }),
@@ -236,4 +278,73 @@ export function serializeShoppingListProgress(
     basketKey: basketState.basketKey,
     doneLineIds: safeDoneLineIds,
   } satisfies ShoppingListProgress)
+}
+
+
+// A new versioned key is mandatory: v1 included money and must never be
+// reinterpreted as a price-independent approval. Keep its exact parser intact.
+export const shoppingListPhysicalProgressStorageKey = 'supa:shopping-list-progress:v2'
+
+function physicalState(basket: OneStoreBasket): ShoppingListBasketState | null {
+  const validated = shoppingListBasketState(basket)
+  if (!validated) return null
+  const snapshot = JSON.parse(validated.basketKey) as {
+    storeId: string
+    lines: Record<string, unknown>[]
+  }
+  const lines = snapshot.lines.map(line => {
+    if (line.status !== 'matched') return line
+    const { pricePerPackCents: _packPrice, lineTotalCents: _total, ...physical } = line
+    void _packPrice
+    void _total
+    return physical
+  })
+  return { basketKey: JSON.stringify({ storeId: snapshot.storeId, lines }),
+    validIds: validated.validIds }
+}
+
+/** Physical completion can survive a price-only update, never a SKU/pack,
+ * store, amount, matched-status or ingredient-ID change.
+ */
+export function shoppingListPhysicalBasketKey(basket: OneStoreBasket): string {
+  const state = physicalState(basket)
+  if (!state) throw Error('Invalid physical shopping basket.')
+  return state.basketKey
+}
+
+export function restorePhysicalShoppingProgress(
+  basket: OneStoreBasket, raw: string | null,
+): string[] {
+  if (!raw) return []
+  try {
+    const state = physicalState(basket)
+    if (!state) return []
+    const root: unknown = JSON.parse(raw)
+    if (!root || typeof root !== 'object' || Array.isArray(root)) return []
+    const record = root as Record<string, unknown>
+    if (Object.keys(record).sort().join(',') !==
+        ['schemaVersion', 'physicalBasketKey', 'doneLineIds'].sort().join(',') ||
+        record.schemaVersion !== 2 || record.physicalBasketKey !== state.basketKey ||
+        !Array.isArray(record.doneLineIds) ||
+        record.doneLineIds.length > state.validIds.size) return []
+    const done = new Set<string>()
+    for (const id of record.doneLineIds) {
+      if (typeof id !== 'string' || !state.validIds.has(id) || done.has(id)) return []
+      done.add(id)
+    }
+    return [...done]
+  } catch { return [] }
+}
+
+export function serializePhysicalShoppingProgress(
+  basket: OneStoreBasket, doneLineIds: unknown,
+): string {
+  const state = physicalState(basket)
+  if (!state) throw Error('Invalid physical shopping basket.')
+  const candidates = Array.isArray(doneLineIds) ? doneLineIds : []
+  const done = Array.from(new Set(candidates.filter((id): id is string =>
+    typeof id === 'string' && state.validIds.has(id))))
+  return JSON.stringify({
+    schemaVersion: 2, physicalBasketKey: state.basketKey, doneLineIds: done,
+  })
 }

@@ -1,0 +1,338 @@
+/* Original SUPA Hifi, Home 3307:4224. Static asset geometry follows Figma. */
+:root {
+  --surface: #f3f4f6;
+  --surface-strong: #fff;
+  --ink: #262527;
+  --muted: #797979;
+  --line: #e8ebed;
+  --accent: #c4fdeb;
+  --accent-ink: #006642;
+  --hifi-action: #005135;
+  --hifi-mint: #76f8ca;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', Inter, 'Segoe UI', sans-serif;
+}
+body { background: #e9eeec; }
+.app-shell { max-width: 440px; background: var(--surface); }
+.app-shell.hifi-shell { padding-bottom: 0; }
+.hifi-shell > .content { padding: 0; }
+.hifi-home { padding: 64px 24px 128px; display: flex; flex-direction: column; gap: 24px; min-height: 100dvh; color: var(--ink); }
+.hifi-home button { cursor: pointer; color: inherit; }
+.hifi-home img, .hifi-nav img { display: block; flex-shrink: 0; }
+.hifi-home h1, .hifi-home h2, .hifi-home h3 { margin: 0; letter-spacing: 0; line-height: 1.2; font-weight: 600; }
+.hifi-greeting { display: flex; justify-content: space-between; align-items: center; }
+.hifi-person { display: flex; gap: 12px; align-items: center; }
+.hifi-person > img { border-radius: 34px; object-fit: cover; }
+.hifi-person p { color: var(--muted); font-size: 14px; }
+.hifi-person strong { font-size: 16px; font-weight: 500; }
+.hifi-demo-label { color: var(--muted); font-size: 11px; }
+.hifi-icon-button { border: 0; padding: 0; background: transparent; width: 50px; height: 50px; }
+.hifi-week { background: var(--accent); color: var(--accent-ink); border-radius: 20px; padding: 24px; display: grid; gap: 24px; }
+.hifi-week h1 { font-size: 16px; margin-bottom: 4px; }
+.hifi-week p { color: #2b8365; font-size: 14px; line-height: 1.25; }
+.hifi-days { display: flex; justify-content: space-between; align-items: flex-end; }
+.hifi-days button { position: relative; display: grid; justify-items: center; gap: 4px; padding: 12px 0 0; background: none; border: 0; font-size: 14px; color: var(--accent-ink); }
+.hifi-days button > span:last-child { width: 50px; height: 50px; display: grid; place-items: center; background: #9aedcf80; border-radius: 50%; color: #258262; }
+.hifi-days button:first-child > span:last-child { background: #9aedcf; }
+.hifi-today::before { content: ''; display: block; width: 8px; height: 8px; background: #006642; position: absolute; left: calc(50% - 4px); top: 0; border-radius: 50%; }
+.hifi-home .hifi-plan-button { border: 0; border-radius: 40px; background: var(--hifi-action); color: var(--hifi-mint); display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 12px 20px; font-size: 14px; font-weight: 600; width: 100%; }
+.hifi-week .hifi-plan-button { margin-top: -8px; }
+.hifi-search-row { display: flex; gap: 8px; }
+.hifi-search { display: flex; flex: 1; min-width: 0; align-items: center; gap: 24px; padding: 14px; border: 2px solid #f5f6f9; border-radius: 61px; background: white; }
+.hifi-search input { min-width: 0; width: 100%; border: 0; background: none; color: var(--ink); font-size: 14px; padding: 0; height: 20px; }
+.hifi-search input::placeholder { color: #848484; opacity: 1; }
+.hifi-filter { width: 52px; flex-shrink: 0; border: 2px solid #f5f6f9; border-radius: 41px; display: grid; place-items: center; background: white; }
+.hifi-filter[aria-expanded=true] { background: var(--accent); }
+.hifi-filter-panel { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: white; border-radius: 15px; font-size: 14px; }
+.hifi-filter-panel label { display: flex; gap: 8px; align-items: center; }
+.hifi-filter-panel button { min-height: 44px; border: 0; background: none; }
+.hifi-demo-note { color: #666; font-size: 11px; line-height: 1.4; margin: -14px 2px -12px; }
+.hifi-section { display: grid; gap: 16px; min-width: 0; }
+.hifi-section-heading { display: flex; justify-content: space-between; align-items: center; gap: 6px; padding: 0 2px; }
+.hifi-section-heading h2 { font-size: 16px; color: #333; }
+.hifi-section-heading button { display: flex; align-items: center; gap: 6px; padding: 0; min-height: 28px; white-space: nowrap; font-size: 14px; color: #848484; background: none; border: 0; }
+.hifi-recipe-row { display: flex; gap: 8px; width: calc(100% + 24px); overflow-x: auto; scroll-snap-type: x proximity; padding: 0 24px 5px 0; scrollbar-width: none; }
+.hifi-recipe-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.hifi-recipe-card { isolation: isolate; flex: 0 0 192px; min-width: 0; height: 143px; padding: 12px; border-radius: 15px; position: relative; display: flex; flex-direction: column; justify-content: space-between; color: white; box-shadow: 3px 5px 5.2px #00000014; scroll-snap-align: start; }
+.hifi-recipe-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 15px; z-index: -2; }
+.hifi-recipe-card::after { content: ''; position: absolute; inset: 0; border-radius: 15px; z-index: -1; background: linear-gradient(0deg,#000c 4%,#6660 95%); pointer-events: none; }
+.hifi-recipe-open { position: absolute; inset: 0; border: 0; border-radius: 15px; background: none; }
+.hifi-recipe-top { display: flex; justify-content: space-between; align-items: center; pointer-events: none; }
+.hifi-saving { display: flex; gap: 2px; align-items: center; background: #00513599; border-radius: 15px; padding: 6px 9px; font-size: 12px; color: #36c693; backdrop-filter: blur(3px); }
+.hifi-favorite { position: relative; z-index: 1; pointer-events: auto; border: 0; padding: 0; background: none; border-radius: 50%; }
+.hifi-favorite::after { content: ''; position: absolute; inset: -7px; }
+.hifi-favorite[aria-pressed=true] { background: #005135; outline: 2px solid #76f8ca; }
+.hifi-recipe-caption { pointer-events: none; }
+.hifi-recipe-caption h3 { font-size: 14px; margin-bottom: 2px; }
+.hifi-recipe-caption p, .hifi-recipe-caption p span { display: flex; align-items: center; gap: 2px; font-size: 12px; }
+.hifi-recipe-caption p { gap: 12px; }
+.hifi-product-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px 12px; margin: 0 -4px; }
+.hifi-product-card { min-width: 0; padding: 12px; background: white; border-radius: 15px; display: grid; gap: 12px; }
+.hifi-product-image { position: relative; display: grid; place-items: center; height: 120px; border-radius: 10px; background: #f3f4f6; }
+.hifi-product-photo { width: 68px; height: 72px; object-fit: cover; }
+.hifi-store-logo { position: absolute; top: 7.5px; left: 8px; width: 32px; height: 32px; overflow: hidden; border-radius: 8px; }
+.hifi-store-logo img { position: absolute; max-width: none; }
+.hifi-store-logo.dirk img { width: 272.11%; height: 136.67%; left: -86.39%; top: -18.45%; }
+.hifi-store-logo.hoogvliet img { width: 152.43%; height: 152.43%; left: -26.21%; top: -26.21%; }
+.hifi-store-logo.jumbo img { width: 152.91%; height: 150.15%; left: -26.62%; top: -25.25%; }
+.hifi-unit-price { position: absolute; top: 15px; right: 8px; color: #848484; font-size: 12px; }
+.hifi-product-copy { padding: 0 6px; display: grid; gap: 4px; }
+.hifi-product-copy h3 { font-size: 14px; font-weight: 500; min-height: 37px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.hifi-product-price { display: flex; align-items: baseline; gap: 4px; font-size: 12px; }
+.hifi-product-price > span { margin-right: auto; color: #848484; font-size: 11px; }
+.hifi-product-price del { color: #848484; white-space: nowrap; }
+.hifi-product-price strong { font-size: 14px; font-weight: 500; white-space: nowrap; }
+.hifi-product-actions { display: flex; align-items: center; justify-content: space-between; margin: -6px 0 -6px; }
+.hifi-product-actions button { min-width: 44px; min-height: 44px; display: grid; place-items: center; padding: 6px; border: 0; border-radius: 50%; background: none; }
+.hifi-product-actions button:first-child { margin-left: -6px; }
+.hifi-product-actions button:last-child { margin-right: -6px; }
+.hifi-product-favorite[aria-pressed=true] { background: var(--accent); }
+.hifi-added { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: #def5ed; color: #006642; font-weight: bold; }
+.hifi-feedback:empty { display: none; }
+.hifi-feedback, .hifi-empty { font-size: 14px; line-height: 1.4; }
+.hifi-feedback { background: white; border-radius: 12px; padding: 12px; }
+.hifi-home .hifi-page-title { font-size: 24px; }
+.hifi-products-heading { display: flex; align-items: center; justify-content: space-between; }
+.hifi-products-heading .hifi-page-title { font-size: 18px; letter-spacing: -.216px; }
+.hifi-products-heading .hifi-icon-button { display: grid; place-items: center; }
+.hifi-products .hifi-section-heading .hifi-product-sort { background: white; padding: 8px 12px; border-radius: 30px; font-size: 12px; color: #111; }
+.hifi-products .hifi-product-sort[aria-pressed=true] { background: #def5ed; }
+.hifi-products .hifi-filter-panel { flex-wrap: wrap; gap: 10px; }
+.hifi-products .hifi-filter-panel select { min-height: 40px; max-width: 156px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 12px; background: white; color: #333; font: inherit; }
+.hifi-products .hifi-filter-panel label { gap: 6px; }
+.hifi-products .hifi-section-heading .hifi-product-sort { min-height: 38px; gap: 7px; white-space: normal; text-align: left; max-width: 190px; }
+.hifi-products .hifi-product-sort[aria-pressed=true] { outline: 2px solid #006642; outline-offset: 1px; }
+
+.bottom-nav.hifi-nav { grid-template-columns: repeat(5,minmax(0,1fr)); width: min(calc(100% - 48px),392px); padding: 16px; gap: 0; bottom: calc(24px + env(safe-area-inset-bottom)); border: 0; background: white; box-shadow: 0 8px 36px #152d2829; z-index: 20; }
+.hifi-nav button { width: 50px; height: 50px; min-width: 0; padding: 0; display: grid; place-items: center; justify-self: center; position: relative; }
+.hifi-nav button.active { background: #def5ed; }
+.hifi-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.hifi-utilities { display: flex; justify-content: flex-end; gap: 8px; margin: 10px 0 18px; }
+.hifi-utilities button { border: 0; border-radius: 20px; min-height: 44px; padding: 8px 14px; color: #006642; background: white; }
+.hifi-dialog { width: min(392px,calc(100% - 32px)); max-height: calc(100dvh - 48px); border: 0; border-radius: 20px; padding: 24px; color: var(--ink); }
+.hifi-dialog::backdrop { background: #13251fcc; }
+.hifi-dialog form { display: flex; justify-content: flex-end; margin-bottom: 16px; }
+.hifi-dialog h2 { font-size: 24px; margin: 16px 0 8px; }
+.hifi-dialog p { font-size: 14px; line-height: 1.5; margin-bottom: 16px; }
+.hifi-detail-photo { width: 100%; height: 180px; object-fit: cover; border-radius: 15px; }
+.hifi-demo-list { display: grid; gap: 12px; background: white; border-radius: 20px; padding: 16px; margin-bottom: 24px; }
+.hifi-demo-list-row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.hifi-demo-list-row > img { object-fit: contain; }
+.hifi-demo-list-row > span { flex: 1; }
+.hifi-working-shell > .topbar { display: none; }
+.hifi-working-shell > .content { padding: 64px 24px 128px; }
+.hifi-working-shell .hifi-utilities { margin: 0 0 16px; }
+.hifi-working-shell .section-heading h2 { font-family: Poppins, -apple-system, sans-serif; font-size: 18px; letter-spacing: -.216px; color: #333; }
+.hifi-planner-screen { gap: 24px; }
+.hifi-planner-screen .day-grid { gap: 8px; }
+.hifi-planner-screen .meal-config, .hifi-planner-screen .meal-config.active { border: 0; border-radius: 20px; background: white; box-shadow: none; padding: 16px 20px; min-height: 98px; }
+.hifi-planner-screen .day { border-right: 1.5px solid #e5e5e5; border-radius: 0; background: none; align-self: stretch; display: grid; place-items: center; font-size: 14px; }
+.hifi-planner-screen .plan-check { border: 0; border-radius: 50%; background: #005135; color: #76f8ca; font-size: 24px; font-weight: 500; }
+.hifi-planner-screen .meal-copy select { font-size: 14px; font-weight: 500; }
+.hifi-planner-screen .meal-copy label { font-size: 11px; font-weight: 400; text-transform: none; letter-spacing: 0; }
+.hifi-planner-screen .budget-card { border: 0; border-radius: 20px; padding: 24px; }
+.hifi-planner-screen .budget-heading strong { font-size: 24px; font-weight: 600; letter-spacing: 0; }
+.hifi-planner-screen .budget-chip.active { background: #005135; border-color: #005135; color: #76f8ca; }
+
+/* Original Shoplist 3342:4815: visual hierarchy follows the 24px outer
+   gutter, 40px store chip and 20px white item cards. Domain basket
+   identities and product order are never replaced by Figma example content. */
+.hifi-shopping-screen { gap: 24px; }
+.hifi-shopping-screen .section-heading:first-child { margin: 0; }
+.hifi-shoplist-store { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.hifi-shoplist-store-mark { width: 40px; height: 40px; flex: none; display: grid; place-items: center; border: 2.5px solid #76f8ca; border-radius: 8px; background: #005135; color: #76f8ca; font-weight: 700; }
+.hifi-shoplist-store > div:last-child { min-width: 0; display: grid; gap: 3px; }
+.hifi-shoplist-store span { font-size: 12px; color: #848484; }
+.hifi-shoplist-store strong { color: #333; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.hifi-shoplist-store small { color: #626569; font-size: 11px; line-height: 1.4; }
+.hifi-shoplist-category { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.hifi-shoplist-category h3 { color: #1e1e1e; font-size: 16px; font-weight: 500; margin: 0; }
+.hifi-shoplist-category > span { padding: 5px 8px; background: #e1e1ea; color: #333; border-radius: 5px; font-size: 12px; white-space: nowrap; }
+.hifi-shopping-screen .list-card { border: 0; background: transparent; border-radius: 0; overflow: visible; display: grid; gap: 8px; }
+.hifi-shopping-screen .shopping-row { border: 0; min-height: 74px; padding: 16px; border-radius: 20px; grid-template-columns: 18px 1fr; align-items: center; gap: 12px; }
+.hifi-shopping-screen .check { width: 16px; height: 16px; border: 1px solid #848484; border-radius: 50%; font-size: 12px; }
+.hifi-shopping-screen .shopping-row strong { font-size: 14px; font-weight: 500; }
+.hifi-shopping-screen .shopping-row small { font-size: 14px; color: #848484; }
+@media (max-width: 390px) {
+  .hifi-working-shell > .content { padding-left: 16px; padding-right: 16px; }
+  .hifi-home { padding-left: 16px; padding-right: 16px; }
+  .hifi-week { padding: 20px; }
+  .hifi-days button > span:last-child { width: 44px; height: 44px; }
+  .hifi-search { gap: 12px; }
+  .hifi-search input { font-size: 12px; }
+  .hifi-section-heading h2 { font-size: 14px; }
+  .hifi-section-heading button { font-size: 12px; }
+  .hifi-product-card { padding: 10px; }
+  .hifi-product-copy { padding: 0; }
+  .hifi-unit-price { font-size: 10px; right: 5px; }
+  .hifi-recipe-row { width: calc(100% + 16px); padding-right: 16px; }
+  .hifi-product-price { flex-wrap: wrap; }
+}
+
+/* Figma 3064:3125: retain the original two-column card geometry for genuine
+   source-capture identities, but never substitute unrelated prototype photos. */
+.hifi-product-source-tabs { display: flex; gap: 8px; }
+.hifi-product-source-tabs button { flex: 1; min-height: 44px; border: 0; border-radius: 24px; padding: 9px 12px; background: white; color: #333; font-size: 12px; }
+.hifi-product-source-tabs button[aria-pressed=true] { color: #76f8ca; background: #005135; }
+.hifi-historical-warning { margin: 0; background: #e2f5ed; padding: 12px 14px; border-radius: 12px; font-size: 12px; line-height: 1.5; }
+.hifi-source-image { display: grid; place-items: center; width: 68px; height: 72px; border-radius: 10px; background: #d8ede4; color: #005135; font-size: 30px; font-weight: 700; }
+.hifi-store-logo.hifi-store-text { display: grid; place-items: center; background: #fff; color: #005135; font-size: 9px; font-weight: 700; border: 1px solid #d8e4de; }
+.hifi-no-price { font-size: 12px; font-weight: 600; color: #576962; }
+.hifi-product-copy small { font-size: 10px; color: #68766f; line-height: 1.4; }
+.hifi-source-link { border-radius: 20px; background: #e2f5ed; color: #005135; padding: 10px 12px; min-height: 44px; display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; text-decoration: none; }
+.hifi-products .hifi-product-source-tabs button { white-space: normal; }
+
+/* Figma Products 3064:3125 — screen-first layout, source controls secondary. */
+.hifi-products { gap: 16px; }
+.hifi-products .hifi-products-heading { min-height: 50px; }
+.hifi-products .hifi-products-heading .hifi-page-title {
+  font-family: Poppins, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 18px; font-weight: 600; color: #333; letter-spacing: -.216px;
+}
+.hifi-products .hifi-products-heading .hifi-icon-button {
+  display: grid; place-items: center; border-radius: 50px;
+}
+.hifi-products .hifi-products-heading .hifi-icon-button[aria-expanded=true] {
+  background: white;
+}
+.hifi-products .hifi-search-row { min-height: 50px; align-items: stretch; }
+.hifi-products .hifi-search {
+  min-height: 50px; border-radius: 61px; padding: 16px;
+  gap: 24px; background: #fff; border-color: #f5f6f9;
+}
+.hifi-products .hifi-search input { font-size: 14px; }
+.hifi-weekly-link {
+  width: 50px; height: 50px; flex: 0 0 50px; border: 0; border-radius: 50%;
+  background: white; display: grid; place-items: center; cursor: pointer;
+}
+.hifi-weekly-link img { display: block; }
+.hifi-products .hifi-section { gap: 16px; }
+.hifi-products .hifi-section-heading { min-height: 38px; align-items: start; }
+.hifi-products .hifi-section-heading h2 { font-size: 16px; }
+.hifi-products .hifi-section-heading .recipe-count { color: #848484; font-size: 14px; margin-top: 2px; }
+.hifi-products .hifi-product-grid { gap: 12px; }
+.hifi-products .hifi-product-card { min-height: 260px; }
+.hifi-products .hifi-filter-panel {
+  align-items: stretch; gap: 12px; padding: 16px; flex-direction: column;
+  border: 1px solid #f1f3f5; border-radius: 16px;
+}
+.hifi-products .hifi-filter-panel label { justify-content: space-between; min-height: 38px; }
+.hifi-products .hifi-product-source-tabs { width: 100%; order: -1; }
+.hifi-products .hifi-product-source-tabs button { min-height: 44px; }
+.hifi-products .hifi-historical-warning { margin: 0; }
+
+/* Figma Shoplist 3342:4815 — card stack, product slot, right-hand price,
+   and bottom total, preserving real checklist IDs and storage semantics. */
+.hifi-shopping-screen .shopping-row {
+  display: grid; grid-template-columns: 16px 50px minmax(0,1fr) minmax(44px,auto);
+  gap: 8px; align-items: center; min-height: 74px;
+  padding: 12px 16px 12px 12px; border-radius: 20px;
+  background: white; border: 0; text-align: left;
+}
+.hifi-shopping-screen .shopping-row.unresolved-shopping { background: #fff9ef; }
+.hifi-shopping-screen .shopping-row.checked { opacity: .76; }
+.hifi-shopping-screen .shopping-row .check {
+  width: 16px; height: 16px; border: 1.5px solid #848484; border-radius: 50%;
+}
+.hifi-shopping-thumb {
+  flex: none; width: 50px; height: 50px; display: grid; place-items: center;
+  border-radius: 12px; background: #edf1ed; color: #547363;
+  font-size: 20px; font-weight: 600;
+}
+.hifi-shopping-detail { display: grid; gap: 4px; min-width: 0; }
+.hifi-shopping-screen .hifi-shopping-detail strong {
+  font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+  font-size: 14px; line-height: 1.25; color: #111; font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.hifi-shopping-screen .hifi-shopping-detail small {
+  font-size: 14px; line-height: 1.3; color: #4c4c4c;
+}
+.hifi-shopping-price {
+  justify-self: end; font-size: 14px; color: #333;
+  white-space: nowrap; font-weight: 500; font-variant-numeric: tabular-nums;
+}
+.hifi-shopping-screen .hifi-shoplist-category { margin-top: 2px; }
+.hifi-shoplist-total {
+  display: grid; gap: 12px; background: #fff;
+  border-radius: 20px; padding: 24px; margin-bottom: 12px;
+}
+.hifi-shoplist-total__line {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  color: #111; font-size: 16px;
+}
+.hifi-shoplist-total__line strong {
+  color: #333; font-size: 20px; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.hifi-shoplist-total>p { color: #848484; font-size: 12px; line-height: 1.45; }
+.hifi-shoplist-tools { border: 0; background: transparent; min-width: 0; }
+.hifi-shoplist-tools summary {
+  cursor: pointer; color: #3b6651; font-size: 13px; font-weight: 600;
+  min-height: 44px; display: flex; align-items: center;
+}
+.hifi-shoplist-tool-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.hifi-shoplist-tool-actions button { min-height: 44px; }
+@media (max-width: 359px) {
+  .hifi-shopping-screen .shopping-row {
+    grid-template-columns: 16px 42px minmax(0,1fr);
+  }
+  .hifi-shopping-thumb { width: 42px; height: 42px; }
+  .hifi-shopping-price { grid-column: 3; justify-self: start; font-size: 12px; }
+}
+
+/* Keep secondary prototype selections out of the primary Figma shoplist frame. */
+.hifi-demo-details { margin: 4px 0 26px; }
+.hifi-demo-details > summary {
+  display: flex; align-items: center; min-height: 44px; cursor: pointer;
+  font-size: 13px; font-weight: 600; color: #4f7262;
+}
+.hifi-demo-details .hifi-demo-list { margin: 0 0 12px; }
+@media (max-width: 390px) {
+  .hifi-products .hifi-search { gap: 12px; }
+  .hifi-products .hifi-search input { font-size: 14px; }
+  .hifi-products .hifi-product-grid { margin: 0 -4px; }
+}
+
+/* Producten 3064:3125 — exact Figma-export imagery at its original 68×72 card slot. */
+.hifi-products .hifi-product-photo { width: 68px; height: 72px; object-fit: contain; }
+.hifi-products .hifi-unpriced { display: inline-block; font-size: 11px; line-height: 1.3; color: #848484; text-align: right; }
+
+/* Figma Shoplist 3342:4815 — recipe-based section headers, displayed once. */
+.hifi-shopping-screen .list-card > .hifi-shoplist-category { margin: 14px 2px 0; min-height: 30px; }
+.hifi-shopping-screen .list-card > .hifi-shoplist-category:first-child { margin-top: 0; }
+.hifi-shopping-screen .list-card > .hifi-shoplist-category h3 { font-size: 16px; line-height: 1.3; }
+.hifi-shopping-screen .list-card > .hifi-shoplist-category span { font-size: 12px; }
+
+/* P0 product selection: historical observations are explicitly unpriced and
+   visually separated from Figma-only mock-product cards. */
+.hifi-history-add {
+  font: inherit; font-weight: 700; cursor: pointer; min-height: 44px;
+  border: 1px solid #829b89; background: #e7f0e6; color: #244835;
+  border-radius: 10px; padding: .45rem .65rem;
+}
+.hifi-history-add[aria-pressed="true"] { background: #244835; color: white; }
+.hifi-history-add:focus-visible, .hifi-demo-list :is(button,textarea):focus-visible {
+  outline: 3px solid #276e55; outline-offset: 3px;
+}
+.hifi-picked-history, .hifi-picked-demo { display: grid; gap: .65rem; min-width: 0; }
+.hifi-picked-history h4, .hifi-picked-demo h4 { margin: .4rem 0 0; }
+.hifi-picked-history { border-left: 4px solid #668875; padding: .25rem 0 .25rem .85rem; }
+.hifi-picked-demo { border-left: 4px solid #bdbdbc; padding: .25rem 0 .25rem .85rem; }
+.hifi-picked-source-logo { width: 38px; height: 38px; display: grid; place-items: center;
+  flex: 0 0 38px; background: #e6eddf; border-radius: 8px; font-weight: 800; }
+.hifi-picked-details { min-width: 0; flex: 1; display: grid; gap: .3rem; overflow-wrap: anywhere; }
+.hifi-picked-details span { color: #58665d; font-size: .85em; }
+.hifi-picked-copy-label { display: grid; gap: .45rem; font-weight: 650; }
+.hifi-picked-copy-label textarea { resize: vertical; width: 100%; box-sizing: border-box;
+  padding: .75rem; color: #202020; background: #f9fbf8; border: 1px solid #abb7ad;
+  border-radius: 9px; line-height: 1.45; font-size: .87rem; }
+@media (max-width: 620px) {
+  .hifi-picked-history-row { flex-wrap: wrap; }
+  .hifi-picked-history-row .ghost-button { margin-left: auto; min-height: 44px; }
+}
+
+.hifi-go-to-list { min-height: 44px; border-radius: 12px; padding: .5rem .85rem;
+  border: 1px solid #78967f; background: #e8f1e7; font: inherit;
+  color: #254e38; font-weight: 750; cursor: pointer; margin-left: auto; }
+.hifi-go-to-list:focus-visible { outline: 3px solid #226f52; outline-offset: 3px; }
+@media(max-width:420px) { .hifi-go-to-list { font-size: .82rem; padding: .5rem .6rem; } }

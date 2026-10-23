@@ -1,0 +1,49 @@
+/* The Lijst source picker is only a direct handoff to Vergelijk's strict
+   local user-file parser, never a price, retailer-right or SKU approval. */
+.supa-list-source-upload {
+  display: grid;
+  gap: .45rem;
+  padding: .9rem;
+  border: 1px solid #bdd5c4;
+  border-radius: 12px;
+  background: #f5faf6;
+  color: #214f35;
+  line-height: 1.45;
+}
+.supa-list-source-upload small {
+  font-weight: 400;
+  color: #4a6752;
+  overflow-wrap: anywhere;
+}
+.supa-list-source-upload input {
+  display: block;
+  box-sizing: border-box;
+  min-height: 44px;
+  max-width: 100%;
+  border: 1px solid #89a998;
+  border-radius: 8px;
+  padding: .55rem;
+  background: #fff;
+  font: inherit;
+}
+.supa-list-source-upload input::file-selector-button {
+  min-height: 42px;
+  padding: .4rem .65rem;
+  margin-right: .55rem;
+  border: 1px solid #629172;
+  border-radius: 8px;
+  font: inherit;
+  cursor: pointer;
+  color: #214f35;
+  background: #eaf3ea;
+}
+.supa-list-source-upload input:focus-visible {
+  outline: 3px solid #246b50;
+  outline-offset: 2px;
+}
+.supa-list-source-upload__error {
+  border-left: 3px solid #b45042;
+  padding: .6rem;
+  color: #802d21;
+  background: #fff2ee;
+}

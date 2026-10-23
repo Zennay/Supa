@@ -167,6 +167,46 @@ try {
     body: JSON.stringify({ url: baseUrl }),
   })
 
+  await waitForText(sessionId, 'Weekplanning')
+  const homeLoaded = await execute(sessionId, `return {
+    node: document.querySelector('[data-figma-node]')?.getAttribute('data-figma-node'),
+    homeCurrent: document.querySelector('.hifi-nav button[aria-current]')?.textContent.trim(),
+    assets: [...document.querySelectorAll('.hifi-home img, .hifi-nav img')].map(i => ({src:i.getAttribute('src'), width:i.getBoundingClientRect().width, height:i.getBoundingClientRect().height})),
+    overflow: document.documentElement.scrollWidth > innerWidth
+  }`)
+  assert.equal(homeLoaded.node, '3307:4224')
+  assert.equal(homeLoaded.homeCurrent, 'Home')
+  assert.equal(homeLoaded.overflow, false)
+  assert.ok(homeLoaded.assets.length >= 35)
+  assert.ok(homeLoaded.assets.every(i => !i.src.includes('figma.com') && i.width > 0 && i.height > 0))
+  for (let attempt = 0; attempt < 50; attempt++) {
+    if (await execute(sessionId, 'return [...document.querySelectorAll(".hifi-home img, .hifi-nav img")].every(i => i.complete && i.naturalWidth > 0)')) break
+    await new Promise(resolve => setTimeout(resolve, 100))
+  }
+  assert.equal(await execute(sessionId, 'return [...document.querySelectorAll(".hifi-home img, .hifi-nav img")].every(i => i.complete && i.naturalWidth > 0)'), true)
+  await screenshot(sessionId, 'hifi-home.png')
+  await execute(sessionId, `const input = document.querySelector('.hifi-search input'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'Bananen'); input.dispatchEvent(new Event('input',{bubbles:true}));`)
+  await waitForText(sessionId, 'Geen gerechten gevonden')
+  assert.equal(await execute(sessionId, 'return document.querySelectorAll(".hifi-product-card").length'), 1)
+  await execute(sessionId, `document.querySelector('.hifi-product-actions button:last-child').click()`)
+  await waitForText(sessionId, 'toegevoegd aan je demolijst')
+  await clickNav(sessionId, 'Lijst')
+  await waitForText(sessionId, 'Jouw gekozen producten')
+  await execute(sessionId, `document.querySelector('.hifi-demo-list button').click()`)
+  assert.equal(await execute(sessionId, 'return document.querySelector(".hifi-demo-list") === null'), true)
+  await clickNav(sessionId, 'Home')
+  await waitForText(sessionId, 'Weekplanning')
+  await execute(sessionId, `document.querySelector('.hifi-recipe-open').click()`)
+  await waitForText(sessionId, 'De volledige bereiding')
+  assert.equal(await execute(sessionId, 'return document.querySelector("dialog").open'), true)
+  await execute(sessionId, `document.querySelector('dialog form button').click()`)
+  await execute(sessionId, `document.querySelector('.hifi-recipe-card .hifi-favorite').click(); document.querySelector('.hifi-filter').click()`)
+  await execute(sessionId, `document.querySelector('#hifi-filter-panel input').click()`)
+  await waitForText(sessionId, 'Geen producten gevonden')
+  assert.equal(await execute(sessionId, 'return document.querySelectorAll(".hifi-recipe-card").length'), 1)
+  await execute(sessionId, `document.querySelector('#hifi-filter-panel button').click()`)
+  evidence.checks.push({step:'figma-home-interactions', passed:true, observed:'Original local Figma assets loaded; Home search, demo-list add/remove, recipe modal and favorite filter work.', assets:homeLoaded.assets})
+  await clickNav(sessionId, 'Planner')
   const plannerText = await waitForText(sessionId, 'Plan eerst. Vergelijk daarna.')
   assert.match(plannerText, /4 maaltijden actief/)
   evidence.checks.push({
@@ -543,6 +583,8 @@ try {
     body: JSON.stringify({ url: baseUrl }),
   })
 
+  await waitForText(sessionId, 'Weekplanning')
+  await clickNav(sessionId, 'Planner')
   let restoredText = await waitForText(sessionId, '3 maaltijden actief')
   restoredText = await waitForText(sessionId, '16,52')
   assert.match(restoredText, /40,00/)

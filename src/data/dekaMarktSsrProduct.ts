@@ -100,13 +100,22 @@ function safeCapturedAt(value: unknown): value is string {
       .slice(1)
       .split(':')
       .map(Number)
-    // Civil UTC offsets are bounded by ±14:00; 14:01–23:59
-    // may parse in permissive JS engines but cannot prove capture time.
-    if (offsetHour > 14 || offsetMinute > 59 ||
-        (offsetHour === 14 && offsetMinute !== 0)) return false
+    // Physical civil offsets: UTC−12:00..UTC+14:00 (asymmetric).
+    // JS Date.parse can accept −13/−14 even though no civil zone can.
+    const upper = match[5][0] === '-' ? 12 : 14
+    if (offsetHour > upper || offsetMinute > 59 ||
+        (offsetHour === upper && offsetMinute !== 0)) return false
   }
 
-  return Number.isFinite(Date.parse(value))
+  const millis = Date.parse(value)
+  if (!Number.isFinite(millis)) return false
+  // The product adapters must apply the same ±60s future skew rule as
+  // catalog/offers capture ingestion, with the original 1–9 fractional
+  // digits retained rather than silently accepting a future sub-ms tick.
+  const fraction = /\.(\d{1,9})(?:Z|[+-]\d{2}:\d{2})$/u.exec(value)?.[1] ?? ''
+  const capturedNs = BigInt(millis) * 1_000_000n +
+    BigInt((fraction.padEnd(9, '0').slice(3)) || '0')
+  return capturedNs <= BigInt(Date.now() + 60_000) * 1_000_000n
 }
 
 function safeHtmlContentType(value: unknown): value is string {
@@ -123,7 +132,18 @@ function safeDekaMarktProductUrl(value: unknown): value is string {
       url.protocol === 'https:' &&
       url.hostname === 'www.dekamarkt.nl' &&
       url.port === '' &&
+      url.search === '' && url.hash === '' &&
+      !value.includes('?') && !value.includes('#') &&
+      (value === url.href || value === url.href.replace(
+        'https://' + url.hostname + '/', 'https://' + url.hostname + ':443/',
+      )) &&
       url.pathname.startsWith('/producten/') &&
+      url.pathname.length > '/producten/'.length &&
+      // Evidence must be the exact bare, canonical public product page.
+      // A query, fragment, credential or ambiguous URL cannot gain a
+      // verified-SKU identity just by appearing in both source/JSON-LD.
+      url.href === value &&
+      !/[?#]/u.test(value) &&
       url.username === '' &&
       url.password === ''
     )
@@ -140,6 +160,104 @@ function dekaMarktProductIdFromUrl(value: string): string | null {
   } catch {
     return null
   }
+}
+
+/**
+ * Deka's Nuxt amount is the independent current-package reference.
+ * Every explicitly written JSON-LD price and currency must corroborate it,
+ * not merely the historical uppercase Price spelling. Case variants cannot
+ * hide an alternative SKU amount or contradictory availability statement.
+ */
+function corroborateDekaOffer(offer: JsonObject, expectedCents: number): boolean {
+  let sawPrice = false
+  let sawEuroCurrency = false
+  const availabilities: string[] = []
+  for (const [key, value] of Object.entries(offer)) {
+    const kind = key.toLocaleLowerCase('en')
+    if (kind === 'price') {
+      sawPrice = true
+      if ((typeof value !== 'string' && typeof value !== 'number') ||
+          normalizeMoneyToCents(String(value)) !== expectedCents) return false
+    } else if (kind === 'pricecurrency') {
+      sawEuroCurrency = true
+      if (typeof value !== 'string' || value !== 'EUR') return false
+    } else if (kind === 'availability') {
+      if (typeof value !== 'string' || !value.trim()) return false
+      availabilities.push(value)
+    }
+  }
+  if (!sawPrice || !sawEuroCurrency) return false
+  const known = availabilities.map(normalizeSchemaOrgAvailability)
+  if (known.length > 0 && (known.includes('unknown') ||
+      new Set(known).size !== 1)) return false
+  return true
+}
+
+type ComparablePack = { amount: number | null; unit: string; count: number }
+const explicitWeightUnits: Record<string, string> = {
+  g: 'g', gram: 'g', grams: 'g', kg: 'kg', kilogram: 'kg',
+  ml: 'ml', milliliter: 'ml', millilitre: 'ml', l: 'l',
+  liter: 'l', litre: 'l', st: 'piece', stuk: 'piece',
+  stuks: 'piece', piece: 'piece',
+  GRM: 'g', KGM: 'kg', MLT: 'ml', LTR: 'l', C62: 'piece',
+}
+
+/** A metric quantity becomes an exact, bounded decimal integer in base
+ * micrograms/microlitres/millionths of a piece, with multipack included. */
+function exactPhysicalPack(pack: ComparablePack): string | null {
+  if (pack.amount === null || !Number.isFinite(pack.amount) || pack.amount <= 0) return null
+  const factor = pack.unit === 'kg' || pack.unit === 'l' ? 1000n :
+    pack.unit === 'g' || pack.unit === 'ml' || pack.unit === 'piece' ? 1n : null
+  if (factor === null || !Number.isSafeInteger(pack.count) || pack.count < 1) return null
+  const amount = String(pack.amount)
+  const match = /^(\d+)(?:\.(\d{1,6}))?$/u.exec(amount)
+  if (!match || match[1].length > 15) return null
+  const family = pack.unit === 'g' || pack.unit === 'kg'
+    ? 'mass' : pack.unit === 'ml' || pack.unit === 'l' ? 'volume' : 'piece'
+  const micro = BigInt(match[1]) * 1_000_000n +
+    BigInt((match[2] ?? '').padEnd(6, '0'))
+  if (micro <= 0n) return null
+  return family + ':' + (micro * factor * BigInt(pack.count)).toString()
+}
+
+/** Optional JSON-LD physical weight cannot contradict the Nuxt package.
+ * Missing JSON-LD weight remains allowed; invalid explicit quantities do not
+ * become a source-priced candidate. */
+function corroborateDekaWeight(weight: unknown, nuxtPack: ComparablePack): boolean {
+  if (weight === undefined || weight === null) return true
+  if (typeof weight !== 'string' && !isObject(weight)) return false
+  let value: unknown = weight
+  let unitText: unknown
+  let unitCode: unknown
+  if (isObject(weight)) {
+    value = weight.value
+    unitText = weight.unitText
+    unitCode = weight.unitCode
+  }
+  const metadata = [unitText, unitCode].filter(item => item !== undefined && item !== null)
+  const declaredUnits: string[] = []
+  for (const item of metadata) {
+    if (typeof item !== 'string') return false
+    const unit = explicitWeightUnits[item.trim()] ??
+      explicitWeightUnits[item.trim().toLocaleLowerCase('en')]
+    if (!unit) return false
+    declaredUnits.push(unit)
+  }
+  if (new Set(declaredUnits).size > 1) return false
+  const raw = typeof value === 'string' ? value.trim() :
+    typeof value === 'number' && Number.isFinite(value) ? String(value) : ''
+  if (!raw) return false
+  let parsed = normalizePackText(raw)
+  if (parsed.amount === null || parsed.unit === 'unknown') {
+    if (!declaredUnits.length || !/^(?:\d+)(?:[.,]\d+)?$/u.test(raw)) return false
+    parsed = normalizePackText(raw + ' ' + declaredUnits[0])
+  } else if (declaredUnits.some(unit => unit !== parsed.unit)) {
+    return false
+  }
+  if (parsed.amount === null || parsed.unit === 'unknown') return false
+  const declared = exactPhysicalPack(parsed)
+  const original = exactPhysicalPack(nuxtPack)
+  return declared !== null && original !== null && declared === original
 }
 
 function dereference(payload: unknown[], ref: unknown): unknown {
@@ -290,19 +408,22 @@ export function parseDekaMarktSsrProductEvidence(
     typeof jsonLd?.mpn === 'string' || typeof jsonLd?.mpn === 'number'
       ? String(jsonLd.mpn)
       : null
-  const jsonCurrency = typeof offers?.priceCurrency === 'string' ? offers.priceCurrency : null
   const observedCapitalPrice = offers?.Price
+  const declaredUrl = jsonLd?.url
 
   if (
     !jsonLd ||
     jsonLd['@type'] !== 'Product' ||
     jsonName !== name ||
     jsonMpn !== String(productId) ||
-    jsonCurrency !== 'EUR' ||
+    (declaredUrl !== undefined && (!safeDekaMarktProductUrl(declaredUrl) ||
+      declaredUrl !== evidence.source.url)) ||
+    !offers ||
     typeof observedCapitalPrice !== 'number' ||
-    normalizeMoneyToCents(String(observedCapitalPrice)) !== currentPriceCents
+    !corroborateDekaOffer(offers, currentPriceCents) ||
+    !corroborateDekaWeight(jsonLd.weight, normalizedPack)
   ) {
-    return { type: 'abstain', reason: 'DekaMarkt JSON-LD does not corroborate Nuxt product identity/price' }
+    return { type: 'abstain', reason: 'DekaMarkt JSON-LD does not corroborate Nuxt source, identity, package, price, currency or availability' }
   }
 
   const observation: RawProductObservation = {

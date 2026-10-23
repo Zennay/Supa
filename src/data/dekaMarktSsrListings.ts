@@ -131,13 +131,22 @@ function validCapturedAt(value: unknown): value is string {
       .slice(1)
       .split(':')
       .map(Number)
-    // Civil UTC offsets are bounded by ±14:00; 14:01–23:59
-    // may parse in permissive JS engines but cannot prove capture time.
-    if (offsetHour > 14 || offsetMinute > 59 ||
-        (offsetHour === 14 && offsetMinute !== 0)) return false
+    // Physical civil offsets: UTC−12:00..UTC+14:00 (asymmetric).
+    // JS Date.parse can accept −13/−14 even though no civil zone can.
+    const upper = match[5][0] === '-' ? 12 : 14
+    if (offsetHour > upper || offsetMinute > 59 ||
+        (offsetHour === upper && offsetMinute !== 0)) return false
   }
 
   return Number.isFinite(Date.parse(value))
+}
+
+// Capture provenance is about an ALREADY completed request. Promotional
+// validTo dates may legitimately be in the future: do not reuse this stricter
+// boundary for Nuxt offer validity windows.
+function validSourceCapturedAt(value: unknown): value is string {
+  return validCapturedAt(value) &&
+    Date.parse(value) <= Date.now() + 60_000
 }
 
 function validateEvidenceBoundary(
@@ -180,12 +189,20 @@ function validateEvidenceBoundary(
     if (!routeMatches) {
       return `DekaMarkt evidence source route does not match ${expectedKind}`
     }
+    if (url.search || url.hash ||
+        evidence.source.url.includes('?') || evidence.source.url.includes('#') ||
+        (url.href !== evidence.source.url &&
+         evidence.source.url !== url.href.replace(
+           'https://www.dekamarkt.nl/', 'https://www.dekamarkt.nl:443/',
+         ))) {
+      return 'DekaMarkt evidence source must use the credential-free public HTTPS host'
+    }
   } catch {
     return 'DekaMarkt evidence source must contain a valid URL'
   }
 
   if (
-    !validCapturedAt(evidence.source.capturedAt) ||
+    !validSourceCapturedAt(evidence.source.capturedAt) ||
     !/^[a-f0-9]{64}$/.test(evidence.source.sha256)
   ) {
     return 'DekaMarkt evidence source provenance is incomplete'

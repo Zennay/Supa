@@ -16,7 +16,7 @@ test('actual routed Planner renders the private M3 sharing controls and no prepa
 
   try {
     const { App } = await vite.ssrLoadModule('/src/App.tsx')
-    const html = renderToStaticMarkup(createElement(App))
+    const html = renderToStaticMarkup(createElement(App, { initialTab: 'planner' }))
 
     assert.match(html, /aria-label="Weekmenu delen"/)
     assert.match(html, /Toon kopieertekst/)

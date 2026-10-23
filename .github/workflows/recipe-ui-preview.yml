@@ -1,0 +1,47 @@
+name: Recipe UI preview
+on:
+  pull_request:
+    paths: ['src/**', 'server/**', 'tests/recipe-library-browser.mjs', 'tests/product-figma-products-browser.mjs', '.github/workflows/recipe-ui-preview.yml']
+permissions:
+  contents: read
+concurrency:
+  group: supa-recipe-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  preview:
+    if: ((github.event_name != 'pull_request' && github.event_name != 'pull_request_target') || (github.event.pull_request.head.repo.full_name == github.repository && github.actor == 'Zennay'))
+    runs-on: [self-hosted, supa, vps]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm install --no-save --package-lock=false playwright@1.56.1
+      - run: npx playwright install --with-deps chromium
+      - name: Render and exercise recipe UI
+        run: |
+          set -euo pipefail
+          npm start > /tmp/supa-recipe-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4174 >/dev/null; then break; fi
+            sleep 1
+          done
+          node tests/recipe-library-browser.mjs
+          node tests/product-figma-products-browser.mjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: supa-recipe-ui-preview
+          path: |
+            artifacts/recipe-ui/
+            artifacts/product-ui/
+            dist/
+          retention-days: 7
