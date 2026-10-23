@@ -3649,6 +3649,11 @@ export function OfflineReviewedWorkbench({
           null), en <code>available</code> (true/false). Optioneel <code>packCount</code>.
           Gebruik uitsluitend gegevens die je mag bewaren en verwerken.
           Ontbrekende prijzen: zet <code>priceCents: null</code> en <code>available: false</code>.</p>
+        <p>Je kunt ook één JSON-object uit de bestaande productadapter importeren
+          (<code>RawProductObservation</code>). Supa zet dit lokaal om naar hetzelfde privé-opnameformaat,
+          bewaart per product de gevalideerde bron-URL, SHA-256 en brontype, en houdt onbekende
+          beschikbaarheid onbekend. Er wordt niets opgehaald via het netwerk; dit bewijst geen bronrechten
+          of menselijke veldwaarneming.</p>
       </details>
       <div id="supa-own-price-import" className="offline-price-workbench__input" tabIndex={-1} role="region" aria-label="Eigen winkelprijsgegevens importeren">
         <label>Herstel eerdere privémand-sessie van ditzelfde weekmenu (zonder oude bevestigingen)
