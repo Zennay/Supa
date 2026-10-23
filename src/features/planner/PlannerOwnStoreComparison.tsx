@@ -38,7 +38,7 @@ import './plannerOwnStoreComparison.css'
 const stores = ['PLUS', 'DekaMarkt'] as const
 
 /** Exact own-source totals only. No fixture or unreviewed prices. */
-export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred, hasDemand, budget, onSelect, onOpenComparison, onImportSourceFiles, onReviewIngredient, onOpenList, onOpenMixedRoute, onChooseRouteLine, plannedMeals, ingredientRecipes, activeDays, hasIngredientData }: {
+export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred, hasDemand, budget, onSelect, onOpenComparison, onImportSourceFiles, onReviewIngredient, onOpenRecipes, onOpenList, onOpenMixedRoute, onChooseRouteLine, plannedMeals, ingredientRecipes, activeDays, hasIngredientData }: {
   reviewed: PrivateReviewedBaskets | null
   captureProgress: PrivateCaptureProgress | null
   plannedMeals: PlannedMeal[]
@@ -52,6 +52,7 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
   onOpenComparison: () => void
   onImportSourceFiles: (files: File[]) => void
   onReviewIngredient: (store: OwnStore, ingredientId: string) => void
+  onOpenRecipes: () => void
   onOpenList: () => void
   onOpenMixedRoute: (extraCostRaw?: string) => void
   onChooseRouteLine: (choice: Omit<PrivateRouteChoice, 'serial'>) => void
@@ -801,6 +802,7 @@ export function PlannerOwnStoreComparison({ reviewed, captureProgress, preferred
     {hasDemand && <Suspense fallback={<p role="status">Lokale plakimport laden…</p>}>
       <PlannerQuickSourcePaste onImport={onImportSourceFiles} hasDemand={hasDemand}
         needs={captureNeeds} onReviewIngredient={onReviewIngredient}
+        onOpenRecipes={onOpenRecipes}
         onRecapture={store => {
           setCaptureTarget(store)
           window.requestAnimationFrame(() =>
