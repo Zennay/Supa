@@ -10,6 +10,8 @@ export type PreviewMatchLine = {
   packAmount: number | null; packUnit: string | null; packCount: number | null
   pricePerPackCents: number | null; lineTotalCents: number | null
   unitPrice: string | null
+  sourceUrl?: string | null; sourceSha256?: string | null
+  sourceKind?: 'product' | 'catalog' | 'offers' | null
 }
 const clean = (text: string) => text.normalize('NFKD').replace(/\p{M}/gu, '').toLocaleLowerCase('nl-NL')
 const safe = (text: unknown) => String(text ?? '').replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ').replace(/\s+/gu, ' ').trim().slice(0, 180)
@@ -118,6 +120,21 @@ export function CaptureMatchingPreview({ retailer, lines, appended, reason }: {
             </span>
             <small>Voorstel uit jouw eigen lokale bron; prijs, SKU en pakketinhoud
               zijn nog niet persoonlijk bevestigd. Geen mandtotaal of besparingsclaim.</small>
+            {(line.sourceUrl || line.sourceSha256 || line.sourceKind) && <details
+              className="offline-price-workbench__source-provenance">
+              <summary>Herkomst van dit bronartikel</summary>
+              {line.sourceKind && <p>Bronsoort: {line.sourceKind === 'product'
+                ? 'productpagina' : line.sourceKind === 'catalog'
+                  ? 'catalogus' : 'aanbiedingen'}.</p>}
+              {line.sourceUrl && <p>Originele bronpagina:{' '}
+                <a href={line.sourceUrl} target="_blank" rel="noopener noreferrer">
+                  {line.sourceUrl}
+                </a>
+              </p>}
+              {line.sourceSha256 && <p>Snapshot SHA-256: <code>{line.sourceSha256}</code></p>}
+              <small>De hash identificeert de aangeleverde snapshot; dit bewijst op zichzelf
+                geen bronrechten, prijsactualiteit of productgelijkwaardigheid.</small>
+            </details>}
           </> : 'Nog geen betrouwbare productmatch. ' +
             (line.reasons[0] ? reason(line.reasons[0]) : 'Handmatige keuze nodig.')}
       </li>)}</ul>}
