@@ -36,16 +36,18 @@ export function ComparisonReadiness({
   const [exportMessage, setExportMessage] = useState('')
   const sources = (['PLUS', 'DekaMarkt'] as const).map(store => {
     const observation = captures[store]
-    const ageMs = nowMs - observation.observedMs
-    const olderThanWeek = ageMs > 7 * 24 * 60 * 60 * 1000
-    const inFuture = ageMs < -5 * 60 * 1000
-    const readableAge = inFuture ? 'in de toekomst'
-      : ageMs < 0 ? 'zojuist (kleine klokafwijking)'
-        : ageMs < 60 * 60 * 1000 ? Math.max(0, Math.floor(ageMs / 60000)) + ' minuten oud'
-          : ageMs < 24 * 60 * 60 * 1000
-            ? (ageMs / (60 * 60 * 1000)).toLocaleString('nl-NL', { maximumFractionDigits: 1 }) + ' uur oud'
-            : (ageMs / (24 * 60 * 60 * 1000)).toLocaleString('nl-NL', { maximumFractionDigits: 1 }) + ' dagen oud'
-    return { store, at: observation.observedAt, olderThanWeek, inFuture, readableAge }
+    const ageValid = Number.isFinite(nowMs) && Number.isFinite(observation.observedMs)
+    const ageMs = ageValid ? nowMs - observation.observedMs : Number.NaN
+    const olderThanWeek = !ageValid || ageMs > 7 * 24 * 60 * 60 * 1000
+    const inFuture = ageValid && ageMs < -5 * 60 * 1000
+    const readableAge = !ageValid ? 'ouderdom onbekend'
+      : inFuture ? 'in de toekomst'
+        : ageMs < 0 ? 'zojuist (kleine klokafwijking)'
+          : ageMs < 60 * 60 * 1000 ? Math.max(0, Math.floor(ageMs / 60000)) + ' minuten oud'
+            : ageMs < 24 * 60 * 60 * 1000
+              ? (ageMs / (60 * 60 * 1000)).toLocaleString('nl-NL', { maximumFractionDigits: 1 }) + ' uur oud'
+              : (ageMs / (24 * 60 * 60 * 1000)).toLocaleString('nl-NL', { maximumFractionDigits: 1 }) + ' dagen oud'
+    return { store, at: observation.observedAt, ageValid, olderThanWeek, inFuture, readableAge }
   })
   // The imported pair is already canonical-admitted with nanosecond timestamps.
   // Show which source is older without altering its evidence timestamp.
@@ -56,7 +58,7 @@ export function ComparisonReadiness({
     ? plusInstant - dekaInstant : dekaInstant - plusInstant
   const observationGapHours = Number(observationGapNs) / 3_600_000_000_000
   const pairWithin24h = pairedWithin24h && observationGapNs <= 86_400_000_000_000n
-  const sourcesFresh = sourceFresh && sources.every(item => !item.olderThanWeek && !item.inFuture)
+  const sourcesFresh = sourceFresh && sources.every(item => item.ageValid && !item.olderThanWeek && !item.inFuture)
   const gapText = observationGapHours.toLocaleString('nl-NL', { maximumFractionDigits: 1 })
 
   const hasDemand = plus.selectedMealCount > 0 && deka.selectedMealCount > 0 &&
@@ -97,7 +99,7 @@ export function ComparisonReadiness({
     'Alleen privé ingevoerde bronmomenten; geen actuele retailerclaim of besparing.',
     `PLUS: ${captures.PLUS.observedAt} (${sources[0].readableAge})`,
     `DekaMarkt: ${captures.DekaMarkt.observedAt} (${sources[1].readableAge})`,
-    !sourcesFresh ? 'ACTIE: vernieuw verlopen/toekomstige bronmomenten.' : '',
+    !sourcesFresh ? 'ACTIE: vernieuw verlopen, toekomstige of onbekende bronmomenten.' : '',
     !pairWithin24h ? `ACTIE: vernieuw ${refreshStore}; bronmomenten verschillen ${gapText} uur.` : '',
     !hasDemand ? 'ACTIE: kies eerst een weekmenu in Planner.' : '',
     ...(['PLUS', 'DekaMarkt'] as const).flatMap(store => {
@@ -153,8 +155,8 @@ export function ComparisonReadiness({
   if (!sourcesFresh) steps.push({
     id: 'fresh',
     heading: 'Laad recente prijsopnames',
-    detail: sources.filter(item => item.olderThanWeek || item.inFuture)
-      .map(item => item.store + ': ' + (item.olderThanWeek ? 'ouder dan 7 dagen' : 'tijdstip in de toekomst'))
+    detail: sources.filter(item => !item.ageValid || item.olderThanWeek || item.inFuture)
+      .map(item => item.store + ': ' + (!item.ageValid ? 'tijdstip onbekend' : item.olderThanWeek ? 'ouder dan 7 dagen' : 'tijdstip in de toekomst'))
       .join('; ') || 'Een of beide bronmomenten vallen buiten het toegestane zeven-dagenvenster.',
     action: 'Naar bronimport', onClick: onOpenImport,
   })
