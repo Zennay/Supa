@@ -1916,10 +1916,13 @@ export function OfflineReviewedWorkbench({
           throw new Error('Alle bestanden in deze batch moeten geldige JSON-productobservaties bevatten.')
         }
         const entries = Array.isArray(parsed) ? parsed : [parsed]
-        if (entries.length === 0 || entries.some(entry => !isRawProductObservationShape(entry))) {
-          throw new Error('Combineer uitsluitend RawProductObservation-objecten of arrays daarvan. Voor gewone CSV/winkelopnames: maximaal twee bestanden.')
+        if (entries.length === 0) {
+          throw new Error('Lege JSON-productbestanden kunnen geen winkelopname vullen.')
         }
         for (const entry of entries) {
+          if (!isRawProductObservationShape(entry)) {
+            throw new Error('Combineer uitsluitend RawProductObservation-objecten of arrays daarvan. Voor gewone CSV/winkelopnames: maximaal twee bestanden.')
+          }
           const store = entry.supermarket
           if (store !== 'plus' && store !== 'dekamarkt') {
             throw new Error('Onbekende winkel in bronobservatie; gebruik een bestaande PLUS- of DekaMarkt-adapter.')
