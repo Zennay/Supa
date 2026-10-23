@@ -111,8 +111,8 @@ function completeOwnStore(basket: OneStoreBasket, fresh: boolean): boolean {
   for (const line of basket.lines) {
     if (!line || line.status !== 'matched' ||
         !Number.isSafeInteger(line.packs) || line.packs <= 0 ||
-        !Number.isSafeInteger(line.pricePerPackCents) || line.pricePerPackCents < 0 ||
-        !Number.isSafeInteger(line.lineTotalCents) || line.lineTotalCents < 0 ||
+        !Number.isSafeInteger(line.pricePerPackCents) || line.pricePerPackCents <= 0 ||
+        !Number.isSafeInteger(line.lineTotalCents) || line.lineTotalCents <= 0 ||
         !Number.isSafeInteger(line.pricePerPackCents * line.packs) ||
         line.pricePerPackCents * line.packs !== line.lineTotalCents ||
         calculateDecimalPackCount([line.requirement], {
