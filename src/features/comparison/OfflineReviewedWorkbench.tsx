@@ -5,7 +5,7 @@ import { compareFullBaskets, samePhysicalDemand } from '../../domain/basketCompa
 import { calculateDecimalPackCount } from '../../domain/decimalPackArithmetic.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots, type OfflineStoreProduct } from '../../domain/offlineReviewedImport.ts'
-import { rawProductObservationToPrivateCaptureJson } from '../../data/schemaOrgProduct.ts'
+import { rawProductObservationsToPrivateCaptureJson } from '../../data/schemaOrgProduct.ts'
 import { combineTwoOwnShopCaptures, splitOwnStorePastedSheets } from './combineOwnStoreCaptures.ts'
 import { LocalTwoStorePriceEditor, type ReviewedRecaptureSeed } from './LocalTwoStorePriceEditor.tsx'
 import { ownPriceCapturesToCsv } from './ownPriceCsvExport.ts'
@@ -45,6 +45,12 @@ import { createPrivateBasketComparisonCsv } from '../../privateBasketComparisonC
 import { UnpricedPlannerChecklist } from './UnpricedPlannerChecklist.tsx'
 import { PrivateCapturePastePreview } from './PrivateCapturePastePreview.tsx'
 
+function isRawProductObservationShape(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false
+  return ['supermarket', 'provenance', 'pack'].every(key =>
+    Object.prototype.hasOwnProperty.call(value, key))
+}
+
 function normalizeRawProductObservationInput(input: string): { content: string; converted: boolean } {
   let parsed: unknown
   try {
@@ -52,18 +58,24 @@ function normalizeRawProductObservationInput(input: string): { content: string; 
   } catch {
     return { content: input, converted: false }
   }
-  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+
+  if (Array.isArray(parsed)) {
+    const observationItems = parsed.filter(isRawProductObservationShape)
+    if (observationItems.length === 0 && parsed.length > 0) {
+      return { content: input, converted: false }
+    }
+    if (observationItems.length !== parsed.length) {
+      throw new Error('Een batch moet uitsluitend volledige RawProductObservation-objecten bevatten.')
+    }
+    return { content: rawProductObservationsToPrivateCaptureJson(parsed), converted: true }
+  }
+
+  if (!isRawProductObservationShape(parsed)) {
     return { content: input, converted: false }
   }
-  const value = parsed as Record<string, unknown>
-  const has = (key: string) => Object.prototype.hasOwnProperty.call(value, key)
-  // Existing adapter output is distinct from Schema.org JSON-LD itself. Only
-  // convert the already-provenanced RawProductObservation shape; all other
-  // JSON continues through the existing canonical capture parser unchanged.
-  if (!has('supermarket') || !has('provenance') || !has('pack')) {
-    return { content: input, converted: false }
-  }
-  return { content: rawProductObservationToPrivateCaptureJson(value), converted: true }
+  // Raw adapter observations are not Schema.org JSON-LD itself. Convert one
+  // observation or a same-store/same-instant array, then run canonical import.
+  return { content: rawProductObservationsToPrivateCaptureJson(parsed), converted: true }
 }
 import { PortableBlankCapture } from './PortableBlankCapture.tsx'
 import { CaptureMatchingPreview, type PreviewMatchLine } from './CaptureMatchingPreview.tsx'
@@ -1727,9 +1739,12 @@ export function OfflineReviewedWorkbench({
       setManualSku({ PLUS: {}, DekaMarkt: {} })
       setSkuFilter({})
       setClockMs(Date.now())
+      const productCount = Object.values(parsed.captures).reduce(
+        (count, capture) => count + (capture?.products.length ?? 0), 0)
+      const productLabel = productCount === 1 ? 'bronartikel' : 'bronartikelen'
       setMessage(Object.keys(parsed.captures).length === 1
-        ? 'Eén eigen winkelopname lokaal geladen. Voeg een echte andere winkel toe voor een prijsverschil.'
-        : 'Twee privéopnames lokaal geladen. Controleer de fysieke SKU’s en prijzen opnieuw.')
+        ? productCount + ' ' + productLabel + ' in één eigen winkelopname lokaal geladen. Voeg een echte andere winkel toe voor een prijsverschil.'
+        : productCount + ' ' + productLabel + ' in twee privéopnames lokaal geladen. Controleer de fysieke SKU’s en prijzen opnieuw.')
     } catch (error) {
       setMessage((error instanceof Error ? error.message : 'Ongeldige import.') +
         ' Vorige brondata, reviews en afvinkingen blijven intact.')
