@@ -296,6 +296,19 @@ adapter moet eerst gevalideerde observaties leveren. Een batch bevat maximaal
 dezelfde winkel én exact hetzelfde oorspronkelijke UTC-Z-bronmoment hebben.
 Gemengde winkels, verschillende bronmomenten, dubbele productcodes en onvolledige
 fysieke verpakkingen worden geweigerd; Supa verzint geen tijdstempels of SKU's.
+
+Wanneer productobservaties als **afzonderlijke lokale JSON-bestanden** zijn bewaard,
+kun je via de bestaande bestandskiezer ook 3–24 bestanden tegelijk aanwijzen. Supa
+leest deze lokaal als één atomische batch (gezamenlijk maximaal 512 kB), groepeert
+per werkelijke retailer en vereist binnen elke winkel exact hetzelfde oorspronkelijke
+UTC-Z-bronmoment. Per winkel blijven maximaal 1.000 unieke producten en de bestaande
+256-kB-limiet van de canonieke opname gelden. Twee geldige winkelgroepen worden
+via de reeds bestaande twee-winkelcombinatie binnengebracht. Een ongeldige regel
+of ontbrekende broninformatie weigert de **hele** nieuwe import; de bestaande
+prijsopnames, persoonlijke productreviews en vinkjes blijven onveranderd.
+Gewone CSV- en volledige winkelopnamebestanden blijven beperkt tot twee bestanden
+tegelijk. De originele prijs, hoeveelheid en herkomst worden nergens aangevuld
+of verzonnen.
 Supa valideert opnieuw de retailer, UTC-Z-bronmoment, originele productcode,
 fysieke verpakking, HTTPS-bron-URL en SHA-256. De URL, hash, brontype en
 expliciete/onbekende beschikbaarheid blijven per product bewaard. Zowel in de
