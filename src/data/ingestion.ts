@@ -84,7 +84,7 @@ function validIso(value: unknown): value is string {
 
 function validCaptureInstant(value: unknown): value is string {
   if (typeof value !== 'string') return false
-  const match = /^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2}):(\\d{2})(?:\\.(\\d{1,3}))?Z$/.exec(value)
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?Z$/.exec(value)
   if (!match) return false
 
   const year = Number(match[1])
