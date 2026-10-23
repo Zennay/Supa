@@ -409,3 +409,64 @@ export function parseSchemaOrgProduct(
     }
   }
 }
+
+/**
+ * Convert one already-parsed, user-supplied raw product observation into the
+ * existing private single-store capture format. This is an offline adapter:
+ * it never fetches a retailer page and does not grant source permission.
+ */
+export function rawProductObservationToPrivateCaptureJson(raw: unknown): string {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new Error('De bronobservatie moet een JSON-object zijn.')
+  }
+  const observation = validateRawProductObservation(raw as RawProductObservation)
+  if (observation.supermarket !== 'plus' && observation.supermarket !== 'dekamarkt') {
+    throw new Error('Alleen PLUS- en DekaMarkt-observaties passen in deze privévergelijking.')
+  }
+  if (observation.sourceProductId === null) {
+    throw new Error('De originele productcode ontbreekt; Supa verzint geen SKU.')
+  }
+
+  const pack = observation.pack
+  if (pack.rawText === null || pack.amount === null ||
+      !['g', 'kg', 'ml', 'l', 'piece'].includes(pack.unit)) {
+    throw new Error('De oorspronkelijke verpakking is onvoldoende bekend; beoordeel deze bron handmatig.')
+  }
+  const normalizedPack = normalizePackText(pack.rawText)
+  if (normalizedPack.amount === null ||
+      normalizedPack.amount !== pack.amount ||
+      normalizedPack.unit !== pack.unit ||
+      !Number.isSafeInteger(normalizedPack.count) ||
+      normalizedPack.count < 1 || normalizedPack.count > 1000 ||
+      (pack.unit === 'piece' &&
+        (!Number.isSafeInteger(pack.amount) || !Number.isSafeInteger(normalizedPack.count)))) {
+    throw new Error('De hoeveelheid of het aantal verpakkingen komt niet overeen met de oorspronkelijke producttekst.')
+  }
+
+  const retailer = observation.supermarket === 'plus' ? 'PLUS' : 'DekaMarkt'
+  const sourceAvailable = observation.availability === 'available'
+    ? true
+    : observation.availability === 'unavailable' ? false : null
+  const capture = {
+    schema: 'supa-private-single-store-prices-v1',
+    captures: [{
+      retailer,
+      observedAt: observation.provenance.capturedAt,
+      products: [{
+        id: observation.sourceProductId,
+        name: observation.name,
+        packAmount: pack.amount,
+        packUnit: pack.unit,
+        packCount: normalizedPack.count,
+        priceCents: observation.currentPriceCents,
+        available: observation.availability === 'available' && observation.currentPriceCents !== null,
+        sourceAvailable,
+        availabilityLabel: observation.availability,
+        sourceUrl: observation.provenance.url,
+        sourceSha256: observation.provenance.sha256,
+        sourceKind: observation.provenance.kind,
+      }],
+    }],
+  }
+  return JSON.stringify(capture)
+}
