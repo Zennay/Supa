@@ -34,11 +34,12 @@ const exactEuro = (cents: number): string => {
 const sourceDate = new Intl.DateTimeFormat('nl-NL', { dateStyle: 'medium', timeStyle: 'short' })
 
 /** Unconfirmed, read-only candidate hints. Canonical Workbench approves totals. */
-export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, onRecapture }: {
+export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, onRecapture, onOpenRecipes }: {
   needs: readonly PlannerCaptureGuideNeed[]
   source: OfflinePriceSnapshots
   onReviewIngredient?: (store: 'PLUS' | 'DekaMarkt', ingredientId: string) => void
   onRecapture?: (store: 'PLUS' | 'DekaMarkt') => void
+  onOpenRecipes?: () => void
 }) {
   // An open Planner tab may outlive a source capture's seven-day validity.
   // Recompute proposed SKUs on the real clock, not only on source-file edits.
@@ -80,7 +81,13 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
       const suggestions = {} as Record<OfflineRetailer, Suggestion>
       const unpricedHints = { PLUS: null, DekaMarkt: null } as Record<OfflineRetailer, UnpricedHint>
       const manualReview = { PLUS: false, DekaMarkt: false }
+      const measurementReview = need.unit === 'piece' &&
+        (typeof need.amount !== 'number' || !Number.isSafeInteger(need.amount) || need.amount <= 0)
       for (const store of stores) {
+        if (measurementReview) {
+          suggestions[store] = null
+          continue
+        }
         const capture = source.captures[store]
         // A real original source can still inform an individual shop even
         // when its paired capture window has expired. The paired delta below
@@ -189,7 +196,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
                 packsNeeded, lineCents: packsNeeded * match.sourcePriceCents }
             })() : null
       }
-      return { need, suggestions, manualReview, unpricedHints }
+      return { need, suggestions, manualReview, unpricedHints, measurementReview }
     })
   }, [needs, source, olderPairedStore, clock])
   if (!coverage.length) return null
@@ -206,15 +213,18 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
     coverage.filter(line => !!line.unpricedHints[store]).length)
   // Review uncertain existing SKUs before asking for new source capture.
   const priority = (line: typeof coverage[number]) =>
-    stores.some(store => line.manualReview[store]) ? 0 :
-    stores.some(store => line.unpricedHints[store]) ? 1 :
-    stores.some(store => !line.suggestions[store]) ? 2 : 3
+    line.measurementReview ? 0 :
+    stores.some(store => line.manualReview[store]) ? 1 :
+    stores.some(store => line.unpricedHints[store]) ? 2 :
+    stores.some(store => !line.suggestions[store]) ? 3 : 4
   const candidateLineGap = (line: typeof coverage[number]) =>
     source.pairedWithin24h && line.suggestions.PLUS && line.suggestions.DekaMarkt
       ? line.suggestions.DekaMarkt.lineCents - line.suggestions.PLUS.lineCents : null
   // Explain precisely why a physical week ingredient cannot yet be compared.
   // A local uploaded source is not proof that either retailer authorized reuse.
   const noLineGapReason = (line: typeof coverage[number]): string | null => {
+    if (line.measurementReview)
+      return line.need.label + ': controleer eerst in Recepten het aantal hele stuks; een nieuwe winkelopname lost dit niet op.'
     if (candidateLineGap(line) !== null) return null
     if (olderPairedStore) return 'Bronmomenten meer dan 24 uur uiteen: vernieuw ' +
       olderPairedStore + ' met een echte waarneming.'
@@ -256,7 +266,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
     if (actionFilter === 'choose-sku') return selectedStores.some(store => line.manualReview[store])
     if (actionFilter === 'fix-source') return selectedStores.some(store =>
       !!line.unpricedHints[store])
-    if (actionFilter === 'capture') return selectedStores.some(store =>
+    if (actionFilter === 'capture') return !line.measurementReview && selectedStores.some(store =>
       !line.suggestions[store] && !line.manualReview[store] &&
       !line.unpricedHints[store])
     if (actionFilter === 'paired') return source.pairedWithin24h &&
@@ -370,8 +380,8 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
     // even if its candidate list looks complete in isolation.
     if (!capture || !recentOwnCaptureInstant(capture.observedAt, nowMs) ||
         olderPairedStore === store) return [...needs]
-    return missing.filter(({ suggestions, manualReview }) =>
-      !suggestions[store] && !manualReview[store]).map(({ need }) => need)
+    return missing.filter(({ suggestions, manualReview, measurementReview }) =>
+      !measurementReview && !suggestions[store] && !manualReview[store]).map(({ need }) => need)
   }
   const pendingPlus = needsForNewSource('PLUS', clock).length
   const pendingDeka = needsForNewSource('DekaMarkt', clock).length
@@ -595,10 +605,17 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
         <strong role="columnheader">PLUS</strong>
         <strong role="columnheader">DekaMarkt</strong>
       </div>
-      {shown.map(({ need, suggestions, manualReview, unpricedHints }) => <div className="supa-planner-source-matches__row"
+      {shown.map(({ need, suggestions, manualReview, unpricedHints, measurementReview }) => <div className="supa-planner-source-matches__row"
         role="row" key={need.id}>
         <span role="cell" data-store="Fysieke behoefte"><strong>{need.label}</strong>
           <small>{need.amount ?? 'Onbekend'} {need.unit}</small>
+          {measurementReview && <div>
+            <small className="supa-planner-source-matches__missing-delta">
+              Dit aantal stuks is geen positief geheel getal. Beoordeel de hoeveelheid eerst in Recepten.
+            </small>
+            {onOpenRecipes && <button type="button" className="ghost-button"
+              onClick={onOpenRecipes}>Open Recepten om aantallen te controleren</button>}
+          </div>}
           {source.pairedWithin24h && suggestions.PLUS && suggestions.DekaMarkt &&
             (() => {
               // Exact source-derived line arithmetic for the SAME physical
@@ -617,10 +634,10 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
                 </small>
               </span>
             })()}
-          {noLineGapReason({ need, suggestions, manualReview, unpricedHints }) &&
+          {noLineGapReason({ need, suggestions, manualReview, unpricedHints, measurementReview }) &&
             <small className="supa-planner-source-matches__missing-delta">
               Prijsverschil onbekend:
-              {' '}{noLineGapReason({ need, suggestions, manualReview, unpricedHints })}
+              {' '}{noLineGapReason({ need, suggestions, manualReview, unpricedHints, measurementReview })}
             </small>}</span>
         {stores.map(store => <span role="cell" data-store={store} key={store}>
           {suggestions[store] ? <>Kandidaat: {suggestions[store]!.name}
@@ -641,6 +658,8 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
               {' '}{exactEuro(suggestions[store]!.lineCents)}
               {' '}volgens exacte metrische behoefte;
               {' '}niet bevestigd, gedeelde producten pas in Vergelijk samenvoegen.</small></>
+            : measurementReview
+              ? 'Controleer eerst het aantal hele stuks in Recepten; dit is geen ontbrekende winkelbron'
             : source.captures[store] &&
               !recentOwnCaptureInstant(source.captures[store]!.observedAt, clock)
               ? 'Verlopen of toekomstige bron: geen actueel geprijsd voorstel; leg een echte nieuwe opname vast'
@@ -664,7 +683,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
                 ? 'Bekijk bestaande maar ongeprijsde ' + store + '-SKU in Vergelijk'
                 : 'Controleer deze ' + store + '-SKU in Vergelijk'}
             </button>}
-          {onRecapture && !suggestions[store] && !manualReview[store] &&
+          {onRecapture && !measurementReview && !suggestions[store] && !manualReview[store] &&
             <button type="button" className="ghost-button"
               onClick={() => onRecapture(store)}>
               Open leeg {store}-opnameblad
