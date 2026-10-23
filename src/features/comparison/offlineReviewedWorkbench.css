@@ -613,3 +613,26 @@ border-radius:10px;padding:.65rem;scroll-margin-top:1.25rem}
   margin: .8rem 0; padding: clamp(.8rem, 2.5vw, 1.1rem);
   border: 1px solid #c8d8cd; border-radius: 12px; background: #f7fbf8;
 }
+
+/* Source provenance is available per matched product without triggering a fetch. */
+.offline-price-workbench__source-provenance {
+  margin-block: .5rem;
+  padding: .55rem .7rem;
+  border: 1px solid #ceddce;
+  border-radius: .65rem;
+  overflow-wrap: anywhere;
+}
+.offline-price-workbench__source-provenance summary {
+  cursor: pointer;
+  min-height: 2rem;
+  display: flex;
+  align-items: center;
+}
+.offline-price-workbench__source-provenance p {
+  margin: .35rem 0;
+  overflow-wrap: anywhere;
+}
+.offline-price-workbench__source-provenance code {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
