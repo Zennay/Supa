@@ -45,11 +45,12 @@ async function normalizedOwnSource(raw: string): Promise<string> {
 }
 
 /** Local preview using the same converter and source contract as Vergelijk. */
-export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredient, hasDemand, needs, initiallyOpen = false }: {
+export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredient, onOpenRecipes, hasDemand, needs, initiallyOpen = false }: {
   initiallyOpen?: boolean
   onImport: (files: File[]) => void
   onRecapture: (store: 'PLUS' | 'DekaMarkt') => void
   onReviewIngredient?: (store: 'PLUS' | 'DekaMarkt', ingredientId: string) => void
+  onOpenRecipes?: () => void
   hasDemand: boolean
   needs: readonly PlannerCaptureGuideNeed[]
 }) {
@@ -728,6 +729,7 @@ export function PlannerQuickSourcePaste({ onImport, onRecapture, onReviewIngredi
         </p>}
         {hasDemand && needs.length > 0 && liveAdmission &&
           <PlannerSourceMatchPreview needs={needs} source={liveAdmission}
+            onOpenRecipes={onOpenRecipes}
             onRecapture={onRecapture}
             onReviewIngredient={onReviewIngredient
               ? (store, ingredientId) => handoff({ store, ingredientId })
