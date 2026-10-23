@@ -12,17 +12,24 @@ export function exportOwnRecipeChecklistCsv(
   const rows = [
     encode(['Recept', checklist.recipeCount ? 'Aantal recepten' : 'Porties', 'Origineel ingrediënt', 'Naam', 'Hoeveelheid', 'Eenheid',
       'Controle', 'Afgevinkt', 'Prijs']),
-    ...checklist.lines.map(line => encode([
-      checklist.title,
-      String(checklist.recipeCount ?? checklist.portions),
-      line.original,
-      line.label,
-      line.needsReview || line.amount === null ? '' : String(line.amount),
-      line.needsReview ? '' : line.unit === 'piece' ? 'stuks' : line.unit ?? '',
-      line.needsReview ? 'Handmatig beoordelen' : 'Metrisch gecontroleerd',
-      checked[line.key] === true ? 'ja' : 'nee',
-      'Onbekend',
-    ])),
+    ...checklist.lines.map(line => {
+      const reviewStatus = line.needsReview
+        ? line.holdReason === 'combined_quantity_exceeds_safe_limit'
+          ? 'Samengevoegde hoeveelheid overschrijdt de veilige grens'
+          : 'Handmatig beoordelen'
+        : 'Metrisch gecontroleerd'
+      return encode([
+        checklist.title,
+        String(checklist.recipeCount ?? checklist.portions),
+        line.original,
+        line.label,
+        line.needsReview || line.amount === null ? '' : String(line.amount),
+        line.needsReview ? '' : line.unit === 'piece' ? 'stuks' : line.unit ?? '',
+        reviewStatus,
+        checked[line.key] === true ? 'ja' : 'nee',
+        'Onbekend',
+      ])
+    }),
   ].join('\r\n') + '\r\n'
   if (new TextEncoder().encode(rows).length > 256_000) {
     throw new Error('De ongeprijsde boodschappenlijst is te groot voor CSV.')
