@@ -170,10 +170,9 @@ function unitPriceSpecificationMatchesPack(specification: JsonObject, pack: RawP
   const unit = schemaUnitCode(reference.unitCode)
   if (!value || !unit) return false
   const normalized = normalizePackText(value + ' ' + unit)
-  return normalized.amount !== null &&
-    normalized.unit !== 'unknown' &&
-    normalized.amount === pack.amount &&
-    normalized.unit === pack.unit
+  const referenceKey = physicalPackSignature(normalized)
+  const productKey = rawPackSignature(pack)
+  return referenceKey !== null && productKey !== null && referenceKey === productKey
 }
 
 function extractPrice(offers: JsonObject[], pack: RawPack): ExtractedPrice | null {
@@ -358,6 +357,13 @@ function extractPack(product: JsonObject): RawPack {
   const amount = weight.amount * weight.count
   if (!Number.isFinite(amount) || amount <= 0) return unknownPack()
   return { rawText: weight.rawText, amount, unit: weight.unit }
+}
+
+function rawPackSignature(pack: RawPack): string | null {
+  if (pack.amount === null || pack.unit === 'unknown') return null
+  const unitText = pack.unit === 'piece' ? 'st' : pack.unit
+  const normalized = normalizePackText(String(pack.amount) + ' ' + unitText)
+  return physicalPackSignature(normalized)
 }
 
 function buildOffer(offers: JsonObject[], price: ExtractedPrice | null): RawOffer | null {
