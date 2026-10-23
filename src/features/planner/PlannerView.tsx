@@ -131,16 +131,19 @@ export function PlannerView({
   ), [recipes])
   const hasIngredientData = ingredientRecipes.length > 0 &&
     ingredientRecipes.length === recipes.length
-  const pieceReviewLabels = useMemo(() => {
+  const measurementReviewLabels = useMemo(() => {
     const byId = new Map(ingredientRecipes.map(recipe => [recipe.id, recipe]))
     const active = new Set(activeDays)
     const labels = new Map<string, string>()
+    const supportedUnits = new Set(['g', 'kg', 'ml', 'l', 'piece'])
     for (const meal of plannedMeals) {
       if (!active.has(meal.day)) continue
       for (const item of byId.get(meal.recipeId)?.ingredients ?? []) {
-        if (item.unit !== 'piece' || item.amount === null ||
-            typeof item.amount !== 'number' ||
-            (Number.isSafeInteger(item.amount) && item.amount > 0)) continue
+        const amountValid = typeof item.amount === 'number' &&
+          Number.isFinite(item.amount) && item.amount > 0 && item.amount <= 1_000_000
+        const pieceValid = item.unit !== 'piece' ||
+          (typeof item.amount === 'number' && Number.isSafeInteger(item.amount) && item.amount > 0)
+        if (supportedUnits.has(item.unit) && amountValid && pieceValid) continue
         if (typeof item.id === 'string' && typeof item.label === 'string')
           labels.set(item.id, item.label)
       }
@@ -367,13 +370,14 @@ export function PlannerView({
         </p>}
       </section>
 
-      {pieceReviewLabels.length > 0 && <div className="attention-card" role="status">
-        <strong>{pieceReviewLabels.length} ingrediënt(en) hebben een gedeeltelijk of ongeldig aantal stuks</strong>
-        <p>Voor {pieceReviewLabels.join(', ')} kan Supa nog geen betrouwbaar
+      {measurementReviewLabels.length > 0 && <div className="attention-card" role="status">
+        <strong>{measurementReviewLabels.length} ingrediënt(en) hebben een hoeveelheid of maateenheid die controle nodig heeft</strong>
+        <p>Voor {measurementReviewLabels.join(', ')} kan Supa nog geen betrouwbaar
           winkelproduct of volledig mandtotaal kiezen. Controleer eerst in Recepten
-          hoeveel hele stuks je wilt kopen; de rest van je boodschappenlijst blijft bruikbaar.</p>
+          de hoeveelheid en eenheid; stuks moeten een positief heel aantal zijn.
+          De rest van je boodschappenlijst blijft bruikbaar.</p>
         <button type="button" className="ghost-button" onClick={onOpenRecipes}>
-          Open Recepten om aantallen te controleren
+          Open Recepten om hoeveelheden te controleren
         </button>
       </div>}
 
