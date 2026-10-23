@@ -93,9 +93,9 @@ export function shoppingListCompletion(
       !Number.isSafeInteger(line.pack?.count) ||
       line.pack.count < 1 ||
       !Number.isSafeInteger(line.pricePerPackCents) ||
-      line.pricePerPackCents < 0 ||
+      line.pricePerPackCents <= 0 ||
       !Number.isSafeInteger(line.lineTotalCents) ||
-      line.lineTotalCents < 0 ||
+      line.lineTotalCents <= 0 ||
       line.lineTotalCents !== line.packs * line.pricePerPackCents
     ) {
       return { ...invalid }
