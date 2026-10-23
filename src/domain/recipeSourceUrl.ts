@@ -4,23 +4,29 @@
  * login / PKCE / OAuth / SAML credentials into a portable recipe backup.
  */
 const SECRET_KEYS = /^(?:code|auth(?:orization)?code|oauthcode|accesstoken|refreshtoken|idtoken|clientsecret|clientidsecret|codeverifier|pkceverifier|codechallenge|samlrequest|samlresponse|assertion|password|passwd|session(?:id|token)?|state|csrf|jwt|bearer|apikey|secret|token|credential|signature|sig)$/u
+const URL_CONTROL_OR_DELIMITER = /[&=?#\u0000-\u001f\u007f]/u
+const COMPATIBILITY_NOISE = /[\p{Default_Ignorable_Code_Point}\p{Mark}]/gu
 
 function queryKeyNeedsRemoval(key: string): boolean {
   let decoded = key
   for (let i = 0; i < 8; i++) {
-    const normalized = decoded.normalize('NFKC')
-      .replace(/[\p{Default_Ignorable_Code_Point}\p{Mark}]/gu, '')
-      .toLocaleLowerCase('en')
-      .replace(/[^a-z0-9]/gu, '')
+    // Normalize BEFORE inspecting structure. NFKC can turn fullwidth ＆＝？＃％
+    // into query delimiters or percent escapes that another URL parser sees.
+    const canonical = decoded.normalize('NFKC').replace(COMPATIBILITY_NOISE, '')
+    if (URL_CONTROL_OR_DELIMITER.test(canonical)) return true
+    const normalized = canonical.toLocaleLowerCase('en').replace(/[^a-z0-9]/gu, '')
     if (SECRET_KEYS.test(normalized)) return true
-    if (!/%[0-9a-fA-F]{2}/.test(decoded)) return false
+    if (!canonical.includes('%')) return false
+    // A literal or malformed percent in a query key is ambiguous at a later
+    // decoding boundary. Valid nested escapes are decoded from canonical text.
+    if (!/%[0-9a-fA-F]{2}/u.test(canonical)) return true
     let next: string
-    try { next = decodeURIComponent(decoded) } catch { return true }
-    if (next === decoded) return false
+    try { next = decodeURIComponent(canonical) } catch { return true }
+    if (next === canonical) return true
     decoded = next
   }
-  // Unresolved nesting is not safe to emit to another device.
-  return decoded.includes('%')
+  // Eight decode layers is the limit; never emit a key we did not fully inspect.
+  return true
 }
 
 /**
@@ -31,15 +37,19 @@ function queryKeyNeedsRemoval(key: string): boolean {
 function nestedRecipeQueryNeedsRemoval(value: string): boolean {
   let decoded = value
   for (let depth = 0; depth < 8; depth++) {
-    const marker = decoded.indexOf('?')
+    // Canonicalize only for admission. The stored link remains unchanged unless
+    // its risky parameter is removed by safeRecipeSourceUrl below.
+    const canonical = decoded.normalize('NFKC').replace(COMPATIBILITY_NOISE, '')
+    const marker = canonical.indexOf('?')
     if (marker !== -1) {
-      const query = decoded.slice(marker + 1).split('#', 1)[0]
+      const query = canonical.slice(marker + 1).split('#', 1)[0]
       if ([...new URLSearchParams(query).keys()].some(queryKeyNeedsRemoval)) return true
     }
-    if (!/%[0-9a-fA-F]{2}/u.test(decoded)) return false
+    if (!canonical.includes('%')) return false
+    if (!/%[0-9a-fA-F]{2}/u.test(canonical)) return true
     let next: string
-    try { next = decodeURIComponent(decoded) } catch { return true }
-    if (next === decoded) return false
+    try { next = decodeURIComponent(canonical) } catch { return true }
+    if (next === canonical) return true
     decoded = next
   }
   return true
