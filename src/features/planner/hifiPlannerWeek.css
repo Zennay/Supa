@@ -369,3 +369,9 @@
 .hifi-reuse-rings::after { right: 0; }
 .hifi-reuse-copy { min-width: 0; overflow-wrap: anywhere; }
 .hifi-reuse-copy strong { font-weight: 600; }
+.hifi-planner-day-number.next-open {
+  background: #1f6b4a;
+  color: #fff;
+  font-size: 26px;
+  font-weight: 400;
+}

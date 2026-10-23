@@ -35,6 +35,8 @@ export function HiFiPlannerWeekCard({
   dayImages?: Record<string, string>
 }) {
   const today = new Date()
+  // Figma marks the first open day as the place to add the next meal.
+  const nextOpenDay = plannedMeals.find(({ day }) => !activeDays.includes(day))?.day
 
   return (
     <section className="hifi-planner-week-card" aria-labelledby="hifi-week-planning-title" data-figma-node="3359:4900">
@@ -56,9 +58,11 @@ export function HiFiPlannerWeekCard({
               onClick={() => onToggleDay(day)}
             >
               <span className="hifi-planner-day-label">{day.slice(0, 1)}</span>
-              <span className={active && dayImages[day] ? 'hifi-planner-day-number with-photo' : 'hifi-planner-day-number'}>
+              <span className={active && dayImages[day]
+                ? 'hifi-planner-day-number with-photo'
+                : day === nextOpenDay ? 'hifi-planner-day-number next-open' : 'hifi-planner-day-number'}>
                 {active && dayImages[day] && <FigmaImage asset={dayImages[day]} alt="" />}
-                <span>{date.getDate()}</span>
+                <span>{day === nextOpenDay ? '+' : date.getDate()}</span>
               </span>
             </button>
           )
