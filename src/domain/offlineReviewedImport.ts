@@ -6,9 +6,15 @@ export type OfflineRetailer = 'PLUS' | 'DekaMarkt'
 /** Raw missing-price and availability signals only for explanatory UI.
  * The purchasable StoreProduct shape is still fail-closed: no unknown price
  * can become a zero-cent match through these optional source annotations. */
+export type OfflineAvailabilityLabel = 'available' | 'unavailable' | 'unknown'
+export type OfflineSourceKind = 'product' | 'catalog' | 'offers'
 export type OfflineStoreProduct = StoreProduct & {
   sourcePriceCents?: number | null
-  sourceAvailable?: boolean
+  sourceAvailable?: boolean | null
+  availabilityLabel?: OfflineAvailabilityLabel
+  sourceUrl?: string
+  sourceSha256?: string
+  sourceKind?: OfflineSourceKind
 }
 
 export type OfflineCapture = Readonly<{
@@ -27,6 +33,32 @@ export type OfflinePriceSnapshots = Readonly<{
 }>
 const RETAILERS = ['PLUS', 'DekaMarkt'] as const
 const UNITS: ReadonlySet<string> = new Set(['g', 'kg', 'ml', 'l', 'piece'])
+const SOURCE_KINDS: ReadonlySet<string> = new Set(['product', 'catalog', 'offers'])
+const SOURCE_HOSTS: Record<OfflineRetailer, string> = {
+  PLUS: 'www.plus.nl',
+  DekaMarkt: 'www.dekamarkt.nl',
+}
+function validProductSourceProvenance(raw: Record<string, unknown>, retailer: OfflineRetailer): boolean {
+  const hasUrl = hasOwn(raw, 'sourceUrl')
+  const hasSha = hasOwn(raw, 'sourceSha256')
+  const hasKind = hasOwn(raw, 'sourceKind')
+  if (!hasUrl && !hasSha && !hasKind) return true
+  if (!hasUrl || !hasSha || !hasKind ||
+      typeof raw.sourceUrl !== 'string' ||
+      typeof raw.sourceSha256 !== 'string' ||
+      !/^[a-f0-9]{64}$/.test(raw.sourceSha256) ||
+      !SOURCE_KINDS.has(raw.sourceKind as string)) return false
+  try {
+    const url = new URL(raw.sourceUrl)
+    return url.protocol === 'https:' &&
+      url.hostname === SOURCE_HOSTS[retailer] &&
+      url.port === '' &&
+      !url.username && !url.password && !url.search && !url.hash &&
+      !/[?#]/.test(raw.sourceUrl)
+  } catch {
+    return false
+  }
+}
 // A missing package is represented by null rather than a fabricated size. Only
 // a positive measured package and known price may become a purchasable match.
 const hasOwn = (x: object, key: string) => Object.hasOwn(x, key)
@@ -71,7 +103,10 @@ export function observedInstant(raw: unknown): { ms: number; ns: bigint } | null
   return { ms: parsed, ns: BigInt(parsed - fractionalMillis) * 1_000_000n + BigInt(fraction) }
 }
 function parseProduct(raw: unknown, retailer: OfflineRetailer): OfflineStoreProduct {
-  if (!isRecord(raw) || !allowedFields(raw, ['id', 'name', 'packAmount', 'packUnit', 'packCount', 'priceCents', 'available']) ||
+  if (!isRecord(raw) || !allowedFields(raw, [
+        'id', 'name', 'packAmount', 'packUnit', 'packCount', 'priceCents', 'available',
+        'sourceAvailable', 'availabilityLabel', 'sourceUrl', 'sourceSha256', 'sourceKind',
+      ]) ||
       !validName(raw.id, 100) || !validName(raw.name, 160) ||
       (raw.packAmount !== null && (typeof raw.packAmount !== 'number' || !Number.isFinite(raw.packAmount) ||
         raw.packAmount <= 0 || raw.packAmount > 100000)) ||
@@ -82,6 +117,11 @@ function parseProduct(raw: unknown, retailer: OfflineRetailer): OfflineStoreProd
       (raw.packCount !== undefined && (!Number.isSafeInteger(raw.packCount) ||
         (raw.packCount as number) < 1 || (raw.packCount as number) > 1000)) ||
       typeof raw.available !== 'boolean' ||
+      (raw.sourceAvailable !== undefined && raw.sourceAvailable !== null &&
+        typeof raw.sourceAvailable !== 'boolean') ||
+      (raw.availabilityLabel !== undefined &&
+        !['available', 'unavailable', 'unknown'].includes(raw.availabilityLabel as string)) ||
+      !validProductSourceProvenance(raw, retailer) ||
       (raw.priceCents !== null && (!Number.isSafeInteger(raw.priceCents) ||
         (raw.priceCents as number) <= 0 || (raw.priceCents as number) > 1000000)) ||
       (raw.available && raw.priceCents === null) ||
@@ -99,7 +139,12 @@ function parseProduct(raw: unknown, retailer: OfflineRetailer): OfflineStoreProd
     // Distinguish missing price from genuinely observed unavailability in
     // the user's private UI, without loosening the strict CSV/JSON importer.
     sourcePriceCents: raw.priceCents as number | null,
-    sourceAvailable: raw.available,
+    sourceAvailable: raw.sourceAvailable === undefined
+      ? raw.available : raw.sourceAvailable as boolean | null,
+    availabilityLabel: raw.availabilityLabel as OfflineAvailabilityLabel | undefined,
+    sourceUrl: raw.sourceUrl as string | undefined,
+    sourceSha256: raw.sourceSha256 as string | undefined,
+    sourceKind: raw.sourceKind as OfflineSourceKind | undefined,
   }
 }
 export function parseOfflinePriceSnapshots(
