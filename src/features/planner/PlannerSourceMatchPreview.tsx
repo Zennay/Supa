@@ -81,8 +81,10 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
       const suggestions = {} as Record<OfflineRetailer, Suggestion>
       const unpricedHints = { PLUS: null, DekaMarkt: null } as Record<OfflineRetailer, UnpricedHint>
       const manualReview = { PLUS: false, DekaMarkt: false }
-      const measurementReview = need.unit === 'piece' &&
-        (typeof need.amount !== 'number' || !Number.isSafeInteger(need.amount) || need.amount <= 0)
+      const measurementReview = !units.has(need.unit) ||
+        typeof need.amount !== 'number' || !Number.isFinite(need.amount) ||
+        need.amount <= 0 || need.amount > 1_000_000 ||
+        (need.unit === 'piece' && !Number.isSafeInteger(need.amount))
       for (const store of stores) {
         if (measurementReview) {
           suggestions[store] = null
@@ -228,7 +230,9 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
   // A local uploaded source is not proof that either retailer authorized reuse.
   const noLineGapReason = (line: typeof coverage[number]): string | null => {
     if (line.measurementReview)
-      return line.need.label + ': controleer eerst in Recepten het aantal hele stuks; een nieuwe winkelopname lost dit niet op.'
+      return line.need.unit === 'piece'
+        ? line.need.label + ': het aantal stuks moet positief en heel zijn; controleer eerst Recepten.'
+        : line.need.label + ': hoeveelheid of maateenheid ontbreekt of is ongeldig; controleer eerst Recepten.'
     if (candidateLineGap(line) !== null) return null
     if (olderPairedStore) return 'Bronmomenten meer dan 24 uur uiteen: vernieuw ' +
       olderPairedStore + ' met een echte waarneming.'
@@ -615,7 +619,9 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
           <small>{need.amount ?? 'Onbekend'} {need.unit}</small>
           {measurementReview && <div>
             <small className="supa-planner-source-matches__missing-delta">
-              Dit aantal stuks is geen positief geheel getal. Beoordeel de hoeveelheid eerst in Recepten.
+              {need.unit === 'piece'
+                ? 'Dit aantal stuks is geen positief geheel getal. Beoordeel de hoeveelheid eerst in Recepten.'
+                : 'De hoeveelheid of maateenheid ontbreekt of is ongeldig. Beoordeel deze behoefte eerst in Recepten.'}
             </small>
             {onOpenRecipes && <button type="button" className="ghost-button"
               onClick={onOpenRecipes}>Open Recepten om aantallen te controleren</button>}
@@ -663,7 +669,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
               {' '}volgens exacte metrische behoefte;
               {' '}niet bevestigd, gedeelde producten pas in Vergelijk samenvoegen.</small></>
             : measurementReview
-              ? 'Controleer eerst het aantal hele stuks in Recepten; dit is geen ontbrekende winkelbron'
+              ? 'Controleer eerst de hoeveelheid en eenheid in Recepten; dit is geen ontbrekende winkelbron'
             : source.captures[store] &&
               !recentOwnCaptureInstant(source.captures[store]!.observedAt, clock)
               ? 'Verlopen of toekomstige bron: geen actueel geprijsd voorstel; leg een echte nieuwe opname vast'
