@@ -3985,6 +3985,18 @@ export function OfflineReviewedWorkbench({
                     ))}</ul>
                   </div>
                 )}
+                {pendingReplacement.preview.sourceExamples.length > 0 && (
+                  <div>
+                    <strong>Bronherkomst of bronsignaal gewijzigd (maximaal 8)</strong>
+                    <ul>{pendingReplacement.preview.sourceExamples.map(item => (
+                      <li key={item.sourceId + ':' + item.name + ':' + item.before + ':' + item.after}
+                        style={{ overflowWrap: 'anywhere' }}>
+                        {item.name} · broncode {item.sourceId}:{' '}
+                        <code>{item.before}</code> → <code>{item.after}</code>
+                      </li>
+                    ))}</ul>
+                  </div>
+                )}
                 <p>Alle eerder bevestigde productkeuzes en afvinkingen van <strong>{pendingReplacement.store}</strong>
                   {' '}worden ingetrokken bij bevestigen.
                   {' '}{pendingReplacement.preview.otherStore} blijft met oorspronkelijke
