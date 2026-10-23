@@ -45,8 +45,10 @@ function nestedRecipeQueryNeedsRemoval(value: string): boolean {
       const query = canonical.slice(marker + 1).split('#', 1)[0]
       if ([...new URLSearchParams(query).keys()].some(queryKeyNeedsRemoval)) return true
     }
-    if (!canonical.includes('%')) return false
-    if (!/%[0-9a-fA-F]{2}/u.test(canonical)) return true
+    // Values may legitimately contain a literal percent sign. Only decode a
+    // value when it contains an actual escape; malformed escapes are rejected
+    // when they occur in a query key, where they can change parameter identity.
+    if (!/%[0-9a-fA-F]{2}/u.test(canonical)) return false
     let next: string
     try { next = decodeURIComponent(canonical) } catch { return true }
     if (next === canonical) return true
