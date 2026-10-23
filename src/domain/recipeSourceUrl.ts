@@ -58,11 +58,11 @@ function nestedRecipeQueryNeedsRemoval(value: string): boolean {
 }
 
 function isPublicRecipeHost(hostname: string): boolean {
-  const host = hostname.toLowerCase().replace(/\\.$/u, '')
+  const host = hostname.toLowerCase().replace(/\.$/u, '')
   // Keep local admission aligned with the server's public-host contract.
   // URL canonicalizes alternate IPv4 forms; bracketed/colon hosts cover IPv6.
-  if (!host || host.includes(':') || /^(?:\\d{1,3}\\.){3}\\d{1,3}$/u.test(host)) return false
-  if (!host.includes('.') || /\\.(?:localhost|local|internal|test|invalid)$/u.test(host)) return false
+  if (!host || host.includes(':') || /^(?:\d{1,3}\.){3}\d{1,3}$/u.test(host)) return false
+  if (!host.includes('.') || /\.(?:localhost|local|internal|test|invalid)$/u.test(host)) return false
   return true
 }
 
