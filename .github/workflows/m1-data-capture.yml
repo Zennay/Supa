@@ -79,6 +79,8 @@ jobs:
 
       - name: Verify bounded source contract
         run: npm test
+        env:
+          NODE_OPTIONS: --test-concurrency=1
 
       - name: Run matching benchmark
         run: npm run m1:matching-benchmark
