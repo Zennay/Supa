@@ -1504,6 +1504,25 @@ export function OfflineReviewedWorkbench({
     }
   }
 
+  function sameCapturedProduct(
+    left: OfflineStoreProduct | undefined,
+    right: OfflineStoreProduct | undefined,
+  ): boolean {
+    return !!left && !!right && left.id === right.id &&
+      left.name === right.name &&
+      left.packAmount === right.packAmount &&
+      left.packUnit === right.packUnit &&
+      left.packCount === right.packCount &&
+      left.priceCents === right.priceCents &&
+      left.available === right.available &&
+      left.sourcePriceCents === right.sourcePriceCents &&
+      left.sourceAvailable === right.sourceAvailable &&
+      left.availabilityLabel === right.availabilityLabel &&
+      left.sourceUrl === right.sourceUrl &&
+      left.sourceSha256 === right.sourceSha256 &&
+      left.sourceKind === right.sourceKind
+  }
+
   function sameCanonicalCapture(
     previous: OfflinePriceSnapshots['captures'][typeof stores[number]],
     incoming: OfflinePriceSnapshots['captures'][typeof stores[number]],
@@ -1511,24 +1530,8 @@ export function OfflineReviewedWorkbench({
     if (!previous || !incoming || previous.observedAt !== incoming.observedAt ||
         previous.products.length !== incoming.products.length) return false
     const bySku = new Map(previous.products.map(product => [product.id, product]))
-    return incoming.products.every(product => {
-      const old = bySku.get(product.id)
-      return !!old && old.name === product.name &&
-        old.packAmount === product.packAmount && old.packUnit === product.packUnit &&
-        old.packCount === product.packCount &&
-        // A capture is unchanged only when every fact that can affect a
-        // priced match or its provenance is unchanged. In particular, legacy
-        // rows may have no sourcePriceCents, so comparing that optional field
-        // alone would miss a changed actual price and incorrectly retain reviews.
-        old.priceCents === product.priceCents &&
-        old.available === product.available &&
-        old.sourcePriceCents === product.sourcePriceCents &&
-        old.sourceAvailable === product.sourceAvailable &&
-        old.availabilityLabel === product.availabilityLabel &&
-        old.sourceUrl === product.sourceUrl &&
-        old.sourceSha256 === product.sourceSha256 &&
-        old.sourceKind === product.sourceKind
-    })
+    return incoming.products.every(product =>
+      sameCapturedProduct(bySku.get(product.id), product))
   }
 
   function stageBothStoreReplacement(input: string, version: number) {
@@ -1557,14 +1560,9 @@ export function OfflineReviewedWorkbench({
       const newBySku = new Map(incoming.products.map(product => [product.id, product]))
       const added = incoming.products.filter(item => !oldBySku.has(item.id)).length
       const removed = prior?.products.filter(item => !newBySku.has(item.id)).length ?? 0
-      const changed = incoming.products.filter(item => {
-        const old = oldBySku.get(item.id)
-        return old && (old.name !== item.name ||
-          old.packAmount !== item.packAmount || old.packUnit !== item.packUnit ||
-          old.packCount !== item.packCount ||
-          old.sourcePriceCents !== item.sourcePriceCents ||
-          old.sourceAvailable !== item.sourceAvailable)
-      }).length
+      const changed = incoming.products.filter(item =>
+        oldBySku.has(item.id) && !sameCapturedProduct(oldBySku.get(item.id), item)
+      ).length
       const priceLabel = (product?: OfflineStoreProduct) => {
         if (!product) return 'niet meer in bestand'
         if (product.sourceAvailable !== true || product.sourcePriceCents === null ||
@@ -1573,23 +1571,49 @@ export function OfflineReviewedWorkbench({
         return exactEuro.formatCents(product.sourcePriceCents) + ' per pak · ' +
           product.packCount + ' × ' + product.packAmount + ' ' + product.packUnit
       }
+      const sourceLabel = (product?: OfflineStoreProduct) => {
+        if (!product) return 'product ontbreekt'
+        const url = product.sourceUrl
+          ? product.sourceUrl.slice(0, 180) + (product.sourceUrl.length > 180 ? '…' : '')
+          : 'bron-URL ontbreekt'
+        const hash = product.sourceSha256
+          ? 'SHA-256 ' + product.sourceSha256.slice(0, 12)
+          : 'snapshot-hash ontbreekt'
+        const availability = product.sourceAvailable === undefined
+          ? 'bronbeschikbaarheid onbekend'
+          : product.sourceAvailable ? 'bron beschikbaar' : 'bron niet beschikbaar'
+        return [
+          product.sourceKind ?? 'brontype onbekend',
+          url,
+          hash,
+          availability,
+          product.availabilityLabel ? 'bronsignaal ' + product.availabilityLabel : '',
+        ].filter(Boolean).join(' · ')
+      }
       const examples = [...new Set([...oldBySku.keys(), ...newBySku.keys()])]
         .filter(id => {
           const old = oldBySku.get(id)
           const latest = newBySku.get(id)
-          return !old || !latest || old.name !== latest.name ||
-            old.packAmount !== latest.packAmount || old.packUnit !== latest.packUnit ||
-            old.packCount !== latest.packCount ||
-            old.sourcePriceCents !== latest.sourcePriceCents ||
-            old.sourceAvailable !== latest.sourceAvailable
+          return !sameCapturedProduct(old, latest)
         })
         .slice(0, 6)
         .map(id => {
           const before = oldBySku.get(id)
           const after = newBySku.get(id)
+          const sourceChanged = !!before && !!after && (
+            before.sourceUrl !== after.sourceUrl ||
+            before.sourceSha256 !== after.sourceSha256 ||
+            before.sourceKind !== after.sourceKind ||
+            before.sourceAvailable !== after.sourceAvailable ||
+            before.availabilityLabel !== after.availabilityLabel
+          )
           return { id, name: after?.name ?? before?.name ?? id,
             before: before ? priceLabel(before) : 'nieuw bronproduct',
-            after: priceLabel(after) }
+            after: priceLabel(after),
+            sourceChanged,
+            beforeSource: sourceLabel(before),
+            afterSource: sourceLabel(after),
+          }
         })
       const priced = (product: OfflineStoreProduct) =>
         product.sourceAvailable === true && product.sourcePriceCents !== null &&
@@ -3830,9 +3854,15 @@ export function OfflineReviewedWorkbench({
                 {change.examples.length > 0 && <details>
                   <summary>Bekijk originele SKU- en pakprijswijzigingen (maximaal 6)</summary>
                   <ul>{change.examples.map(item => (
-                    <li key={item.id}>{item.name} · broncode {item.id}
+                    <li key={item.id} style={{ overflowWrap: 'anywhere' }}>
+                      {item.name} · broncode {item.id}
                       <br />Oud: {item.before}
-                      <br />Nieuw: {item.after}</li>
+                      <br />Nieuw: {item.after}
+                      {item.sourceChanged && <>
+                        <br /><small>Bronherkomst gewijzigd: <code>{item.beforeSource}</code>
+                          {' '}→ <code>{item.afterSource}</code></small>
+                      </>}
+                    </li>
                   ))}</ul>
                 </details>}
               </li>
