@@ -52,8 +52,11 @@ export function ComparisonReadiness({
   const plusInstant = captures.PLUS.observedNs
   const dekaInstant = captures.DekaMarkt.observedNs
   const refreshStore = plusInstant <= dekaInstant ? 'PLUS' : 'DekaMarkt'
-  const observationGapHours = Number(plusInstant >= dekaInstant
-    ? plusInstant - dekaInstant : dekaInstant - plusInstant) / 3_600_000_000_000
+  const observationGapNs = plusInstant >= dekaInstant
+    ? plusInstant - dekaInstant : dekaInstant - plusInstant
+  const observationGapHours = Number(observationGapNs) / 3_600_000_000_000
+  const pairWithin24h = pairedWithin24h && observationGapNs <= 86_400_000_000_000n
+  const sourcesFresh = sourceFresh && sources.every(item => !item.olderThanWeek && !item.inFuture)
   const gapText = observationGapHours.toLocaleString('nl-NL', { maximumFractionDigits: 1 })
 
   const hasDemand = plus.selectedMealCount > 0 && deka.selectedMealCount > 0 &&
@@ -71,7 +74,9 @@ export function ComparisonReadiness({
       onSecondaryClick: onOpenImport,
     }] : []
   })
-  const needsSource = !sourceFresh || !pairedWithin24h
+  // Re-check the actual capture timestamps here; stale props must not
+  // make an old/future source pair look ready after the evidence has aged.
+  const needsSource = !sourcesFresh || !pairWithin24h
   const pendingByStoreCount =
     (pendingReviewByStore?.PLUS?.length ?? 0) +
     (pendingReviewByStore?.DekaMarkt?.length ?? 0)
@@ -92,8 +97,8 @@ export function ComparisonReadiness({
     'Alleen privé ingevoerde bronmomenten; geen actuele retailerclaim of besparing.',
     `PLUS: ${captures.PLUS.observedAt} (${sources[0].readableAge})`,
     `DekaMarkt: ${captures.DekaMarkt.observedAt} (${sources[1].readableAge})`,
-    !sourceFresh ? 'ACTIE: vernieuw verlopen/toekomstige bronmomenten.' : '',
-    !pairedWithin24h ? `ACTIE: vernieuw ${refreshStore}; bronmomenten verschillen ${gapText} uur.` : '',
+    !sourcesFresh ? 'ACTIE: vernieuw verlopen/toekomstige bronmomenten.' : '',
+    !pairWithin24h ? `ACTIE: vernieuw ${refreshStore}; bronmomenten verschillen ${gapText} uur.` : '',
     !hasDemand ? 'ACTIE: kies eerst een weekmenu in Planner.' : '',
     ...(['PLUS', 'DekaMarkt'] as const).flatMap(store => {
       const basket = store === 'PLUS' ? plus : deka
@@ -145,7 +150,7 @@ export function ComparisonReadiness({
     detail: 'Een leeg weekmenu is geen vergelijkbaar boodschappenmandje.',
     action: onOpenPlanner ? 'Open Planner' : undefined, onClick: onOpenPlanner,
   })
-  if (!sourceFresh) steps.push({
+  if (!sourcesFresh) steps.push({
     id: 'fresh',
     heading: 'Laad recente prijsopnames',
     detail: sources.filter(item => item.olderThanWeek || item.inFuture)
@@ -153,7 +158,7 @@ export function ComparisonReadiness({
       .join('; ') || 'Een of beide bronmomenten vallen buiten het toegestane zeven-dagenvenster.',
     action: 'Naar bronimport', onClick: onOpenImport,
   })
-  if (!pairedWithin24h) steps.push({
+  if (!pairWithin24h) steps.push({
     id: 'gap',
     heading: 'PLUS en DekaMarkt binnen 24 uur observeren',
     detail: 'De bronmomenten verschillen ' + gapText + ' uur. ' + refreshStore +
@@ -216,7 +221,7 @@ export function ComparisonReadiness({
           'Lokale leeftijd binnen 7 dagen; geen externe prijsverificatie'}</small>
       </div>)}
     </div>
-    {!pairedWithin24h && <p className="disclaimer">
+    {!pairWithin24h && <p className="disclaimer">
       De twee eigen bronmomenten liggen meer dan 24 uur uiteen.
       Er wordt geen volledig prijsverschil berekend totdat ze tijdsvergelijkbaar zijn.
     </p>}
