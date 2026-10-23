@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node dist/server.mjs",
     "dev": "vite",
-    "test": "node --experimental-strip-types --test tests/*.test.mjs",
+    "test": "node --experimental-strip-types --test --test-concurrency=1 tests/*.test.mjs",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "m1:matching-benchmark": "node --experimental-strip-types scripts/m1-run-matching-benchmark.mjs",
