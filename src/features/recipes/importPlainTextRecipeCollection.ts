@@ -16,10 +16,9 @@ const nonRecipeHeadings = new Set([
 ])
 
 function normalizedHeading(line: string): string {
-  return line.replace(/^#{1,6}\\s+/u, '')
-    .replace(/\\s+#+\\s*$/u, '')
-    .replace(/^\\*\\*(.+?)\\*\\*: ?$/u, '$1')
-    .replace(/^\\*\\*(.+?)\\*\\*:?$/u, '$1')
+  return line.replace(/^#{1,6}\s+/u, '')
+    .replace(/\s+#+\s*$/u, '')
+    .replace(/^\*\*(.+?)\*\*:?$/u, '$1')
     .replace(/:$/u, '')
     .trim()
     .toLocaleLowerCase('nl')
@@ -30,10 +29,10 @@ function normalizedHeading(line: string): string {
 
 function recipeSection(line: string): RecipeSection | null {
   const heading = normalizedHeading(line)
-  if (/^(?:ingredi[eë]nten|benodigdheden|wat heb je nodig|ingredients|what you need)(?:\\s+(?:(?:voor|for|serves?)\\s+)?\\d{1,4}\\s*(?:personen|porties|servings?|people)?)?$/u.test(heading)) {
+  if (/^(?:ingredi[eë]nten|benodigdheden|wat heb je nodig|ingredients|what you need)(?:\s+(?:(?:voor|for|serves?)\s+)?\d{1,4}\s*(?:personen|porties|servings?|people)?)?$/u.test(heading)) {
     return 'ingredients'
   }
-  if (/^(?:bereiding|bereidingswijze|instructies|stappen|werkwijze|zo maak je het|method|directions|instructions|steps|preparation|how to make it)(?:\\s+(?:(?:ca\\.?|approx\\.?|about)\\s*)?\\d{1,4}\\s*(?:min(?:uten)?|mins?|minutes?|uur|hours?))?$/u.test(heading)) {
+  if (/^(?:bereiding|bereidingswijze|instructies|stappen|werkwijze|zo maak je het|method|directions|instructions|steps|preparation|how to make it)(?:\s+(?:(?:ca\.?|approx\.?|about)\s*)?\d{1,4}\s*(?:min(?:uten)?|mins?|minutes?|uur|hours?))?$/u.test(heading)) {
     return 'steps'
   }
   return null
@@ -53,7 +52,7 @@ function isCompleteRecipe(lines: readonly string[]): boolean {
 function markdownTitles(lines: readonly string[]): MarkdownTitle[] {
   const result: MarkdownTitle[] = []
   lines.forEach((line, index) => {
-    const match = /^(#{1,2})\\s+(.+?)\\s*#*\\s*$/u.exec(line.trim())
+    const match = /^(#{1,2})\s+(.+?)\s*#*\s*$/u.exec(line.trim())
     if (!match || recipeSection(line)) return
     const title = normalizedHeading(line)
     if (collectionHeadings.has(title) || nonRecipeHeadings.has(title)) return
@@ -76,7 +75,7 @@ function titleStartsAtLevel(
 }
 
 function splitMarkdownCollection(raw: string): string[] {
-  const lines = raw.split('\\n')
+  const lines = raw.split('\n')
   const headings = markdownTitles(lines)
   if (headings.length < 2) return [raw]
 
@@ -88,13 +87,13 @@ function splitMarkdownCollection(raw: string): string[] {
   // cookbook heading is safe to omit; any other preamble keeps the old
   // all-or-nothing single-document path, which will ask for clearer structure.
   const prefix = lines.slice(0, starts[0]).filter(line => line.trim())
-  if (prefix.some(line => !/^#{1,2}\\s+(?:recepten|recipes|mijn recepten|my recipes|kookboek|receptenbundel|recipe collection)\\s*#*\\s*$/iu.test(line.trim()))) {
+  if (prefix.some(line => !/^#{1,2}\s+(?:recepten|recipes|mijn recepten|my recipes|kookboek|receptenbundel|recipe collection)\s*#*\s*$/iu.test(line.trim()))) {
     return [raw]
   }
 
   const parts = starts.map((start, index) =>
-    lines.slice(start, starts[index + 1] ?? lines.length).join('\\n').trim())
-  return parts.length >= 2 && parts.every(part => isCompleteRecipe(part.split('\\n')))
+    lines.slice(start, starts[index + 1] ?? lines.length).join('\n').trim())
+  return parts.length >= 2 && parts.every(part => isCompleteRecipe(part.split('\n')))
     ? parts
     : [raw]
 }
@@ -109,9 +108,9 @@ export function importPlainTextRecipeCollection(raw: string): UserRecipeDraft[] 
       new TextEncoder().encode(raw).length > 500_000) {
     throw new Error('Kies een lokaal receptenbestand van maximaal 500 kB.')
   }
-  const normalized = raw.replace(/\\r\\n?/gu, '\\n')
-  const parts = /^---[ \\t]*$/mu.test(normalized)
-    ? normalized.split(/^---[ \\t]*$/gmu)
+  const normalized = raw.replace(/\r\n?/gu, '\n')
+  const parts = /^---[ \t]*$/mu.test(normalized)
+    ? normalized.split(/^---[ \t]*$/gmu)
     : splitMarkdownCollection(normalized)
   if (parts.length > 15 || parts.some(part => !part.trim())) {
     throw new Error('Importeer maximaal 15 volledige recepten. Laat geen lege recepten tussen de scheidingsregels.')
