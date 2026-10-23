@@ -5,6 +5,10 @@ import { replacePrivateStoreCapture } from './replacePrivateStoreCapture.ts'
 type SourceProduct = {
   id: string; name: string; packAmount: number | null; packUnit: string
   packCount?: number; priceCents: number | null; available: boolean
+  sourcePriceCents?: number | null; sourceAvailable?: boolean
+  availabilityLabel?: 'available' | 'unavailable' | 'unknown'
+  sourceUrl?: string; sourceSha256?: string
+  sourceKind?: 'product' | 'catalog' | 'offers'
 }
 type SourceCapture = { retailer: OfflineRetailer; observedAt: string; products: SourceProduct[] }
 
@@ -40,7 +44,13 @@ export function describePrivateStoreCaptureChange(
       prior.packUnit !== item.packUnit ||
       (prior.packCount ?? 1) !== (item.packCount ?? 1) ||
       prior.available !== item.available ||
-      prior.priceCents !== item.priceCents
+      prior.priceCents !== item.priceCents ||
+      prior.sourcePriceCents !== item.sourcePriceCents ||
+      prior.sourceAvailable !== item.sourceAvailable ||
+      prior.availabilityLabel !== item.availabilityLabel ||
+      prior.sourceUrl !== item.sourceUrl ||
+      prior.sourceSha256 !== item.sourceSha256 ||
+      prior.sourceKind !== item.sourceKind
     )
   }).length
   const formatCents = (item: SourceProduct): string => {
