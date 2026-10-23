@@ -37,10 +37,27 @@ const STOP_TOKENS = new Set([
   'de',
   'het',
   'een',
+  'in',
+  'met',
+  'van',
+  'voor',
+  'zonder',
+  'en',
+  'per',
+  'uit',
+  'op',
+  'aan',
+  'bij',
+  'tot',
+  'of',
   'pak',
+  'pakken',
   'fles',
+  'flessen',
   'zak',
+  'zakje',
   'doos',
+  'doosje',
 ])
 
 const MATCH_UNITS: ReadonlySet<string> = new Set([
@@ -99,6 +116,11 @@ function abstain(reason: string): MatchDecision {
   }
 }
 
+// Strip only explicit physical pack notation before comparing names. A pack
+// size is handled by the physical-quantity score below, not as a product-name
+// token that can distort confidence.
+const PACK_NOTATION = /\b(?:\d{1,4}\s*[x×]\s*)?\d{1,7}(?:[.,]\d+)?\s*(?:kilogram(?:men)?|kg|gram(?:men)?|gr|g|milliliter|millilitre|ml|cl|liter|litre|l|stuks?|stuk|pcs?|pieces?)\b/giu
+
 function textTokens(value: string): string[] {
   return value
     .normalize('NFD')
@@ -110,37 +132,8 @@ function textTokens(value: string): string[] {
     .filter((token) => token && /[\p{L}\p{N}]/u.test(token) && !STOP_TOKENS.has(token))
 }
 
-function normalizedPhrase(value: string): string {
-  return textTokens(value).join(' ')
-}
-
-function baseUnitAmount(
-  amount: number | null,
-  unit: MatchUnit,
-): { amount: number | null; family: 'mass' | 'volume' | 'piece' | 'unknown' } {
-  if (unit === 'kg') {
-    return { amount: amount === null ? null : amount * 1000, family: 'mass' }
-  }
-  if (unit === 'g') return { amount, family: 'mass' }
-  if (unit === 'l') {
-    return { amount: amount === null ? null : amount * 1000, family: 'volume' }
-  }
-  if (unit === 'ml') return { amount, family: 'volume' }
-  if (unit === 'piece') return { amount, family: 'piece' }
-  return { amount, family: 'unknown' }
-}
-
-function hasInvalidKnownAmount(amount: number | null): boolean {
-  return amount !== null && (!Number.isFinite(amount) || amount <= 0)
-}
-
-function hasInvalidBaseUnitAmount(
-  amount: number | null,
-  unit: MatchUnit,
-): boolean {
-  if (amount === null) return false
-  const normalized = baseUnitAmount(amount, unit).amount
-  return normalized !== null && (!Number.isFinite(normalized) || normalized <= 0)
+function identityTokens(value: string): string[] {
+  return [...new Set(textTokens(value.replace(PACK_NOTATION, ' ')))]
 }
 
 function scoreCandidate(
@@ -154,16 +147,20 @@ function scoreCandidate(
   if (hasInvalidKnownAmount(candidate.packAmount)) {
     return { score: -100, reasons: ['candidate pack amount invalid'] }
   }
+  if (candidate.packUnit === 'piece' && candidate.packAmount !== null &&
+      !Number.isSafeInteger(candidate.packAmount)) {
+    return { score: -100, reasons: ['candidate piece pack amount must be a whole number'] }
+  }
 
   const packCount = candidate.packCount ?? 1
   if (!Number.isSafeInteger(packCount) || packCount <= 0) {
     return { score: -100, reasons: ['invalid pack count'] }
   }
 
-  const queryPhrase = normalizedPhrase(requirement.query)
-  const productPhrase = normalizedPhrase(candidate.name)
-  const queryTokens = new Set(textTokens(requirement.query))
-  const productTokens = new Set(textTokens(candidate.name))
+  const queryWords = identityTokens(requirement.query)
+  const productWords = identityTokens(candidate.name)
+  const queryTokens = new Set(queryWords)
+  const productTokens = new Set(productWords)
   const reasons: string[] = []
 
   let overlap = 0
@@ -174,34 +171,23 @@ function scoreCandidate(
   const overlapRatio = queryTokens.size === 0 ? 0 : overlap / queryTokens.size
   let score = Math.round(overlapRatio * 55)
 
-  if (queryPhrase && productPhrase.includes(queryPhrase)) {
+  // A substring inside a token is not product identity: "ham" must not
+  // receive the exact-phrase bonus from "champignonham". Extra meaningful
+  // descriptors such as "geraspte", "bio" or "basilicum" require review
+  // instead of turning a partial name overlap into an automatic match.
+  const exactTokenIdentity = queryWords.length > 0 &&
+    queryWords.length === productWords.length &&
+    queryWords.every((token) => productTokens.has(token))
+  if (exactTokenIdentity) {
     score += 35
-    reasons.push('query phrase present')
+    reasons.push('exact normalized product identity')
   } else if (overlap > 0) {
     reasons.push(`${overlap}/${queryTokens.size} query tokens present`)
-  }
-
-  const required = baseUnitAmount(requirement.amount, requirement.unit)
-  const effectivePackAmount =
-    candidate.packAmount === null ? null : candidate.packAmount * packCount
-
-  if (
-    effectivePackAmount !== null &&
-    (!Number.isFinite(effectivePackAmount) || effectivePackAmount <= 0)
-  ) {
-    return { score: -100, reasons: ['candidate effective pack amount invalid'] }
-  }
-
-  const pack = baseUnitAmount(effectivePackAmount, candidate.packUnit)
-  if (
-    pack.amount !== null &&
-    (!Number.isFinite(pack.amount) || pack.amount <= 0)
-  ) {
-    return { score: -100, reasons: ['candidate normalized pack amount invalid'] }
-  }
-
-  if (packCount > 1 && candidate.packAmount !== null) {
-    reasons.push(`multipack count ${packCount} applied`)
+    const additionalDescriptors = [...productTokens].filter((token) => !queryTokens.has(token)).length
+    if (additionalDescriptors > 0) {
+      score -= Math.min(45, additionalDescriptors * 15)
+      reasons.push(`${additionalDescriptors} additional product descriptor(s) require review`)
+    }
   }
 
   if (
@@ -276,6 +262,18 @@ export function matchIngredient(
       score: null,
       runnerUpScore: null,
       reasons: ['requirement amount invalid'],
+    }
+  }
+
+  // A fractional physical item (for example 1.5 eggs) cannot be priced as
+  // whole retail packs. Refuse it here even if a caller bypasses recipe review.
+  if (requirement.unit === 'piece' && requirement.amount !== null &&
+      !Number.isSafeInteger(requirement.amount)) {
+    return {
+      type: 'abstain',
+      score: null,
+      runnerUpScore: null,
+      reasons: ['fractional piece requirement requires human review'],
     }
   }
 
