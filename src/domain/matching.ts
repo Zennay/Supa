@@ -147,6 +147,10 @@ function scoreCandidate(
   if (hasInvalidKnownAmount(candidate.packAmount)) {
     return { score: -100, reasons: ['candidate pack amount invalid'] }
   }
+  if (candidate.packUnit === 'piece' && candidate.packAmount !== null &&
+      !Number.isSafeInteger(candidate.packAmount)) {
+    return { score: -100, reasons: ['candidate piece pack amount must be a whole number'] }
+  }
 
   const packCount = candidate.packCount ?? 1
   if (!Number.isSafeInteger(packCount) || packCount <= 0) {
@@ -258,6 +262,18 @@ export function matchIngredient(
       score: null,
       runnerUpScore: null,
       reasons: ['requirement amount invalid'],
+    }
+  }
+
+  // A fractional physical item (for example 1.5 eggs) cannot be priced as
+  // whole retail packs. Refuse it here even if a caller bypasses recipe review.
+  if (requirement.unit === 'piece' && requirement.amount !== null &&
+      !Number.isSafeInteger(requirement.amount)) {
+    return {
+      type: 'abstain',
+      score: null,
+      runnerUpScore: null,
+      reasons: ['fractional piece requirement requires human review'],
     }
   }
 
