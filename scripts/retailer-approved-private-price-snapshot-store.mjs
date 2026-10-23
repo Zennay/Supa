@@ -54,6 +54,24 @@ const permittedReasons = new Set([
 ])
 const hosts = { plus: 'www.plus.nl', dekamarkt: 'www.dekamarkt.nl' }
 
+// Failed or out-of-stock captures still need an independently attributable
+// original article URL in the private archive. Never accept only a host name,
+// a sibling SKU, a redirect or a caller-supplied source without a route.
+function approvedSourceUrl(source) {
+  if (typeof source?.url !== 'string' || source.url.length > 2048 ||
+      !Object.hasOwn(hosts, source.retailerId)) return false
+  try {
+    const parsed = new URL(source.url)
+    const prefix = source.retailerId === 'plus' ? '/product/' : '/producten/'
+    return parsed.href === source.url && parsed.protocol === 'https:' &&
+      parsed.hostname === hosts[source.retailerId] && !parsed.port &&
+      !parsed.username && !parsed.password && !parsed.search && !parsed.hash &&
+      parsed.pathname.startsWith(prefix) && parsed.pathname.length > prefix.length
+  } catch {
+    return false
+  }
+}
+
 function admitted(value) {
   if (!value || value.mode !== 'private-authorized-html-product-candidate' ||
       !['candidate_needs_review', 'review_required'].includes(value.status) ||
@@ -65,6 +83,7 @@ function admitted(value) {
       !value.source ||
       !Object.hasOwn(hosts, value.source.retailerId) ||
       value.source.kind !== 'product' ||
+      !approvedSourceUrl(value.source) ||
       typeof value.source.sha256 !== 'string' ||
       !/^[a-f0-9]{64}$/.test(value.source.sha256) ||
       typeof value.source.capturedAt !== 'string' ||
@@ -87,18 +106,13 @@ function admitted(value) {
       provenance.kind !== 'product' ||
       provenance.capturedAt !== value.source.capturedAt ||
       provenance.sha256 !== value.source.sha256 ||
+      provenance.url !== value.source.url ||
       observation.currentPriceCents === null ||
       observation.currentPriceCents <= 0 ||
       observation.pack.amount === null ||
       ['unknown', 'pack'].includes(observation.pack.unit) ||
       observation.availability !== 'available' ||
       Date.now() - Date.parse(provenance.capturedAt) > 24 * 3600_000) refuse()
-  const url = new URL(provenance.url)
-  if (url.hostname !== hosts[value.source.retailerId] ||
-      url.protocol !== 'https:' || url.port || url.search || url.hash ||
-      url.username || url.password ||
-      !url.pathname.startsWith(value.source.retailerId === 'plus'
-        ? '/product/' : '/producten/')) refuse()
   return { source: value.source, status: value.status,
     reason: null, observation }
 }
@@ -116,7 +130,7 @@ export async function writePrivateRetailerPriceSnapshot(candidates, outputFile) 
   const identities = new Set()
   for (const item of entries) {
     const key = [item.source.retailerId, item.source.kind,
-      item.source.sha256, item.source.capturedAt].join(':')
+      item.source.url, item.source.sha256, item.source.capturedAt].join(':')
     if (identities.has(key)) refuse()
     identities.add(key)
   }
