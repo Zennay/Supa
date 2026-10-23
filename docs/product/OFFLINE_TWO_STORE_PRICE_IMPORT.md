@@ -309,8 +309,9 @@ Bij vervanging toont Supa ook wijzigingen in bronherkomst en bronsignalen voorda
 je de nieuwe bron bevestigt. De lokale
 CSV voor de twee-winkelcontrole bevat per winkel/product ook de oorspronkelijke
 bron-URL, bronsoort en snapshot-SHA-256 wanneer deze zijn aangeleverd; ontbrekende
-herkomst blijft leeg. De kopieerbare en printbare offline checklist neemt dezelfde
-herkomst per artikel mee, zodat de bron ook buiten de app controleerbaar blijft.
+herkomst blijft leeg. De definitieve privémandregels tonen die herkomst naast de
+prijs, en het offline prijsrapport plus de kopieerbare/printbare checklist nemen
+dezelfde herkomst per artikel mee, zodat de bron ook buiten de app controleerbaar blijft.
 Dit is herleidbaarheid van aangeleverde data, geen bewijs van bronrechten,
 onafhankelijke verificatie of actuele winkelprijs. Er is geen netwerkrequest en
 onzekere prijs, beschikbaarheid of verpakking wordt niet ingevuld.
