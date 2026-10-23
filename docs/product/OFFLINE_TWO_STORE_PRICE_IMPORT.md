@@ -331,6 +331,12 @@ bron-URL, bronsoort en snapshot-SHA-256 wanneer deze zijn aangeleverd; ontbreken
 herkomst blijft leeg. De definitieve privémandregels tonen die herkomst naast de
 prijs, en het offline prijsrapport plus de kopieerbare/printbare checklist nemen
 dezelfde herkomst per artikel mee, zodat de bron ook buiten de app controleerbaar blijft.
+Het lokale HTML-prijsrapport leest het **verschil DekaMarkt minus PLUS** uitsluitend uit
+de expliciet benoemde prijsverschilkolom van zijn eigen huidige exportformaat;
+de afzonderlijke bron-URL, bronsoort en SHA-256-kolommen mogen nooit als bedrag
+of eenheidsprijs worden geïnterpreteerd. Een ontbrekende prijs betekent
+**verschil onbekend**, niet nul euro. Bronvelden worden alleen escaped als
+lokale tekst weergegeven; het rapport voert geen externe inhoud uit.
 Dit is herleidbaarheid van aangeleverde data, geen bewijs van bronrechten,
 onafhankelijke verificatie of actuele winkelprijs. Er is geen netwerkrequest en
 onzekere prijs, beschikbaarheid of verpakking wordt niet ingevuld.
