@@ -1516,8 +1516,18 @@ export function OfflineReviewedWorkbench({
       return !!old && old.name === product.name &&
         old.packAmount === product.packAmount && old.packUnit === product.packUnit &&
         old.packCount === product.packCount &&
+        // A capture is unchanged only when every fact that can affect a
+        // priced match or its provenance is unchanged. In particular, legacy
+        // rows may have no sourcePriceCents, so comparing that optional field
+        // alone would miss a changed actual price and incorrectly retain reviews.
+        old.priceCents === product.priceCents &&
+        old.available === product.available &&
         old.sourcePriceCents === product.sourcePriceCents &&
-        old.sourceAvailable === product.sourceAvailable
+        old.sourceAvailable === product.sourceAvailable &&
+        old.availabilityLabel === product.availabilityLabel &&
+        old.sourceUrl === product.sourceUrl &&
+        old.sourceSha256 === product.sourceSha256 &&
+        old.sourceKind === product.sourceKind
     })
   }
 
