@@ -386,7 +386,7 @@ export function PlannerView({
         onSelect={onOwnSourceChange}
         onOpenComparison={onOpenComparison}
         onImportSourceFiles={onImportSourceFiles} onReviewIngredient={onReviewIngredient}
-        onOpenList={onOpenShoppingList}
+        onOpenRecipes={onOpenRecipes} onOpenList={onOpenShoppingList}
         onOpenMixedRoute={onOpenMixedRoute} onChooseRouteLine={onChooseRouteLine} />
       </Suspense>
 
