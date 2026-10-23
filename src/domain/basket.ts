@@ -83,8 +83,12 @@ function compatibleDemandUnits(left: MatchUnit, right: MatchUnit): boolean {
 
 /** Stable output units keep equivalent demand independent of recipe order. */
 function canonicalDemandUnit(unit: MatchUnit): MatchUnit {
-  if (unit === 'g') return 'kg'
-  if (unit === 'ml') return 'l'
+  // Keep canonical shopping demand in human-usable base metric units. This
+  // remains order-independent for mixed kg/g and l/ml recipes while preserving
+  // the established grams/millilitres contract used by the Planner and M3
+  // field worksheet; matching and pack arithmetic still compare unit families.
+  if (unit === 'kg') return 'g'
+  if (unit === 'l') return 'ml'
   return unit
 }
 
