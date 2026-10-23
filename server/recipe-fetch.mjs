@@ -21,15 +21,19 @@ const PRIVATE_QUERY_KEY = /^(?:code|auth(?:orization)?code|oauthcode|accesstoken
 function privateRecipeQueryKey(key) {
   let current = key
   for (let depth = 0; depth < 8; depth++) {
-    const folded = current.normalize('NFKC')
+    // Canonicalize before parsing identity: NFKC may turn fullwidth query
+    // delimiters into separators that a later URL consumer would re-parse.
+    const canonical = current.normalize('NFKC')
       .replace(/[\p{Default_Ignorable_Code_Point}\p{Mark}]/gu, '')
-      .toLocaleLowerCase('en').replace(/[^a-z0-9]/gu, '')
+    if (/[&=?#\u0000-\u001f\u007f]/u.test(canonical)) return true
+    const folded = canonical.toLocaleLowerCase('en').replace(/[^a-z0-9]/gu, '')
     if (PRIVATE_QUERY_KEY.test(folded) ||
         /(?:token|secret|password|credential|signature|apikey|codeverifier|codechallenge|samlresponse|csrf)/u.test(folded)) return true
-    if (!/%[0-9a-fA-F]{2}/u.test(current)) return false
+    if (!canonical.includes('%')) return false
+    if (!/%[0-9a-fA-F]{2}/u.test(canonical)) return true
     let decoded
-    try { decoded = decodeURIComponent(current) } catch { return true }
-    if (decoded === current) return false
+    try { decoded = decodeURIComponent(canonical) } catch { return true }
+    if (decoded === canonical) return true
     current = decoded
   }
   return true
