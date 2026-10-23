@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { FigmaImage } from '../../components/FigmaImage'
-import { figmaAssets as a } from '../home/figmaAssets'
+import { figmaAssets as a, figmaRecipeImages } from '../home/figmaAssets'
 import { createManualRecipeDraft, importRecipeFromHtml, type UserRecipeDraft } from '../../domain/userRecipeImport'
 import { safeRecipeSourceUrl } from '../../domain/recipeSourceUrl'
 import { RECIPE_LIBRARY_KEY, readRecipeLibrary, saveRecipeLibrary, reviewRecipe, retainUnresolvedRecipeReview, sourceOnlyRecipeWarnings, acknowledgeRecipeSourceWarnings, type LibraryState, type SavedRecipe } from './recipeLibrary.ts'
@@ -50,14 +50,6 @@ function keyed<T>(items: readonly T[], identity: (item: T) => string) {
   })
 }
 
-const figmaRecipeImages: Record<string, string> = {
-  'supa-thai': a.recipeThai,
-  'supa-quesadillas': a.recipeQuesadillas,
-  'supa-fried-rice': a.imgRecepten,
-  'supa-bao': a.imgRecepten1,
-  'supa-katsu': a.imgRecepten2,
-  'supa-veg-pasta': a.recipePasta,
-}
 const examples = curatedFigmaRecipes.map(recipe => ({
   ...recipe, image: figmaRecipeImages[recipe.id] ?? null,
   sourceLabel: 'SUPA-recept',
