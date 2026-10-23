@@ -318,7 +318,7 @@ function declaredPack(value: unknown): NormalizedDeclaredPack | null {
 
 /** Normalize a full retail pack to a comparable base-unit identity. */
 function physicalPackSignature(pack: NormalizedDeclaredPack): string | null {
-  if (!Number.isFinite(pack.amount) || pack.amount <= 0 ||
+  if (pack.amount === null || !Number.isFinite(pack.amount) || pack.amount <= 0 ||
       !Number.isSafeInteger(pack.count) || pack.count <= 0) return null
   const unit = pack.unit
   const family = unit === 'g' || unit === 'kg' ? 'mass'
