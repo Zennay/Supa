@@ -5,7 +5,7 @@ import { compareFullBaskets, samePhysicalDemand } from '../../domain/basketCompa
 import { calculateDecimalPackCount } from '../../domain/decimalPackArithmetic.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { parseOfflinePriceSnapshots, type OfflinePriceSnapshots, type OfflineStoreProduct } from '../../domain/offlineReviewedImport.ts'
-import { rawProductObservationsToPrivateCaptureJson } from '../../data/schemaOrgProduct.ts'
+import { rawProductObservationBundleToPrivateCaptureJson, rawProductObservationsToPrivateCaptureJson } from '../../data/schemaOrgProduct.ts'
 import { combineTwoOwnShopCaptures, splitOwnStorePastedSheets } from './combineOwnStoreCaptures.ts'
 import { LocalTwoStorePriceEditor, type ReviewedRecaptureSeed } from './LocalTwoStorePriceEditor.tsx'
 import { ownPriceCapturesToCsv } from './ownPriceCsvExport.ts'
@@ -67,7 +67,9 @@ function normalizeRawProductObservationInput(input: string): { content: string; 
     if (observationItems.length !== parsed.length) {
       throw new Error('Een batch moet uitsluitend volledige RawProductObservation-objecten bevatten.')
     }
-    return { content: rawProductObservationsToPrivateCaptureJson(parsed), converted: true }
+    // A pasted array may contain one or BOTH independently observed shops;
+    // the canonical bridge keeps each shop's own source moment and SKU set.
+    return { content: rawProductObservationBundleToPrivateCaptureJson(parsed), converted: true }
   }
 
   if (!isRawProductObservationShape(parsed)) {
@@ -3881,7 +3883,7 @@ export function OfflineReviewedWorkbench({
             Beschikbaarheid: true/false of ja/nee; prijs uitsluitend in hele eurocenten.
             Deze import gebruikt dezelfde lokale broncontrole als de bestandskiezer:
             ontbrekende prijzen blijven onbekend, en iedere SKU vereist jouw review.</small>
-          <small>Adapterbatch: een JSON-array met maximaal 1.000 RawProductObservation-records kan één winkelopname vullen als alle regels dezelfde winkel en exact hetzelfde oorspronkelijke UTC-Z-bronmoment hebben. Dubbele productcodes, gemengde winkels of verschillende momenten worden geweigerd; elke productregel blijft afzonderlijk te beoordelen.</small>
+          <small>Adapterbatch: plak één JSON-object of een JSON-array met maximaal 2.000 RawProductObservation-records (maximaal 1.000 per winkel). Supa maakt per winkel een aparte opname met het exact originele UTC-Z-bronmoment; dubbele productcodes of verschillende momenten binnen dezelfde winkel worden geweigerd. Bij twee winkels volgen dezelfde fysieke productreviews en de 24-uursbroncontrole; een ontbrekende of oude prijs blijft onbekend.</small>
         </div>
         {imported && Object.keys(imported.captures).length === 1 && (
           <label>Voeg de echte opname van de andere winkel toe (CSV of JSON)
