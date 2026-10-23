@@ -8,6 +8,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { types as nodeTypes } from 'node:util'
 import { planDailyRefresh } from './daily-refresh.mjs'
 import { findFreshProducts } from './retailer-search-api.mjs'
+import { foldText, isGlobalGtin, nameNumbers, normalizeGtin } from './lib/normalize.mjs'
 
 const fail = () => { throw new Error('Private matched retailer comparison refused') }
 // Persisted product_matches may have been built before pack-safe matching.
@@ -21,6 +22,34 @@ const physicalPackKey = ({pack_amount, pack_unit, pack_count, pack_text}) => {
   const total = pack_amount * pack_count
   if (!Number.isFinite(total) || total <= 0) return null
   return JSON.stringify([pack_unit, pack_count, total])
+}
+
+/**
+ * A persisted canonical ID is historical, not current identity evidence.
+ * Require complete current brand/name facts, then accept either an exact
+ * normalized brand+name match or a valid shared global GTIN. A shared GTIN
+ * never overrides conflicting brand or product-identity numbers (0% vs 100%).
+ */
+function productIdentityEvidence(row) {
+  if (typeof row.brand !== 'string' || typeof row.name !== 'string') return null
+  const brandKey = foldText(row.brand)
+  const nameKey = foldText(row.name)
+  if (!brandKey || !nameKey) return null
+  const gtins = typeof row.gtins === 'string'
+    ? [...new Set(row.gtins.split(',').map(normalizeGtin).filter(gtin => gtin && isGlobalGtin(gtin)))]
+    : []
+  // Multipack notation is physical-pack metadata, not a flavour/variant
+  // number. The pack guard already checks count and amount independently.
+  const identityName = row.name.replace(/\b\d+\s*[x×*]\s*(?=\d)/giu, ' ')
+  return { brandKey, nameKey, identityNumbers: nameNumbers(identityName), gtins }
+}
+
+function sameProductIdentity(left, right) {
+  if (!left || !right || !left.brandKey || left.brandKey !== right.brandKey ||
+      !left.nameKey || !right.nameKey ||
+      left.identityNumbers !== right.identityNumbers) return false
+  if (left.nameKey === right.nameKey) return true
+  return left.gtins.some(gtin => right.gtins.includes(gtin))
 }
 const money = cents => '€' + (cents / 100).toFixed(2)
 const printable = value => String(value).replace(
@@ -98,8 +127,9 @@ export async function compareApprovedLocalCatalog(options = {}) {
     // timestamp, available stock and a physically ACTIVE offer price.
     const fresh = findFreshProducts(database, approved, query, now)
     const idStmt = database.prepare(
-      'SELECT m.canonical_id, p.pack_amount, p.pack_unit, ' +
-      'p.pack_count, p.pack_text FROM product_matches m ' +
+      'SELECT m.canonical_id, p.pack_amount, p.pack_unit, p.pack_count, p.pack_text, ' +
+      'p.brand, p.name, (SELECT group_concat(g.gtin) FROM product_gtins g ' +
+      'WHERE g.product_id = p.id) AS gtins FROM product_matches m ' +
       'JOIN products p ON p.id = m.product_id ' +
       'WHERE p.retailer_id=? AND p.url=? LIMIT 2')
     groups = new Map()
@@ -111,9 +141,14 @@ export async function compareApprovedLocalCatalog(options = {}) {
           !Number.isSafeInteger(matches[0].canonical_id)) continue
       const key = matches[0].canonical_id
       const packKey = physicalPackKey(matches[0])
-      if (!packKey) { invalidGroups.add(key); continue }
+      const identity = productIdentityEvidence(matches[0])
+      if (!packKey || !identity) { invalidGroups.add(key); continue }
       if (!groups.has(key)) groups.set(key, [])
       const rows = groups.get(key)
+      // A stale canonical ID cannot bridge different brands or named variants.
+      if (rows.length > 0 && !sameProductIdentity(rows[0].identity, identity)) {
+        invalidGroups.add(key)
+      }
       // One retailer having several physical rows under one canonical ID is
       // ambiguous even if the first candidate happens to match the other
       // retailer. Refuse the *entire group* rather than picking arbitrarily.
@@ -123,6 +158,7 @@ export async function compareApprovedLocalCatalog(options = {}) {
       }
       rows.push({
           packKey,
+          identity,
           supermarket: row.supermarket,
           name: printable(row.name),
           priceCents: row.priceCents,
