@@ -68,6 +68,8 @@ jobs:
 
       - name: Run unit and domain regressions
         run: npm test
+        env:
+          NODE_OPTIONS: --test-concurrency=1
 
       - name: Build production bundle
         run: npm run build
