@@ -72,7 +72,18 @@ export function ComparisonReadiness({
     }] : []
   })
   const needsSource = !sourceFresh || !pairedWithin24h
-  const isReady = comparable && hasDemand && !needsSource && incomplete.length === 0
+  const pendingByStoreCount =
+    (pendingReviewByStore?.PLUS?.length ?? 0) +
+    (pendingReviewByStore?.DekaMarkt?.length ?? 0)
+  const pendingCountValid = Number.isSafeInteger(pendingHumanReview) && pendingHumanReview >= 0
+  // Both the aggregate count and per-store detail are evidence. A stale zero
+  // aggregate must not hide actual pending rows or mark the comparison ready.
+  const pendingReviewCount = pendingCountValid
+    ? Math.max(pendingHumanReview, pendingByStoreCount)
+    : pendingByStoreCount
+  const hasPendingHumanReview = !pendingCountValid || pendingReviewCount > 0
+  const isReady = comparable && hasDemand && !needsSource &&
+    incomplete.length === 0 && !hasPendingHumanReview
   // One portable, strictly unpriced follow-up round for BOTH retailers. This
   // preserves the original store and capture timestamp but never invents an
   // EAN/SKU, a comparable price or an independently observed source.
@@ -101,9 +112,11 @@ export function ComparisonReadiness({
         ...(unresolved.length === 0 ? ['Geen onopgeloste productkoppelingen in dit mandje.'] : []),
       ]
     }),
-    pendingHumanReview > 0
-      ? `ACTIE: controleer nog ${pendingHumanReview} voorgestelde bronartikelregels handmatig (SKU, verpakking en prijs).`
-      : '',
+    pendingReviewCount > 0
+      ? `ACTIE: controleer nog ${pendingReviewCount} voorgestelde bronartikelregels handmatig (SKU, verpakking en prijs).`
+      : !pendingCountValid
+        ? 'ACTIE: open broncontrole-telling is ongeldig; laad de broncontrole opnieuw.'
+        : '',
     '', 'Vul ontbrekende artikelen uitsluitend aan met jouw eigen toegestane waarnemingen.',
     'Controleer fysieke hoeveelheden en echte pakprijzen opnieuw vóór vergelijking.',
   ].filter(Boolean).join('\n')
@@ -149,10 +162,14 @@ export function ComparisonReadiness({
     action: 'Vervang de verouderde winkelopname', onClick: onOpenImport,
   })
   if (hasDemand) steps.push(...incomplete)
-  if (hasDemand && pendingHumanReview > 0) steps.push({
+  if (hasDemand && hasPendingHumanReview) steps.push({
     id: 'human-review',
-    heading: 'Controleer nog ' + pendingHumanReview + ' bronproductregels',
-    detail: 'Controleer originele artikelcode, verpakking en prijs. Dit is geen bewijs van productidentiteit.',
+    heading: pendingReviewCount > 0
+      ? 'Controleer nog ' + pendingReviewCount + ' bronproductregels'
+      : 'Controleer open bronproductregels',
+    detail: pendingCountValid
+      ? 'Controleer originele artikelcode, verpakking en prijs. Dit is geen bewijs van productidentiteit.'
+      : 'De open-reviewtelling is ongeldig. Herlaad de broncontrole en controleer de onbevestigde artikelen.',
     action: onReviewFirstPending ? 'Open eerste onbevestigde artikel' : undefined,
     onClick: onReviewFirstPending,
   })
