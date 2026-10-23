@@ -51,14 +51,22 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   const sourceProvenance = (store: OwnStore, line: Matched) => {
     const source = reviewed.stores[store]?.sourceProducts?.find(item => item.id === line.productId)
     if (!source || !(source.sourceUrl || source.sourceSha256 || source.sourceKind)) return null
-    return <details className="offline-price-workbench__source-provenance">
-      <summary>Herkomst van bronprijs</summary>
-      {source.sourceKind && <p>Bronsoort: {source.sourceKind === 'product'
+    return <details style={{ marginBlock: '.5rem', padding: '.55rem .7rem',
+      border: '1px solid #ceddce', borderRadius: '.65rem', overflowWrap: 'anywhere' }}>
+      <summary style={{ cursor: 'pointer', minHeight: '2rem', display: 'flex', alignItems: 'center' }}>
+        Herkomst van bronprijs
+      </summary>
+      {source.sourceKind && <p style={{ margin: '.35rem 0' }}>Bronsoort: {source.sourceKind === 'product'
         ? 'productpagina' : source.sourceKind === 'catalog' ? 'catalogus' : 'aanbiedingen'}.</p>}
-      {source.sourceUrl && <p>Originele bronpagina:{' '}
+      {source.sourceUrl && <p style={{ margin: '.35rem 0', overflowWrap: 'anywhere' }}>
+        Originele bronpagina:{' '}
         <a href={source.sourceUrl} target="_blank" rel="noopener noreferrer">{source.sourceUrl}</a>
       </p>}
-      {source.sourceSha256 && <p>Snapshot SHA-256: <code>{source.sourceSha256}</code></p>}
+      {source.sourceSha256 && <p style={{ margin: '.35rem 0', overflowWrap: 'anywhere' }}>
+        Snapshot SHA-256: <code style={{ overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
+          {source.sourceSha256}
+        </code>
+      </p>}
       <small>Dit is de herkomst van de eigen ingevoerde bron, geen onafhankelijke
         verificatie, bronrecht of garantie dat de prijs nog actueel is.</small>
     </details>
