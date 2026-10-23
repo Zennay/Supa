@@ -3862,10 +3862,23 @@ export function OfflineReviewedWorkbench({
                 Boolean(product.sourceUrl && product.sourceSha256)) ?? []
               const productsWithoutProvenance = capture?.products.filter(product =>
                 !product.sourceUrl || !product.sourceSha256).length ?? 0
+              const priceableProducts = capture?.products.filter(product =>
+                product.available && typeof product.sourcePriceCents === 'number' &&
+                product.sourcePriceCents > 0).length ?? 0
+              const productsWithoutPrice = capture?.products.filter(product =>
+                product.sourcePriceCents === null || product.sourcePriceCents === undefined).length ?? 0
+              const unavailableProducts = capture?.products.filter(product =>
+                product.sourceAvailable === false).length ?? 0
+              const unknownAvailabilityProducts = capture?.products.filter(product =>
+                product.sourceAvailable === undefined).length ?? 0
               return capture
                 ? <div key={store}>
                     <p><strong>{store}</strong> · waargenomen {captureDate(capture.observedMs)}
                       {' '}· {capture.products.length} eigen bronproducten</p>
+                    <small>Brondekking per product: {priceableProducts} beschikbaar met prijs ·
+                      {productsWithoutPrice} zonder prijs · {unavailableProducts} niet beschikbaar ·
+                      {unknownAvailabilityProducts} met onbekende beschikbaarheid.
+                      Dit is geen telling van volledige manddekking.</small>
                     {provenanceProducts.length > 0 && <details>
                       <summary>Bronherkomst en SHA-256 ({provenanceProducts.length} product(en))</summary>
                       <ul>
