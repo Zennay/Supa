@@ -73,6 +73,24 @@ export function PlannerView({
   onRecipeChange,
   onReset,
 }: PlannerViewProps) {
+  // The week strip can select a day without introducing a second planner.
+  // Recipe changes and day toggles still go through the existing persisted App callbacks.
+  const [focusedDay, setFocusedDay] = useState('')
+  const quickDay = plannedMeals.some(({ day }) => day === focusedDay)
+    ? focusedDay
+    : (plannedMeals.find(({ day }) => activeDays.includes(day))?.day ?? plannedMeals[0]?.day ?? '')
+  const quickDayActive = activeDays.includes(quickDay)
+
+  const jumpToRecipe = () => {
+    const select = document.getElementById(`recipe-${quickDay}`)
+    select?.scrollIntoView({ block: 'center' })
+    select?.focus({ preventScroll: true })
+  }
+
+  const jumpToBudget = () => {
+    document.getElementById('weekbudget-title')?.scrollIntoView({ block: 'center' })
+  }
+
   const [customOpen, setCustomOpen] = useState(false)
   const [customDraft, setCustomDraft] = useState('')
   const [customError, setCustomError] = useState('')
@@ -173,7 +191,43 @@ export function PlannerView({
         plannedMeals={plannedMeals}
         activeDays={activeDays}
         onToggleDay={onToggleDay}
+        focusedDay={quickDay}
+        onFocusDay={setFocusedDay}
       />
+
+      {quickDay && (
+        <nav className="planner-mobile-jump" aria-label="Snelle acties voor je weekplanning">
+          <div className="planner-mobile-jump-heading">
+            <label htmlFor="planner-mobile-edit-day">Bewerk een dag zonder de planning te wijzigen</label>
+            <select
+              id="planner-mobile-edit-day"
+              value={quickDay}
+              onChange={(event) => setFocusedDay(event.currentTarget.value)}
+            >
+              {plannedMeals.map(({ day }) => (
+                <option key={day} value={day}>
+                  {day} · {activeDays.includes(day) ? 'gepland' : 'nog niet ingepland'}
+                </option>
+              ))}
+            </select>
+            <p aria-live="polite">
+              <strong>{quickDay}</strong> · {quickDayActive ? 'In je planning' : 'Nog niet ingepland'}
+              <span> · {activeDays.length} van {plannedMeals.length} dagen</span>
+            </p>
+          </div>
+          <div className="planner-mobile-jump-buttons">
+            <button type="button" onClick={jumpToRecipe} aria-controls={`recipe-${quickDay}`}>
+              Kies recept voor {quickDay}
+            </button>
+            <button type="button" onClick={jumpToBudget}>
+              Naar weekbudget
+            </button>
+            <button type="button" onClick={onOpenShoppingList}>
+              Naar boodschappenlijst
+            </button>
+          </div>
+        </nav>
+      )}
 
       <div className="day-grid" aria-label="Geplande maaltijden">
         {plannedMeals.map((item) => {
@@ -183,7 +237,7 @@ export function PlannerView({
 
           return (
             <article
-              className={active ? 'meal-card meal-config active' : 'meal-card meal-config'}
+              className={`meal-card meal-config${active ? ' active' : ''}${item.day === quickDay ? ' quick-focused' : ''}`}
               key={item.day}
             >
               <span className="day">{item.day}</span>
