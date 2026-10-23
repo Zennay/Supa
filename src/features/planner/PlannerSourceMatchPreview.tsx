@@ -150,11 +150,14 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
             }
           }
         }
-        // An ambiguous source already contains several valid original SKUs.
-        // The user must pick one in Vergelijk, not re-observe a made-up new
-        // product or silently treat the first result as a match.
-        manualReview[store] = choice.type === 'abstain' &&
-          choice.reasons.includes('top candidates too close')
+        // Ambiguous candidates and meaningful extra product descriptors both
+        // require human SKU review. Do not route these known source products to
+        // a new capture sheet or silently promote the first plausible variant.
+        manualReview[store] = choice.type === 'abstain' && (
+          choice.reasons.includes('top candidates too close') ||
+          choice.reasons.some(reason =>
+            reason.includes('additional product descriptor(s) require review'))
+        )
         const match = choice.type === 'match' ? products[store].get(choice.productId) : null
         // The fuzzy matcher can rank an attractive name even if the source
         // package belongs to a different physical unit family. Never present
@@ -201,7 +204,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
     coverage.filter(line => line.manualReview[store]).length)
   const sourceKnownButUnpriced = stores.map(store =>
     coverage.filter(line => !!line.unpricedHints[store]).length)
-  // Review ambiguous existing SKUs before asking for new source capture.
+  // Review uncertain existing SKUs before asking for new source capture.
   const priority = (line: typeof coverage[number]) =>
     stores.some(store => line.manualReview[store]) ? 0 :
     stores.some(store => line.unpricedHints[store]) ? 1 :
@@ -221,7 +224,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
       if (!recentOwnCaptureInstant(capture.observedAt, clock))
         return store + ': opname is verlopen of komt uit de toekomst.'
       if (line.manualReview[store])
-        return store + ': kies handmatig één van de meerdere passende originele SKU’s.'
+        return store + ': controleer de oorspronkelijke SKU handmatig; de automatische match is niet eenduidig.'
       if (line.unpricedHints[store])
         return store + ': bestaande mogelijke SKU ' + line.unpricedHints[store]!.sku +
           ' heeft geen bruikbare brondata (' + line.unpricedHints[store]!.reason + ').'
@@ -376,11 +379,11 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
   // suggestions. Never approve an SKU here; only navigate to the canonical
   // review workbench or to a deliberately empty real-source capture sheet.
   const nextReview = coverage.flatMap(line => stores.flatMap(store =>
-    line.manualReview[store] ? [{ store, need: line.need, ambiguous: true }] : [],
+    line.manualReview[store] ? [{ store, need: line.need, manualReview: true }] : [],
   ))[0] ?? coverage.flatMap(line => stores.flatMap(store =>
-    line.unpricedHints[store] ? [{ store, need: line.need, ambiguous: false, incomplete: true }] : [],
+    line.unpricedHints[store] ? [{ store, need: line.need, manualReview: false, incomplete: true }] : [],
   ))[0] ?? coverage.flatMap(line => stores.flatMap(store =>
-    line.suggestions[store] ? [{ store, need: line.need, ambiguous: false, incomplete: false }] : [],
+    line.suggestions[store] ? [{ store, need: line.need, manualReview: false, incomplete: false }] : [],
   ))[0]
   const nextCapture = pendingPlus ? 'PLUS' : pendingDeka ? 'DekaMarkt' : null
   const firstIncompleteStore = (stores as readonly ('PLUS' | 'DekaMarkt')[])
@@ -521,7 +524,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
               onReviewIngredient(nextReview.store, nextReview.need.id)
           }}>
           {nextCapture ? '2.' : '1.'} Beoordeel {nextReview.need.label} bij {nextReview.store}
-          {nextReview.ambiguous ? ' (meerdere SKU’s)' :
+          {nextReview.manualReview ? ' (menselijke controle)' :
             'incomplete' in nextReview && nextReview.incomplete
               ? ' (bestaande SKU mist brondata)' : ' (bron-SKU nog onbevestigd)'}
         </button>}
@@ -644,7 +647,7 @@ export function PlannerSourceMatchPreview({ needs, source, onReviewIngredient, o
             : olderPairedStore === store
               ? 'Bronpaar >24 uur uiteen: neem deze oudste winkel opnieuw op voordat je prijzen vergelijkt'
             : manualReview[store]
-              ? 'Meerdere geschikte SKU’s: kies de juiste originele verpakking zelf in Vergelijk'
+              ? 'Automatische match onzeker: controleer de juiste originele SKU en verpakking zelf in Vergelijk'
               : unpricedHints[store]
                 ? <>Mogelijke bestaande originele SKU: {unpricedHints[store]!.sku}
                   <small>{unpricedHints[store]!.name} · {unpricedHints[store]!.reason}.
