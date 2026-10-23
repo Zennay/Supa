@@ -423,6 +423,16 @@ export function parseSchemaOrgProduct(
   }
 
   const pack = extractPack(product)
+  // Missing physical weight can remain unknown under the existing contract,
+  // but once a source explicitly declares weight, contradictory or unparseable
+  // unit/size evidence must not accompany a priced observation.
+  if (product.weight !== undefined && product.weight !== null &&
+      (pack.amount === null || pack.unit === 'unknown')) {
+    return {
+      type: 'abstain',
+      reason: 'Product JSON-LD has contradictory or unparseable physical pack evidence',
+    }
+  }
   const extractedPrice = extractPrice(offers, pack)
   const price = extractedPrice?.cents ?? null
   if (price !== null && currency === null) {
