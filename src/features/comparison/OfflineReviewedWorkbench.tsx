@@ -1886,8 +1886,88 @@ export function OfflineReviewedWorkbench({
     }
   }
 
+  /** Many individually saved adapter records can be dropped together.
+   * All records are validated locally through the existing one-store adapter,
+   * canonical capture parser and two-store combiner. A failed batch never
+   * changes an admitted receipt, any review decision or shopping tick. */
+  async function loadRawObservationFiles(files: File[], selectedForPlan?: string) {
+    const version = ++importRevision.current
+    setPendingReplacement(null)
+    setBusy(true)
+    try {
+      if (files.length < 3 || files.length > 24) {
+        throw new Error('Selecteer 3 tot 24 originele JSON-productbestanden per batch.')
+      }
+      const byStore = new Map<'plus' | 'dekamarkt', unknown[]>()
+      let combinedBytes = 0
+      for (const file of files) {
+        if (!file.size || file.size > 256000) {
+          throw new Error('Elk eigen JSON-productbestand moet gevuld zijn en maximaal 256 kB bevatten.')
+        }
+        const raw = await readOwnSourceTextFile(file)
+        combinedBytes += new TextEncoder().encode(raw).length
+        if (combinedBytes > 512000) {
+          throw new Error('De twee samen te stellen winkelopnames mogen samen maximaal 512 kB bevatten.')
+        }
+        let parsed: unknown
+        try {
+          parsed = JSON.parse(raw)
+        } catch {
+          throw new Error('Alle bestanden in deze batch moeten geldige JSON-productobservaties bevatten.')
+        }
+        const entries = Array.isArray(parsed) ? parsed : [parsed]
+        if (entries.length === 0 || entries.some(entry => !isRawProductObservationShape(entry))) {
+          throw new Error('Combineer uitsluitend RawProductObservation-objecten of arrays daarvan. Voor gewone CSV/winkelopnames: maximaal twee bestanden.')
+        }
+        for (const entry of entries) {
+          const store = entry.supermarket
+          if (store !== 'plus' && store !== 'dekamarkt') {
+            throw new Error('Onbekende winkel in bronobservatie; gebruik een bestaande PLUS- of DekaMarkt-adapter.')
+          }
+          const group = byStore.get(store) ?? []
+          group.push(entry)
+          if (group.length > 1000) {
+            throw new Error('Per winkelopname zijn maximaal 1.000 originele productobservaties toegestaan.')
+          }
+          byStore.set(store, group)
+        }
+        if (version !== importRevision.current) return
+      }
+      if (selectedForPlan !== undefined && selectedForPlan !== currentlySelectedPlan.current) {
+        setMessage('Je weekmenu is gewijzigd tijdens het lezen. Kies deze bronbestanden opnieuw.')
+        return
+      }
+      const captures = [...byStore.values()].map(raw =>
+        rawProductObservationsToPrivateCaptureJson(raw))
+      if (captures.length === 0) {
+        throw new Error('Geen valide bronobservaties gevonden.')
+      }
+      const nextSource = captures.length === 2
+        ? combineTwoOwnShopCaptures(captures) : captures[0]
+      // Canonical validation rejects oversized, stale or conflicting captures
+      // before any UI state can be replaced or a source review is retained.
+      parseOfflinePriceSnapshots(nextSource, Date.now())
+      if (version !== importRevision.current) return
+      if (imported && captures.length === 2) {
+        stageBothStoreReplacement(nextSource, version)
+      } else {
+        acceptManualSource(nextSource)
+      }
+    } catch (error) {
+      if (version !== importRevision.current) return
+      setMessage((error instanceof Error ? error.message : 'Bronbatch kon niet worden verwerkt.') +
+        ' De vorige winkelopnames, productreviews en afvinkingen blijven behouden.')
+    } finally {
+      if (version === importRevision.current) setBusy(false)
+    }
+  }
+
   async function loadSelectedSources(files: File[], selectedForPlan?: string) {
     if (files.length === 0) return
+    if (files.length > 2) {
+      await loadRawObservationFiles(files, selectedForPlan)
+      return
+    }
     if (files.length === 1) {
       await stageSelectedSource(files[0], selectedForPlan)
       return
@@ -3754,7 +3834,7 @@ export function OfflineReviewedWorkbench({
           }}>
           <strong>{dropActive ? 'Laat je eigen bestanden los om ze lokaal te openen' :
             'Sleep eigen PLUS-/Deka-prijsbestanden hierheen'}</strong>
-          <label>Open één bronbestand, of selecteer tegelijk je aparte PLUS- en DekaMarkt-bestanden (CSV/TSV/JSON of negenkoloms-TXT)
+          <label>Open winkelopnames (maximaal twee CSV/JSON), of selecteer 3–24 losse JSON-productobservaties tegelijk
             <input type="file" accept=".csv,.tsv,.json,.txt,text/csv,text/plain,text/tab-separated-values,application/json" multiple disabled={busy}
               onChange={event => {
                 const files = Array.from(event.currentTarget.files ?? [])
@@ -3763,7 +3843,8 @@ export function OfflineReviewedWorkbench({
               }} />
             <small>Twee bestanden moeten ieder precies één verschillende winkel bevatten. Ongeldige of dubbele opnames worden samen geweigerd; onbekende prijzen blijven onbekend.</small>
           </label>
-          <small>Sleep of selecteer maximaal twee eigen CSV/JSON-bestanden (elk 256 kB), ook tekstbestanden met exact de Supa-CSV-kop.
+          <small>Voor gewone CSV/JSON-winkelopnames: maximaal twee bestanden (elk 256 kB). Voor afzonderlijke adapter-productobservaties: selecteer maximaal 24 JSON-bestanden, ieder met een RawProductObservation of een array daarvan; samen maximaal 512 kB. Supa groepeert uitsluitend per winkel en exact oorspronkelijk UTC-bronmoment. De bestaande prijs- en SKU-controle blijft verplicht.</small>
+          <small>Ook tekstbestanden met exact de Supa-CSV-kop zijn toegestaan.
             Excel-/spreadsheetgegevens mogen komma's, puntkomma's of tabs tussen kolommen hebben;
             een verpakkingsmaat mag een decimale komma gebruiken (bijvoorbeeld 0,75 kg).
             Beschikbaarheid: true/false of ja/nee; prijs uitsluitend in hele eurocenten.
