@@ -10,6 +10,8 @@ export type OwnRecipeChecklistLine = {
   amount: number | null
   unit: 'g' | 'ml' | 'piece' | null
   needsReview: boolean
+  /** A specific reason a combined physical quantity was deliberately held. */
+  holdReason?: 'combined_quantity_exceeds_safe_limit'
   original: string
 }
 
@@ -36,7 +38,9 @@ export function formatOwnRecipeChecklist(
       : `Mijn recept: ${checklist.title} — ${checklist.portions} porties`,
     'Eigen ongeprijsde boodschappenlijst · controleer hoeveelheden en verpakking zelf.',
     ...checklist.lines.map(line => line.needsReview
-      ? `[?] ${line.original} — hoeveelheid handmatig controleren`
+      ? `[?] ${line.original} — ${line.holdReason === 'combined_quantity_exceeds_safe_limit'
+        ? 'samengevoegde hoeveelheid overschrijdt de veilige grens; splits of controleer handmatig'
+        : 'hoeveelheid handmatig controleren'}`
       : `${checked[line.key] ? '[x]' : '[ ]'} ${compactAmount(line.amount!)} ${line.unit === 'piece' ? 'stuks' : line.unit} ${line.label}`),
     'Prijzen, winkelvoorraad en besparingen zijn onbekend.',
   ].join('\n')
@@ -100,6 +104,7 @@ export function ownRecipeShoppingChecklist(recipe: SavedRecipe, portions: number
       previous.amount = null
       previous.unit = null
       previous.needsReview = true
+      previous.holdReason = 'combined_quantity_exceeds_safe_limit'
       blockedGroups.add(groupKey)
       continue
     }
