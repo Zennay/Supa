@@ -298,9 +298,12 @@ Gemengde winkels, verschillende bronmomenten, dubbele productcodes en onvolledig
 fysieke verpakkingen worden geweigerd; Supa verzint geen tijdstempels of SKU's.
 Supa valideert opnieuw de retailer, UTC-Z-bronmoment, originele productcode,
 fysieke verpakking, HTTPS-bron-URL en SHA-256. De URL, hash, brontype en
-expliciete/onbekende beschikbaarheid blijven per product bewaard. Er is geen
-netwerkrequest en de import bewijst geen bronrechten of menselijke veldwaarneming;
-onzekere prijs, beschikbaarheid of verpakking wordt niet ingevuld.
+expliciete/onbekende beschikbaarheid blijven per product bewaard. In de
+voorimport-matchingpreview kan elk gematcht bronartikel worden opengeklapt via
+**Herkomst van dit bronartikel** om de oorspronkelijke pagina, bronsoort en
+snapshot-SHA-256 te bekijken; de pagina wordt niet automatisch opgehaald.
+Er is geen netwerkrequest en de import bewijst geen bronrechten of menselijke
+veldwaarneming; onzekere prijs, beschikbaarheid of verpakking wordt niet ingevuld.
 
 Na één import verschijnt alleen de waargenomen winkel met originele
 artikel-ID's, verpakking, waarnemingstijd, eenheidsprijs en de hele
