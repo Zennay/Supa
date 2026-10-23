@@ -57,12 +57,22 @@ function nestedRecipeQueryNeedsRemoval(value: string): boolean {
   return true
 }
 
+function isPublicRecipeHost(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/\\.$/u, '')
+  // Keep local admission aligned with the server's public-host contract.
+  // URL canonicalizes alternate IPv4 forms; bracketed/colon hosts cover IPv6.
+  if (!host || host.includes(':') || /^(?:\\d{1,3}\\.){3}\\d{1,3}$/u.test(host)) return false
+  if (!host.includes('.') || /\\.(?:localhost|local|internal|test|invalid)$/u.test(host)) return false
+  return true
+}
+
 export function safeRecipeSourceUrl(input: string): string {
   let url: URL
   try { url = new URL(input) }
   catch { throw new Error('Ongeldige receptbron. Controleer de HTTPS-link.') }
-  if (url.protocol !== 'https:' || !url.hostname || url.username || url.password ||
-      url.toString().length > 4096) {
+  if (input.length > 2048 || url.toString().length > 2048 ||
+      url.protocol !== 'https:' || !isPublicRecipeHost(url.hostname) ||
+      url.port !== '' || url.username || url.password) {
     throw new Error('Alleen openbare HTTPS-receptbronnen zonder accountgegevens zijn toegestaan.')
   }
   url.hash = ''
