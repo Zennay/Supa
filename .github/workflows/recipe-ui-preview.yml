@@ -20,6 +20,10 @@ jobs:
     container:
       image: mcr.microsoft.com/playwright:v1.56.1-noble
       options: --ipc=host --user 1000:1000
+      # The self-hosted checkout can use an absolute .git worktree pointer under runner.workspace.
+      # Mount that workspace at the same absolute path so Git cleanup works inside this container.
+      volumes:
+        - "${{ runner.workspace }}:${{ runner.workspace }}"
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
