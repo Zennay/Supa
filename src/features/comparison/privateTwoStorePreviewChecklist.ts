@@ -9,6 +9,19 @@ import { observedInstant } from '../../domain/offlineReviewedImport.ts'
 const clean = (value: unknown) => String(value ?? '')
   .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ')
   .replace(/\s+/gu, ' ').trim().slice(0, 180)
+const cleanSourceUrl = (value: string) => value
+  .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, ' ')
+  .replace(/\s+/gu, ' ').trim().slice(0, 2048)
+
+function sourceEvidence(line: PreviewMatchLine | null): string {
+  if (!line) return 'bronherkomst niet aangeleverd'
+  const parts = [
+    line.sourceKind ? 'bronsoort ' + line.sourceKind : '',
+    line.sourceUrl ? 'bron-URL ' + cleanSourceUrl(line.sourceUrl) : '',
+    line.sourceSha256 ? 'snapshot SHA-256 ' + line.sourceSha256 : '',
+  ].filter(Boolean)
+  return parts.join(' | ') || 'bronherkomst niet aangeleverd'
+}
 
 function offer(line: PreviewMatchLine | null,
   describeReason?: (value: string) => string, usable = true): string {
@@ -16,10 +29,12 @@ function offer(line: PreviewMatchLine | null,
     line.product?.trim() ? 'origineel bronproduct ' + clean(line.product) : '',
     line.originalSku?.trim() ? 'originele SKU ' + clean(line.originalSku) : '',
   ].filter(Boolean).join(' | ') : ''
-  if (!usable) return 'prijs en eenheidsprijs onbekend; bron opnieuw opnemen. ' + identity
+  if (!usable) return 'prijs en eenheidsprijs onbekend; bron opnieuw opnemen. ' +
+    identity + ' | ' + sourceEvidence(line)
   if (!completePreviewProposal(line)) {
     return 'geen complete betrouwbare voorgestelde match; prijs onbekend. ' +
-      identity + ' | ' + (line?.reasons?.length && describeReason
+      identity + ' | ' + sourceEvidence(line) + ' | ' +
+      (line?.reasons?.length && describeReason
         ? clean(describeReason(line.reasons[0]))
         : 'Originele code, pakinhoud en hele-pak-prijs handmatig controleren.')
   }
@@ -31,6 +46,7 @@ function offer(line: PreviewMatchLine | null,
       euro.formatCents(line.pricePerPackCents!) + ' = ' +
       euro.formatCents(line.lineTotalCents!) + ' (NIET BEVESTIGD)',
     'Indicatief ' + clean(line.unitPrice ?? 'eenheidsprijs niet berekenbaar'),
+    sourceEvidence(line),
   ].join(' | ')
 }
 
