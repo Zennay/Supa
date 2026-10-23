@@ -67,10 +67,14 @@ function isPublicRecipeHost(hostname: string): boolean {
 }
 
 export function safeRecipeSourceUrl(input: string): string {
+  // Reject non-string or oversized untrusted input before URL parsing/coercion.
+  if (typeof input !== 'string' || input.length > 2048) {
+    throw new Error('Ongeldige receptbron. Controleer de HTTPS-link.')
+  }
   let url: URL
   try { url = new URL(input) }
   catch { throw new Error('Ongeldige receptbron. Controleer de HTTPS-link.') }
-  if (input.length > 2048 || url.toString().length > 2048 ||
+  if (url.toString().length > 2048 ||
       url.protocol !== 'https:' || !isPublicRecipeHost(url.hostname) ||
       url.port !== '' || url.username || url.password) {
     throw new Error('Alleen openbare HTTPS-receptbronnen zonder accountgegevens zijn toegestaan.')
