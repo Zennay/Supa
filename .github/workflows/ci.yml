@@ -28,7 +28,7 @@ jobs:
       - run: npm audit --audit-level=high
       - run: npm test
         env:
-          NODE_OPTIONS: --test-concurrency=1
+          NODE_OPTIONS: --max-old-space-size=1024
       - run: npm run m1:matching-benchmark
       - run: npm run m1:source-permission-gate
       - run: npm run build
