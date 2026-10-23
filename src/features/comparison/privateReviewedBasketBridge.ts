@@ -4,10 +4,19 @@ import type { BasketTraceLine, OneStoreBasket } from '../../domain/basket.ts'
 
 /** Transient, human-reviewed own-source baskets. No storage, no retailer rights. */
 export type OwnStore = 'PLUS' | 'DekaMarkt'
+export type PrivateSourceProvenance = {
+  id: string
+  sourceUrl?: string
+  sourceSha256?: string
+  sourceKind?: 'product' | 'catalog' | 'offers'
+}
 export type PrivateReviewedBasket = {
   basket: OneStoreBasket
   observedAt: string
   capturedMs: number
+  // Ephemeral source references for the final private price view. These are
+  // not persisted as permission, approval or independent field evidence.
+  sourceProducts?: readonly PrivateSourceProvenance[]
 }
 export type PrivateReviewedBaskets = {
   planKey: string
