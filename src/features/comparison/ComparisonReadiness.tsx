@@ -83,12 +83,15 @@ export function ComparisonReadiness({
     (pendingReviewByStore?.PLUS?.length ?? 0) +
     (pendingReviewByStore?.DekaMarkt?.length ?? 0)
   const pendingCountValid = Number.isSafeInteger(pendingHumanReview) && pendingHumanReview >= 0
+  const pendingDetailValid = pendingReviewByStore === undefined ||
+    (Array.isArray(pendingReviewByStore.PLUS) && Array.isArray(pendingReviewByStore.DekaMarkt))
+  const pendingEvidenceValid = pendingCountValid && pendingDetailValid
   // Both the aggregate count and per-store detail are evidence. A stale zero
-  // aggregate must not hide actual pending rows or mark the comparison ready.
+  // aggregate or malformed detail object must not mark the comparison ready.
   const pendingReviewCount = pendingCountValid
     ? Math.max(pendingHumanReview, pendingByStoreCount)
     : pendingByStoreCount
-  const hasPendingHumanReview = !pendingCountValid || pendingReviewCount > 0
+  const hasPendingHumanReview = !pendingEvidenceValid || pendingReviewCount > 0
   const isReady = comparable && hasDemand && !needsSource &&
     incomplete.length === 0 && !hasPendingHumanReview
   // One portable, strictly unpriced follow-up round for BOTH retailers. This
@@ -123,8 +126,8 @@ export function ComparisonReadiness({
     }),
     pendingReviewCount > 0
       ? `ACTIE: controleer nog ${pendingReviewCount} voorgestelde bronartikelregels handmatig (SKU, verpakking en prijs).`
-      : !pendingCountValid
-        ? 'ACTIE: open broncontrole-telling is ongeldig; laad de broncontrole opnieuw.'
+      : !pendingEvidenceValid
+        ? 'ACTIE: de bronreviewstatus is ongeldig; laad de broncontrole opnieuw.'
         : '',
     '', 'Vul ontbrekende artikelen uitsluitend aan met jouw eigen toegestane waarnemingen.',
     'Controleer fysieke hoeveelheden en echte pakprijzen opnieuw vóór vergelijking.',
@@ -176,9 +179,9 @@ export function ComparisonReadiness({
     heading: pendingReviewCount > 0
       ? 'Controleer nog ' + pendingReviewCount + ' bronproductregels'
       : 'Controleer open bronproductregels',
-    detail: pendingCountValid
+    detail: pendingEvidenceValid
       ? 'Controleer originele artikelcode, verpakking en prijs. Dit is geen bewijs van productidentiteit.'
-      : 'De open-reviewtelling is ongeldig. Herlaad de broncontrole en controleer de onbevestigde artikelen.',
+      : 'De open-reviewtelling of per-winkel reviewlijst is ongeldig. Herlaad de broncontrole en controleer de onbevestigde artikelen.',
     action: onReviewFirstPending ? 'Open eerste onbevestigde artikel' : undefined,
     onClick: onReviewFirstPending,
   })
