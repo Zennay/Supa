@@ -82,6 +82,28 @@ function validIso(value: unknown): value is string {
   return typeof value === 'string' && Number.isFinite(Date.parse(value))
 }
 
+function validCaptureInstant(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+  const match = /^(\\d{4})-(\\d{2})-(\\d{2})T(\\d{2}):(\\d{2}):(\\d{2})(?:\\.(\\d{1,3}))?Z$/.exec(value)
+  if (!match) return false
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const hour = Number(match[4])
+  const minute = Number(match[5])
+  const second = Number(match[6])
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
+  const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+
+  return month >= 1 && month <= 12 &&
+    day >= 1 && day <= daysInMonth[month - 1] &&
+    hour >= 0 && hour <= 23 &&
+    minute >= 0 && minute <= 59 &&
+    second >= 0 && second <= 59 &&
+    Number.isFinite(Date.parse(value))
+}
+
 function validateNullableMoneyCents(value: unknown, label: string) {
   if (
     value !== null &&
@@ -123,13 +145,25 @@ function validateSnapshotRef(
   }
 
   const expectedHost = HOST_BY_SUPERMARKET[observationSupermarket]
-  if (url.protocol !== 'https:' || url.hostname !== expectedHost) {
+  if (url.protocol !== 'https:' || url.hostname !== expectedHost || url.port !== '') {
     throw new Error(
-      `Product observation provenance must use HTTPS on ${expectedHost}`,
+      `Product observation provenance must use HTTPS on ${expectedHost} with the default port`,
     )
   }
 
-  if (!validIso(provenance.capturedAt)) {
+  if (
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash ||
+    /[?#]/.test(provenance.url)
+  ) {
+    throw new Error(
+      'Product observation provenance must not contain credentials, query parameters or fragments',
+    )
+  }
+
+  if (!validCaptureInstant(provenance.capturedAt)) {
     throw new Error('Product observation provenance must include a valid capturedAt')
   }
 
