@@ -446,7 +446,7 @@ export function rawProductObservationToPrivateCaptureJson(raw: unknown): string 
   const retailer = observation.supermarket === 'plus' ? 'PLUS' : 'DekaMarkt'
   const sourceAvailable = observation.availability === 'available'
     ? true
-    : observation.availability === 'unavailable' ? false : null
+    : observation.availability === 'unavailable' ? false : undefined
   const capture = {
     schema: 'supa-private-single-store-prices-v1',
     captures: [{
