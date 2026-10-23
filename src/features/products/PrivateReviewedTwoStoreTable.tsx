@@ -48,6 +48,21 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
   const searchTerms = productSearchTerms(search)
   const reviewedRef = useRef(reviewed)
   reviewedRef.current = reviewed
+  const sourceProvenance = (store: OwnStore, line: Matched) => {
+    const source = reviewed.stores[store]?.sourceProducts?.find(item => item.id === line.productId)
+    if (!source || !(source.sourceUrl || source.sourceSha256 || source.sourceKind)) return null
+    return <details className="offline-price-workbench__source-provenance">
+      <summary>Herkomst van bronprijs</summary>
+      {source.sourceKind && <p>Bronsoort: {source.sourceKind === 'product'
+        ? 'productpagina' : source.sourceKind === 'catalog' ? 'catalogus' : 'aanbiedingen'}.</p>}
+      {source.sourceUrl && <p>Originele bronpagina:{' '}
+        <a href={source.sourceUrl} target="_blank" rel="noopener noreferrer">{source.sourceUrl}</a>
+      </p>}
+      {source.sourceSha256 && <p>Snapshot SHA-256: <code>{source.sourceSha256}</code></p>}
+      <small>Dit is de herkomst van de eigen ingevoerde bron, geen onafhankelijke
+        verificatie, bronrecht of garantie dat de prijs nog actueel is.</small>
+    </details>
+  }
   const [receiptMessage, setReceiptMessage] = useState('')
   // Manual-copy text contains checkbox state; invalidate it if the shopper
   // changes any original line after generating the displayed private text.
@@ -866,6 +881,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
                     <small>{money.format(line.pricePerPackCents / 100)} per pak ·
                       {' '}{privateUnitPrice(line) ?? 'eenheidsprijs onbekend'}</small>
                     <strong>{money.format(line.lineTotalCents / 100)} voor dit ingrediënt</strong>
+                    {sourceProvenance(shop, line)}
                   </div>)}
               </div>
               <p>{first.lineTotalCents === second.lineTotalCents
@@ -1049,6 +1065,7 @@ export function PrivateReviewedTwoStoreTable({ reviewed, search, unitFilter, ord
     <span>{line.packs} × {line.pack.count} × {line.pack.amount} {line.pack.unit}</span>
     <small>{money.format(line.pricePerPackCents / 100)} per pak · {privateUnitPrice(line) ?? 'eenheidsprijs onbekend'}</small>
     <strong>{money.format(line.lineTotalCents / 100)} voor deze week</strong>
+    {sourceProvenance(store, line)}
   </div>
   return <section className="private-reviewed-products__paired" aria-label="Mijn exacte twee-winkelprijsvergelijking">
     <h3>Zelfde weekmandje · twee winkels</h3>
