@@ -303,9 +303,12 @@ voorimport-matchingpreview als naast de twee-winkelregelvoorinzage kan elk
 gematcht bronartikel worden opengeklapt via **Herkomst van dit bronartikel** om
 de oorspronkelijke pagina, bronsoort en snapshot-SHA-256 te bekijken; de pagina
 wordt niet automatisch opgehaald. Bij vervanging toont Supa ook wijzigingen in
-bronherkomst en bronsignalen voordat je de nieuwe bron bevestigt. Er is geen
-netwerkrequest en de import bewijst geen bronrechten of menselijke veldwaarneming;
-onzekere prijs, beschikbaarheid of verpakking wordt niet ingevuld.
+bronherkomst en bronsignalen voordat je de nieuwe bron bevestigt. De lokale
+CSV voor de twee-winkelcontrole bevat per winkel/product ook de oorspronkelijke
+bron-URL, bronsoort en snapshot-SHA-256 wanneer deze zijn aangeleverd; ontbrekende
+herkomst blijft leeg. Dit is herleidbaarheid van aangeleverde data, geen bewijs
+van bronrechten, onafhankelijke verificatie of actuele winkelprijs. Er is geen
+netwerkrequest en onzekere prijs, beschikbaarheid of verpakking wordt niet ingevuld.
 
 Na één import verschijnt alleen de waargenomen winkel met originele
 artikel-ID's, verpakking, waarnemingstijd, eenheidsprijs en de hele
