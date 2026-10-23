@@ -2,14 +2,32 @@ import type { PackUnit, RawPack } from './ingestion'
 
 const UNIT_ALIASES: Record<string, PackUnit> = {
   g: 'g',
+  gr: 'g',
   gram: 'g',
+  grams: 'g',
+  gramme: 'g',
+  grammes: 'g',
   kg: 'kg',
+  kilo: 'kg',
+  kilogram: 'kg',
+  kilograms: 'kg',
   ml: 'ml',
+  milliliter: 'ml',
+  milliliters: 'ml',
+  millilitre: 'ml',
+  millilitres: 'ml',
   l: 'l',
   liter: 'l',
+  liters: 'l',
+  litre: 'l',
+  litres: 'l',
   st: 'piece',
   stuk: 'piece',
   stuks: 'piece',
+  piece: 'piece',
+  pieces: 'piece',
+  pc: 'piece',
+  pcs: 'piece',
 }
 
 function decimal(value: string): number {
@@ -87,7 +105,7 @@ export function normalizePackText(input: unknown): NormalizedPack {
     .trim()
 
   const multipack = cleaned.match(
-    /^(\d+)\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*(kg|g|gram|l|liter|ml|st|stuk|stuks)(?:\s+\((?:ca\.\s*)?\d+\s*(?:st|stuk|stuks)\))?$/,
+    /^(\d+)\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*(kilograms?|kilo|kg|grammes?|grams?|gram|gr|g|milliliters?|millilitres?|ml|liters?|litres?|liter|l|pieces?|pcs?|pc|stuks|stuk|st)(?:\s+\((?:ca\.\s*)?\d+\s*(?:st|stuk|stuks)\))?$/,
   )
 
   if (multipack) {
@@ -110,7 +128,7 @@ export function normalizePackText(input: unknown): NormalizedPack {
   }
 
   const single = cleaned.match(
-    /^(\d+(?:[.,]\d+)?)\s*(kg|g|gram|l|liter|ml|st|stuk|stuks)(?:\s+\((?:ca\.\s*)?\d+\s*(?:st|stuk|stuks)\))?$/,
+    /^(\d+(?:[.,]\d+)?)\s*(kilograms?|kilo|kg|grammes?|grams?|gram|gr|g|milliliters?|millilitres?|ml|liters?|litres?|liter|l|pieces?|pcs?|pc|stuks|stuk|st)(?:\s+\((?:ca\.\s*)?\d+\s*(?:st|stuk|stuks)\))?$/,
   )
 
   if (single) {
