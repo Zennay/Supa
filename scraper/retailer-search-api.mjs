@@ -109,6 +109,7 @@ export function findFreshProducts(database, approvedIds, query, now = new Date()
       supermarket:row.retailer_id, supermarketName:row.retailer_name,
       name:row.name,brand:text(row.brand,120)?row.brand:null,
       pack:text(row.pack_text,120)?row.pack_text:null,
+      packAmount:row.pack_amount,packUnit:row.pack_unit,packCount:row.pack_count,
       priceCents:effective,regularPriceCents:row.price_cents,
       offer:Boolean(hasOffer && effective<row.price_cents),
       observedAt:row.observed_at,sourceUrl:url,availability:'available',
