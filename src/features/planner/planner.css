@@ -211,6 +211,32 @@
     background: #fff;
     color: #262527;
   }
+  .planner-mobile-jump-heading {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+  }
+  .planner-mobile-jump-heading label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #65706a;
+  }
+  .planner-mobile-jump-heading select {
+    min-width: 0;
+    width: 100%;
+    min-height: 44px;
+    padding: 9px 12px;
+    border: 1px solid #d8e6dd;
+    border-radius: 12px;
+    background: #fff;
+    color: #262527;
+    font: inherit;
+    font-size: 16px;
+  }
+  .planner-mobile-jump-heading select:focus-visible {
+    outline: 3px solid #176c50;
+    outline-offset: 2px;
+  }
   .planner-mobile-jump p {
     margin: 0;
     font-size: 13px;
