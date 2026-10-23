@@ -136,6 +136,35 @@ function identityTokens(value: string): string[] {
   return [...new Set(textTokens(value.replace(PACK_NOTATION, ' ')))]
 }
 
+function baseUnitAmount(
+  amount: number | null,
+  unit: MatchUnit,
+): { amount: number | null; family: 'mass' | 'volume' | 'piece' | 'unknown' } {
+  if (unit === 'kg') {
+    return { amount: amount === null ? null : amount * 1000, family: 'mass' }
+  }
+  if (unit === 'g') return { amount, family: 'mass' }
+  if (unit === 'l') {
+    return { amount: amount === null ? null : amount * 1000, family: 'volume' }
+  }
+  if (unit === 'ml') return { amount, family: 'volume' }
+  if (unit === 'piece') return { amount, family: 'piece' }
+  return { amount, family: 'unknown' }
+}
+
+function hasInvalidKnownAmount(amount: number | null): boolean {
+  return amount !== null && (!Number.isFinite(amount) || amount <= 0)
+}
+
+function hasInvalidBaseUnitAmount(
+  amount: number | null,
+  unit: MatchUnit,
+): boolean {
+  if (amount === null) return false
+  const normalized = baseUnitAmount(amount, unit).amount
+  return normalized !== null && (!Number.isFinite(normalized) || normalized <= 0)
+}
+
 function scoreCandidate(
   requirement: IngredientRequirement,
   candidate: ProductCandidate,
@@ -188,6 +217,29 @@ function scoreCandidate(
       score -= Math.min(45, additionalDescriptors * 15)
       reasons.push(`${additionalDescriptors} additional product descriptor(s) require review`)
     }
+  }
+
+  const required = baseUnitAmount(requirement.amount, requirement.unit)
+  const effectivePackAmount =
+    candidate.packAmount === null ? null : candidate.packAmount * packCount
+
+  if (
+    effectivePackAmount !== null &&
+    (!Number.isFinite(effectivePackAmount) || effectivePackAmount <= 0)
+  ) {
+    return { score: -100, reasons: ['candidate effective pack amount invalid'] }
+  }
+
+  const pack = baseUnitAmount(effectivePackAmount, candidate.packUnit)
+  if (
+    pack.amount !== null &&
+    (!Number.isFinite(pack.amount) || pack.amount <= 0)
+  ) {
+    return { score: -100, reasons: ['candidate normalized pack amount invalid'] }
+  }
+
+  if (packCount > 1 && candidate.packAmount !== null) {
+    reasons.push(`multipack count ${packCount} applied`)
   }
 
   if (
