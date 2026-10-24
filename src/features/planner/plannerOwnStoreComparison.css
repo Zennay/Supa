@@ -75,7 +75,9 @@
 .supa-planner-direct-source {
   display: grid;
   gap: .35rem;
+  box-sizing: border-box;
   width: 100%;
+  min-width: 0;
   padding: .8rem;
   border: 1px solid #bfd7c7;
   background: #f7faf8;
@@ -86,6 +88,7 @@
 .supa-planner-direct-source input[type="file"] {
   display: block;
   box-sizing: border-box;
+  width: 100%;
   max-width: 100%;
   padding: .5rem;
   border: 1px solid #819f8c;
@@ -115,6 +118,7 @@
 
 .supa-planner-source-drop {
   flex: 1 1 300px;
+  min-width: 0;
   max-width: 100%;
   border: 2px dashed transparent;
   border-radius: 12px;

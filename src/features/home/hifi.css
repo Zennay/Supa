@@ -124,14 +124,6 @@ body { background: #e9eeec; }
 .hifi-working-shell .section-heading h2 { font-family: Poppins, -apple-system, sans-serif; font-size: 18px; letter-spacing: -.216px; color: #333; }
 .hifi-planner-screen { gap: 24px; }
 .hifi-planner-screen .day-grid { gap: 8px; }
-.hifi-planner-screen .meal-config, .hifi-planner-screen .meal-config.active { border: 0; border-radius: 20px; background: white; box-shadow: none; padding: 16px 20px; min-height: 98px; }
-.hifi-planner-screen .day { border-right: 1.5px solid #e5e5e5; border-radius: 0; background: none; align-self: stretch; display: grid; place-items: center; font-size: 14px; }
-.hifi-planner-screen .plan-check { border: 0; border-radius: 50%; background: #005135; color: #76f8ca; font-size: 24px; font-weight: 500; }
-.hifi-planner-screen .meal-copy select { font-size: 14px; font-weight: 500; }
-.hifi-planner-screen .meal-copy label { font-size: 11px; font-weight: 400; text-transform: none; letter-spacing: 0; }
-.hifi-planner-screen .budget-card { border: 0; border-radius: 20px; padding: 24px; }
-.hifi-planner-screen .budget-heading strong { font-size: 24px; font-weight: 600; letter-spacing: 0; }
-.hifi-planner-screen .budget-chip.active { background: #005135; border-color: #005135; color: #76f8ca; }
 
 /* Original Shoplist 3342:4815: visual hierarchy follows the 24px outer
    gutter, 40px store chip and 20px white item cards. Domain basket

@@ -53,3 +53,16 @@ import productsNavProducts from '../../assets/figma/products/1f33a.svg'
 import productsNavList from '../../assets/figma/home/895ab.svg'
 
 export const figmaAssets = { productPaprika, productWatermelon, productColaRed, productArlaMilk, productHeinekenPack, productPastry, productMuffins, productCalvePeanutButter, productFruitSalad, productGinger, productsFilter, productsSearch, productsWeekly, productsSort, productsNavHome, productsNavPlanner, productsNavRecipes, productsNavProducts, productsNavList, recipeThai, recipeQuesadillas, recipePasta, recipeBack, recipeSearch, recipeSort, recipeHeartActive, imgImage27, imgRecepten, imgRecepten1, imgRecepten2, imgProductFoto, imgDirk, imgProductFoto1, imgProductFoto2, imgDirk1, imgProductFoto3, imgDirk2, imgFrame7312, imgVector, imgVector1, imgVector2, imgFrame7159, imgVector3, imgFilter, imgVector4, imgHeartButton, imgFrame7121, imgVector5, imgButton, imgButton1, imgButton2, imgButton3 }
+
+/**
+ * Original Figma food photography for the curated SUPA recipes only.
+ * The bundled Thai curry (d982c) and Quesadillas (51c5a) exports are
+ * truncated PNGs and render half-empty, so those recipes fall back to a
+ * monogram until they are re-exported from Figma.
+ */
+export const figmaRecipeImages: Record<string, string> = {
+  'supa-fried-rice': imgRecepten,
+  'supa-bao': imgRecepten1,
+  'supa-katsu': imgRecepten2,
+  'supa-veg-pasta': recipePasta,
+}

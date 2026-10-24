@@ -94,7 +94,7 @@ select:focus-visible {
   padding-right: calc(18px + env(safe-area-inset-right));
 }
 
-.screen { display: grid; gap: 18px; }
+.screen { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
 
 .section-heading {
   display: flex;

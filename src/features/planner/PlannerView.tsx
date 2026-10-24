@@ -3,6 +3,7 @@ import type { PlannedMeal, Recipe } from '../../domain/types'
 import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../domain/basket.ts'
 import { buildIngredientReuseInsight } from '../../domain/ingredientReuse.ts'
 import { IngredientReuseCard } from './IngredientReuseCard.tsx'
+import { HiFiReuseStrip } from './HiFiReuseStrip.tsx'
 // Previewing a proposed replacement is optional: do not pull its entire
 // physical shopping and retailer capture-sheet toolchain into app startup.
 const RecipeReusePreviewPanel = lazy(() => import('./RecipeReusePreviewPanel.tsx')
@@ -12,7 +13,9 @@ import { euro } from '../../lib/money'
 import { RecipePriceExplanation } from './RecipePriceExplanation'
 import { plannerKnownMinimumOverrunCents } from './plannerKnownMinimumOverrun.ts'
 import { parseCustomWeekBudgetCents, validCustomWeekBudgetEuros } from './customWeekBudget.ts'
-import { HiFiPlannerWeekCard } from './HiFiPlannerWeekCard.tsx'
+import { HiFiPlannerWeekCard, plannerWeekDate, weekdayNames } from './HiFiPlannerWeekCard.tsx'
+import { FigmaImage } from '../../components/FigmaImage'
+import { figmaAssets, figmaRecipeImages } from '../home/figmaAssets'
 // The full trusted source matching and multi-store comparison are only needed
 // when the user opens Planner, never on the lightweight Supa home screen.
 const PlannerOwnStoreComparison = lazy(() => import('./PlannerOwnStoreComparison.tsx')
@@ -159,6 +162,11 @@ export function PlannerView({
     ? buildIngredientReuseInsight({ plan: plannedMeals, recipes: ingredientRecipes, activeDays })
     : null, [hasIngredientData, plannedMeals, ingredientRecipes, activeDays])
 
+  const dayImages = useMemo(() => Object.fromEntries(plannedMeals.flatMap(meal => {
+    const image = figmaRecipeImages[meal.recipeId]
+    return image ? [[meal.day, image]] : []
+  })), [plannedMeals])
+
   return (
     <section className="screen hifi-planner-screen" data-figma-node="3359:4896">
       <div className="section-heading">
@@ -173,7 +181,10 @@ export function PlannerView({
         plannedMeals={plannedMeals}
         activeDays={activeDays}
         onToggleDay={onToggleDay}
+        dayImages={dayImages}
       />
+
+      {hasIngredientData && <HiFiReuseStrip insight={reuseInsight} />}
 
       <div className="day-grid" aria-label="Geplande maaltijden">
         {plannedMeals.map((item) => {
@@ -181,28 +192,54 @@ export function PlannerView({
           if (!recipe) return null
           const active = activeDays.includes(item.day)
 
+          const date = plannerWeekDate(item.day).getDate()
+          const weekday = weekdayNames[item.day] ?? item.day
+          const image = figmaRecipeImages[recipe.id]
+
+          // Figma 3359:4896 meal rows: date column, photo, title and
+          // time for planned days; an "add to planner" prompt otherwise.
           return (
             <article
-              className={active ? 'meal-card meal-config active' : 'meal-card meal-config'}
+              className={active ? 'meal-card meal-config hifi-meal-row active' : 'meal-card meal-config hifi-meal-row'}
               key={item.day}
             >
-              <span className="day">{item.day}</span>
-              <span className="meal-copy">
-                <label htmlFor={`recipe-${item.day}`}>Recept</label>
-                <select
-                  id={`recipe-${item.day}`}
-                  value={item.recipeId}
-                  onChange={(event) => onRecipeChange(item.day, event.target.value)}
-                >
-                  {recipes.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.title}
-                    </option>
-                  ))}
-                </select>
-                <small>{recipe.minutes} min</small>
-                <RecipePriceExplanation estimatedCost={recipe.estimatedCost} />
+              <span className="day hifi-meal-date" aria-label={`${weekday} ${date}`}>
+                <small>{item.day}</small>
+                <strong>{date}</strong>
               </span>
+              {active
+                ? <span className="meal-copy hifi-meal-copy">
+                    <span className="hifi-meal-thumb" aria-hidden="true">
+                      {image
+                        ? <FigmaImage asset={image} alt="" />
+                        : <span>{recipe.title.slice(0, 1)}</span>}
+                    </span>
+                    <span className="hifi-meal-text">
+                      <label htmlFor={`recipe-${item.day}`}>Recept</label>
+                      <select
+                        id={`recipe-${item.day}`}
+                        value={item.recipeId}
+                        onChange={(event) => onRecipeChange(item.day, event.target.value)}
+                      >
+                        {recipes.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.title}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="hifi-meal-meta">
+                        <small className="hifi-meal-time">
+                          <FigmaImage asset={figmaAssets.imgVector4} alt="" />
+                          {recipe.minutes} min
+                        </small>
+                        <RecipePriceExplanation estimatedCost={recipe.estimatedCost} />
+                      </span>
+                    </span>
+                  </span>
+                : <span className="meal-copy hifi-meal-empty">
+                    <strong>Voeg nu iets toe aan de planner</strong>
+                    <small>{recipe.title} staat klaar voor {weekday.toLowerCase()}</small>
+                  </span>}
               <button
                 type="button"
                 className="plan-check"
@@ -234,138 +271,146 @@ export function PlannerView({
             Een prijsverschil mag pas worden getoond wanneer beide bronmomenten vergelijkbaar zijn.</p>
         </div>
       )}
-      <section className="budget-card" aria-labelledby="weekbudget-title">
-        <div className="budget-heading">
-          <div>
-            <span className="eyebrow">Voorkeur · weekbudget</span>
-            <strong id="weekbudget-title">{euro.format(budget)}</strong>
-          </div>
-          <span
-            className={
-              budgetKnown && budgetAssessment?.status === 'known' && budgetAssessment.budgetState.overBudget
-                ? 'budget-status warning'
-                : budgetKnown
-                  ? 'budget-status'
-                  : 'budget-status warning'
-            }
-            aria-live="polite"
-          >
-            {trustedCents === null
-              ? 'Prijs onbekend · nog geen eigen winkelbron'
-              : budgetKnown
-              ? exactRemainingCents === null
-                ? 'Budgetgegevens controleren'
-                : exactRemainingCents < 0
-                  ? `${euro.formatCents(-exactRemainingCents)} boven budget`
-                  : `${euro.formatCents(exactRemainingCents)} over`
-              : knownMinimumOverrunCents !== null
-                ? `Minimaal ${euro.formatCents(knownMinimumOverrunCents)} boven budget · ${unresolvedCount} ${unresolvedCount === 1 ? 'mandregel' : 'mandregels'} open`
-                : `${unresolvedCount} ${unresolvedCount === 1 ? 'mandregel' : 'mandregels'} open`}
+      <section className="budget-card hifi-planner-total" aria-labelledby="weekbudget-title">
+        <div className="budget-summary hifi-total-row">
+          <span>
+            <strong className="hifi-total-label">Totaal</strong>
+            <small>{activeDays.length} maaltijden actief</small>
           </span>
-        </div>
-
-        <div className="budget-options" aria-label="Kies je weekbudget">
-          {budgetOptions.map((option) => (
-            <button
-              type="button"
-              key={option}
-              className={budget === option ? 'budget-chip active' : 'budget-chip'}
-              aria-pressed={budget === option}
-              onClick={() => onBudgetChange(option)}
-            >
-              {euro.format(option)}
-            </button>
-          ))}
-        </div>
-
-        <div className="budget-custom">
-          <button
-            type="button"
-            className={customActive ? 'budget-chip budget-custom-toggle active' : 'budget-chip budget-custom-toggle'}
-            aria-pressed={customActive}
-            aria-expanded={customOpen}
-            aria-controls="custom-weekbudget-form"
-            onClick={() => {
-              setCustomOpen((open) => !open)
-              setCustomError('')
-              setCustomDraft(customActive ? budget.toFixed(2).replace('.', ',') : '')
-            }}
-          >
-            {customActive ? `Eigen budget · ${euro.format(budget)}` : 'Ander bedrag instellen'}
-          </button>
-          {customOpen && (
-            <form id="custom-weekbudget-form" className="budget-custom-form" onSubmit={commitCustomBudget} noValidate>
-              <label htmlFor="custom-weekbudget-value">Eigen weekbudget (€)</label>
-              <input
-                id="custom-weekbudget-value"
-                type="text"
-                inputMode="decimal"
-                autoComplete="off"
-                placeholder="Bijv. 27,50"
-                value={customDraft}
-                aria-invalid={customError !== '' ? true : undefined}
-                aria-describedby="custom-weekbudget-hint"
-                onChange={(event) => {
-                  setCustomDraft(event.target.value)
-                  setCustomError('')
-                }}
-              />
-              <p id="custom-weekbudget-hint" className="disclaimer">€0,01 – €1.000,00 · maximaal twee decimalen</p>
-              <button type="submit" className="budget-chip">Budget opslaan</button>
-              {customError && <p role="alert" className="budget-custom-error">{customError}</p>}
-            </form>
-          )}
-        </div>
-
-        {plannedCost !== null && budgetState !== null
-          ? <div
-              className="budget-progress"
-              role="progressbar"
-              aria-label={budgetKnown ? 'Gepland deel van het weekbudget' : 'Bekend minimum van het weekbudget'}
-              aria-valuemin={0}
-              aria-valuemax={budget}
-              aria-valuenow={Math.min(plannedCost, budget)}
-            >
-              <span style={{ width: `${budgetState.usage * 100}%` }} />
-            </div>
-          : <p className="disclaimer" role="status">
-              Geen budgetbalk berekend: er zijn nog geen complete, zelf gecontroleerde winkelprijzen.
-            </p>}
-
-        <div className="budget-summary">
-          <span>{activeDays.length} maaltijden actief</span>
-          <strong>
+          <strong className="hifi-total-amount">
             {plannedCost === null
               ? 'Prijs onbekend'
               : budgetKnown ? euro.format(plannedCost)
                 : `min. ${euro.format(plannedCost)}`}
           </strong>
         </div>
-        {trustedCents !== null && ownSource && <p className="disclaimer" role="status">
-          Privécontrole: {ownSource.store} · eigen winkelopname {ownSource.observedAt}.
-          Het getoonde budgetbedrag gebruikt jouw volledige, persoonlijk bevestigde winkelmand
-          in plaats van de Supa-voorbeeldprijzen. Geen kassagarantie of publieke besparingsclaim.
-        </p>}
-        {trustedCents === null && <p className="disclaimer" role="status">
-          Je weekbudget is ingesteld, maar de werkelijke mandprijs is onbekend.
-          Supa rekent voorbeeldcatalogusprijzen niet mee als jouw uitgaven.
-          Open Vergelijk om eigen actuele winkelproducten, verpakkingen en prijzen te controleren.
-        </p>}
+        <hr className="hifi-total-divider" />
+        <div className="budget-heading">
+          <span>
+            <span className="hifi-budget-label">Weekbudget</span>
+            <small>Jouw voorkeur</small>
+          </span>
+          <strong id="weekbudget-title">{euro.format(budget)}</strong>
+        </div>
+        <span
+          className={
+            budgetKnown && budgetAssessment?.status === 'known' && budgetAssessment.budgetState.overBudget
+              ? 'budget-status warning'
+              : budgetKnown
+                ? 'budget-status'
+                : 'budget-status warning'
+          }
+          aria-live="polite"
+        >
+          {trustedCents === null
+            ? 'Prijs onbekend · nog geen eigen winkelbron'
+            : budgetKnown
+            ? exactRemainingCents === null
+              ? 'Budgetgegevens controleren'
+              : exactRemainingCents < 0
+                ? `${euro.formatCents(-exactRemainingCents)} boven budget`
+                : `${euro.formatCents(exactRemainingCents)} over`
+            : knownMinimumOverrunCents !== null
+              ? `Minimaal ${euro.formatCents(knownMinimumOverrunCents)} boven budget · ${unresolvedCount} ${unresolvedCount === 1 ? 'mandregel' : 'mandregels'} open`
+              : `${unresolvedCount} ${unresolvedCount === 1 ? 'mandregel' : 'mandregels'} open`}
+        </span>
+
+        <details className="hifi-planner-calc">
+          <summary>Bekijk berekening</summary>
+          <div className="budget-options" aria-label="Kies je weekbudget">
+            {budgetOptions.map((option) => (
+              <button
+                type="button"
+                key={option}
+                className={budget === option ? 'budget-chip active' : 'budget-chip'}
+                aria-pressed={budget === option}
+                onClick={() => onBudgetChange(option)}
+              >
+                {euro.format(option)}
+              </button>
+            ))}
+          </div>
+
+          <div className="budget-custom">
+            <button
+              type="button"
+              className={customActive ? 'budget-chip budget-custom-toggle active' : 'budget-chip budget-custom-toggle'}
+              aria-pressed={customActive}
+              aria-expanded={customOpen}
+              aria-controls="custom-weekbudget-form"
+              onClick={() => {
+                setCustomOpen((open) => !open)
+                setCustomError('')
+                setCustomDraft(customActive ? budget.toFixed(2).replace('.', ',') : '')
+              }}
+            >
+              {customActive ? `Eigen budget · ${euro.format(budget)}` : 'Ander bedrag instellen'}
+            </button>
+            {customOpen && (
+              <form id="custom-weekbudget-form" className="budget-custom-form" onSubmit={commitCustomBudget} noValidate>
+                <label htmlFor="custom-weekbudget-value">Eigen weekbudget (€)</label>
+                <input
+                  id="custom-weekbudget-value"
+                  type="text"
+                  inputMode="decimal"
+                  autoComplete="off"
+                  placeholder="Bijv. 27,50"
+                  value={customDraft}
+                  aria-invalid={customError !== '' ? true : undefined}
+                  aria-describedby="custom-weekbudget-hint"
+                  onChange={(event) => {
+                    setCustomDraft(event.target.value)
+                    setCustomError('')
+                  }}
+                />
+                <p id="custom-weekbudget-hint" className="disclaimer">€0,01 – €1.000,00 · maximaal twee decimalen</p>
+                <button type="submit" className="budget-chip">Budget opslaan</button>
+                {customError && <p role="alert" className="budget-custom-error">{customError}</p>}
+              </form>
+            )}
+          </div>
+
+          {plannedCost !== null && budgetState !== null
+            ? <div
+                className="budget-progress"
+                role="progressbar"
+                aria-label={budgetKnown ? 'Gepland deel van het weekbudget' : 'Bekend minimum van het weekbudget'}
+                aria-valuemin={0}
+                aria-valuemax={budget}
+                aria-valuenow={Math.min(plannedCost, budget)}
+              >
+                <span style={{ width: `${budgetState.usage * 100}%` }} />
+              </div>
+            : <p className="disclaimer" role="status">
+                Geen budgetbalk berekend: er zijn nog geen complete, zelf gecontroleerde winkelprijzen.
+              </p>}
+
+          {trustedCents !== null && ownSource && <p className="disclaimer" role="status">
+            Privécontrole: {ownSource.store} · eigen winkelopname {ownSource.observedAt}.
+            Het getoonde budgetbedrag gebruikt jouw volledige, persoonlijk bevestigde winkelmand
+            in plaats van de Supa-voorbeeldprijzen. Geen kassagarantie of publieke besparingsclaim.
+          </p>}
+          {trustedCents === null && <p className="disclaimer" role="status">
+            Je weekbudget is ingesteld, maar de werkelijke mandprijs is onbekend.
+            Supa rekent voorbeeldcatalogusprijzen niet mee als jouw uitgaven.
+            Open Vergelijk om eigen actuele winkelproducten, verpakkingen en prijzen te controleren.
+          </p>}
+          {trustedCents !== null && <p className="disclaimer">
+            {budgetKnown
+              ? <>Dit bedrag komt uit jouw persoonlijk bevestigde winkelbron
+                  en dezelfde fysieke verpakkingsberekening als Vergelijk.</>
+              : <>Nog {unresolvedCount} {unresolvedCount === 1 ? 'productmatch is' : 'productmatches zijn'}
+                  {' '}onopgelost; dit is uitsluitend het bekende minimum.
+                  {knownMinimumOverrunCents !== null
+                    ? <> De huidige eigen bronkosten liggen minimaal {euro.formatCents(knownMinimumOverrunCents)} boven budget. Het werkelijke tekort kan groter zijn.</>
+                    : <> Supa kan nog niet bepalen of je binnen budget zit.</>}
+                </>}
+          </p>}
+        </details>
         {trustedCents === null && <button type="button" className="ghost-button"
           onClick={onOpenComparison}>
           Open Vergelijk · voeg eigen winkelprijzen toe
         </button>}
-        {trustedCents !== null && <p className="disclaimer">
-          {budgetKnown
-            ? <>Dit bedrag komt uit jouw persoonlijk bevestigde winkelbron
-                en dezelfde fysieke verpakkingsberekening als Vergelijk.</>
-            : <>Nog {unresolvedCount} {unresolvedCount === 1 ? 'productmatch is' : 'productmatches zijn'}
-                {' '}onopgelost; dit is uitsluitend het bekende minimum.
-                {knownMinimumOverrunCents !== null
-                  ? <> De huidige eigen bronkosten liggen minimaal {euro.formatCents(knownMinimumOverrunCents)} boven budget. Het werkelijke tekort kan groter zijn.</>
-                  : <> Supa kan nog niet bepalen of je binnen budget zit.</>}
-              </>}
-        </p>}
       </section>
 
       {pieceReviewLabels.length > 0 && <div className="attention-card" role="status">
