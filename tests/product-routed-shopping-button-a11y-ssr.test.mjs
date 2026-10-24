@@ -7,10 +7,8 @@ import { createServer } from 'vite'
 import { buildOneStoreBasket } from '../src/domain/basket.ts'
 import { m2InitialPlan, m2Recipes, m2Products, m2Store } from '../src/data/m2Fixture.ts'
 
-test('routed shopping rows announce toggle state instead of relying on glyph alone', async () => {
+test('shopping rows announce toggle state instead of relying on glyph alone', async () => {
   const source = await readFile(new URL('../src/features/shopping-list/ShoppingListView.tsx', import.meta.url), 'utf8')
-  const app = await readFile(new URL('../src/App.tsx', import.meta.url), 'utf8')
-  assert.match(app, /ShoppingListView basket=\{basket\}/)
   assert.match(source, /aria-pressed=\{checked\}/)
   assert.match(source, /className="check" aria-hidden="true"/)
 

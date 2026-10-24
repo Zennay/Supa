@@ -1,0 +1,61 @@
+/* Recipe chooser sheet: same white 20px surfaces and type as the Planner. */
+.hifi-recipe-picker {
+  width: min(440px, 100%);
+  max-height: min(80dvh, 720px);
+  margin: auto auto 0;
+  padding: 24px 24px calc(24px + env(safe-area-inset-bottom));
+  border: 0;
+  border-radius: 20px 20px 0 0;
+  background: #f2f3f5;
+  color: #262527;
+  overflow: auto;
+}
+.hifi-recipe-picker::backdrop { background: rgb(19 37 31 / .55); }
+.hifi-recipe-picker header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.hifi-recipe-picker h3 { margin: 0; font-size: 16px; font-weight: 600; }
+.hifi-recipe-picker-close {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  color: #262527;
+  font-size: 24px;
+  line-height: 1;
+}
+.hifi-recipe-picker ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.hifi-recipe-picker li > button {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-height: 74px;
+  padding: 12px 16px;
+  border: 2px solid transparent;
+  border-radius: 20px;
+  background: #fff;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.hifi-recipe-picker li > button[aria-pressed="true"] { border-color: #3ccf91; }
+.hifi-recipe-picker li > button:focus-visible { outline: 3px solid #005135; outline-offset: 2px; }
+.hifi-recipe-picker-text { display: grid; gap: 4px; min-width: 0; }
+.hifi-recipe-picker-text strong { font-size: 15px; font-weight: 500; }
+.hifi-recipe-picker-remove {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 16px;
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+  color: #8b2b20;
+  font-size: 14px;
+  font-weight: 500;
+}

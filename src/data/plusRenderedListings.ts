@@ -27,6 +27,28 @@ export type PlusRenderedListingCard = {
   priceInteger: string
   priceDecimals: string
   previousPriceText: string
+  /** Optional product photo of this exact card (PLUS image CDN only). */
+  imageSrc?: string
+}
+
+/** Kept outside the pinned selector contract so older evidence stays valid. */
+export const PLUS_RENDERED_LISTING_IMAGE_SELECTOR = 'img'
+const PLUS_IMAGE_HOST = 'images.ctfassets.net'
+
+function cardImageSrc(block: Element): string | undefined {
+  // One card == one product photo. Several images (badges, logos) are
+  // ambiguous, so only a single image from the PLUS image CDN is kept.
+  const images = [...block.querySelectorAll(PLUS_RENDERED_LISTING_IMAGE_SELECTOR)]
+    .map(image => image.getAttribute('src') ?? image.getAttribute('srcset')?.split(/\s+/)[0] ?? '')
+    .filter(src => {
+      try {
+        const url = new URL(src)
+        return url.protocol === 'https:' && url.hostname === PLUS_IMAGE_HOST
+      } catch {
+        return false
+      }
+    })
+  return images.length === 1 ? images[0] : undefined
 }
 
 type PlusRenderedListingEvidenceBase = {
@@ -529,6 +551,8 @@ export function projectPlusRenderedListingCard(
       priceDecimals,
       previousPriceText,
     }
+    const imageSrc = cardImageSrc(block)
+    if (imageSrc) card.imageSrc = imageSrc
     if (!normalizedPack(card) || currentPriceCents(card) === null) return null
     if (kind === 'catalog' && previousPriceText) return null
     if (kind === 'offers') {

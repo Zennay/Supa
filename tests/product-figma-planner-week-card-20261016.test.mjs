@@ -17,24 +17,24 @@ test('actual Planner renders the Figma week control with real plan and preferenc
     const { PlannerView } = await vite.ssrLoadModule('/src/features/planner/PlannerView.tsx')
     const renderCard = activeDays => renderToStaticMarkup(createElement(HiFiPlannerWeekCard, {
       plannedMeals: m2InitialPlan, activeDays,
-      onToggleDay() { assert.fail('SSR cannot mutate the plan') },
+      onChooseDay() { assert.fail('SSR cannot open the picker') },
     }))
     const selected = renderCard(['Ma', 'Wo'])
     assert.match(selected, /data-figma-node="3359:4900"/)
     assert.match(selected, /Weekplanning/)
-    assert.match(selected, /2 van 4 dagen geselecteerd/)
     assert.equal((selected.match(/aria-pressed="true"/g) ?? []).length, 2)
     assert.equal((selected.match(/aria-pressed="false"/g) ?? []).length, 2)
     assert.equal((selected.match(/class="hifi-planner-day selected"/g) ?? []).length, 2)
-    assert.match(selected, /Maandag \d+ uit planning halen/)
-    assert.match(selected, /Dinsdag \d+ aan planning toevoegen/)
+    // Every day opens the recipe picker; nothing toggles implicitly.
+    assert.match(selected, /Maandag \d+: recept wijzigen/)
+    assert.match(selected, /Dinsdag \d+: recept kiezen/)
+    assert.doesNotMatch(selected, /van 4 dagen geselecteerd/)
     assert.doesNotMatch(selected, /bespaar tot 40%|€[0-9]|Nick Bergen/)
-    // Only the first open day (Di) carries Figma's green add marker.
+    // Only the first open day (Di) carries the design's add marker.
     assert.equal((selected.match(/hifi-planner-day-number next-open/g) ?? []).length, 1)
-    assert.match(selected, /aria-label="Dinsdag \d+ aan planning toevoegen"[^>]*><span class="hifi-planner-day-label">D<\/span><span class="hifi-planner-day-number next-open">/)
+    assert.match(selected, /aria-label="Dinsdag \d+: recept kiezen"[^>]*><span class="hifi-planner-day-label">D<\/span><span class="hifi-planner-day-number next-open">/)
 
     const none = renderCard([])
-    assert.match(none, /0 van 4 dagen geselecteerd/)
     assert.equal((none.match(/aria-pressed="true"/g) ?? []).length, 0)
 
     const page = renderToStaticMarkup(createElement(PlannerView, {

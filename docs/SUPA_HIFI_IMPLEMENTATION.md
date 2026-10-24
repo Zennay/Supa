@@ -66,3 +66,15 @@ The M2 Firefox workflow enters Planner from the new Home before replaying all ex
 - Thai red curry krijgt in de Planner (rij + dagcirkel, 50px slots) een uitsnede uit de aangeleverde Planner-export (`src/assets/figma/planner/thai-thumb.png`), omdat de originele export afgekapt is. De receptkaarten (groter formaat) houden de groene fallback tot de originele foto opnieuw is geëxporteerd; Quesadillas idem.
 - Recepten: kop "Recepten" met hartje (favorietenfilter) en zoekveld "Zoek recepten", zoals in Figma; de terugknop is weg omdat Recepten een hoofdtab is.
 - Bewust niet overgenomen: kortingsbadges, "Bespaart €…", doorgestreepte totalen, "bespaar tot 40%", supermarkt-selectie met prijzen en de vaste persoon "Nick Bergen" — dat zijn demo-claims zonder echte prijsdata.
+
+## Opschoning naar ontwerp + scraper-import (24 oktober 2026)
+
+- **Planner** bevat alleen nog wat in de aangeleverde Planner-export staat: weekstrip, "in combinatie"-strip, maaltijdrijen, totaalkaart met "Bekijk berekening" en de knop naar de boodschappenlijst. Mand/Meten-knoppen, weekmenu delen, back-up, eigen-winkelvergelijking, hergebruik-kaarten en Reset zijn weg.
+- **Geen automatisch toevoegen meer:** elke "+", dag en rij opent een receptkiezer; pas na een keuze komt het recept op die dag. Home's "Plan" en de dagcirkels openen dezelfde kiezer.
+- **Home**: witte weekplanningkaart met "Plan"-knop; het blok "Jouw recepten, jouw winkelmand" is weg.
+- **Lijst**: knoppen bovenaan, bestandsupload, privacy-/exportpanelen en eigen-extra-boodschappen zijn weg.
+- **Recept-/ingrediëntfoto's**: standaardrecepten (Tikka-bowl, Teriyaki-bowl, tomatenpasta) gebruiken uitsneden uit de ontwerp-exports; ingrediënten tonen de foto van een geïmporteerd scraperproduct met dezelfde naam.
+- **Producten** toont geïmporteerde PLUS/DekaMarkt-scraperproducten in de ontwerpkaart (winkelbadge, foto, prijs per kg/L, naam, verpakking, waargenomen prijs, hartje, plus). De winkelknop naast het zoekveld importeert scraperbestanden (`plus-browser-rendered-*`, `dekamarkt-public-ssr-nuxt-*`); de bestaande strikte parsers bepalen wat betrouwbaar is. Alle zes `fixtures/m1`-bestanden importeren (13 producten). Foto's komen mee waar de scraper ze heeft (nu: PLUS-productpagina); de PLUS-kaartprojectie neemt voortaan ook een unieke `imageSrc` van de PLUS-CDN mee.
+- **Openstaand, eigenaarsbesluit nodig:**
+  - Alle VPS-workflows (scraper `capture`, `browser-e2e`, `report-gate`, mobile) eisen nog hostnaam `vps-bb300bba`; sinds de VPS-migratie heet de runner `VM-7eb5ee16-2c71-440d-b7fd-8095d204e930`, dus de scrapers draaien niet. Aanpassen van die runner-check is een beveiligingswijziging en is niet in deze PR gedaan.
+  - Winkelfoto's worden geladen via één component (`src/components/RetailerImage.tsx`, alleen https PLUS/DekaMarkt-CDN, zonder referrer). De privacytest `production-subresource-boundary` staat alleen `FigmaImage` toe; die test toestemming geven voor `RetailerImage` is een bewuste keuze voor de eigenaar.

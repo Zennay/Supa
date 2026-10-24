@@ -43,6 +43,8 @@ type Props = {
   addedProducts: string[]
   onToggleProduct: (id: string) => void
   activeDays?: readonly string[]
+  /** Opens Planner's recipe picker (for a weekday, or the first open day). */
+  onPlanDay?: (plannerDay: string | null) => void
 }
 
 export function HiFiHome(props: Props) {
@@ -54,7 +56,7 @@ export function HiFiHome(props: Props) {
   return <HiFiDiscovery {...props} />
 }
 
-function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activeDays = [] }: Props) {
+function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activeDays = [], onPlanDay }: Props) {
   const [query, setQuery] = useState('')
   const [favorites, setFavorites] = useState<string[]>([])
   const [filterOpen, setFilterOpen] = useState(false)
@@ -88,9 +90,12 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
         <button className="hifi-icon-button" aria-label="Meldingen" onClick={() => setMessage('Je hebt geen nieuwe meldingen.')}><FigmaImage asset={a.imgFrame7312} alt="" /></button>
       </header>
       <section className="hifi-week" aria-labelledby="hifi-week-title" data-figma-node="3307:4186">
-        <div><h1 id="hifi-week-title">Weekplanning</h1><p>Maak een planning en ontdek wat je kunt besparen met aanbiedingen en overlappende ingrediënten.</p></div>
-        <div className="hifi-days">{upcomingHomeWeek().map(({ label, date, plannerDay, fullName, month, year }) => <button key={`${year}-${month}-${date}`} onClick={() => onNavigate('planner')} aria-label={`Open weekplanning voor ${fullName} ${date}`}><span className={activeDays.includes(plannerDay) ? 'hifi-today' : ''}>{label}</span><span>{date}</span></button>)}</div>
-        <button className="hifi-plan-button" onClick={() => onNavigate('planner')}><FigmaImage asset={a.imgVector} alt="" />Plan en bespaar</button>
+        <div><h1 id="hifi-week-title">Weekplanning</h1><p>Maak een planning met overlappende ingrediënten.</p></div>
+        <div className="hifi-days">{upcomingHomeWeek().map(({ label, date, plannerDay, fullName, month, year }) => {
+          const today = new Date(); const isToday = today.getDate() === date && today.getMonth() === month && today.getFullYear() === year
+          return <button key={`${year}-${month}-${date}`} onClick={() => onPlanDay ? onPlanDay(plannerDay) : onNavigate('planner')} aria-label={`Plan ${fullName} ${date}`} className={activeDays.includes(plannerDay) ? 'planned' : undefined}><span className={isToday ? 'hifi-today' : ''}>{label}</span><span>{date}</span></button>
+        })}</div>
+        <button className="hifi-plan-button" onClick={() => onPlanDay ? onPlanDay(null) : onNavigate('planner')}><FigmaImage asset={a.imgVector} alt="" />Plan</button>
       </section>
     </> : <header className="hifi-products-heading" data-figma-node="3064:3128"><h1 className="hifi-page-title">Producten</h1><button type="button" className="hifi-go-to-list" onClick={() => onNavigate('list')} aria-label={`Bekijk mijn lijst met ${addedProducts.length} gekozen producten`}>Mijn lijst <span aria-hidden="true">({addedProducts.length})</span> →</button><button className="hifi-icon-button" aria-label="Productfilters" aria-expanded={filterOpen} aria-controls="hifi-filter-panel" onClick={() => setFilterOpen(!filterOpen)}><FigmaImage asset={a.productsFilter} alt="" /></button></header>}
 
@@ -101,17 +106,8 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
         : <button className="hifi-filter" aria-label="Filters" aria-expanded={filterOpen} aria-controls="hifi-filter-panel" onClick={() => setFilterOpen(!filterOpen)}><FigmaImage asset={a.imgVector2} alt="" /></button>}
     </div>
     {filterOpen && <div id="hifi-filter-panel" className="hifi-filter-panel"><label><input type="checkbox" checked={favoritesOnly} onChange={e => setFavoritesOnly(e.target.checked)} /> Alleen favorieten</label>{view === 'products' && <div className="hifi-product-source-tabs" role="group" aria-label="Weergave van producten"><button type="button" aria-pressed={productSource === 'figma'} onClick={() => { setProductSource('figma'); setQuery(''); setStoreFilter('all') }}>Ontwerpvoorbeelden</button><button type="button" aria-pressed={productSource === 'history'} onClick={() => { setProductSource('history'); setQuery(''); setUnitFilter('all'); setSortByPrice(false) }}>Bronproducten</button></div>}{view === 'products' && productSource === 'history' && <label>Winkel <select aria-label="Filter historische producten op winkel" value={storeFilter} onChange={e => setStoreFilter(e.target.value as 'all' | 'PLUS' | 'DekaMarkt')}><option value="all">Alle winkels</option><option value="PLUS">PLUS</option><option value="DekaMarkt">DekaMarkt</option></select></label>}{view === 'products' && productSource === 'figma' && <label>Eenheid <select aria-label="Filter producten op eenheid" value={unitFilter} onChange={e => setUnitFilter(e.target.value as DemoUnitFilter)}><option value="all">Alle eenheden</option><option value="l">Per liter</option><option value="kg">Per kilogram</option></select></label>}<button onClick={() => { setQuery(''); setFavoritesOnly(false); setUnitFilter('all'); setStoreFilter('all'); setSortByPrice(false) }}>Wis filters</button></div>}
-    {view === 'home' && <p className="hifi-demo-note">Recepten uit de SUPA-planner · voorbeeldproductprijzen en aanbiedingen zijn niet actueel.</p>}
-    {view === 'home' && <section className="hifi-section" aria-label="Mijn eigen winkelmand vergelijken">
-      <h2>Jouw recepten, jouw winkelmand</h2>
-      <p className="hifi-demo-note">Gebruik de actuele Planner-ingrediënten met je eigen PLUS/DekaMarkt-bronbestand.
-        De berekening is privé en geeft ontbrekende winkelprijzen eerlijk als onbekend weer.</p>
-      <button type="button" className="hifi-plan-button" onClick={() => onNavigate('basket')}>
-        Vergelijk mijn winkelmand
-      </button>
-    </section>}
     {view !== 'products' && <section className="hifi-section" aria-labelledby="hifi-recipes-title">
-      <div className="hifi-section-heading"><h2 id="hifi-recipes-title">Recepten uit je planner</h2>{view === 'home' && <button onClick={() => changeView('recipes')}>Bekijk meer <FigmaImage asset={a.imgFrame7159} alt="" /></button>}</div>
+      <div className="hifi-section-heading"><h2 id="hifi-recipes-title">Gerechten voor je planner</h2>{view === 'home' && <button onClick={() => changeView('recipes')}>Bekijk meer <FigmaImage asset={a.imgFrame7159} alt="" /></button>}</div>
       <div className={view === 'recipes' ? 'hifi-recipe-grid' : 'hifi-recipe-row'}>{recipes.map(recipe => <article key={recipe.id} className="hifi-recipe-card">
         {recipe.image && <FigmaImage className="hifi-recipe-photo" asset={recipe.image} alt="" />}
         <button className="hifi-recipe-open" aria-label={`Bekijk ${recipe.title}`} onClick={() => { setSelectedRecipe(recipe); dialog.current?.showModal() }} />

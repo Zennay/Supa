@@ -32,31 +32,27 @@ test('live M3 planner explains actual current-week ingredient reuse without clai
       onRecipeChange() {},
       onReset() {},
     }))
+    const strip = html => html.match(/<p class="hifi-reuse-strip"[\s\S]*?<\/p>/)?.[0] ?? ''
     const initial = render()
-    assert.match(initial, /aria-label="Ingrediënten opnieuw gebruiken"/)
-    assert.match(initial, /Basmati rijst/)
-    assert.match(initial, /3 maaltijden/)
-    assert.match(initial, /geen restjes, minder verpakkingen of financiële besparing/)
+    assert.match(strip(initial), /Basmati rijst/)
     assert.match(initial, /Geplande maaltijden/)
-    assert.doesNotMatch(initial, /aangetoonde besparing|Besparing bewezen/i)
+    assert.doesNotMatch(initial, /aangetoonde besparing|Besparing bewezen|Bespaart/i)
 
     const changed = render({ days: ['Ma', 'Di'],
       meals: m2InitialPlan.map(meal =>
         meal.day === 'Di' ? { ...meal, recipeId: 'pasta' } : meal),
     })
-    assert.match(changed, /geen ingrediënten meerdere dagen terug/)
-    assert.doesNotMatch(changed, /3 maaltijden/)
+    assert.equal(strip(changed), '')
     assert.notEqual(changed, initial)
 
     const untrusted = render({
       recipes: m2Recipes.map(({ ingredients, ...recipe }) => recipe),
     })
-    assert.doesNotMatch(untrusted, /Ingrediënten opnieuw gebruiken|Handig gecombineerd/)
+    assert.equal(strip(untrusted), '')
     assert.match(untrusted, /Geplande maaltijden/)
 
     const duplicate = render({ days: ['Ma', 'Ma'] })
-    assert.match(duplicate, /Maak eerst een geldige planning/)
-    assert.doesNotMatch(duplicate, /<ul class="ingredient-reuse-list"/)
+    assert.equal(strip(duplicate), '')
   } finally {
     await vite.close()
   }

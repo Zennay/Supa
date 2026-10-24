@@ -59,7 +59,7 @@
   background: #c4fdeb;
   color: #006642;
 }
-.hifi-planner-day.selected::before {
+.hifi-planner-day.today::before {
   content: '';
   position: absolute;
   top: 0;
@@ -89,7 +89,7 @@
 .hifi-planner-screen .day-grid { gap: 8px; }
 .hifi-planner-screen .hifi-meal-row,
 .hifi-planner-screen .hifi-meal-row.active {
-  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  grid-template-columns: 44px minmax(0, 1fr);
   gap: 12px;
   min-height: 82px;
   border: 0;
@@ -348,6 +348,8 @@
   font-weight: 600;
 }
 .hifi-reuse-marks > span + span { margin-left: -12px; }
+.hifi-reuse-marks > span { overflow: hidden; }
+.hifi-reuse-marks img { width: 100%; height: 100%; object-fit: contain; }
 .hifi-reuse-rings {
   position: relative;
   flex: none;
@@ -388,3 +390,44 @@
 }
 .hifi-planner-list-cta:disabled { opacity: .45; cursor: not-allowed; }
 .hifi-planner-list-cta:focus-visible { outline: 3px solid #005135; outline-offset: 3px; }
+
+/* Whole row (after the date) is one button that opens the recipe picker. */
+.hifi-planner-screen .hifi-meal-open {
+  grid-column: 2 / -1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+  min-height: 50px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.hifi-planner-screen .hifi-meal-open:focus-visible { outline: 3px solid #005135; outline-offset: 4px; border-radius: 12px; }
+.hifi-meal-title {
+  display: block;
+  overflow: hidden;
+  color: #262527;
+  font: 500 15px/1.3 -apple-system, BlinkMacSystemFont, 'SF Pro', Inter, sans-serif;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hifi-meal-price { color: #848484; font-size: 12px; }
+.hifi-meal-chevron {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin: 0 10px 0 auto;
+  border-top: 2px solid #262527;
+  border-right: 2px solid #262527;
+  transform: rotate(45deg);
+}
+.hifi-planner-screen .hifi-meal-empty .plan-check {
+  flex: none;
+  margin-left: auto;
+}

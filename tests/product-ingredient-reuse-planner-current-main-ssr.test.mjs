@@ -31,26 +31,24 @@ test('live planner explains overlap from current days and selected recipes, neve
         onReset() {},
       }))
 
+    // Figma overlap strip between week card and rows: names the shared
+    // ingredients and days of the current plan, never an amount or saving.
+    const strip = html => html.match(/<p class="hifi-reuse-strip"[\s\S]*?<\/p>/)?.[0] ?? ''
     const baseline = render()
-    assert.match(baseline, /aria-label="Ingrediënten opnieuw gebruiken"/)
-    assert.match(baseline, /Handig gecombineerd/)
-    assert.match(baseline, /Basmati rijst/)
-    assert.match(baseline, /3 maaltijden/)
-    assert.match(baseline, /Het bewijst[^<]*geen restjes, minder verpakkingen of financiële besparing/)
-    assert.match(baseline, /Ander bedrag instellen/)
+    assert.match(strip(baseline), /in combinatie: /)
+    assert.match(strip(baseline), /Basmati rijst/)
+    assert.doesNotMatch(strip(baseline), /€|bespaar|besparing/i)
 
     const alteredPlan = m2InitialPlan.map((meal) =>
       meal.day === 'Di' ? { ...meal, recipeId: 'pasta' } : meal)
     const changed = render({ plannedMeals: alteredPlan, activeDays: ['Ma', 'Di'] })
-    assert.match(changed, /komen nog geen ingrediënten meerdere dagen terug/)
-    assert.doesNotMatch(changed, /3 maaltijden · Ma, Di/)
+    assert.equal(strip(changed), '')
     assert.notEqual(changed, baseline)
 
     const onlyOneDay = render({ activeDays: ['Wo'] })
-    assert.match(onlyOneDay, /komen nog geen ingrediënten meerdere dagen terug/)
+    assert.equal(strip(onlyOneDay), '')
     const missingIngredients = render({ recipes: m2Recipes.map(({ ingredients, ...recipe }) => recipe) })
-    assert.doesNotMatch(missingIngredients, /aria-label="Ingrediënten opnieuw gebruiken"/)
-    assert.doesNotMatch(missingIngredients, /Handig gecombineerd/)
+    assert.equal(strip(missingIngredients), '')
   } finally {
     await vite.close()
   }

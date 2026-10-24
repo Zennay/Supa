@@ -10,13 +10,13 @@ function render(value) {
   return renderToStaticMarkup(createElement(RecipePriceExplanation, { estimatedCost: value }))
 }
 
-test('routed Planner uses native, touch-sized recipe estimate disclosure instead of an unqualified price', async () => {
+test('routed Planner shows the design per-serving estimate, labelled as an example estimate', async () => {
   const planner = await readFile(new URL('../src/features/planner/PlannerView.tsx', import.meta.url), 'utf8')
-  const css = await readFile(new URL('../src/features/planner/planner.css', import.meta.url), 'utf8')
-  assert.match(planner, /import \{ RecipePriceExplanation \} from '\.\/RecipePriceExplanation'/)
-  assert.match(planner, /<RecipePriceExplanation estimatedCost=\{recipe\.estimatedCost\} \/>/)
-  assert.doesNotMatch(planner, /euro\.format\(recipe\.estimatedCost\)\s*}\s*\/ recept/)
-  assert.match(css, /\.recipe-estimate-note summary\s*\{[^}]*min-height:\s*44px/s)
+  // Exact cents per serving, or nothing for an invalid/inexact estimate.
+  assert.match(planner, /function servingEstimateCents\(recipe: Recipe\): number \| null/)
+  assert.match(planner, /if \(cents \/ 100 !== cost\) return null/)
+  assert.match(planner, /title="Richtprijs uit het voorbeeldrecept, geen actuele winkelprijs"/)
+  assert.doesNotMatch(planner, /euro\.format\(recipe\.estimatedCost\)/)
 })
 
 test('controlled catalog prices remain visibly indicative and have a native accessible disclosure', () => {
