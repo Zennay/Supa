@@ -35,17 +35,19 @@ test('Figma Planner 3359:4896 meal rows and total card keep real state and make 
 
     assert.equal((html.match(/class="meal-card meal-config hifi-meal-row active"/g) ?? []).length, activeDays.length)
     assert.equal((html.match(/Voeg nu iets toe aan de planner/g) ?? []).length, 1)
-    assert.match(html, new RegExp(`aria-label="${inactiveDay} aan planning toevoegen"`))
-    assert.doesNotMatch(html, new RegExp(`id="recipe-${inactiveDay}"`))
-    for (const day of activeDays) assert.match(html, new RegExp(`id="recipe-${day}"`))
-    // Only the curated SUPA recipe receives original Figma food photography.
-    assert.equal((html.match(/<span class="hifi-meal-thumb" aria-hidden="true"><img /g) ?? []).length, 1)
-    assert.match(html, /<strong class="hifi-total-label">Totaal<\/strong>/)
+    // Rows open the recipe picker instead of toggling or using a native select.
+    assert.equal((html.match(/: recept kiezen"/g) ?? []).length, 2) // week strip + row
+    assert.equal((html.match(/ wijzigen"/g) ?? []).length, activeDays.length * 2)
+    assert.doesNotMatch(html, /id="recipe-|uit planning halen|aan planning toevoegen/)
+    void inactiveDay
+    // Every planned default/curated recipe has a design photo.
+    assert.equal((html.match(/<span class="hifi-meal-thumb" aria-hidden="true"><img /g) ?? []).length, activeDays.length)
+    assert.match(html, /<strong class="hifi-total-label"[^>]*>Totaal<\/strong>/)
     assert.match(html, /Prijs onbekend/)
     assert.match(html, /<summary>Bekijk berekening<\/summary>/)
     assert.match(html, /id="weekbudget-title"/)
-    // Week strip shows the same original photo for the planned curated day.
-    assert.equal((html.match(/hifi-planner-day-number with-photo/g) ?? []).length, 1)
+    // Week strip shows the same photo for every planned day.
+    assert.equal((html.match(/hifi-planner-day-number with-photo/g) ?? []).length, activeDays.length)
     // Overlap strip names shared ingredients and days, never an amount.
     const strip = html.match(/<p class="hifi-reuse-strip"[\s\S]*?<\/p>/)?.[0] ?? ''
     assert.match(strip, /in combinatie: /)

@@ -26,15 +26,15 @@ body { background: #e9eeec; }
 .hifi-person strong { font-size: 16px; font-weight: 500; }
 .hifi-demo-label { color: var(--muted); font-size: 11px; }
 .hifi-icon-button { border: 0; padding: 0; background: transparent; width: 50px; height: 50px; }
-.hifi-week { background: var(--accent); color: var(--accent-ink); border-radius: 20px; padding: 24px; display: grid; gap: 24px; }
-.hifi-week h1 { font-size: 16px; margin-bottom: 4px; }
-.hifi-week p { color: #2b8365; font-size: 14px; line-height: 1.25; }
+.hifi-week { background: #fff; color: #262527; border-radius: 20px; padding: 24px; display: grid; gap: 24px; }
+.hifi-week h1 { font-size: 16px; font-weight: 500; margin-bottom: 4px; }
+.hifi-week p { color: #b2b2b2; font-size: 14px; line-height: 1.25; }
 .hifi-days { display: flex; justify-content: space-between; align-items: flex-end; }
-.hifi-days button { position: relative; display: grid; justify-items: center; gap: 4px; padding: 12px 0 0; background: none; border: 0; font-size: 14px; color: var(--accent-ink); }
-.hifi-days button > span:last-child { width: 50px; height: 50px; display: grid; place-items: center; background: #9aedcf80; border-radius: 50%; color: #258262; }
-.hifi-days button:first-child > span:last-child { background: #9aedcf; }
-.hifi-today::before { content: ''; display: block; width: 8px; height: 8px; background: #006642; position: absolute; left: calc(50% - 4px); top: 0; border-radius: 50%; }
-.hifi-home .hifi-plan-button { border: 0; border-radius: 40px; background: var(--hifi-action); color: var(--hifi-mint); display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 12px 20px; font-size: 14px; font-weight: 600; width: 100%; }
+.hifi-days button { position: relative; display: grid; justify-items: center; gap: 4px; padding: 12px 0 0; background: none; border: 0; font-size: 14px; color: #262527; cursor: pointer; }
+.hifi-days button > span:last-child { width: 50px; height: 50px; display: grid; place-items: center; background: #f2f3f5; border-radius: 50%; color: #262527; }
+.hifi-days button.planned > span:last-child { background: #c4fdeb; color: #006642; }
+.hifi-today::before { content: ''; display: block; width: 8px; height: 8px; background: #68e797; position: absolute; left: calc(50% - 4px); top: 0; border-radius: 50%; }
+.hifi-home .hifi-plan-button { border: 0; border-radius: 40px; background: var(--hifi-action); color: var(--hifi-mint); display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; padding: 12px 20px; font-size: 16px; font-weight: 500; width: 100%; }
 .hifi-week .hifi-plan-button { margin-top: -8px; }
 .hifi-search-row { display: flex; gap: 8px; }
 .hifi-search { display: flex; flex: 1; min-width: 0; align-items: center; gap: 24px; padding: 14px; border: 2px solid #f5f6f9; border-radius: 61px; background: white; }

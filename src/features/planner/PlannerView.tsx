@@ -1,54 +1,47 @@
-import { lazy, Suspense, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import type { PlannedMeal, Recipe } from '../../domain/types'
-import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../domain/basket.ts'
+import type { RecipeWithIngredients } from '../../domain/basket.ts'
 import { buildIngredientReuseInsight } from '../../domain/ingredientReuse.ts'
-import { IngredientReuseCard } from './IngredientReuseCard.tsx'
 import { HiFiReuseStrip } from './HiFiReuseStrip.tsx'
-// Previewing a proposed replacement is optional: do not pull its entire
-// physical shopping and retailer capture-sheet toolchain into app startup.
-const RecipeReusePreviewPanel = lazy(() => import('./RecipeReusePreviewPanel.tsx')
-  .then(module => ({ default: module.RecipeReusePreviewPanel })))
 import { assessPlannerBudget, getBudgetState } from '../../domain/planner'
 import { euro } from '../../lib/money'
-import { RecipePriceExplanation } from './RecipePriceExplanation'
 import { plannerKnownMinimumOverrunCents } from './plannerKnownMinimumOverrun.ts'
 import { parseCustomWeekBudgetCents, validCustomWeekBudgetEuros } from './customWeekBudget.ts'
 import { HiFiPlannerWeekCard, plannerWeekDate, weekdayNames } from './HiFiPlannerWeekCard.tsx'
+import { RecipePicker } from './RecipePicker.tsx'
 import { FigmaImage } from '../../components/FigmaImage'
 import { figmaAssets, figmaPlannerThumbs } from '../home/figmaAssets'
-// The full trusted source matching and multi-store comparison are only needed
-// when the user opens Planner, never on the lightweight Supa home screen.
-const PlannerOwnStoreComparison = lazy(() => import('./PlannerOwnStoreComparison.tsx')
-  .then(module => ({ default: module.PlannerOwnStoreComparison })))
-import type { PrivateReviewedBaskets, PrivateCaptureProgress, OwnStore, PrivateRouteChoice } from '../comparison/privateReviewedBasketBridge.ts'
 import './planner.css'
 
 const budgetOptions = [30, 35, 40]
+const shortDayNames: Record<string, string> = {
+  Ma: 'Ma', Di: 'Di', Wo: 'Wo', Do: 'Do', Vr: 'Vr', Za: 'Za', Zo: 'Zon',
+}
 
 type PlannerViewProps = {
   budget: number
   activeDays: string[]
   plannedMeals: PlannedMeal[]
   recipes: Recipe[]
-  ownReviewed?: PrivateReviewedBaskets | null
-  captureProgress?: PrivateCaptureProgress | null
-  preferredOwnStore: OwnStore
   onOpenShoppingList: () => void
-  onOpenRecipes: () => void
-  onOpenMixedRoute: (extraCostRaw?: string) => void
-  onChooseRouteLine: (choice: Omit<PrivateRouteChoice, 'serial'>) => void
   basketTotalCents: number | null
   basketUnresolvedLineCount: number
   ownSource?: { store: string; observedAt: string }
-  ownSourceChoices?: { store: string; observedAt: string }[]
-  onOwnSourceChange: (store: OwnStore) => void
-  onOpenComparison: () => void
-  onImportSourceFiles: (files: File[]) => void
-  onReviewIngredient: (store: OwnStore, ingredientId: string) => void
   onBudgetChange: (budget: number) => void
   onToggleDay: (day: string) => void
   onRecipeChange: (day: string, recipeId: string) => void
-  onReset: () => void
+  /** Home's "Plan" asks Planner to open the picker for a day. */
+  pickRequest?: { day: string | null; serial: number } | null
+}
+
+/** Per-serving example estimate in exact cents, or null when unknown. */
+function servingEstimateCents(recipe: Recipe): number | null {
+  const cost = recipe.estimatedCost
+  if (typeof cost !== 'number' || !Number.isFinite(cost) || cost < 0) return null
+  if (!Number.isSafeInteger(recipe.servings) || recipe.servings < 1) return null
+  const cents = Math.round(cost * 100)
+  if (cents / 100 !== cost) return null
+  return Math.round(cents / recipe.servings)
 }
 
 export function PlannerView({
@@ -56,30 +49,31 @@ export function PlannerView({
   activeDays,
   plannedMeals,
   recipes,
-  ownReviewed,
-  captureProgress,
-  preferredOwnStore,
   onOpenShoppingList,
-  onOpenRecipes,
-  onOpenMixedRoute,
-  onChooseRouteLine,
   basketTotalCents,
   basketUnresolvedLineCount,
   ownSource,
-  ownSourceChoices,
-  onOwnSourceChange,
-  onOpenComparison,
-  onImportSourceFiles,
-  onReviewIngredient,
   onBudgetChange,
   onToggleDay,
   onRecipeChange,
-  onReset,
+  pickRequest,
 }: PlannerViewProps) {
   const [customOpen, setCustomOpen] = useState(false)
   const [customDraft, setCustomDraft] = useState('')
   const [customError, setCustomError] = useState('')
+  const [pickingDay, setPickingDay] = useState<string | null>(null)
   const customActive = validCustomWeekBudgetEuros(budget) !== null && !budgetOptions.includes(budget)
+
+  useEffect(() => {
+    if (!pickRequest) return
+    const requested = pickRequest.day && plannedMeals.some(meal => meal.day === pickRequest.day)
+      ? pickRequest.day : null
+    const day = requested ?? plannedMeals.find(meal => !activeDays.includes(meal.day))?.day ??
+      plannedMeals[0]?.day ?? null
+    if (day) setPickingDay(day)
+    // Only a new request (serial) may open the sheet.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pickRequest?.serial])
 
   const commitCustomBudget = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -134,30 +128,6 @@ export function PlannerView({
   ), [recipes])
   const hasIngredientData = ingredientRecipes.length > 0 &&
     ingredientRecipes.length === recipes.length
-  // The source-match preview can inspect up to 200 physical requirements
-  // against two local price files. Keep that exact Planner demand stable
-  // while users change unrelated UI controls such as budget or filters.
-  const captureNeeds = useMemo(() => {
-    if (!hasIngredientData) return []
-    try { return aggregatePlanIngredients(plannedMeals, ingredientRecipes, activeDays) }
-    catch { return [] }
-  }, [hasIngredientData, plannedMeals, ingredientRecipes, activeDays])
-  const pieceReviewLabels = useMemo(() => {
-    const byId = new Map(ingredientRecipes.map(recipe => [recipe.id, recipe]))
-    const active = new Set(activeDays)
-    const labels = new Map<string, string>()
-    for (const meal of plannedMeals) {
-      if (!active.has(meal.day)) continue
-      for (const item of byId.get(meal.recipeId)?.ingredients ?? []) {
-        if (item.unit !== 'piece' || item.amount === null ||
-            typeof item.amount !== 'number' ||
-            (Number.isSafeInteger(item.amount) && item.amount > 0)) continue
-        if (typeof item.id === 'string' && typeof item.label === 'string')
-          labels.set(item.id, item.label)
-      }
-    }
-    return [...labels.values()].slice(0, 20)
-  }, [ingredientRecipes, plannedMeals, activeDays])
   const reuseInsight = useMemo(() => hasIngredientData
     ? buildIngredientReuseInsight({ plan: plannedMeals, recipes: ingredientRecipes, activeDays })
     : null, [hasIngredientData, plannedMeals, ingredientRecipes, activeDays])
@@ -167,6 +137,11 @@ export function PlannerView({
     return image ? [[meal.day, image]] : []
   })), [plannedMeals])
 
+  const pickingMeal = pickingDay ? plannedMeals.find(meal => meal.day === pickingDay) : undefined
+  const pickingLabel = pickingDay
+    ? `${weekdayNames[pickingDay] ?? pickingDay} ${plannerWeekDate(pickingDay).getDate()}`
+    : ''
+
   return (
     <section className="screen hifi-planner-screen" data-figma-node="3359:4896">
       <div className="section-heading">
@@ -174,13 +149,12 @@ export function PlannerView({
           <h2>Planning</h2>
           <span className="hifi-sr-only">Plan eerst. Vergelijk daarna.</span>
         </div>
-        <button type="button" className="ghost-button" onClick={onReset}>Reset</button>
       </div>
 
       <HiFiPlannerWeekCard
         plannedMeals={plannedMeals}
         activeDays={activeDays}
-        onToggleDay={onToggleDay}
+        onChooseDay={setPickingDay}
         dayImages={dayImages}
       />
 
@@ -191,90 +165,65 @@ export function PlannerView({
           const recipe = recipes.find((candidate) => candidate.id === item.recipeId)
           if (!recipe) return null
           const active = activeDays.includes(item.day)
-
           const date = plannerWeekDate(item.day).getDate()
           const weekday = weekdayNames[item.day] ?? item.day
           const image = figmaPlannerThumbs[recipe.id]
+          const perServing = servingEstimateCents(recipe)
 
-          // Figma 3359:4896 meal rows: date column, photo, title and
-          // time for planned days; an "add to planner" prompt otherwise.
+          // Figma 3359:4896 meal rows: date column, photo, title, time and
+          // chevron for planned days; an "add to planner" prompt otherwise.
+          // Every tap opens the recipe picker; nothing is added implicitly.
           return (
             <article
               className={active ? 'meal-card meal-config hifi-meal-row active' : 'meal-card meal-config hifi-meal-row'}
               key={item.day}
             >
-              <span className="day hifi-meal-date" aria-label={`${weekday} ${date}`}>
-                <small>{item.day}</small>
+              <span className="day hifi-meal-date" aria-hidden="true">
+                <small>{shortDayNames[item.day] ?? item.day}</small>
                 <strong>{date}</strong>
               </span>
               {active
-                ? <span className="meal-copy hifi-meal-copy">
+                ? <button type="button" className="meal-copy hifi-meal-copy hifi-meal-open"
+                    aria-label={`${weekday} ${date}: ${recipe.title} wijzigen`}
+                    onClick={() => setPickingDay(item.day)}>
                     <span className="hifi-meal-thumb" aria-hidden="true">
                       {image
                         ? <FigmaImage asset={image} alt="" />
                         : <span>{recipe.title.slice(0, 1)}</span>}
                     </span>
                     <span className="hifi-meal-text">
-                      <label htmlFor={`recipe-${item.day}`}>Recept</label>
-                      <select
-                        id={`recipe-${item.day}`}
-                        value={item.recipeId}
-                        onChange={(event) => onRecipeChange(item.day, event.target.value)}
-                      >
-                        {recipes.map((option) => (
-                          <option key={option.id} value={option.id}>
-                            {option.title}
-                          </option>
-                        ))}
-                      </select>
+                      <strong className="hifi-meal-title">{recipe.title}</strong>
                       <span className="hifi-meal-meta">
                         <small className="hifi-meal-time">
                           <FigmaImage asset={figmaAssets.imgVector4} alt="" />
                           {recipe.minutes} min
                         </small>
-                        <RecipePriceExplanation estimatedCost={recipe.estimatedCost} />
+                        {perServing !== null && <small className="hifi-meal-price"
+                          title="Richtprijs uit het voorbeeldrecept, geen actuele winkelprijs">
+                          {euro.formatCents(perServing)} p.p
+                        </small>}
                       </span>
                     </span>
-                  </span>
-                : <span className="meal-copy hifi-meal-empty">
-                    <strong>Voeg nu iets toe aan de planner</strong>
-                    <small>{recipe.title} staat klaar voor {weekday.toLowerCase()}</small>
-                  </span>}
-              <button
-                type="button"
-                className="plan-check"
-                aria-label={active ? `${item.day} uit planning halen` : `${item.day} aan planning toevoegen`}
-                aria-pressed={active}
-                onClick={() => onToggleDay(item.day)}
-              >
-                {active ? '✓' : '+'}
-              </button>
+                    <span className="hifi-meal-chevron" aria-hidden="true" />
+                  </button>
+                : <button type="button" className="meal-copy hifi-meal-empty hifi-meal-open"
+                    aria-label={`${weekday} ${date}: recept kiezen`}
+                    onClick={() => setPickingDay(item.day)}>
+                    <span className="hifi-meal-text">
+                      <strong>Voeg nu iets toe aan de planner</strong>
+                      <small>Kies een recept</small>
+                    </span>
+                    <span className="plan-check" aria-hidden="true">+</span>
+                  </button>}
             </article>
           )
         })}
       </div>
 
-      {ownSource && ownSourceChoices && ownSourceChoices.length > 1 &&
-        onOwnSourceChange && (
-        <div className="budget-card" aria-label="Kies welke echte winkelbron jouw weekbudget gebruikt">
-          <label htmlFor="own-source-budget-store"><strong>Winkel voor jouw eigen bronbudget</strong></label>
-          <select id="own-source-budget-store" value={ownSource.store}
-            onChange={event => {
-              const choice = event.currentTarget.value
-              if (choice === 'PLUS' || choice === 'DekaMarkt') onOwnSourceChange(choice)
-            }}
-            style={{ display: 'block', width: '100%', minHeight: 44, marginTop: 8 }}>
-            {ownSourceChoices.map(choice =>
-              <option key={choice.store} value={choice.store}>{choice.store} · eigen opname {choice.observedAt}</option>)}
-          </select>
-          <p className="disclaimer">Alleen jouw afzonderlijk bevestigde winkelmandjes.
-            Een prijsverschil mag pas worden getoond wanneer beide bronmomenten vergelijkbaar zijn.</p>
-        </div>
-      )}
-      <section className="budget-card hifi-planner-total" aria-labelledby="weekbudget-title">
+      <section className="budget-card hifi-planner-total" aria-labelledby="hifi-total-title">
         <div className="budget-summary hifi-total-row">
           <span>
-            <strong className="hifi-total-label">Totaal</strong>
+            <strong className="hifi-total-label" id="hifi-total-title">Totaal</strong>
             <small>{activeDays.length} maaltijden actief</small>
           </span>
           <strong className="hifi-total-amount">
@@ -285,38 +234,38 @@ export function PlannerView({
           </strong>
         </div>
         <hr className="hifi-total-divider" />
-        <div className="budget-heading">
-          <span>
-            <span className="hifi-budget-label">Weekbudget</span>
-            <small>Jouw voorkeur</small>
-          </span>
-          <strong id="weekbudget-title">{euro.format(budget)}</strong>
-        </div>
-        <span
-          className={
-            budgetKnown && budgetAssessment?.status === 'known' && budgetAssessment.budgetState.overBudget
-              ? 'budget-status warning'
-              : budgetKnown
-                ? 'budget-status'
-                : 'budget-status warning'
-          }
-          aria-live="polite"
-        >
-          {trustedCents === null
-            ? 'Prijs onbekend · nog geen eigen winkelbron'
-            : budgetKnown
-            ? exactRemainingCents === null
-              ? 'Budgetgegevens controleren'
-              : exactRemainingCents < 0
-                ? `${euro.formatCents(-exactRemainingCents)} boven budget`
-                : `${euro.formatCents(exactRemainingCents)} over`
-            : knownMinimumOverrunCents !== null
-              ? `Minimaal ${euro.formatCents(knownMinimumOverrunCents)} boven budget · ${unresolvedCount} ${unresolvedCount === 1 ? 'mandregel' : 'mandregels'} open`
-              : `${unresolvedCount} ${unresolvedCount === 1 ? 'mandregel' : 'mandregels'} open`}
-        </span>
 
         <details className="hifi-planner-calc">
           <summary>Bekijk berekening</summary>
+          <div className="budget-heading">
+            <span>
+              <span className="hifi-budget-label">Weekbudget</span>
+              <small>Jouw voorkeur</small>
+            </span>
+            <strong id="weekbudget-title">{euro.format(budget)}</strong>
+          </div>
+          <span
+            className={
+              budgetKnown && budgetAssessment?.status === 'known' && budgetAssessment.budgetState.overBudget
+                ? 'budget-status warning'
+                : budgetKnown
+                  ? 'budget-status'
+                  : 'budget-status warning'
+            }
+            aria-live="polite"
+          >
+            {trustedCents === null
+              ? 'Prijs onbekend · nog geen eigen winkelbron'
+              : budgetKnown
+              ? exactRemainingCents === null
+                ? 'Budgetgegevens controleren'
+                : exactRemainingCents < 0
+                  ? `${euro.formatCents(-exactRemainingCents)} boven budget`
+                  : `${euro.formatCents(exactRemainingCents)} over`
+              : knownMinimumOverrunCents !== null
+                ? `Minimaal ${euro.formatCents(knownMinimumOverrunCents)} boven budget · ${unresolvedCount} ${unresolvedCount === 1 ? 'mandregel' : 'mandregels'} open`
+                : `${unresolvedCount} ${unresolvedCount === 1 ? 'mandregel' : 'mandregels'} open`}
+          </span>
           <div className="budget-options" aria-label="Kies je weekbudget">
             {budgetOptions.map((option) => (
               <button
@@ -382,35 +331,17 @@ export function PlannerView({
                 <span style={{ width: `${budgetState.usage * 100}%` }} />
               </div>
             : <p className="disclaimer" role="status">
-                Geen budgetbalk berekend: er zijn nog geen complete, zelf gecontroleerde winkelprijzen.
+                Nog geen totaal: er zijn nog geen complete, gecontroleerde winkelprijzen voor deze week.
               </p>}
 
           {trustedCents !== null && ownSource && <p className="disclaimer" role="status">
-            Privécontrole: {ownSource.store} · eigen winkelopname {ownSource.observedAt}.
-            Het getoonde budgetbedrag gebruikt jouw volledige, persoonlijk bevestigde winkelmand
-            in plaats van de Supa-voorbeeldprijzen. Geen kassagarantie of publieke besparingsclaim.
+            Bron: {ownSource.store} · eigen winkelopname {ownSource.observedAt}.
           </p>}
-          {trustedCents === null && <p className="disclaimer" role="status">
-            Je weekbudget is ingesteld, maar de werkelijke mandprijs is onbekend.
-            Supa rekent voorbeeldcatalogusprijzen niet mee als jouw uitgaven.
-            Open Vergelijk om eigen actuele winkelproducten, verpakkingen en prijzen te controleren.
-          </p>}
-          {trustedCents !== null && <p className="disclaimer">
-            {budgetKnown
-              ? <>Dit bedrag komt uit jouw persoonlijk bevestigde winkelbron
-                  en dezelfde fysieke verpakkingsberekening als Vergelijk.</>
-              : <>Nog {unresolvedCount} {unresolvedCount === 1 ? 'productmatch is' : 'productmatches zijn'}
-                  {' '}onopgelost; dit is uitsluitend het bekende minimum.
-                  {knownMinimumOverrunCents !== null
-                    ? <> De huidige eigen bronkosten liggen minimaal {euro.formatCents(knownMinimumOverrunCents)} boven budget. Het werkelijke tekort kan groter zijn.</>
-                    : <> Supa kan nog niet bepalen of je binnen budget zit.</>}
-                </>}
+          {trustedCents !== null && !budgetKnown && <p className="disclaimer">
+            Nog {unresolvedCount} {unresolvedCount === 1 ? 'productmatch is' : 'productmatches zijn'}
+            {' '}onopgelost; dit is uitsluitend het bekende minimum.
           </p>}
         </details>
-        {trustedCents === null && <button type="button" className="ghost-button"
-          onClick={onOpenComparison}>
-          Open Vergelijk · voeg eigen winkelprijzen toe
-        </button>}
       </section>
 
       {/* Figma Planner primary action under the total card. */}
@@ -419,50 +350,25 @@ export function PlannerView({
         Voeg planning toe aan boodschappenlijst
       </button>
 
-      {pieceReviewLabels.length > 0 && <div className="attention-card" role="status">
-        <strong>{pieceReviewLabels.length} ingrediënt(en) hebben een gedeeltelijk of ongeldig aantal stuks</strong>
-        <p>Voor {pieceReviewLabels.join(', ')} kan Supa nog geen betrouwbaar
-          winkelproduct of volledig mandtotaal kiezen. Controleer eerst in Recepten
-          hoeveel hele stuks je wilt kopen; de rest van je boodschappenlijst blijft bruikbaar.</p>
-        <button type="button" className="ghost-button" onClick={onOpenRecipes}>
-          Open Recepten om aantallen te controleren
-        </button>
-      </div>}
-
-      <Suspense fallback={<p role="status" aria-live="polite">Eigen PLUS/Deka-winkelvergelijking laden…</p>}>
-      <PlannerOwnStoreComparison reviewed={ownReviewed ?? null} captureProgress={captureProgress ?? null}
-        preferred={preferredOwnStore}
-        captureNeeds={captureNeeds}
-        hasDemand={activeDays.length > 0} budget={budget}
-        onSelect={onOwnSourceChange}
-        onOpenComparison={onOpenComparison}
-        onImportSourceFiles={onImportSourceFiles} onReviewIngredient={onReviewIngredient}
-        onOpenList={onOpenShoppingList}
-        onOpenMixedRoute={onOpenMixedRoute} onChooseRouteLine={onChooseRouteLine} />
-      </Suspense>
-
-      {hasIngredientData && <IngredientReuseCard insight={reuseInsight} />}
-      {hasIngredientData && (
-        <Suspense fallback={<p role="status" aria-live="polite">Receptwissel en volledige weeklijst laden…</p>}>
-        <RecipeReusePreviewPanel
-          plannedMeals={plannedMeals}
-          activeDays={activeDays}
-          recipes={ingredientRecipes}
-          onChooseRecipe={onRecipeChange}
-          onImportSourceFiles={onImportSourceFiles}
-          onOpenComparison={onOpenComparison}
-          onOpenList={onOpenShoppingList}
+      {pickingDay && pickingMeal && (
+        <RecipePicker
+          day={pickingDay}
+          dayLabel={pickingLabel}
+          recipes={recipes}
+          selectedId={pickingMeal.recipeId}
+          active={activeDays.includes(pickingDay)}
+          onChoose={(recipeId) => {
+            if (recipeId !== pickingMeal.recipeId) onRecipeChange(pickingDay, recipeId)
+            if (!activeDays.includes(pickingDay)) onToggleDay(pickingDay)
+            setPickingDay(null)
+          }}
+          onRemove={() => {
+            if (activeDays.includes(pickingDay)) onToggleDay(pickingDay)
+            setPickingDay(null)
+          }}
+          onClose={() => setPickingDay(null)}
         />
-        </Suspense>
       )}
-
-      <div className="insight-card">
-        <strong>Van je planning naar je boodschappenlijst</strong>
-        <p>
-          Onzekere productmatches worden niet ingevuld: ze blijven zichtbaar
-          als controlepunt in Mand en Lijst.
-        </p>
-      </div>
     </section>
   )
 }

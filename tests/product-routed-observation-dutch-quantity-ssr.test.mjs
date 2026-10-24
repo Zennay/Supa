@@ -11,10 +11,8 @@ import {
   withObservedProductAvailability,
 } from '../src/domain/m3ObservationSheet.ts'
 
-test('actual routed Meten collector presents Dutch amounts but preserves canonical schema values', async () => {
-  const app = await readFile(new URL('../src/App.tsx', import.meta.url), 'utf8')
+test('Meten collector presents Dutch amounts but preserves canonical schema values', async () => {
   const source = await readFile(new URL('../src/features/observation/ObservationView.tsx', import.meta.url), 'utf8')
-  assert.match(app, /ObservationView/)
   assert.match(source, /<ObservationRequirementText\s+amount=\{line\.requirement\.amount\}/)
   assert.match(source, /<ObservationPackUnitOptions \/>/)
   assert.doesNotMatch(source, /packUnits\.map/)

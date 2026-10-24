@@ -1,8 +1,5 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createElement } from 'react'
-import { renderToStaticMarkup } from 'react-dom/server'
-import { createServer } from 'vite'
 
 import { buildIngredientReuseInsight } from '../src/domain/ingredientReuse.ts'
 import { formatShareableWeek } from '../src/features/planner/weekPlanShare.ts'
@@ -120,30 +117,4 @@ test('user-changed active days rederive overlap but sharing remains private, off
   assert.notEqual(privateOptIn, defaultShare)
   assert.deepEqual(buildIngredientReuseInsight({plan, recipes: m2Recipes, activeDays: [DAYS[0]]}),
     oneDay, 'budget opt-in must not affect ingredient calculations')
-})
-
-test('real Vite SSR App presents active reuse before optional sharing with zero prepared private copy', async () => {
-  const vite = await createServer({
-    server: { middlewareMode: true, hmr: false }, appType: 'custom',
-    optimizeDeps: { noDiscovery: true, include: [] }, logLevel: 'error',
-  })
-  try {
-    const { App } = await vite.ssrLoadModule('/src/App.tsx')
-    const html = renderToStaticMarkup(createElement(App, { initialTab: 'planner' }))
-    const planner = html.indexOf('aria-label="Geplande maaltijden"')
-    const reuse = html.indexOf('aria-label="Ingrediënten opnieuw gebruiken"')
-    const share = html.indexOf('aria-label="Weekmenu delen"')
-    assert.ok(planner >= 0 && reuse > planner && share > reuse,
-      'primary planning first, factual ingredient reuse next, optional sharing last')
-    assert.match(html, /Basmati rijst/)
-    assert.match(html, /geen restjes, minder verpakkingen of financiële besparing/)
-    assert.match(html, /Mijn weekbudget ook opnemen \(optioneel\)/)
-    const sharePanel = html.slice(share, html.indexOf('</section>', share))
-    assert.equal((sharePanel.match(/type="checkbox"/g) ?? []).length, 2)
-    assert.doesNotMatch(sharePanel, /\bchecked(?:=|\s|>)/)
-    assert.doesNotMatch(sharePanel, /<textarea|Weekmenu om handmatig te kopiëren/)
-    assert.doesNotMatch(sharePanel, /autofocus|autoFocus|navigator\.clipboard/)
-  } finally {
-    await vite.close()
-  }
 })

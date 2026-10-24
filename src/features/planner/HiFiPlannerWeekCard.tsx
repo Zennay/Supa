@@ -25,12 +25,13 @@ export function plannerWeekDate(day: string, today = new Date()) {
 export function HiFiPlannerWeekCard({
   plannedMeals,
   activeDays,
-  onToggleDay,
+  onChooseDay,
   dayImages = {},
 }: {
   plannedMeals: PlannedMeal[]
   activeDays: string[]
-  onToggleDay: (day: string) => void
+  /** Opens the recipe picker for that day; never toggles the plan directly. */
+  onChooseDay: (day: string) => void
   /** Original Figma photo of the recipe planned on a day, when one exists. */
   dayImages?: Record<string, string>
 }) {
@@ -42,20 +43,21 @@ export function HiFiPlannerWeekCard({
     <section className="hifi-planner-week-card" aria-labelledby="hifi-week-planning-title" data-figma-node="3359:4900">
       <div className="hifi-planner-week-heading">
         <h3 id="hifi-week-planning-title">Weekplanning</h3>
-        <p>Vul je planning aan en kies op welke dagen je kookt.</p>
+        <p>Vul je planning aan</p>
       </div>
       <div className="hifi-planner-week-days" aria-label="Dagen in je weekplanning">
         {plannedMeals.map(({ day }) => {
           const active = activeDays.includes(day)
           const date = plannerWeekDate(day, today)
+          const isToday = date.toDateString() === today.toDateString()
           return (
             <button
               key={day}
               type="button"
-              className={active ? 'hifi-planner-day selected' : 'hifi-planner-day'}
-              aria-label={`${weekdayNames[day] ?? day} ${date.getDate()} ${active ? 'uit planning halen' : 'aan planning toevoegen'}`}
+              className={['hifi-planner-day', active ? 'selected' : '', isToday ? 'today' : ''].filter(Boolean).join(' ')}
+              aria-label={`${weekdayNames[day] ?? day} ${date.getDate()}: ${active ? 'recept wijzigen' : 'recept kiezen'}`}
               aria-pressed={active}
-              onClick={() => onToggleDay(day)}
+              onClick={() => onChooseDay(day)}
             >
               <span className="hifi-planner-day-label">{day.slice(0, 1)}</span>
               <span className={active && dayImages[day]
@@ -68,9 +70,6 @@ export function HiFiPlannerWeekCard({
           )
         })}
       </div>
-      <p className="hifi-planner-week-count" aria-live="polite">
-        {plannedMeals.filter(({ day }) => activeDays.includes(day)).length} van {plannedMeals.length} dagen geselecteerd
-      </p>
     </section>
   )
 }

@@ -23,6 +23,7 @@ export function HiFiReuseStrip({ insight }: { insight: IngredientReuseInsight | 
           ? <>{first.label} in combinatie: </>
           : <>{reused.length} ingrediënten in combinatie: </>}
         <strong>{first.days.join(', ')}</strong>
+        <span className="hifi-sr-only"> · {reused.map(item => item.label).join(', ')}</span>
       </span>
     </p>
   )
