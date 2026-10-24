@@ -15,7 +15,7 @@ import { plannerKnownMinimumOverrunCents } from './plannerKnownMinimumOverrun.ts
 import { parseCustomWeekBudgetCents, validCustomWeekBudgetEuros } from './customWeekBudget.ts'
 import { HiFiPlannerWeekCard, plannerWeekDate, weekdayNames } from './HiFiPlannerWeekCard.tsx'
 import { FigmaImage } from '../../components/FigmaImage'
-import { figmaAssets, figmaRecipeImages } from '../home/figmaAssets'
+import { figmaAssets, figmaPlannerThumbs } from '../home/figmaAssets'
 // The full trusted source matching and multi-store comparison are only needed
 // when the user opens Planner, never on the lightweight Supa home screen.
 const PlannerOwnStoreComparison = lazy(() => import('./PlannerOwnStoreComparison.tsx')
@@ -163,7 +163,7 @@ export function PlannerView({
     : null, [hasIngredientData, plannedMeals, ingredientRecipes, activeDays])
 
   const dayImages = useMemo(() => Object.fromEntries(plannedMeals.flatMap(meal => {
-    const image = figmaRecipeImages[meal.recipeId]
+    const image = figmaPlannerThumbs[meal.recipeId]
     return image ? [[meal.day, image]] : []
   })), [plannedMeals])
 
@@ -194,7 +194,7 @@ export function PlannerView({
 
           const date = plannerWeekDate(item.day).getDate()
           const weekday = weekdayNames[item.day] ?? item.day
-          const image = figmaRecipeImages[recipe.id]
+          const image = figmaPlannerThumbs[recipe.id]
 
           // Figma 3359:4896 meal rows: date column, photo, title and
           // time for planned days; an "add to planner" prompt otherwise.
@@ -412,6 +412,12 @@ export function PlannerView({
           Open Vergelijk · voeg eigen winkelprijzen toe
         </button>}
       </section>
+
+      {/* Figma Planner primary action under the total card. */}
+      <button type="button" className="hifi-planner-list-cta" onClick={onOpenShoppingList}
+        disabled={activeDays.length === 0}>
+        Voeg planning toe aan boodschappenlijst
+      </button>
 
       {pieceReviewLabels.length > 0 && <div className="attention-card" role="status">
         <strong>{pieceReviewLabels.length} ingrediënt(en) hebben een gedeeltelijk of ongeldig aantal stuks</strong>

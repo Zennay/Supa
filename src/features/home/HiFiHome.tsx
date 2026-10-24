@@ -50,7 +50,7 @@ export function HiFiHome(props: Props) {
     <section className="hifi-home" role="status" aria-live="polite">
       <p>Je recepten worden geopend…</p>
     </section>
-  }><RecipeLibrary onBack={() => props.onNavigate('home')} /></Suspense>
+  }><RecipeLibrary /></Suspense>
   return <HiFiDiscovery {...props} />
 }
 
