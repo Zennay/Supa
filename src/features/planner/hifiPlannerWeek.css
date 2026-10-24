@@ -370,8 +370,21 @@
 .hifi-reuse-copy { min-width: 0; overflow-wrap: anywhere; }
 .hifi-reuse-copy strong { font-weight: 600; }
 .hifi-planner-day-number.next-open {
-  background: #1f6b4a;
-  color: #fff;
+  background: #f2f3f5;
+  color: #262527;
   font-size: 26px;
   font-weight: 400;
 }
+
+/* Figma Planner CTA: full-width dark green pill with mint label. */
+.hifi-planner-list-cta {
+  min-height: 60px;
+  border: 0;
+  border-radius: 999px;
+  background: #005135;
+  color: #76f8ca;
+  font: 500 16px/1.2 -apple-system, BlinkMacSystemFont, 'SF Pro', Inter, sans-serif;
+  cursor: pointer;
+}
+.hifi-planner-list-cta:disabled { opacity: .45; cursor: not-allowed; }
+.hifi-planner-list-cta:focus-visible { outline: 3px solid #005135; outline-offset: 3px; }

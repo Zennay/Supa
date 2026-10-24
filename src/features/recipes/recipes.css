@@ -1,7 +1,10 @@
 .recipe-library { padding-top: 52px; }
-.recipe-heading { display: flex; gap: 8px; align-items: center; min-height: 50px; }
+.recipe-heading { display: flex; gap: 8px; align-items: center; justify-content: space-between; min-height: 50px; }
 .recipe-heading h1 { font-family: Poppins, -apple-system, sans-serif; font-size: 18px; letter-spacing: -.216px; color: #333; }
-.recipe-back { padding: 0; border: 0; background: none; width: 40px; height: 40px; flex-shrink: 0; }
+.recipe-favorites-toggle { display: grid; place-items: center; width: 44px; height: 44px; flex-shrink: 0; padding: 0; border: 0; border-radius: 50%; background: none; color: #333; cursor: pointer; }
+.recipe-favorites-toggle[aria-pressed="true"] { color: #3ccf91; }
+.recipe-favorites-toggle[aria-pressed="true"] path { fill: currentColor; }
+.recipe-favorites-toggle:focus-visible { outline: 3px solid #005135; outline-offset: 2px; }
 .recipe-count { font-size: 14px; color: #848484; margin-top: 2px; }
 .recipe-library .hifi-section-heading { padding: 0; }
 .recipe-library .hifi-favorite[aria-pressed=true] { background: none; outline: none; }

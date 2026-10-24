@@ -50,6 +50,8 @@ test('Figma Planner 3359:4896 meal rows and total card keep real state and make 
     const strip = html.match(/<p class="hifi-reuse-strip"[\s\S]*?<\/p>/)?.[0] ?? ''
     assert.match(strip, /in combinatie: /)
     assert.doesNotMatch(strip, /€|bespaar/i)
+    // Figma primary action routes to the real shopping list.
+    assert.match(html, /<button type="button" class="hifi-planner-list-cta">Voeg planning toe aan boodschappenlijst<\/button>/)
     assert.doesNotMatch(html, /Potentiele besparing|Potentiële besparing|Supavoordeel|bespaar tot/i)
   } finally {
     await vite.close()
