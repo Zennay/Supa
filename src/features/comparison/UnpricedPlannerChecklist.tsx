@@ -3,6 +3,8 @@ import { aggregatePlanIngredients, type RecipeWithIngredients } from '../../doma
 import { groupShoppingByRecipe } from '../shopping-list/shoppingRecipeGroups.ts'
 import type { PlannedMeal } from '../../domain/types.ts'
 import { exportUnpricedProgress, importUnpricedProgress, unpricedProgressStorageKey } from './unpricedPlannerProgress.ts'
+import { scraperImageForIngredient, storedScraperProducts } from '../products/scraperProducts.ts'
+import { RetailerImage } from '../../components/RetailerImage'
 import './unpricedPlannerChecklist.css'
 
 type ChecklistProps = {
@@ -87,6 +89,7 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays }: Checklis
   }, [demandIdentity, storageKey])
 
   const completed = items.filter(item => checked[itemKey(item)]).length
+  const scraperProducts = useMemo(() => storedScraperProducts(), [])
   const recipeGroups = groupShoppingByRecipe(items, plan, recipes, activeDays)
 
   return (
@@ -115,7 +118,8 @@ export function UnpricedPlannerChecklist({ plan, recipes, activeDays }: Checklis
                         setProgress({ identity: demandIdentity, checked: { ...checked, [key]: selected } })
                       }} />
                     <span className="unpriced-planner-checklist__thumb" aria-hidden="true">
-                      {item.label.trim().slice(0, 1).toLocaleUpperCase('nl') || '•'}
+                      <RetailerImage src={scraperImageForIngredient(scraperProducts, item.label)}
+                        fallback={item.label.trim().slice(0, 1).toLocaleUpperCase('nl') || '•'} />
                     </span>
                     <span className="unpriced-planner-checklist__item-copy">
                       <strong>{item.label}</strong><small>{quantity(item)}</small>

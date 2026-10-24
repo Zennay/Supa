@@ -348,6 +348,8 @@
   font-weight: 600;
 }
 .hifi-reuse-marks > span + span { margin-left: -12px; }
+.hifi-reuse-marks > span { overflow: hidden; }
+.hifi-reuse-marks img { width: 100%; height: 100%; object-fit: contain; }
 .hifi-reuse-rings {
   position: relative;
   flex: none;

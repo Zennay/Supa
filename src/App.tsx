@@ -13,18 +13,8 @@ const PartialReviewedShoppingList = lazy(async () => {
   const module = await import('./features/shopping-list/PartialReviewedShoppingList.tsx')
   return { default: module.PartialReviewedShoppingList }
 })
-import { privatePhysicalShoppingTick } from './features/shopping-list/privatePhysicalShoppingTick.ts'
-// Historical demo products remain separate. Only load the user's reviewed
-// private source catalogue when they actually open the Products screen.
-const PrivateReviewedProductCatalog = lazy(async () => {
-  const module = await import('./features/products/PrivateReviewedProductCatalog.tsx')
-  return { default: module.PrivateReviewedProductCatalog }
-})
+import { ScraperProductsView, ScraperPicksList } from './features/products/ScraperProductsView.tsx'
 import { UnpricedPlannerChecklist } from './features/comparison/UnpricedPlannerChecklist.tsx'
-const OwnExtraGroceries = lazy(async () => {
-  const module = await import('./features/comparison/OwnExtraGroceries.tsx')
-  return { default: module.OwnExtraGroceries }
-})
 import type { PrivateExtraVisitCostIntent } from './features/comparison/privateExtraVisitCost.ts'
 import type { PrivateSourceFileHandoff } from './features/comparison/privateSourceFileHandoff.ts'
 import { freshReviewedBaskets, type PrivateReviewedBaskets, type PrivateCaptureProgress, type PrivateReviewFocus, type OwnStore, type PrivateRouteChoice } from './features/comparison/privateReviewedBasketBridge.ts'
@@ -145,13 +135,12 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   const [tab, setTab] = useState<Tab>(initialTab)
   const [visitedBasket, setVisitedBasket] = useState(initialTab === 'basket')
   const [visitedList, setVisitedList] = useState(initialTab === 'list')
-  const [mixedRouteOpenSignal, setMixedRouteOpenSignal] = useState(0)
-  const [mixedCostIntent, setMixedCostIntent] = useState<PrivateExtraVisitCostIntent | null>(null)
-  const [privateRouteChoice, setPrivateRouteChoice] = useState<PrivateRouteChoice | null>(null)
+  // Route intents were raised by the removed Planner/Products comparison panels.
+  const [mixedRouteOpenSignal] = useState(0)
+  const [mixedCostIntent] = useState<PrivateExtraVisitCostIntent | null>(null)
+  const [privateRouteChoice] = useState<PrivateRouteChoice | null>(null)
   const [ownPriceImportSignal, setOwnPriceImportSignal] = useState(0)
   const [incomingPriceFiles, setIncomingPriceFiles] = useState<PrivateSourceFileHandoff | null>(null)
-  const [listSourceFileWarning, setListSourceFileWarning] = useState('')
-  const nextPriceFileSerial = useRef(0)
   const [privateReviewed, setPrivateReviewed] = useState<PrivateReviewedBaskets | null>(null)
   const [privateCaptureProgress, setPrivateCaptureProgress] = useState<PrivateCaptureProgress | null>(null)
   const [privateReviewFocus, setPrivateReviewFocus] = useState<PrivateReviewFocus | null>(null)
@@ -460,22 +449,6 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   // merely adds an unrelated recipe or edits an inactive day. Only changing
   // the ACTUAL selected physical week can invalidate these private receipts.
   const privatePlanKey = privatePhysicalPlanIdentity(plannedMeals, recipes, activeDays)
-  // Planner and Lijst share the exact same real-source File handoff. Files
-  // stay in this tab until the canonical Vergelijk importer consumes them.
-  // No alternate CSV parser or implicit retailer approval is introduced.
-  const handoffOwnPriceFiles = (files: File[]) => {
-    if (!files.length) return
-    if (files.length > 2 || files.some(file => !file.size || file.size > 256_000)) {
-      setListSourceFileWarning('Kies maximaal twee gevulde eigen bronbestanden van maximaal 256 kB per bestand.')
-      return
-    }
-    setListSourceFileWarning('')
-    nextPriceFileSerial.current += 1
-    setIncomingPriceFiles({
-      serial: nextPriceFileSerial.current, planKey: privatePlanKey, files,
-    })
-    openOwnPriceImport()
-  }
   const livePrivateReviewed = freshReviewedBaskets(privateReviewed, privatePlanKey, sourceNowMs)
   const preferredPrivateBasket = livePrivateReviewed?.stores[preferredOwnStore] ??
     livePrivateReviewed?.stores.PLUS ?? livePrivateReviewed?.stores.DekaMarkt
@@ -608,44 +581,11 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             {planRepairMessage && <p role="alert">{planRepairMessage}</p>}
           </section>
         )}
-        {tab === 'products' && <Suspense fallback={<p role="status">Eigen bronproducten openen…</p>}>
-          <PrivateReviewedProductCatalog reviewed={livePrivateReviewed} budget={budget}
-            checked={privateShoppingTicks}
-            onToggleChecked={(shop, selected) => {
-              // No checkout progress can be created from expired or replaced
-              // source products. Existing local checkmarks remain untouched.
-              const current = freshReviewedBaskets(livePrivateReviewed, privatePlanKey, Date.now())
-              const capture = current?.stores[shop]
-              if (!capture || !capture.basket.lines.includes(selected)) return
-              const key = privatePhysicalShoppingTick(privatePlanKey, shop, capture.basket.store.id, selected)
-              setPrivateShoppingTicks(before => ({ ...before, [key]: !before[key] }))
-            }}
-            onOpenComparison={openOwnPriceImport}
-            onChooseRouteLine={intent => {
-              const serial = mixedRouteOpenSignal + 1
-              setMixedCostIntent(null)
-              setPrivateRouteChoice({ ...intent, serial })
-              setMixedRouteOpenSignal(serial)
-              navigate('list')
-            }}
-            onOpenMixedRoute={() => { setMixedCostIntent(null); setPrivateRouteChoice(null); setMixedRouteOpenSignal(value => value + 1); navigate('list') }}
-            onOpenList={(store) => {
-              if (store) setPreferredOwnStore(store)
-              navigate('list')
-            }} />
-        </Suspense>}
+        {tab === 'products' && <ScraperProductsView />}
         {(tab === 'home' || tab === 'recipes') && <HiFiHome view={tab}
           onNavigate={navigate} activeDays={activeDays}
           onPlanDay={day => { setPlannerPickRequest(previous => ({ day, serial: (previous?.serial ?? 0) + 1 })); navigate('planner') }}
           addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />}
-        {tab === 'products' && <details className="supa-product-archive">
-          <summary>Oude ontwerpvoorbeelden en historische bronkaarten tonen (geen actuele prijzen)</summary>
-          <p>Alleen de persoonlijk bevestigde bronartikelen hierboven tellen mee in
-            de prijsvergelijking, budgetten en winkelroute. Deze voorbeelden zijn
-            geen supermarktvoorraad of actuele aanbiedingen.</p>
-          <HiFiHome view="products" onNavigate={navigate} activeDays={activeDays}
-            addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />
-        </details>}
 
         {productSelectionWarning && (tab === 'list' || tab === 'products') && (
           <p role="status" className="disclaimer">
@@ -723,6 +663,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
           <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
             <section className="screen" aria-label="Boodschappenlijst uit mijn eigen weekmenu">
               <UnpricedPlannerChecklist plan={plannedMeals} recipes={recipes} activeDays={activeDays} />
+              {tab === 'list' && <ScraperPicksList />}
               {tab === 'list' && designProductIds.length > 0 &&
                 <section aria-label="Mijn expliciet toegevoegde producten">
                   <h3>Mijn toegevoegde producten</h3>
@@ -770,14 +711,6 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               Historische artikelen en Figma-voorbeelden zijn geen nieuwe bronprijzen,
               volledige verpakkingsmatches of besparingsbewijs.</p>
             <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
-          </section>
-        )}
-        {tab === 'list' && (
-          <section className="screen" aria-label="Persoonlijke extra boodschappen buiten het prijsmandje">
-            <Suspense fallback={<p>Eigen ongeprijsde boodschappen openen…</p>}>
-              <OwnExtraGroceries identity={privatePlanKey}
-                plan={plannedMeals} recipes={recipes} activeDays={activeDays} />
-            </Suspense>
           </section>
         )}
       </div>

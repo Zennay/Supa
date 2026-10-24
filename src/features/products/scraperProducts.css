@@ -1,0 +1,90 @@
+/* Producten 3064:3125 with imported scraper products. */
+.scraper-products .scraper-favorites-toggle { color: #333; }
+.scraper-products .scraper-favorites-toggle[aria-pressed="true"] { color: #3ccf91; }
+.scraper-products .scraper-favorites-toggle[aria-pressed="true"] path { fill: currentColor; }
+.scraper-products .scraper-sort {
+  display: grid;
+  place-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+}
+.scraper-products .scraper-sort[aria-pressed="true"] { background: #def5ed; }
+.scraper-products-message { margin: 0; color: #626569; font-size: 13px; }
+.scraper-product-photo { width: 76px; height: 88px; object-fit: contain; }
+.scraper-product-monogram {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #fff;
+  color: #005135;
+  font-size: 22px;
+  font-weight: 600;
+}
+.scraper-store-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  min-width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0 6px;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .02em;
+}
+.scraper-store-badge.plus { background: #e3001b; }
+.scraper-store-badge.deka { background: #ffcc00; color: #1a1a1a; }
+.scraper-products-empty {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  min-height: 120px;
+  place-content: center;
+  border: 2px dashed #c9cdd2;
+  border-radius: 20px;
+  background: #fff;
+  color: #333;
+  text-align: center;
+}
+.scraper-products-empty span { color: #848484; font-size: 13px; }
+
+.scraper-picks { display: grid; gap: 8px; }
+.scraper-picks h3 { margin: 0; color: #1e1e1e; font-size: 16px; font-weight: 500; }
+.scraper-pick-row {
+  display: grid;
+  grid-template-columns: 50px minmax(0, 1fr) auto 44px;
+  align-items: center;
+  gap: 12px;
+  min-height: 74px;
+  padding: 12px 8px 12px 16px;
+  border-radius: 20px;
+  background: #fff;
+}
+.scraper-pick-thumb { width: 50px; height: 50px; display: grid; place-items: center; overflow: hidden; }
+.scraper-pick-thumb .scraper-product-photo { width: 50px; height: 50px; }
+.scraper-pick-thumb .scraper-product-monogram { width: 44px; height: 44px; background: #f2f3f5; font-size: 18px; }
+.scraper-pick-copy { display: grid; gap: 2px; min-width: 0; }
+.scraper-pick-copy strong { font-size: 14px; font-weight: 500; overflow-wrap: anywhere; }
+.scraper-pick-copy small { color: #848484; font-size: 12px; }
+.scraper-pick-price { font-size: 14px; font-weight: 500; }
+.scraper-pick-row button {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: #848484;
+  font-size: 22px;
+}
+
+.scraper-products .hifi-product-favorite { color: #848484; }
+.scraper-products .hifi-product-favorite[aria-pressed="true"] { background: none; }
