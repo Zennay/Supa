@@ -2,6 +2,7 @@ import { privateReviewedPairWithin24Hours } from '../comparison/privateReviewedB
 import type { OwnStoreWeekComparison } from './ownStoreBudgetComparison.ts'
 import { createPrivateBasketComparisonCsv } from '../../privateBasketComparisonCsv.ts'
 import { privateUnitPrice } from '../comparison/privateUnitPrice.ts'
+import { privatePhysicalShoppingTick } from '../shopping-list/privatePhysicalShoppingTick.ts'
 
 import { euro as exactEuro } from '../../lib/money.ts'
 
@@ -16,6 +17,11 @@ export function printableOwnStoreComparison(
   comparison: Extract<OwnStoreWeekComparison, { status: 'comparable' }>,
   observations: { PLUS: string; DekaMarkt: string },
   extraVisitCostCents: number | null = null,
+  shopping?: {
+    planKey: string
+    stores: { PLUS: string; DekaMarkt: string }
+    checked: Readonly<Record<string, boolean>>
+  },
 ): string {
   const lines = [
     'Supa · mijn persoonlijke PLUS/DekaMarkt-weekmand',
@@ -59,8 +65,13 @@ export function printableOwnStoreComparison(
   lines.push('', 'Vergelijking per ingrediënt (zelfde fysieke vraag):')
   for (const row of comparison.lines) {
     const label = readable(row.ingredientLabel)
-    const entry = (store: string, line: typeof row.plus) => [
+    const entry = (store: 'PLUS' | 'DekaMarkt', line: typeof row.plus) => [
       store + ': ' + readable(line.productName),
+      ...(shopping ? [
+        shopping.checked[privatePhysicalShoppingTick(
+          shopping.planKey, store, shopping.stores[store], line,
+        )] ? '☑ Afgevinkt in eigen lijst' : '☐ Nog te kopen',
+      ] : []),
       'SKU ' + readable(line.productId),
       line.packs + ' volledige verpakking(en)',
       line.pack.amount + ' ' + line.pack.unit + ' × ' + line.pack.count + ' per verpakking',
