@@ -3,6 +3,7 @@ import { pathToFileURL } from 'node:url'
 import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 
+import { snapshotInertReviewedEvidence } from './retailer-inert-json-admission.mjs'
 import { validateRawProductObservation } from '../src/data/ingestion.ts'
 import { parsePlusRenderedProductEvidence } from '../src/data/plusRenderedProduct.ts'
 import {
@@ -67,7 +68,8 @@ function provenanceMatches(source, observation) {
     actual.sha256 === source.sha256
 }
 
-export function ingestReviewedEvidence(record) {
+function ingestSafeReviewedEvidence(record) {
+  // Internal only: record already detached at the public entrypoint.
   const { key, parser } = validatedInput(record)
   let parsed
   try {
@@ -105,7 +107,13 @@ export function ingestReviewedEvidence(record) {
   return { key, accepted: true, reason: null, observations }
 }
 
+export function ingestReviewedEvidence(record) {
+  return ingestSafeReviewedEvidence(snapshotInertReviewedEvidence(record))
+}
+
 export function ingestReviewedBatch(records) {
+  // Snapshot the whole collection BEFORE accessing .length, iterators or source IDs.
+  records = snapshotInertReviewedEvidence(records)
   if (!Array.isArray(records) || records.length === 0 || records.length > 32) {
     throw new Error('Reviewed batch requires 1–32 source records')
   }
@@ -118,7 +126,7 @@ export function ingestReviewedBatch(records) {
       throw new Error('Duplicate reviewed capture identity')
     }
     unique.add(identifier)
-    results.push(ingestReviewedEvidence(record))
+    results.push(ingestSafeReviewedEvidence(record))
   }
   const accepted = results.filter(result => result.accepted)
   const summary = {
