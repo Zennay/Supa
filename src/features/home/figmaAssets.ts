@@ -32,6 +32,7 @@ import imgButton1 from '../../assets/figma/home/e9694.svg'
 import imgButton2 from '../../assets/figma/home/0ae7f.svg'
 import imgButton3 from '../../assets/figma/home/895ab.svg'
 
+import plannerThaiThumb from '../../assets/figma/planner/thai-thumb.png'
 import productPaprika from '../../assets/figma/products/fe588.png'
 import productWatermelon from '../../assets/figma/products/a886c.png'
 import productColaRed from '../../assets/figma/products/dcae4.png'
@@ -52,4 +53,26 @@ import productsNavRecipes from '../../assets/figma/products/5327d.svg'
 import productsNavProducts from '../../assets/figma/products/1f33a.svg'
 import productsNavList from '../../assets/figma/home/895ab.svg'
 
-export const figmaAssets = { productPaprika, productWatermelon, productColaRed, productArlaMilk, productHeinekenPack, productPastry, productMuffins, productCalvePeanutButter, productFruitSalad, productGinger, productsFilter, productsSearch, productsWeekly, productsSort, productsNavHome, productsNavPlanner, productsNavRecipes, productsNavProducts, productsNavList, recipeThai, recipeQuesadillas, recipePasta, recipeBack, recipeSearch, recipeSort, recipeHeartActive, imgImage27, imgRecepten, imgRecepten1, imgRecepten2, imgProductFoto, imgDirk, imgProductFoto1, imgProductFoto2, imgDirk1, imgProductFoto3, imgDirk2, imgFrame7312, imgVector, imgVector1, imgVector2, imgFrame7159, imgVector3, imgFilter, imgVector4, imgHeartButton, imgFrame7121, imgVector5, imgButton, imgButton1, imgButton2, imgButton3 }
+export const figmaAssets = { plannerThaiThumb, productPaprika, productWatermelon, productColaRed, productArlaMilk, productHeinekenPack, productPastry, productMuffins, productCalvePeanutButter, productFruitSalad, productGinger, productsFilter, productsSearch, productsWeekly, productsSort, productsNavHome, productsNavPlanner, productsNavRecipes, productsNavProducts, productsNavList, recipeThai, recipeQuesadillas, recipePasta, recipeBack, recipeSearch, recipeSort, recipeHeartActive, imgImage27, imgRecepten, imgRecepten1, imgRecepten2, imgProductFoto, imgDirk, imgProductFoto1, imgProductFoto2, imgDirk1, imgProductFoto3, imgDirk2, imgFrame7312, imgVector, imgVector1, imgVector2, imgFrame7159, imgVector3, imgFilter, imgVector4, imgHeartButton, imgFrame7121, imgVector5, imgButton, imgButton1, imgButton2, imgButton3 }
+
+/**
+ * Original Figma food photography for the curated SUPA recipes only.
+ * The bundled Thai curry (d982c) and Quesadillas (51c5a) exports are
+ * truncated PNGs and render half-empty, so those recipes fall back to a
+ * monogram until they are re-exported from Figma.
+ */
+export const figmaRecipeImages: Record<string, string> = {
+  'supa-fried-rice': imgRecepten,
+  'supa-bao': imgRecepten1,
+  'supa-katsu': imgRecepten2,
+  'supa-veg-pasta': recipePasta,
+}
+
+/**
+ * Planner thumbnails (50px slots). The Thai curry slot uses a crop of the
+ * user's exported Planner design render while the original export is broken.
+ */
+export const figmaPlannerThumbs: Record<string, string> = {
+  ...figmaRecipeImages,
+  'supa-thai': plannerThaiThumb,
+}

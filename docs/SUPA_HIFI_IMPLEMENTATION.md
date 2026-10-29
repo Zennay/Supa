@@ -46,3 +46,23 @@ The M2 Firefox workflow enters Planner from the new Home before replaying all ex
 - Oorspronkelijke Producten-icons voor filter, zoekveld, weekknop, sortering en 5-vaks navigatie gebruikt, inclusief ongewijzigde SVG-intrinsieke maten. De Home-productcatalogus is bewust onveranderd.
 - Code-build `npm run build -- --base=/supa/` is geslaagd op exacte productiebron-HEAD `34393e9`; er zijn geen QA- of regressiesuites toegevoegd of uitgevoerd.
 - **Nog open richting exact 1:1:** individuele Figma-productteksten, ontbrekende voorbeeldprijzen, exacte schermscreenshotvergelijking en specifieke Lijst-productfoto's. Figma MCP Starter limiet blokkeert nu nieuwe screenshots; geen volledige visuele acceptatie claimen tot de bron weer beschikbaar is. De originele lokale afbeeldingen zijn geen bewijs van actuele supermarktprijzen.
+
+
+## Planner maaltijdrijen en totaalkaart (23 oktober 2026)
+
+- Figma Planner `3359:4896` opnieuw als screenshot bekeken (designcontext daarna geblokkeerd door de Figma MCP Starter-limiet). Maaltijdkaarten volgen nu de Figma-rijen: witte 20px-kaart, datumkolom (weekdag + echte lokale datum) met 1,5px scheiding, 50px receptfoto, titel met chevron, klok-icoon met bereidingstijd en een compacte richtprijs-uitleg. Inactieve dagen tonen de Figma-rij "Voeg nu iets toe aan de planner" met groene plusknop.
+- Alleen de zes SUPA-recepten krijgen hun originele Figma-foto (`figmaRecipeImages`); overige recepten tonen een neutraal monogram in plaats van een niet-bijbehorende foto.
+- De budgetkaart volgt de Figma-totaalkaart: "Totaal" met uitsluitend een eigen, gecontroleerd mandbedrag (anders "Prijs onbekend"), scheidingslijn, "Weekbudget" in plaats van de onbewezen "Potentiële besparing", en een grijze "Bekijk berekening"-uitklap met budgetkeuzes en toelichting. Geen besparingsclaim toegevoegd.
+- Horizontale overflow van het Planner-scherm op 320–440px opgelost (grid-kolommen `minmax(0, 1fr)` voor `.screen`, bronimport en weekback-up).
+- Weekstrip: een geplande dag met een SUPA-recept toont de originele receptfoto achter de datum, zoals in Figma.
+- De Figma-strip tussen weekkaart en rijen ("… in combinatie: Ma 20") toont echte gedeelde ingrediënten en dagen uit de huidige planning; het Figma-bedrag "Bespaart €2.85" is bewust weggelaten.
+- **Kapotte assets:** `recipes/d982c.png` (Thai red curry) en `recipes/51c5a.png` (Quesadillas) zijn afgekapte PNG's (beide ±768 KiB, decoderen niet volledig). Ze staan niet meer in `figmaRecipeImages`; die recepten tonen een monogram/groene kaart tot ze opnieuw uit Figma zijn geëxporteerd.
+- Nog open: exacte Figma-maten/assets uit designcontext (chevron-, plus- en klok-exports), de vijfde dag in de weekstrip, herexport van de twee kapotte receptfoto's en een visuele diff zodra de Figma-limiet het toelaat.
+
+## Planner/Recepten vanaf aangeleverde design-exports (24 oktober 2026)
+
+- De gebruiker leverde PNG-exports van Home, Planner (nieuwere versie), Productdetail, Producten en Recepten aan.
+- Planner: eerste open dag in de weekstrip is nu een grijze cirkel met plus (nieuwe Figma-versie); grote groene knop "Voeg planning toe aan boodschappenlijst" onder de totaalkaart opent de echte Lijst (uitgeschakeld zonder geplande dagen).
+- Thai red curry krijgt in de Planner (rij + dagcirkel, 50px slots) een uitsnede uit de aangeleverde Planner-export (`src/assets/figma/planner/thai-thumb.png`), omdat de originele export afgekapt is. De receptkaarten (groter formaat) houden de groene fallback tot de originele foto opnieuw is geëxporteerd; Quesadillas idem.
+- Recepten: kop "Recepten" met hartje (favorietenfilter) en zoekveld "Zoek recepten", zoals in Figma; de terugknop is weg omdat Recepten een hoofdtab is.
+- Bewust niet overgenomen: kortingsbadges, "Bespaart €…", doorgestreepte totalen, "bespaar tot 40%", supermarkt-selectie met prijzen en de vaste persoon "Nick Bergen" — dat zijn demo-claims zonder echte prijsdata.
