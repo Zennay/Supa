@@ -133,9 +133,17 @@ function trustedRetailerProductSource(source: SourceSnapshotRef): string | null 
   const expected = hosts[source.supermarket]
   if (!expected) return null
   const parsed = new URL(href)
+  // This price parser is also called directly on historical private HTML.
+  // It must not promote a URL the one-page M1 capture and offline selector
+  // readers refuse. Mirror isAllowedM1RetailerSourcePath's product path:
+  // no duplicate slash, encoded separator/dot/double-encoding or controls.
+  const path = parsed.pathname
+  const ambiguous = /%(?:2f|5c|2e|25|0[0-9a-f]|1[0-9a-f]|7f)/i.test(path) ||
+    path.includes('\\')
   return parsed.hostname === expected.host && parsed.port === '' &&
-    parsed.pathname.startsWith(expected.route) &&
-    parsed.pathname.length > expected.route.length ? href : null
+    !parsed.search && !parsed.hash && !ambiguous &&
+    path.startsWith(expected.route) && path.length > expected.route.length &&
+    path[expected.route.length] !== '/' ? href : null
 }
 
 /**
