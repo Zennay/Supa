@@ -784,43 +784,26 @@ test('independent SHA-bound catalog captures distinguish a stable product route 
   assert.deepEqual(JSON.parse(await readFile(review2, 'utf8')).stableObservedProductRoutes, [])
 })
 
-test('private SHA-pinned HTML may archive evidence but cross-origin base prevents selector replay',async t=>{
+test('capture refuses cross-origin base before creating a private selector source',async t=>{
   const url='https://www.plus.nl/producten'
-  const file=await archivedSelectorPage(t,'plus','catalog',url,
+  await assert.rejects(archivedSelectorPage(t,'plus','catalog',url,
     '<html><head><base href="https://foreign.example/"></head><body>' +
-    '<a href="/product/fictional-123">SYNTHETIC link</a></body></html>')
-  assert.equal((await stat(file)).mode & 0o777,0o600)
-  await assert.rejects(replayPrivateSelectorHtmlSnapshot(file),/Untrusted HTML base URL/)
-  const review=file.replace('captured.html','untrusted-selector-review.json')
-  await assert.rejects(savePrivateSelectorHtmlReview(file,review),/Untrusted HTML base URL/)
-  await assert.rejects(stat(review),/ENOENT/)
+    '<a href="/product/fictional-123">SYNTHETIC link</a></body></html>'),
+    /Untrusted HTML base URL/)
 })
 
-test('SHA-verified private catalog capture with alien canonical identity never writes a selector review',async t=>{
+test('capture refuses alien canonical before creating a private catalog source',async t=>{
   const url='https://www.plus.nl/producten'
-  const file=await archivedSelectorPage(t,'plus','catalog',url,
+  await assert.rejects(archivedSelectorPage(t,'plus','catalog',url,
     '<html><head><link rel="canonical" href="https://foreign.example/catalog"></head>' +
-    '<body><a href="/product/fictional-123">Private mock</a></body></html>')
-  assert.equal((await stat(file)).mode & 0o777,0o600)
-  await assert.rejects(replayPrivateSelectorHtmlSnapshot(file),
+    '<body><a href="/product/fictional-123">Private mock</a></body></html>'),
     /Untrusted HTML canonical source URL/)
-  const archive=file.replace('captured.html','alien-canonical-selector-review.json')
-  await assert.rejects(savePrivateSelectorHtmlReview(file,archive),
-    /Untrusted HTML canonical source URL/)
-  await assert.rejects(stat(archive),/ENOENT/)
 })
 
-test('private source HTML with foreign live canonical URL cannot become a replayed product price',async t=>{
+test('capture refuses foreign live canonical before creating any priced source',async t=>{
   const markup=page.replace('<html><body>',
     '<html><head><link rel="canonical" href="https://foreign.example/product/fictional-flour-123"></head><body>')
-  const file=await capture(t,markup)
-  assert.equal((await stat(file)).mode & 0o777,0o600)
-  await assert.rejects(replayPrivateProductHtmlSnapshot(file),
-    /Private source replay refused/)
-  const review=file.replace('captured.html','foreign-price-review.json')
-  await assert.rejects(savePrivateOfflineProductReview(file,review),
-    /Private source replay refused/)
-  await assert.rejects(stat(review),/ENOENT/)
+  await assert.rejects(capture(t,markup), /Untrusted HTML canonical source URL/)
 })
 
 test('SHA-bound private catalog stability archives unique product path coverage without publishing identifiers',async t=>{

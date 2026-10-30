@@ -218,12 +218,10 @@ test('Deka Nuxt and JSON-LD cannot agree their way around a foreign canonical/ba
     '<base href="https://foreign.example/">',
     '<link rel="canonical" href="http://www.dekamarkt.nl/producten/">',
   ]) {
-    const result=await captureApprovedProductPriceCandidate(options(
-      original.replace('<head>','<head>'+meta)))
-    assert.equal(result.status,'review_required')
-    assert.equal(result.reason,'missing_or_invalid_jsonld')
-    assert.equal(result.observation,null)
-    assert.equal(result.published,false)
+    // Source identity is now checked at transport, before price candidates.
+    await assert.rejects(captureApprovedProductPriceCandidate(options(
+      original.replace('<head>','<head>'+meta))),
+      /Untrusted HTML (canonical source URL|base URL)/)
   }
   const correct=original.replace('<head>',
     '<head><link rel="canonical" href="'+url+'">')
