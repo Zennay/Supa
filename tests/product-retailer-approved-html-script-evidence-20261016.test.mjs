@@ -382,6 +382,24 @@ test('visible meta refresh prevents trusting JSON-LD prices even if markup conta
   assert.equal(inert.jsonLdBlocks.length,0) // JSON-LD inside inert template is not executable
 })
 
+test('direct private HTML price evidence refuses a foreign canonical SKU and non-byte-exact markup', () => {
+  const jsonld=script('type="application/ld+json"',plusProduct)
+  const html='<html><head><link rel="canonical" href="'+plusUrl+'">'+jsonld+'</head></html>'
+  const valid=readAuthorizedHtmlScriptEvidence(html,plusUrl)
+  assert.equal(valid.invalid,false)
+  for (const altered of [
+    html.replace(plusUrl,'https://www.plus.nl/product/another-sku'),
+    '\uFEFF'+html,
+    html.replace(jsonld,'\u0000'+jsonld),
+    html+'\uD800',
+  ]) {
+    const result=readAuthorizedHtmlScriptEvidence(altered,plusUrl)
+    assert.equal(result.invalid,true)
+    assert.deepEqual(result.jsonLdBlocks,[])
+    assert.equal(result.nuxtPayload,null)
+  }
+})
+
 test('standalone script evidence requires provenance to verify declared page identity',()=>{
   const html='<html><head><link rel="canonical" href="'+plusUrl+'">' +
     '<script type="application/ld+json">'+JSON.stringify(plusProduct) +
