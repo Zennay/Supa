@@ -171,8 +171,11 @@ export function parseDekaNuxtFromAuthorizedHtml({ html, provenance, jsonLdBlocks
     const offer = ld?.offers
     if (!ld || !data(offer) || ld.name !== name ||
         !corroborateExplicitDekaPack(ld, pack) ||
-        String(ld.mpn) !== expectedId || offer.priceCurrency !== 'EUR' ||
-        typeof offer.Price !== 'number' ||
+        String(ld.mpn) !== expectedId ||
+        // The direct offline fallback cannot ignore an explicit alternate
+        // Schema.org SKU even when the Nuxt ID and MPN agree.
+        (ld.sku !== undefined && String(ld.sku) !== expectedId) ||
+        offer.priceCurrency !== 'EUR' || typeof offer.Price !== 'number' ||
         !consistentOfferPriceEvidence(offer, cents) ||
         normalizeMoneyToCents(String(offer.Price)) !== cents ||
         (ld['@id'] !== undefined && ld['@id'] !== provenance.url + '#product') ||

@@ -385,3 +385,16 @@ test('Deka private fallback refuses Product.url for a different SKU even when mp
   const good=await captureApprovedProductPriceCandidate(options(html(fixture.nuxtPayload,same)))
   assert.equal(good.status,'candidate_needs_review')
 })
+
+test('standalone Deka fallback verifies JSON-LD sku independently of the HTTP bridge', async () => {
+  const {parseDekaNuxtFromAuthorizedHtml}=await import('../scripts/retailer-approved-deka-nuxt-product.mjs')
+  const {createHash}=await import('node:crypto')
+  for(const [sku,type] of [['999999','abstain'],['115873','observation']]) {
+    const ld=structuredClone(fixture.jsonLdProduct);ld.sku=sku
+    const page=html(fixture.nuxtPayload,ld)
+    const provenance={supermarket:'dekamarkt',kind:'product',url,
+      capturedAt:time,sha256:createHash('sha256').update(page).digest('hex')}
+    const result=parseDekaNuxtFromAuthorizedHtml({html:page,provenance,jsonLdBlocks:[ld]})
+    assert.equal(result.type,type,sku)
+  }
+})
