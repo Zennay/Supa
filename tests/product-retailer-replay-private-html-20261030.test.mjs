@@ -88,3 +88,31 @@ test('offline review is durably written mode 0600, never overwrites or publishes
   assert.equal(JSON.parse(await readFile(filename, 'utf8')).source.sha256,
     createHash('sha256').update(page).digest('hex'))
 })
+
+test('second supermarket: offline archived Deka Nuxt+JSON-LD is corroborated, never released', async t => {
+  const dir = await mkdtemp(join(tmpdir(), 'supa-deka-replay-fixture-'))
+  t.after(() => rm(dir, { recursive: true, force: true }))
+  const fixture = JSON.parse(await readFile(new URL(
+    '../fixtures/m1/dekamarkt-product-halfvolle-melk.v1.json', import.meta.url), 'utf8'))
+  const dekaUrl = fixture.source.url
+  // Only the historical STRUCTURE is reused. This HTML is entirely synthetic.
+  const markup = '<html><head><script id="__NUXT_DATA__">' +
+    JSON.stringify(fixture.nuxtPayload) + '</script>' +
+    '<script type="application/ld+json">' + JSON.stringify(fixture.jsonLdProduct) +
+    '</script></head><body>SYNTHETIC historical form</body></html>'
+  const scoped = { ...grant, supermarket: 'dekamarkt', sourceUrl: dekaUrl }
+  const grantFile = join(dir, 'synthetic-deka-grant.json'), output = join(dir, 'deka.html')
+  await writeFile(grantFile, JSON.stringify(scoped), { mode: 0o600 })
+  const syntheticGate = structuredClone(gate)
+  syntheticGate.sources[1].permissionStatus = 'permitted'
+  syntheticGate.sources[1].productionEnabled = true
+  await download([grantFile, output], { testGateDocument: syntheticGate,
+    fetchFn: async () => new Response(markup, { status: 200,
+      headers: { 'content-type': 'text/html' } }), writeOutput() {} })
+  const replay = await replayPrivateProductHtmlSnapshot(output)
+  assert.equal(replay.status, 'candidate_for_human_review')
+  assert.equal(replay.observation.currentPriceCents, 85)
+  assert.equal(replay.observation.sourceProductId, '115873')
+  assert.equal(replay.permissionVerifiedForThisReplay, false)
+  assert.equal(replay.verifiedCurrentCheckoutPrice, false)
+})
