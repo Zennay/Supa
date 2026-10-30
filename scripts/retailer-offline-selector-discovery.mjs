@@ -120,7 +120,7 @@ function parseHtmlAttributes(text) {
         value = text.slice(pos, end)
         pos = end + 1
       } else {
-        const token=[REDACTED]\s<>=`"']+/.exec(text.slice(pos))?.[0]
+        const token = /^[^\s<>=`"']+/.exec(text.slice(pos))?.[0]
         if (!token) return null
         value = token
         pos += token.length
@@ -207,7 +207,7 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
       }
     }
     for (const name of ['data-testid', 'itemprop']) {
-      const token=[REDACTED]
+      const token = staticAttributeValue(attrs.get(name))
       if (!token || !STATIC_NAME.test(token)) continue
       for (const [field, rule] of Object.entries(FIELD_RULES)) {
         if (rule.test(token)) {
