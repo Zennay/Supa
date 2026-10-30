@@ -948,3 +948,24 @@ test('unscoped JSON-LD Product words never forge official Schema.org product evi
       .structuredSignals.schemaOrgProduct,true)
   }
 })
+
+test('nested HTML character references cannot invent source-observed Schema.org microdata selectors',()=>{
+  for(const [retailerId,url] of [
+    ['plus','https://www.plus.nl/producten'],
+    ['dekamarkt','https://www.dekamarkt.nl/producten'],
+  ]){
+    const pageOrigin={...origin,retailerId,url}
+    for(const encoded of [
+      'https:&#38;sol;&#38;sol;schema.org&#38;sol;Product',
+      'https:&amp;#47;&amp;#47;schema.org&amp;#47;Product',
+      'https:&sol;&sol;schema.org&sol;Prod&amp;#117;ct',
+    ]){
+      const html='<section itemscope itemtype="'+encoded+'">SYNTHETIC</section>'
+      const result=proposeOfflineRetailerSelectors({html,origin:pageOrigin})
+      assert.equal(result.structuredSignals.schemaOrgProduct,false,retailerId+' '+encoded)
+      assert.equal(result.selectors.some(x=>x.field==='product' &&
+        x.selector==='section[itemtype="https://schema.org/Product"]'),false,retailerId+' '+encoded)
+      assert.equal(result.productionEnabled,false)
+    }
+  }
+})

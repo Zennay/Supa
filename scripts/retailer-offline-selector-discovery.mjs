@@ -168,16 +168,17 @@ function parseHtmlAttributes(text) {
 // remains inert and can never invent a selector. No DOM/scripts/network.
 function staticAttributeValue(value) {
   if (typeof value !== 'string') return value
-  // Common exact-case HTML named character references are also decoded by
-  // DOM attribute access. An invented or wrong-case entity stays untouched.
+  // A browser decodes named and numeric references in a SINGLE pass. Two
+  // sequential replacements can invent Product selectors from &amp;#117;.
   const named = Object.freeze({ sol: '/', colon: ':', amp: '&' })
-  const decoded = value.replace(/&(sol|colon|amp);/g, (_, name) => named[name])
-  return decoded.replace(/&#(?:x([0-9a-f]{1,6})|([0-9]{1,7}));/gi, (raw, hex, decimal) => {
-    const point = Number.parseInt(hex ?? decimal, hex === undefined ? 10 : 16)
-    return point > 0 && point <= 0x10ffff &&
-      !(point >= 0xd800 && point <= 0xdfff)
-      ? String.fromCodePoint(point) : raw
-  })
+  return value.replace(/&(sol|colon|amp);|&#(?:[xX]([0-9a-fA-F]{1,6})|([0-9]{1,7}));/g,
+    (raw, name, hex, decimal) => {
+      if (name !== undefined) return named[name]
+      const point = Number.parseInt(hex ?? decimal, hex === undefined ? 10 : 16)
+      return point > 0 && point <= 0x10ffff &&
+        !(point >= 0xd800 && point <= 0xdfff)
+        ? String.fromCodePoint(point) : raw
+    })
 }
 
 // A catalog navigation link to the catalog root is not evidence for a
