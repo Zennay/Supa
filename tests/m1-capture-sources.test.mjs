@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { SOURCES, validateSources, assertArchivableRetailerHtml, readBoundedRetailerUtf8Response } from '../scripts/m1-capture-sources.mjs'
+import { SOURCES, validateSources, assertArchivableRetailerHtml, readBoundedRetailerUtf8Response, storePrivateM1SourceFixture } from '../scripts/m1-capture-sources.mjs'
 
 test('M1 capture source set is bounded to two supermarkets and three page kinds', () => {
   assert.equal(SOURCES.length, 6)
@@ -148,9 +148,10 @@ test('legacy M1 transport rejects redirects before following and writes only aft
   const code=await readFile(new URL('../scripts/m1-capture-sources.mjs',import.meta.url),'utf8')
   assert.match(code,/redirect:\s*'error'/)
   assert.doesNotMatch(code,/redirect:\s*'follow'/)
-  const status=code.indexOf('if (!response.ok) throw new Error')
-  const content=code.indexOf('if (!isHtmlContentType(contentType))')
-  const store=code.indexOf('await writeFile(path.join(dir,')
+  const capture=code.slice(code.indexOf('async function captureSource('))
+  const status=capture.indexOf('if (!response.ok) throw new Error')
+  const content=capture.indexOf('if (!isHtmlContentType(contentType))')
+  const store=capture.indexOf('await storePrivateM1SourceFixture(rootDir, source, body, contentType)')
   assert.ok(status>0 && content>status && store>content,
     'denied/non-HTML source cannot be archived before validation')
 })
@@ -178,7 +179,7 @@ test('M1 capture uses lossless UTF-8 decoding and checks archive opt-outs before
  assert.match(code,/new TextDecoder\('utf-8', \{ fatal: true \}\)\.decode\(raw\)/)
  assert.match(code,/assertArchivableRetailerHtml\(body, contentType\)/)
  const verified=code.indexOf('const bytes = assertArchivableRetailerHtml(body, contentType)')
- const write=code.indexOf('await writeFile(path.join(dir,')
+ const write=code.indexOf('await storePrivateM1SourceFixture(rootDir, source, body, contentType)')
  assert.ok(verified>0 && write>verified)
 })
 
@@ -207,4 +208,46 @@ test('stream rejects malformed UTF-8, BOM and missing response body',async()=>{
    /encoded|BOM|valid|UTF|input/,Array.from(bytes).join(','))
  }
  await assert.rejects(readBoundedRetailerUtf8Response(new Response(null)),/Missing streamed/)
+})
+
+test('captured source HTML is private 0600, non-overwriting, and in 0700 source directories',async()=>{
+ const {mkdtemp,stat,readFile,rm}=await import('node:fs/promises')
+ const {join}=await import('node:path')
+ const {tmpdir}=await import('node:os')
+ const temp=await mkdtemp(join(tmpdir(),'supa-private-source-'))
+ const root=join(temp,'captures')
+ const source=SOURCES[0]
+ const html='<html><body><article class="product-card">Synthetic only</article></body></html>'
+ try{
+  const saved=await storePrivateM1SourceFixture(root,source,html,'text/html;charset=utf-8')
+  assert.equal(saved.stored,true)
+  assert.equal(saved.retailerId,'plus')
+  const file=join(root,'plus',source.id+'.html')
+  assert.equal((await stat(root)).mode&0o777,0o700)
+  assert.equal((await stat(join(root,'plus'))).mode&0o777,0o700)
+  assert.equal((await stat(file)).mode&0o777,0o600)
+  assert.equal(await readFile(file,'utf8'),html)
+  await assert.rejects(storePrivateM1SourceFixture(root,source,'<html>replace</html>','text/html'),
+   /EEXIST|exists/)
+  assert.equal(await readFile(file,'utf8'),html)
+ }finally{await rm(temp,{recursive:true,force:true})}
+})
+
+test('private source storage refuses symlink roots and existing world-readable capture directories',async()=>{
+ const {mkdtemp,mkdir,chmod,symlink,stat,rm}=await import('node:fs/promises')
+ const {join}=await import('node:path')
+ const {tmpdir}=await import('node:os')
+ const tmp=await mkdtemp(join(tmpdir(),'supa-source-perms-'))
+ const real=join(tmp,'real')
+ const alias=join(tmp,'alias')
+ try{
+  await mkdir(real,{mode:0o700})
+  await symlink(real,alias)
+  await assert.rejects(storePrivateM1SourceFixture(alias,SOURCES[0],'<html>safe</html>','text/html'),/symlink/)
+  const unsafe=join(tmp,'world-readable')
+  await mkdir(unsafe,{mode:0o755})
+  await chmod(unsafe,0o755)
+  await assert.rejects(storePrivateM1SourceFixture(unsafe,SOURCES[0],'<html>safe</html>','text/html'),/owner-only/)
+  assert.equal((await stat(real)).mode&0o777,0o700)
+ }finally{await rm(tmp,{recursive:true,force:true})}
 })

@@ -1,11 +1,12 @@
 import { createHash } from 'node:crypto'
-import { mkdir, writeFile, readFile } from 'node:fs/promises'
+import { mkdir, readFile, open, lstat } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 import path from 'node:path'
 
 import { evaluateSourcePermissionGate } from './m1-check-source-permission-gate.mjs'
 import { isAllowedM1RetailerSourcePath } from './retailer-source-route-safety.mjs'
 import { scanOfflineRetailerMarkup } from './retailer-offline-structural-scan.mjs'
+import { assertNoSymlinkedM3OutputParents } from './m3-source-output-preservation.mjs'
 
 export const SOURCES = [
   {
@@ -162,6 +163,36 @@ export async function readBoundedRetailerUtf8Response(response) {
   return new TextDecoder('utf-8', { fatal: true }).decode(raw)
 }
 
+// Authorized capture artifacts are private source evidence, not web assets.
+// Create new files only: no replay may silently overwrite the original HTML.
+async function ensurePrivateM1Directory(folder) {
+  await assertNoSymlinkedM3OutputParents(path.join(folder, '.probe'))
+  await mkdir(folder, { recursive: true, mode: 0o700 })
+  const info = await lstat(folder)
+  if (!info.isDirectory() || info.isSymbolicLink() || (info.mode & 0o077))
+    throw new Error('Private M1 archive requires owner-only directories')
+}
+async function writePrivateM1File(file, body) {
+  await assertNoSymlinkedM3OutputParents(file)
+  const folder = path.dirname(file)
+  await ensurePrivateM1Directory(folder)
+  const handle = await open(file, 'wx', 0o600)
+  try {
+    await handle.writeFile(body, 'utf8')
+    await handle.sync()
+  } finally { await handle.close() }
+}
+// Local-only helper for owned/synthetic HTML. Does NOT request permission or
+// perform HTTP; the caller of captureSource still enforces the real grant.
+export async function storePrivateM1SourceFixture(rootDir, source, body, contentType) {
+  validateSources([source])
+  assertArchivableRetailerHtml(body, contentType)
+  await ensurePrivateM1Directory(rootDir)
+  const file = path.join(rootDir, source.supermarket, `${source.id}.html`)
+  await writePrivateM1File(file, body)
+  return { stored: true, retailerId: source.supermarket, kind: source.kind }
+}
+
 async function captureSource(source, rootDir) {
   const capturedAt = new Date().toISOString()
   const controller = new AbortController()
@@ -239,9 +270,7 @@ async function captureSource(source, rootDir) {
       throw new Error(`Response exceeded ${MAX_BYTES} bytes: ${bytes}`)
     }
 
-    const dir = path.join(rootDir, source.supermarket)
-    await mkdir(dir, { recursive: true })
-    await writeFile(path.join(dir, `${source.id}.html`), body, 'utf8')
+    await storePrivateM1SourceFixture(rootDir, source, body, contentType)
 
     return { ...metadata, success: true }
   } catch (error) {
@@ -270,7 +299,7 @@ export async function main() {
   const rootDir = process.env.SUPA_CAPTURE_DIR ||
     path.join('artifacts', 'm1-captures', safeTimestamp(startedAt))
 
-  await mkdir(rootDir, { recursive: true })
+  await ensurePrivateM1Directory(rootDir)
   const results = []
 
   for (const source of SOURCES) {
@@ -290,10 +319,9 @@ export async function main() {
     results,
   }
 
-  await writeFile(
+  await writePrivateM1File(
     path.join(rootDir, 'manifest.json'),
     JSON.stringify(manifest, null, 2) + '\n',
-    'utf8',
   )
 
   if (manifest.failureCount > 0) {

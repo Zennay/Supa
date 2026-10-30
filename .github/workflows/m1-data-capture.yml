@@ -9,6 +9,7 @@ on:
       - "scripts/retailer-offline-structural-scan.mjs"
       - "scripts/retailer-json-script-mime.mjs"
       - "scripts/retailer-private-unique-key-json.mjs"
+      - "scripts/m3-source-output-preservation.mjs"
       - "evidence/m1/source-permission-gate.v1.json"
       - "tests/m1-capture-sources.test.mjs"
       - "tests/ingestion-contract.test.mjs"
