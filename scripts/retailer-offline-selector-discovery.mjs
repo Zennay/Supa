@@ -212,7 +212,7 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
   const sha256 = createHash('sha256').update(html, 'utf8').digest('hex')
   // Inspect real HTML element boundaries; never infer signal tags from
   // comments, attributes, script strings or inert DOM containers.
-  const { visible, structuredSignals, baseHrefs } = scanOfflineRetailerMarkup(html)
+  const { visible, structuredSignals, baseHrefs, canonicalHrefs } = scanOfflineRetailerMarkup(html)
   // Live HTML base href changes the browser resolution of relative product
   // links. Foreign or malformed bases cannot become store product evidence.
   if (baseHrefs.length) {
@@ -222,6 +222,19 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
     const expected = new URL(origin.url)
     if (base.origin !== expected.origin || base.username || base.password ||
         base.protocol !== 'https:') throw new Error('Untrusted HTML base URL')
+  }
+
+  // An explicit canonical page identity belonging to another domain makes
+  // even otherwise plausible CSS product hints unsafe to attribute to this
+  // retailer. No canonical URL is emitted from the private review.
+  if (canonicalHrefs.length) {
+    let canonical
+    try { canonical = new URL(staticAttributeValue(canonicalHrefs[0]), origin.url) }
+    catch { throw new Error('Untrusted HTML canonical source URL') }
+    const expected = new URL(origin.url)
+    if (canonical.origin !== expected.origin || canonical.username ||
+        canonical.password || canonical.protocol !== 'https:')
+      throw new Error('Untrusted HTML canonical source URL')
   }
 
   const candidates = new Map()
