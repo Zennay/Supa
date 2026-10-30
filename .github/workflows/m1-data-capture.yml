@@ -43,6 +43,7 @@ on:
       - "tests/schema-org-product.test.mjs"
       - "tests/m1-workflow-fork-safety-contract.test.mjs"
       - "tests/m1-workflow-transitive-trigger-closure.test.mjs"
+      - "tests/product-m1-workflow-offline-pr-capture-20261030.test.mjs"
       - ".github/workflows/m1-data-capture.yml"
       - "docs/M1_DATA_FEASIBILITY.md"
   workflow_dispatch:
@@ -92,16 +93,16 @@ jobs:
         run: node scripts/m1-capture-sources.mjs
 
       - name: Inspect capture integrity and structured data
+        if: always() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
         id: inspect
-        if: always()
         run: |
           capture_dir="$(find artifacts/m1-captures -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1)"
           test -n "$capture_dir"
           npm run m1:inspect-captures -- "$capture_dir"
 
       - name: Evaluate capture freshness evidence
+        if: always() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
         id: freshness
-        if: always()
         run: |
           capture_dir="$(find artifacts/m1-captures -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1)"
           test -n "$capture_dir"
@@ -109,7 +110,7 @@ jobs:
 
       - name: Export sanitized product candidates
         id: export
-        if: steps.inspect.outcome == 'success'
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && steps.inspect.outcome == 'success'
         run: |
           capture_dir="$(find artifacts/m1-captures -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1)"
           test -n "$capture_dir"
@@ -117,14 +118,14 @@ jobs:
 
       - name: Build M1 evidence summary
         id: evidence
-        if: steps.inspect.outcome == 'success' && steps.freshness.outcome == 'success' && steps.export.outcome == 'success'
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && steps.inspect.outcome == 'success' && steps.freshness.outcome == 'success' && steps.export.outcome == 'success'
         run: |
           capture_dir="$(find artifacts/m1-captures -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1)"
           test -n "$capture_dir"
           npm run m1:evidence-summary -- "$capture_dir"
 
       - name: Upload capture evidence
-        if: always()
+        if: always() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: supa-m1-source-captures
@@ -133,7 +134,7 @@ jobs:
           retention-days: 14
 
       - name: Fail visibly when capture evidence fails
-        if: steps.capture.outcome != 'success' || steps.inspect.outcome != 'success' || steps.freshness.outcome != 'success' || steps.export.outcome == 'failure' || steps.evidence.outcome == 'failure'
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && (steps.capture.outcome != 'success' || steps.inspect.outcome != 'success' || steps.freshness.outcome != 'success' || steps.export.outcome == 'failure' || steps.evidence.outcome == 'failure')
         run: |
           echo "M1 capture evidence failed. Inspect manifest.json, inspection.json, freshness.json, sanitized-candidates/index.json and evidence-summary.json in the uploaded artifact."
           exit 1
