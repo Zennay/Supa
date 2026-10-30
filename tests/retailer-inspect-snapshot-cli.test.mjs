@@ -38,3 +38,25 @@ test('tampered snapshot and invalid manifest never return selector candidates', 
     await rm(root, { recursive: true, force: true })
   }
 })
+
+test('offline inspector rejects symlink and hardlink aliases before reading snapshots', async () => {
+  const { symlink, link } = await import('node:fs/promises')
+  const root = await mkdtemp(join(tmpdir(), 'supa-inspector-alias-'))
+  try {
+    const file = join(root, 'original.html')
+    const alias = join(root, 'alias.html')
+    const hardlink = join(root, 'linked.html')
+    const html = '<article class="product-card">Synthetic only</article>'
+    await writeFile(file, html)
+    const sha = createHash('sha256').update(html).digest('hex')
+    const prefix = ['fake-retailer', 'https://fixture.example/products', '2026-10-14T11:00:00.000Z', sha]
+    await symlink(file, alias)
+    await assert.rejects(main([...prefix, alias], () => {
+      throw Error('must not publish')
+    }), /ELOOP|symbolic|single-link/)
+    await link(file, hardlink)
+    await assert.rejects(main([...prefix, hardlink], () => {
+      throw Error('must not publish')
+    }), /single-link/)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})

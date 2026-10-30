@@ -291,3 +291,18 @@ geen zelfstandig DOM-element en mag nooit als selector worden voorgesteld.
 Ongebalanceerde of niet-eenduidige HTML-attributen worden fail-closed
 geweigerd. Er worden geen scripts uitgevoerd of actuele productprijzen
 gepubliceerd; validatie blijft menselijke review vereisen.
+
+### 30 oktober — offline HTML-inspectie: fysieke bronidentiteit en echte DOM-tokenbewijs
+
+De operator-CLI `retailer-inspect-snapshot-cli.mjs` opent de vastgelegde
+HTML nu met `O_NOFOLLOW` en `O_NONBLOCK` en controleert dat één regulier,
+niet-gehardlinkt fysiek bestand gedurende het lezen dezelfde device-/inode-,
+size- en wijzigingsidentiteit houdt. Pas daarna accepteert hij de bestaande
+SHA-256 manifestpin. Alias-/symlinkwisselingen worden geweigerd; geen
+netwerkrequest of retailertoestemming wordt geïmpliceerd.
+
+De offline selector discovery laat geciteerde `<script>`-/`<template>`-strings,
+commentaren, verborgen DOM-markup en externe scripts nooit meetellen als
+zichtbaar selector- of JSON-LD-signaal. Geldig JSON-LD binnen een echte HTML
+`<head>` blijft juist herkenbaar. Selectors blijven uitsluitend voorstellen
+voor menselijke review, zonder automatische publicatie of prijsclaim.
