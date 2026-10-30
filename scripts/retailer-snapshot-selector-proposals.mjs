@@ -134,6 +134,11 @@ function jsonLdShape(text, types, keys) {
     const localContextOfficial = declaresContext && !!schemaVocabulary(node['@context'])
     const trusted = declaresContext ? localContextOfficial : inheritedSchema
     const foreignContext = declaresContext && !localContextOfficial
+    // A descendant that overrides an already verified Schema vocabulary
+    // makes the whole offline Product/Offer structural review ambiguous.
+    // The strict source scanner and private price reader refuse it too.
+    if (foreignContext && inheritedSchema)
+      throw new Error('Untrusted nested JSON-LD vocabulary')
     const classes=Array.isArray(node['@type']) ? node['@type'] : [node['@type']]
     // A WebPage that happens to contain "price" or "sku" is not product
     // evidence. Only source-observed, official retail schema records may

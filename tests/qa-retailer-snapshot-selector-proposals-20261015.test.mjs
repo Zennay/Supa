@@ -792,3 +792,19 @@ test('legacy M1 nanosecond clocks can corroborate a genuine source-observed curr
     assert.equal(report.currentPricesExtracted,false)
   }
 })
+
+test('historical M1 structural JSON-LD review refuses official Product hints when nested foreign Offer/graph context contradicts its price source',()=>{
+  for(const [store,kind] of [['plus','catalog'],['dekamarkt','offers']]) {
+    const payloads=[
+      {'@context':'https://schema.org','@type':'Product',offers:{'@context':'https://other.example','@type':'Offer',price:'SYNTHETIC'}},
+      {'@context':'https://schema.org','@graph':[{'@type':'Product'}, {'@type':'Offer','@context':'https://other.example'}]},
+    ]
+    for(const payload of payloads) {
+      const html='<script type="application/ld+json">'+JSON.stringify(payload)+'</script>'
+      const signals=proposeRetailerSelectors(source(store,kind,html),html).embeddedSignals
+      assert.equal(signals.invalidJsonLdCount,1,store)
+      assert.deepEqual(signals.jsonLdTypes,[],store)
+      assert.deepEqual(signals.jsonLdKeys,[],store)
+    }
+  }
+})
