@@ -289,3 +289,41 @@ test('historical source provenance rejects redirects, encoded separators and URL
       /Offline selector review refused:/)
   }
 })
+
+test('legacy capture review ignores foreign JSON-LD vocabularies as Schema.org proof',()=>{
+  const cases=[
+    {'@context':'https://foreign.invalid/','@type':'Product',name:'PRIVATE'},
+    {'@context':['https://schema.org/','https://foreign.invalid/'],
+      '@type':'Product',offers:{'@type':'Offer',price:77}},
+    {'@context':{'@vocab':'https://foreign.invalid/'},
+      '@type':'Product',price:77},
+  ]
+  for(const data of cases) {
+    const html='<html><body><script type="application/ld+json">'+
+      JSON.stringify(data)+'</script></body></html>'
+    const report=proposeRetailerSelectors(source('plus','catalog',html),html)
+    assert.deepEqual(report.embeddedSignals.jsonLdTypes,[])
+    assert.equal(report.currentPricesExtracted,false)
+    assert.equal(report.readyForScraping,false)
+  }
+})
+test('legacy source review preserves valid inherited Schema.org graph types without product data',()=>{
+  const html='<html><body><script type="application/ld+json">'+
+    JSON.stringify({'@context':'https://schema.org/',
+      '@graph':[{'@type':'Product',name:'PRIVATE',offers:{
+        '@type':'Offer',price:99.99}}]})+
+    '</script></body></html>'
+  const result=proposeRetailerSelectors(source('plus','catalog',html),html)
+  assert.deepEqual(result.embeddedSignals.jsonLdTypes,['Offer','Product'])
+  assert.ok(result.embeddedSignals.jsonLdKeys.includes('price'))
+  assert.doesNotMatch(JSON.stringify(result),/PRIVATE|99.99/)
+})
+test('duplicate JSON-LD keys cannot create a source signal in the legacy M1 snapshot review',()=>{
+  const json='{"@context":"https://schema.org","@type":"Product","@type":"Offer"}'
+  const html='<html><body><script type="application/ld+json">'+json+
+    '</script></body></html>'
+  const result=proposeRetailerSelectors(source('plus','catalog',html),html)
+  assert.equal(result.embeddedSignals.invalidJsonLdCount,1)
+  assert.deepEqual(result.embeddedSignals.jsonLdTypes,[])
+  assert.equal(result.readyForScraping,false)
+})

@@ -78,20 +78,39 @@ function validCapture(source, requireHash = true) {
   return { id, supermarket, kind, url: url.href, capturedAt, sha256: expectedSha ?? null }
 }
 
+const OFFICIAL_SCHEMA_CONTEXT = new Set([
+  'https://schema.org','https://schema.org/',
+  'http://schema.org','http://schema.org/',
+])
+function schemaVocabulary(value) {
+  if (typeof value === 'string') return OFFICIAL_SCHEMA_CONTEXT.has(value)
+  if (Array.isArray(value)) return value.length>0 && value.every(schemaVocabulary)
+  return value && typeof value === 'object' &&
+    Object.keys(value).length === 1 && OFFICIAL_SCHEMA_CONTEXT.has(value['@vocab'])
+}
 function jsonLdShape(text, types, keys) {
   let value
-  try { value = JSON.parse(text) } catch { return false }
-  const visit = (node, depth = 0) => {
+  // Duplicate JSON-LD members cannot become apparently verified source
+  // attributes through JSON.parse's last-key-wins behavior.
+  try { value = parseUniqueKeyRetailerJson(text) } catch { return false }
+  const visit = (node, depth = 0, inheritedSchema = false) => {
     if (depth > 12 || !node || typeof node !== 'object') return
-    if (Array.isArray(node)) { node.slice(0, 100).forEach(child => visit(child, depth + 1)); return }
-    for (const [key, child] of Object.entries(node).slice(0, 100)) {
-      if (ALLOWED_JSONLD_KEYS.has(key)) keys.add(key)
+    if (Array.isArray(node)) {
+      node.slice(0,100).forEach(child => visit(child,depth+1,inheritedSchema))
+      return
+    }
+    const trusted = Object.hasOwn(node,'@context')
+      ? !!schemaVocabulary(node['@context']) : inheritedSchema
+    for (const [key,child] of Object.entries(node).slice(0,100)) {
+      if (trusted && ALLOWED_JSONLD_KEYS.has(key)) keys.add(key)
       if (key === '@type') {
-        for (const type of (Array.isArray(child) ? child : [child])) {
-          if (typeof type === 'string' && /^(?:Product|Offer|AggregateOffer|ItemList|WebPage)$/.test(type)) types.add(type)
+        for(const type of (Array.isArray(child)?child:[child])) {
+          if(typeof type !== 'string') continue
+          const match=/^(?:https?:\/\/schema\.org\/)?(Product|Offer|AggregateOffer|ItemList|WebPage)$/.exec(type)
+          if(match && (trusted || type !== match[1])) types.add(match[1])
         }
       }
-      if (child && typeof child === 'object') visit(child, depth + 1)
+      if (child && typeof child === 'object') visit(child,depth+1,trusted)
     }
   }
   visit(value)
