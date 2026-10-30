@@ -6,11 +6,11 @@ import { m2Recipes } from '../src/data/m2Fixture.ts'
 import { buildOneStoreBasket } from '../src/domain/basket.ts'
 import { m2Store, m2Products } from '../src/data/m2Fixture.ts'
 
-test('original Figma six photos have six unique fully cookable recipes', () => {
-  const titles = ['Thai red curry', 'Quesadillas', 'Fried rice', 'Bao buns', 'Katsu curry', 'Groente pasta']
+test('original Figma photos and the Burrito bowl have unique fully cookable recipes', () => {
+  const titles = ['Thai red curry', 'Quesadillas', 'Fried rice', 'Bao buns', 'Katsu curry', 'Groente pasta', 'Burrito bowl']
   assert.deepEqual(curatedFigmaRecipes.map(r => r.title), titles)
-  assert.equal(new Set(curatedFigmaRecipes.map(r => r.id)).size, 6)
-  assert.equal(new Set([...m2Recipes, ...curatedFigmaRecipes].map(r => r.id)).size, 9)
+  assert.equal(new Set(curatedFigmaRecipes.map(r => r.id)).size, 7)
+  assert.equal(new Set([...m2Recipes, ...curatedFigmaRecipes].map(r => r.id)).size, 10)
   for (const recipe of curatedFigmaRecipes) {
     assert.equal(recipe.source, 'supa-original-recipe')
     assert.equal(recipe.servings, 2)

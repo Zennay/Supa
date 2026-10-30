@@ -13,7 +13,7 @@ import { importLocalRecipeHtmlCollection } from './importLocalRecipeHtmlCollecti
 import { ownRecipeAsMarkdown } from './ownRecipeMarkdown'
 import { prepareRecipeBackupImport, serializeRecipeBackup, type RecipeBackupPreview, RECIPE_BACKUP_MAX_BYTES } from './recipeBackup'
 import { curatedFigmaRecipes } from './curatedFigmaRecipes'
-import { m2InitialPlan } from '../../data/m2Fixture'
+import { appInitialPlan } from '../../data/appPlan'
 import { ownRecipeShoppingChecklist, formatOwnRecipeChecklist } from './recipeShoppingChecklist'
 import { ImportedRecipeGroceriesPanel } from './ImportedRecipeGroceriesPanel'
 import { exportOwnRecipeChecklistCsv } from './recipeShoppingCsv'
@@ -106,7 +106,7 @@ export function RecipeLibrary() {
   const [portionVariantPreview, setPortionVariantPreview] = useState<{
     sourceId: string; sourceSnapshot: string; portions: number; draft: UserRecipeDraft
   } | null>(null)
-  const [plannerDay, setPlannerDay] = useState(m2InitialPlan[0].day)
+  const [plannerDay, setPlannerDay] = useState(appInitialPlan[0].day)
   const [shoppingChecks, setShoppingChecks] = useState<Record<string, boolean>>({})
   const [shoppingOpenOnly, setShoppingOpenOnly] = useState(false)
   const [showShoppingCopy, setShowShoppingCopy] = useState(false)
@@ -496,7 +496,7 @@ export function RecipeLibrary() {
       setMessage('Controleer eerst alle metrische hoeveelheden en hele stuks in dit recept.')
       return
     }
-    if (!m2InitialPlan.some(meal => meal.day === plannerDay)) return
+    if (!appInitialPlan.some(meal => meal.day === plannerDay)) return
     const accepted = window.dispatchEvent(new CustomEvent('supa-plan-own-recipe', {
       cancelable: true,
       detail: { recipeId: recipe.id, day: plannerDay, destination },
@@ -1048,7 +1048,7 @@ export function RecipeLibrary() {
             de bestaande winkelbronimport. Eerdere winkelprijzen worden niet hergebruikt.</p>
           <label className="recipe-collection-label">Dag in Planner
             <select value={plannerDay} onChange={event => setPlannerDay(event.currentTarget.value)}>
-              {m2InitialPlan.map(meal => <option key={meal.day} value={meal.day}>{meal.day}</option>)}
+              {appInitialPlan.map(meal => <option key={meal.day} value={meal.day}>{meal.day}</option>)}
             </select>
           </label>
           {lastImportedIds.map(id => {
@@ -1260,7 +1260,7 @@ export function RecipeLibrary() {
               Eerdere prijsopnames moeten opnieuw passen bij de gewijzigde ingrediënten.</p>
             <label>Planner-dag
               <select value={plannerDay} onChange={event => setPlannerDay(event.currentTarget.value)}>
-                {m2InitialPlan.map(meal => <option value={meal.day} key={meal.day}>{meal.day}</option>)}
+                {appInitialPlan.map(meal => <option value={meal.day} key={meal.day}>{meal.day}</option>)}
               </select>
             </label>
             <button type="button" onClick={() => planOwnRecipe(selected)}>

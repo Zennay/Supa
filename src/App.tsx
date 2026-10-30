@@ -54,7 +54,6 @@ import { saveReplacedPlannerRecipes, missingStoredOwnRecipeSelections } from './
 import { restorePlannerPreferencesWithCustomBudget } from './features/planner/customWeekBudget.ts'
 import { canReplacePlannerRecord, persistPlannerRecord } from './features/planner/plannerStorageGuard.ts'
 import {
-  m2InitialPlan,
   m2Products,
   m2Recipes,
   m2Store,
@@ -66,23 +65,23 @@ import {
   m3CandidateStore,
 } from './data/m3ComparisonFixture'
 
+import { appInitialPlan, appDefaultActiveDays } from './data/appPlan'
+import navHomeActive from './assets/figma/nav/home-active.svg'
+import navPlannerActive from './assets/figma/nav/planner-active.svg'
+import navRecipesActive from './assets/figma/nav/recipes-active.svg'
+import navProductsActive from './assets/figma/nav/products-active.svg'
+import navListActive from './assets/figma/nav/list-active.svg'
+
 type Tab = 'home' | 'recipes' | 'products' | 'planner' | 'basket' | 'list' | 'observe'
 
-const tabs: { id: Tab; label: string; icon: string }[] = [
-  { id: 'home', label: 'Home', icon: figmaAssets.imgVector5 },
-  { id: 'planner', label: 'Planner', icon: figmaAssets.imgButton },
-  { id: 'recipes', label: 'Recepten', icon: figmaAssets.imgButton1 },
-  { id: 'products', label: 'Producten', icon: figmaAssets.imgButton2 },
-  { id: 'list', label: 'Lijst', icon: figmaAssets.imgButton3 },
+const tabs: { id: Tab; label: string; icon: string; activeIcon: string }[] = [
+  { id: 'home', label: 'Home', icon: figmaAssets.productsNavHome, activeIcon: navHomeActive },
+  { id: 'planner', label: 'Planner', icon: figmaAssets.imgButton, activeIcon: navPlannerActive },
+  { id: 'recipes', label: 'Recepten', icon: figmaAssets.imgButton1, activeIcon: navRecipesActive },
+  { id: 'products', label: 'Producten', icon: figmaAssets.imgButton2, activeIcon: navProductsActive },
+  { id: 'list', label: 'Lijst', icon: figmaAssets.imgButton3, activeIcon: navListActive },
 ]
 
-const originalProductNavIcons: Partial<Record<Tab, string>> = {
-  home: figmaAssets.productsNavHome,
-  planner: figmaAssets.productsNavPlanner,
-  recipes: figmaAssets.productsNavRecipes,
-  products: figmaAssets.productsNavProducts,
-  list: figmaAssets.productsNavList,
-}
 
 const plannerStorageKey = 'supa:planner-preferences:v2'
 const chosenProductsStorageKey = 'supa:chosen-products:v1'
@@ -119,19 +118,24 @@ function availableRecipes() {
 
 type PersistenceWarning = 'unavailable' | 'protected' | null
 
+function appDefaultPreferences(): PlannerPreferences {
+  return { ...defaultPlannerPreferences(appInitialPlan), activeDays: [...appDefaultActiveDays] }
+}
+
 function readPlannerPreferences(validRecipeIds = availableRecipes().map(recipe => recipe.id)): {
   preferences: PlannerPreferences
   warning: PersistenceWarning
   raw: string | null
 } {
-  const fallback = defaultPlannerPreferences(m2InitialPlan)
+  const fallback = appDefaultPreferences()
   if (typeof window === 'undefined') {
     return { preferences: fallback, warning: null, raw: null }
   }
   try {
     const raw = window.localStorage.getItem(plannerStorageKey)
-    const restored = restorePlannerPreferencesWithCustomBudget(raw, m2InitialPlan, validRecipeIds)
-    const missing = missingStoredOwnRecipeSelections(raw, m2InitialPlan, validRecipeIds)
+    const restored = raw === null ? appDefaultPreferences()
+      : restorePlannerPreferencesWithCustomBudget(raw, appInitialPlan, validRecipeIds)
+    const missing = missingStoredOwnRecipeSelections(raw, appInitialPlan, validRecipeIds)
     return {
       // Missing OWN recipe IDs remain a read-only, in-memory repair intent.
       // The actual week uses its existing safe temporary built-in fallback
@@ -139,7 +143,7 @@ function readPlannerPreferences(validRecipeIds = availableRecipes().map(recipe =
       preferences: Object.keys(missing).length
         ? { ...restored, recipeByDay: { ...restored.recipeByDay, ...missing } }
         : restored,
-      warning: canReplacePlannerRecord(raw, m2InitialPlan.map((meal) => meal.day), validRecipeIds)
+      warning: canReplacePlannerRecord(raw, appInitialPlan.map((meal) => meal.day), validRecipeIds)
         ? null : 'protected',
       raw,
     }
@@ -287,7 +291,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
     const chosenDays = new Set(assignments.map(pair => pair.day))
     const next: PlannerPreferences = {
       ...current,
-      activeDays: m2InitialPlan.map(meal => meal.day).filter(day =>
+      activeDays: appInitialPlan.map(meal => meal.day).filter(day =>
         current.activeDays.includes(day) || chosenDays.has(day)),
       recipeByDay: { ...current.recipeByDay, ...replacements },
     }
@@ -296,7 +300,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       write: raw => window.localStorage.setItem(plannerStorageKey, raw),
       expectedRaw: storedPlannerRawRef.current,
       nextRaw: serializePlannerPreferences(next),
-      validDays: m2InitialPlan.map(meal => meal.day),
+      validDays: appInitialPlan.map(meal => meal.day),
       validRecipeIds,
     })
     if (result.status !== 'saved') {
@@ -330,7 +334,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         recipeId?: unknown; day?: unknown; destination?: unknown
       }
       if (typeof recipeId !== 'string' || typeof day !== 'string' ||
-          !m2InitialPlan.some(meal => meal.day === day)) {
+          !appInitialPlan.some(meal => meal.day === day)) {
         event.preventDefault()
         return
       }
@@ -365,9 +369,9 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         assignments?: unknown; destination?: unknown
       }
       if (!Array.isArray(assignments) || assignments.length < 1 ||
-          assignments.length > m2InitialPlan.length ||
+          assignments.length > appInitialPlan.length ||
           !['planner', 'list', 'basket'].includes(String(destination))) return deny()
-      const validDays = new Set(m2InitialPlan.map(meal => meal.day))
+      const validDays = new Set(appInitialPlan.map(meal => meal.day))
       const days = new Set<string>()
       const ids = new Set<string>()
       const pairs: { day: string; recipeId: string; recipeSnapshot: string }[] = []
@@ -411,15 +415,15 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   // immediately; never silently persist that fallback or carry forward the
   // old source-price comparison. A deliberate user action can repair it.
   const unavailableSelections = useMemo(
-    () => unavailablePlannerRecipes(preferences, m2InitialPlan, validRecipeIds),
+    () => unavailablePlannerRecipes(preferences, appInitialPlan, validRecipeIds),
     [preferences, recipes],
   )
   const plannedMeals = useMemo(
-    () => previewAvailablePlannerMeals(m2InitialPlan, unavailableSelections, recipeByDay),
+    () => previewAvailablePlannerMeals(appInitialPlan, unavailableSelections, recipeByDay),
     [recipeByDay, unavailableSelections],
   )
   function acceptMissingRecipeReplacements() {
-    const remaining = unavailablePlannerRecipes(preferences, m2InitialPlan, recipes.map(recipe => recipe.id))
+    const remaining = unavailablePlannerRecipes(preferences, appInitialPlan, recipes.map(recipe => recipe.id))
     if (!remaining.length) return
     // A corrupt/unreadable recipe library can masquerade as a deleted
     // private recipe. Never offer an irreversible replacement of its saved
@@ -450,7 +454,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       expectedRaw: lastStoredRaw,
       current: repaired,
       replacements: remaining,
-      validDays: m2InitialPlan.map(meal => meal.day),
+      validDays: appInitialPlan.map(meal => meal.day),
       validRecipeIds: recipes.map(recipe => recipe.id),
     })
     if (result.status !== 'saved') {
@@ -556,7 +560,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       write: (raw) => window.localStorage.setItem(plannerStorageKey, raw),
       expectedRaw: lastStoredRaw,
       nextRaw: serializePlannerPreferences(preferences),
-      validDays: m2InitialPlan.map((meal) => meal.day),
+      validDays: appInitialPlan.map((meal) => meal.day),
       validRecipeIds,
     })
     if (result.status === 'saved') {
@@ -615,7 +619,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   }
 
   const resetPlan = () => {
-    setPreferences(defaultPlannerPreferences(m2InitialPlan))
+    setPreferences(appDefaultPreferences())
   }
 
   return (
@@ -691,7 +695,6 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
           <HiFiHome view="products" onNavigate={navigate} activeDays={activeDays}
             addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />
         </details>}
-        {!isHiFiView && <nav className="hifi-utilities" aria-label="Vergelijken en meten"><button onClick={() => navigate('basket')}>Mand</button><button onClick={() => navigate('observe')}>Meten</button></nav>}
 
         {productSelectionWarning && (tab === 'list' || tab === 'products') && (
           <p role="status" className="disclaimer">
@@ -777,7 +780,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         )}
         {tab === 'planner' && <PlannerPortableWeek
           preferences={preferences}
-          days={m2InitialPlan.map(meal => meal.day)}
+          days={appInitialPlan.map(meal => meal.day)}
           recipeIds={recipes.map(recipe => recipe.id)}
           recipeNames={Object.fromEntries(recipes.map(recipe => [recipe.id, recipe.title]))}
           storageProtected={persistenceWarning !== null}
@@ -973,7 +976,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             aria-current={tab === item.id ? 'page' : undefined}
             onClick={() => navigate(item.id)}
           >
-            <FigmaImage asset={tab === "products" ? (originalProductNavIcons[item.id] ?? item.icon) : item.icon} alt="" />
+            <FigmaImage asset={tab === item.id ? item.activeIcon : item.icon} alt="" />
             <span className="hifi-sr-only">{item.label}</span>
           </button>
         ))}

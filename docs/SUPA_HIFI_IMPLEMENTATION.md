@@ -66,3 +66,13 @@ The M2 Firefox workflow enters Planner from the new Home before replaying all ex
 - Thai red curry krijgt in de Planner (rij + dagcirkel, 50px slots) een uitsnede uit de aangeleverde Planner-export (`src/assets/figma/planner/thai-thumb.png`), omdat de originele export afgekapt is. De receptkaarten (groter formaat) houden de groene fallback tot de originele foto opnieuw is geëxporteerd; Quesadillas idem.
 - Recepten: kop "Recepten" met hartje (favorietenfilter) en zoekveld "Zoek recepten", zoals in Figma; de terugknop is weg omdat Recepten een hoofdtab is.
 - Bewust niet overgenomen: kortingsbadges, "Bespaart €…", doorgestreepte totalen, "bespaar tot 40%", supermarkt-selectie met prijzen en de vaste persoon "Nick Bergen" — dat zijn demo-claims zonder echte prijsdata.
+
+
+## Home/Planner feedback round (30 oktober 2026)
+
+- Home: Weekplanning-kaart is wit (zoals Planner), knop heet "Plan". Nieuw: "Kies je supermarkten" met selecteerbare logo's (Jumbo, Dirk, AH, Lidl, PLUS, Vomar, Aldi, Hoogvliet; keuze wordt lokaal bewaard). Verwijderd: de demo-regel onder het zoekveld en de kaart "Jouw recepten, jouw winkelmand". Koppen: "Recepten" en "Producten".
+- Planner: vijf dagen (Zo–Do, `src/data/appPlan.ts`; `m2InitialPlan` blijft ongewijzigd voor het M2/M3-bewijs), kop "Planning" met Reset-icoon, rijen zonder richtprijs-uitleg maar met "€4,25 p.p." en chevron (opent receptkeuze), ingrediëntafbeeldingen in de overlapstrook. Verwijderd: Mand/Meten-knoppen, bronbudget-kiezer, winkelvergelijking, mand-/weekblokken onder de grote knop.
+- Navigatie: het actieve tabblad is groen (`src/assets/figma/nav/`).
+- Ingrediëntafbeeldingen zijn Twemoji (© Twitter/jdecked, CC-BY 4.0) in `src/assets/ingredients/`.
+- Per-persoonprijzen voor Burrito bowl/Fried rice/Thai red curry/Bao buns komen uit het ontwerp (demo, geen actuele winkelprijzen). De Burrito-bowl-foto is een uitsnede uit de Planner-export en daardoor zacht.
+- Windows-hoofdletterbotsing: `RecipeLibrary.tsx` en `recipeLibrary.ts` (en `PrintableShoppingChecklist`) zijn nu met expliciete extensie geïmporteerd.
