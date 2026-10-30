@@ -28,6 +28,25 @@ function oneDekaProduct(jsonLdBlocks) {
   return products.length === 1 && values.length <= 8 ? products[0] : null
 }
 
+// Deka's historical SSR uses capital Price. Additional price claims are
+// evidence, not harmless metadata: any disagreement or ambiguous range must
+// block this otherwise independently corroborated fallback.
+function consistentOfferPriceEvidence(offer, expectedCents) {
+  if (!data(offer) || offer.priceSpecification !== undefined ||
+      Object.keys(offer).some(key => ['lowprice','highprice'].includes(key.toLowerCase()))) {
+    return false
+  }
+  const prices = Object.entries(offer)
+    .filter(([key]) => key.toLowerCase() === 'price')
+  if (!prices.length || prices.some(([, value]) =>
+      !['number','string'].includes(typeof value) ||
+      normalizeMoneyToCents(String(value)) !== expectedCents)) return false
+  const currencies = Object.entries(offer)
+    .filter(([key]) => key.toLowerCase() === 'pricecurrency')
+  if (!currencies.length || currencies.some(([, value]) => value !== 'EUR')) return false
+  return true
+}
+
 export function parseDekaNuxtFromAuthorizedHtml({ html, provenance, jsonLdBlocks } = {}) {
   try {
     if (typeof html !== 'string' || html.length > 2 * 1024 * 1024 ||
@@ -80,6 +99,7 @@ export function parseDekaNuxtFromAuthorizedHtml({ html, provenance, jsonLdBlocks
     if (!ld || !data(offer) || ld.name !== name ||
         String(ld.mpn) !== expectedId || offer.priceCurrency !== 'EUR' ||
         typeof offer.Price !== 'number' ||
+        !consistentOfferPriceEvidence(offer, cents) ||
         normalizeMoneyToCents(String(offer.Price)) !== cents ||
         (ld['@id'] !== undefined && ld['@id'] !== provenance.url + '#product') ||
         (offer.url !== undefined && offer.url !== provenance.url)) return fail()
@@ -98,4 +118,32 @@ export function parseDekaNuxtFromAuthorizedHtml({ html, provenance, jsonLdBlocks
   } catch {
     return fail()
   }
+}
+
+/**
+ * A fully parseable JSON-LD Offer is not grounds to ignore the same page's
+ * Nuxt product/price. If both claim to describe this Deka SKU, all concrete
+ * product facts must corroborate or we abstain. Missing structured pack/price
+ * may be filled only by the independently matched Nuxt+JSON-LD pair.
+ */
+export function corroborateDekaNuxtProduct({ html, provenance, jsonLdBlocks,
+  structured, nuxtPresent } = {}) {
+  if (!nuxtPresent) return structured
+  const fallback = parseDekaNuxtFromAuthorizedHtml({
+    html, provenance, jsonLdBlocks,
+  })
+  if (fallback.type !== 'observation') return fail()
+  if (structured?.type === 'observation') {
+    const a = structured.observation
+    const b = fallback.observation
+    if (a.name !== b.name ||
+        (a.sourceProductId !== null && a.sourceProductId !== b.sourceProductId) ||
+        (a.currentPriceCents !== null &&
+          a.currentPriceCents !== b.currentPriceCents) ||
+        (a.currency !== null && a.currency !== b.currency) ||
+        (a.availability !== 'unknown' && a.availability !== b.availability) ||
+        (a.pack.amount !== null && (a.pack.amount !== b.pack.amount ||
+          a.pack.unit !== b.pack.unit))) return fail()
+  }
+  return fallback
 }

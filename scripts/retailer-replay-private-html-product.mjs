@@ -6,7 +6,7 @@ import { resolve, dirname } from 'node:path'
 import { assertNoSymlinkedM3OutputParents } from './m3-source-output-preservation.mjs'
 import { readAuthorizedHtmlScriptEvidence } from './retailer-approved-html-script-evidence.mjs'
 import { parseSchemaOrgProductForPage } from '../src/data/schemaOrgProductPageSelection.ts'
-import { parseDekaNuxtFromAuthorizedHtml } from './retailer-approved-deka-nuxt-product.mjs'
+import { corroborateDekaNuxtProduct } from './retailer-approved-deka-nuxt-product.mjs'
 import { proposeOfflineRetailerSelectors } from './retailer-offline-selector-discovery.mjs'
 import { compareOfflineSelectorProposals } from './retailer-private-selector-drift.mjs'
 
@@ -83,13 +83,11 @@ export async function replayPrivateProductHtmlSnapshot(filename) {
   const scripts = readAuthorizedHtmlScriptEvidence(html)
   if (scripts.invalid || scripts.jsonLdBlocks.length > 16) fail()
   let parsed = parseSchemaOrgProductForPage(scripts.jsonLdBlocks, provenance)
-  if (src.retailerId === 'dekamarkt' &&
-      (parsed.type !== 'observation' || parsed.observation.currentPriceCents === null ||
-       parsed.observation.pack.amount === null)) {
-    const alt = parseDekaNuxtFromAuthorizedHtml({
+  if (src.retailerId === 'dekamarkt') {
+    parsed = corroborateDekaNuxtProduct({
       html, provenance, jsonLdBlocks: scripts.jsonLdBlocks,
+      structured: parsed, nuxtPresent: scripts.nuxtPayload !== null,
     })
-    if (alt.type === 'observation') parsed = alt
   }
   const selectors = proposeOfflineRetailerSelectors({
     html, origin: { retailerId: src.retailerId, url: src.url, capturedAt: src.capturedAt },

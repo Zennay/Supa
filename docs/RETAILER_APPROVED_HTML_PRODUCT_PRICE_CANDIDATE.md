@@ -216,3 +216,14 @@ gebruikers ontoegankelijk zijn, beide bestanden moeten slechts een fysieke
 hardlink hebben en hun mode moet eigenaar-only zijn. Hardlinks of publieke
 directorynamen worden geweigerd om dubbele historische herkomstclaims te
 voorkomen.
+
+### Geen tegenstrijdige prijs- of productclaims bij Deka Nuxt en JSON-LD
+
+De DekaMarkt-capture en offline privéreplay verifiëren nu beide gestructureerde
+bronkanalen wanneer Nuxt aanwezig is. Ook een geldige JSON-LD Offer.price
+mag geen afwijkend Nuxt-bedrag, SKU, verpakking of voorraadstatus overschrijven.
+Meerdere casevarianten van Price/price met verschillende bedragen, ambigue
+priceSpecification of lowPrice leiden tot een onbesliste opname.
+Volledig overeenstemmende bronnen blijven alleen een kandidaat voor menselijke
+review, nooit een geverifieerde kassaprijs. Tests zijn synthetisch: geen live
+webshop, geen productieprijs of verzonnen toestemming.

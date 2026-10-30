@@ -13,7 +13,7 @@ import { createHash } from 'node:crypto'
 import { captureApprovedRetailerPage } from './retailer-approved-snapshot-capture.mjs'
 import { readAuthorizedHtmlScriptEvidence } from './retailer-approved-html-script-evidence.mjs'
 import { parseSchemaOrgProductForPage } from '../src/data/schemaOrgProductPageSelection.ts'
-import { parseDekaNuxtFromAuthorizedHtml } from './retailer-approved-deka-nuxt-product.mjs'
+import { corroborateDekaNuxtProduct } from './retailer-approved-deka-nuxt-product.mjs'
 
 const MAX_JSONLD_BLOCKS = 16
 const MAX_CAPTURE_AGE_MS = 24 * 60 * 60 * 1000
@@ -85,17 +85,13 @@ export async function captureApprovedProductPriceCandidate(options = {}) {
   // All blocks are reviewed together: a second conflicting Product cannot be
   // ignored just because the first one offers a temptingly cheap price.
   let parsed = parseSchemaOrgProductForPage(blocks, provenance)
-  // Some Deka SSR pages publish an uppercase JSON-LD Price and put the
-  // physical pack and canonical price in Nuxt. Do not invent a generic
-  // schema.org price; accept only the independently corroborated pair.
-  if (provenance.supermarket === 'dekamarkt' &&
-      (parsed.type !== 'observation' ||
-       parsed.observation.currentPriceCents === null ||
-       parsed.observation.pack.amount === null)) {
-    const fallback = parseDekaNuxtFromAuthorizedHtml({
+  // A valid-looking JSON-LD offer cannot overrule a contradictory same-page
+  // Nuxt price, SKU or physical pack. Corroboration is required both ways.
+  if (provenance.supermarket === 'dekamarkt') {
+    parsed = corroborateDekaNuxtProduct({
       html: captured.html, provenance, jsonLdBlocks: blocks,
+      structured: parsed, nuxtPresent: scripts.nuxtPayload !== null,
     })
-    if (fallback.type === 'observation') parsed = fallback
   }
   if (parsed.type !== 'observation') {
     return unavailable('product_identity_or_price_unverified', captured)

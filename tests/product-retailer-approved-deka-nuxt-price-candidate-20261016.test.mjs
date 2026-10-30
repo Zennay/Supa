@@ -106,3 +106,71 @@ test('Deka real checked-in source grant still refuses network; tests do not auth
   }), /Explicit retailer source permission required/)
   assert.equal(calls, 0)
 })
+
+test('Deka source refuses a lower-case Offer.price that contradicts Nuxt and capital Price', async () => {
+  const ld = structuredClone(fixture.jsonLdProduct)
+  ld.weight = { value: '1 liter' }
+  ld.offers.price = '0.01'
+  const result = await captureApprovedProductPriceCandidate(options(html(undefined, ld)))
+  assert.equal(result.status, 'review_required')
+  assert.equal(result.observation, null)
+})
+
+test('Deka source refuses injected lower-case priceSpecification conflict on trusted Nuxt page', async () => {
+  const ld = structuredClone(fixture.jsonLdProduct)
+  ld.offers.priceSpecification = { '@type': 'UnitPriceSpecification', price: '0.01', priceCurrency: 'EUR' }
+  const result = await captureApprovedProductPriceCandidate(options(html(undefined, ld)))
+  assert.equal(result.status, 'review_required')
+  assert.equal(result.observation, null)
+})
+
+test('fully parseable lower-case JSON-LD must not bypass conflicting Deka Nuxt checkout evidence', async () => {
+  const ld = structuredClone(fixture.jsonLdProduct)
+  ld.weight = { value: '1 liter' }
+  ld.offers.Price = 0.99
+  ld.offers.price = '0.99'
+  const result = await captureApprovedProductPriceCandidate(options(html(undefined, ld)))
+  assert.equal(result.status, 'review_required')
+  assert.equal(result.observation, null)
+})
+
+test('fully parseable JSON-LD with wrong product identity cannot bypass Deka Nuxt', async () => {
+  const ld = structuredClone(fixture.jsonLdProduct)
+  ld.weight = { value: '1 liter' }
+  ld.offers.price = '0.85'
+  ld.mpn = 999999
+  const result = await captureApprovedProductPriceCandidate(options(html(undefined, ld)))
+  assert.equal(result.status, 'review_required')
+  assert.equal(result.observation, null)
+})
+
+test('matching complete Deka JSON-LD and Nuxt retain only corroborated private price', async () => {
+  const ld = structuredClone(fixture.jsonLdProduct)
+  ld.weight = { value: '1 liter' }
+  ld.offers.price = '0.85'
+  const result = await captureApprovedProductPriceCandidate(options(html(undefined, ld)))
+  assert.equal(result.status, 'candidate_needs_review')
+  assert.equal(result.observation.currentPriceCents, 85)
+  assert.equal(result.observation.pack.amount, 1)
+  assert.equal(result.observation.pack.unit, 'l')
+  assert.equal(result.observation.sourceProductId, '115873')
+  assert.equal(result.observation.offer, null)
+  assert.equal(result.published, false)
+})
+
+test('complete schema pack/stock must corroborate Deka Nuxt and cannot silently override it', async () => {
+  const ld = structuredClone(fixture.jsonLdProduct)
+  ld.offers.price = '0.85'
+  ld.weight = { value: '500 ml' }
+  const pack = await captureApprovedProductPriceCandidate(options(html(undefined, ld)))
+  assert.equal(pack.status, 'review_required')
+  assert.equal(pack.observation, null)
+
+  const stock = structuredClone(fixture.jsonLdProduct)
+  stock.offers.price = '0.85'
+  stock.weight = { value: '1 liter' }
+  stock.offers.availability = 'https://schema.org/OutOfStock'
+  const result = await captureApprovedProductPriceCandidate(options(html(undefined, stock)))
+  assert.equal(result.status, 'review_required')
+  assert.equal(result.observation, null)
+})

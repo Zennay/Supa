@@ -396,3 +396,36 @@ test('replay refuses source HTML in publicly listable parent directories', async
   await chmod(parent, 0o755)
   await assert.rejects(replayPrivateProductHtmlSnapshot(original), /refused/)
 })
+
+test('archived Deka HTML never trusts parseable JSON-LD over contradictory Nuxt price', async t => {
+  const dir = await mkdtemp(join(tmpdir(), 'supa-deka-conflict-'))
+  t.after(() => rm(dir, { recursive: true, force: true }))
+  const fixture = JSON.parse(await readFile(new URL(
+    '../fixtures/m1/dekamarkt-product-halfvolle-melk.v1.json', import.meta.url), 'utf8'))
+  const dekaUrl = fixture.source.url
+  const ld = structuredClone(fixture.jsonLdProduct)
+  ld.weight = { value: '1 liter' }
+  ld.offers.Price = 0.99
+  ld.offers.price = '0.99'
+  const markup = '<html><script id="__NUXT_DATA__">' +
+    JSON.stringify(fixture.nuxtPayload) + '</script><script type="application/ld+json">' +
+    JSON.stringify(ld) + '</script></html>'
+  const grantFile = join(dir, 'fictitious-grant.json')
+  const output = join(dir, 'snapshot.html')
+  const fake = structuredClone(gate)
+  fake.sources[1].permissionStatus = 'permitted'
+  fake.sources[1].productionEnabled = true
+  await writeFile(grantFile, JSON.stringify({
+    ...grant, supermarket: 'dekamarkt', sourceUrl: dekaUrl,
+  }), { mode: 0o600 })
+  await download([grantFile, output], {
+    testGateDocument: fake, fetchFn: async () => new Response(markup, {
+      status: 200, headers: { 'content-type': 'text/html' },
+    }), writeOutput() {},
+  })
+  const replay = await replayPrivateProductHtmlSnapshot(output)
+  assert.equal(replay.status, 'unverified_product')
+  assert.equal(replay.observation, null)
+  assert.equal(replay.sourceRightsForPublicationVerified, false)
+  assert.equal(replay.published, false)
+})
