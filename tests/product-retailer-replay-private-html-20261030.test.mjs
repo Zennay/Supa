@@ -64,9 +64,12 @@ test('tampered source, source URL mismatch and exposed private files cannot beco
   const forged = JSON.parse(original)
   forged.source.url = 'https://www.plus.nl/product/other'
   await writeFile(manifestPath, JSON.stringify(forged))
-  const mismatched = await replayPrivateProductHtmlSnapshot(output)
-  assert.equal(mismatched.status, 'unverified_product')
-  assert.equal(mismatched.observation, null)
+  await assert.rejects(replayPrivateProductHtmlSnapshot(output), /refused/)
+  await writeFile(manifestPath, original)
+  const duplicate = original.replace('"schemaVersion": 1,',
+    '"schemaVersion": 1,\n  "schemaVersion": 1,')
+  await writeFile(manifestPath, duplicate)
+  await assert.rejects(replayPrivateProductHtmlSnapshot(output), /refused/)
   await writeFile(manifestPath, original)
   await chmod(output, 0o644)
   await assert.rejects(replayPrivateProductHtmlSnapshot(output), /refused/)

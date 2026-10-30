@@ -62,8 +62,13 @@ export async function replayPrivateProductHtmlSnapshot(filename) {
   if (typeof filename !== 'string' || !filename.endsWith('.html') ||
       filename.length > 512 || filename.trim() !== filename) fail()
   const path = resolve(filename)
-  const manifest = JSON.parse(new TextDecoder('utf-8', { fatal: true })
-    .decode(await privateBytes(path + '.manifest.json', 32_768)))
+  const rawManifest = new TextDecoder('utf-8', { fatal: true })
+    .decode(await privateBytes(path + '.manifest.json', 32_768))
+  let manifest
+  try { manifest = JSON.parse(rawManifest) } catch { fail() }
+  // The approved capture downloader writes this exact canonical serialization.
+  // Reject duplicate JSON keys, ambiguous escaped keys and arbitrary rewrites.
+  if (rawManifest !== JSON.stringify(manifest, null, 2) + '\n') fail()
   const src = admitManifest(manifest)
   const bytes = await privateBytes(path, LIMIT)
   if (bytes.length !== manifest.bytes ||
