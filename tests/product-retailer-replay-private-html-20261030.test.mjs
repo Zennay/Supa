@@ -5,7 +5,7 @@ import { mkdtemp, writeFile, readFile, rm, chmod, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { main as download } from '../scripts/retailer-download-reviewed-source.mjs'
-import { replayPrivateProductHtmlSnapshot, savePrivateOfflineProductReview, compareArchivedPrivateProductSnapshots, savePrivateOfflineReviewBatch, savePrivateOfflineDriftReview, replayPrivateSelectorHtmlSnapshot, comparePrivateSelectorHtmlSnapshots, savePrivateSelectorHtmlReview, savePrivateSelectorDriftReview } from '../scripts/retailer-replay-private-html-product.mjs'
+import { replayPrivateProductHtmlSnapshot, savePrivateOfflineProductReview, compareArchivedPrivateProductSnapshots, savePrivateOfflineReviewBatch, savePrivateOfflineDriftReview, replayPrivateSelectorHtmlSnapshot, comparePrivateSelectorHtmlSnapshots, savePrivateSelectorHtmlReview, savePrivateSelectorDriftReview, savePrivateSelectorStabilityArchive } from '../scripts/retailer-replay-private-html-product.mjs'
 
 const url = 'https://www.plus.nl/product/fictional-flour-123'
 const grant = { supermarket: 'plus', kind: 'product', sourceUrl: url,
@@ -603,4 +603,57 @@ test('CLI selector drift archive refuses overwrite and prints no retailer eviden
   assert.equal((await stat(file)).mode & 0o777, 0o600)
   assert.doesNotMatch(stdout, /Synthetic|www\.plus|product-card|item-card/)
   await assert.rejects(run(process.execPath, args))
+})
+
+test('two PLUS catalog snapshots derive stable selectors only from real supplied HTML bytes', async t => {
+  const source = 'https://www.plus.nl/producten'
+  const original = await archivedSelectorPage(t,'plus','catalog',source,
+    '<article class="product-card"><span class="price-value">SECRET 2,39</span></article>')
+  const variant = await archivedSelectorPage(t,'plus','catalog',source,
+    '<article class="product-card"><span class="price-value">SECRET 2,59</span><h3 class="product-name">Synthetic</h3></article>')
+  const out = original.replace('captured.html','stable-selector-review.json')
+  const summary = await savePrivateSelectorStabilityArchive([original,variant],out)
+  assert.equal(summary.sampleCount,2)
+  assert.equal(summary.stableCandidateCount,2)
+  assert.equal(summary.unstableCandidateCount,2)
+  assert.equal(summary.published,false)
+  assert.equal((await stat(out)).mode & 0o777,0o600)
+  assert.doesNotMatch(JSON.stringify(summary),/price-value|SECRET|www\.plus\.nl|captured\.html/)
+  const saved = JSON.parse(await readFile(out,'utf8'))
+  assert.equal(saved.mode,'offline-private-selector-stability')
+  assert.deepEqual(saved.stableCandidates.map(x=>x.selector).sort(),
+    ['article.product-card','span.price-value'].sort())
+  assert.equal(saved.samples.length,2)
+  assert.ok(saved.samples.every(x=>/^[a-f0-9]{64}$/.test(x.sha256)))
+  assert.equal(saved.automatedSelectorPromotion,false)
+  assert.equal(saved.sourceRightsForPublicationVerified,false)
+  assert.equal(saved.priceExtractionEnabled,false)
+  await assert.rejects(savePrivateSelectorStabilityArchive([original,variant],out),/refused/)
+  await assert.rejects(savePrivateSelectorStabilityArchive([original,original],
+    original.replace('captured.html','duplicate.json')),/refused/)
+  const deka = await archivedSelectorPage(t,'dekamarkt','offers',
+    'https://www.dekamarkt.nl/aanbiedingen','<article class="offer-card"></article>')
+  await assert.rejects(savePrivateSelectorStabilityArchive([original,deka],
+    original.replace('captured.html','mixed-store.json')),/refused/)
+})
+
+test('offline Deka offers selector stability CLI publishes only counts and a 0600 digest receipt', async t => {
+  const url = 'https://www.dekamarkt.nl/aanbiedingen'
+  const a = await archivedSelectorPage(t,'dekamarkt','offers',url,
+    '<article class="offer-card"><span class="price-value">SYNTHETIC 1.99</span></article>')
+  const b = await archivedSelectorPage(t,'dekamarkt','offers',url,
+    '<article class="offer-card"><span class="price-value">SYNTHETIC 2.29</span></article>')
+  const archive = a.replace('captured.html','stable-offers.json')
+  const {execFile}=await import('node:child_process')
+  const {promisify}=await import('node:util')
+  const run=promisify(execFile)
+  const tool=new URL('../scripts/retailer-replay-private-html-product.mjs',import.meta.url).pathname
+  const {stdout}=await run(process.execPath,
+    ['--experimental-strip-types',tool,'--selector-stability',archive,a,b])
+  const receipt=JSON.parse(stdout)
+  assert.equal(receipt.stableCandidateCount,3)
+  assert.equal(receipt.published,false)
+  assert.doesNotMatch(stdout,/offer-card|price-value|SYNTHETIC|dekamarkt\.nl|captured\.html|stable-offers/)
+  assert.equal((await stat(archive)).mode & 0o777,0o600)
+  assert.equal(receipt.archiveSha256,createHash('sha256').update(await readFile(archive)).digest('hex'))
 })

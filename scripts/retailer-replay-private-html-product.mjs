@@ -204,6 +204,63 @@ export async function savePrivateSelectorHtmlReview(htmlFile, reviewFile) {
 }
 
 /**
+ * Cross-snapshot selector stability for ONE retailer and page kind. Each input
+ * must be an independently SHA-bound original private catalog/offer capture.
+ * Stable selectors are evidence-backed proposals, never approved selectors.
+ */
+export async function savePrivateSelectorStabilityArchive(htmlFiles, reviewFile) {
+  const { types: nodeTypes } = await import('node:util')
+  if (nodeTypes.isProxy(htmlFiles) || !Array.isArray(htmlFiles) ||
+      Object.getPrototypeOf(htmlFiles) !== Array.prototype ||
+      htmlFiles.length < 2 || htmlFiles.length > 8) fail()
+  const descriptors = Object.getOwnPropertyDescriptors(htmlFiles)
+  if (Reflect.ownKeys(descriptors).length !== htmlFiles.length + 1) fail()
+  const reports = []
+  const unique = new Set()
+  let retailerId = null, kind = null
+  for (let i = 0; i < htmlFiles.length; i++) {
+    const d = descriptors[i]
+    if (!d || !Object.hasOwn(d, 'value') || typeof d.value !== 'string') fail()
+    const report = await replayPrivateSelectorHtmlSnapshot(d.value)
+    if (retailerId === null) { retailerId = report.source.retailerId; kind = report.source.kind }
+    if (report.source.retailerId !== retailerId || report.source.kind !== kind ||
+        unique.has(report.source.sha256)) fail()
+    unique.add(report.source.sha256)
+    reports.push(report)
+  }
+  const counts = new Map()
+  for (const report of reports) {
+    const seen = new Set()
+    for (const row of report.proposals.selectors) {
+      const key = row.field + '\u0000' + row.selector
+      if (seen.has(key)) continue
+      seen.add(key)
+      const found = counts.get(key)
+      if (found) found.observedInSnapshots++
+      else counts.set(key, {field:row.field, selector:row.selector,
+        observedInSnapshots:1, status:'needs-human-review'})
+    }
+  }
+  const stable = [...counts.values()].filter(row => row.observedInSnapshots === reports.length)
+    .sort((a,b) => a.field.localeCompare(b.field) || a.selector.localeCompare(b.selector))
+  const saved = await writePrivateReviewRecord({
+    schemaVersion:1, mode:'offline-private-selector-stability',
+    status:'human-selector-review-required', retailerId, kind,
+    samples:reports.map(x => ({capturedAt:x.source.capturedAt,
+      sha256:x.source.sha256, sourceUrlSha256:x.source.sourceUrlSha256})),
+    sampleCount:reports.length, stableCandidateCount:stable.length,
+    unstableCandidateCount:counts.size-stable.length, stableCandidates:stable,
+    humanReviewRequired:true, automatedSelectorPromotion:false,
+    readyForIngestion:false, sourceRightsForPublicationVerified:false,
+    priceExtractionEnabled:false, publicSavingsClaimEligible:false,
+    productionEnabled:false, published:false,
+  }, reviewFile)
+  // No raw selectors or source URLs in CLI/stdout/API return.
+  return {...saved, sampleCount:reports.length, stableCandidateCount:stable.length,
+    unstableCandidateCount:counts.size-stable.length}
+}
+
+/**
  * Compare two independently SHA-verified original private HTML snapshots;
  * returns count-only selector drift, never proposed names, HTML or prices.
  */
@@ -386,6 +443,13 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
         console.error('Private catalog/offer selector drift archive refused')
         process.exitCode = 2
       })
+  } else if (args[0] === '--selector-stability' && args.length >= 4 && args.length <= 10) {
+    savePrivateSelectorStabilityArchive(args.slice(2), args[1])
+      .then(result => process.stdout.write(JSON.stringify(result) + '\n'))
+      .catch(() => {
+        console.error('Private offline selector stability review refused')
+        process.exitCode = 2
+      })
   } else if (args.length === 3 && args[0] === '--selectors') {
     savePrivateSelectorHtmlReview(args[1], args[2])
       .then(result => process.stdout.write(JSON.stringify(result) + '\n'))
@@ -429,7 +493,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
         process.exitCode = 2
       })
   } else {
-    console.error('Usage: <product.html> <new-review.json> | --batch <new-batch.json> <product1.html> ... | --drift <old-product.html> <new-product.html> | --drift-save <old-product.html> <new-product.html> <new-drift.json> | --selectors <catalog-or-offers.html> <new-review.json> | --selector-drift <old-page.html> <new-page.html> | --selector-drift-save <old-page.html> <new-page.html> <new-drift.json>')
+    console.error('Usage: <product.html> <new-review.json> | --batch <new-batch.json> <product1.html> ... | --drift <old-product.html> <new-product.html> | --drift-save <old-product.html> <new-product.html> <new-drift.json> | --selector-stability <new-review.json> <page1.html> <page2.html> ... | --selectors <catalog-or-offers.html> <new-review.json> | --selector-drift <old-page.html> <new-page.html> | --selector-drift-save <old-page.html> <new-page.html> <new-drift.json>')
     process.exitCode = 2
   }
 }

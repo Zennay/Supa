@@ -347,3 +347,23 @@ los echt script ná een afgesloten fallbackcontainer wel bruikbaar blijft.
 De parser voert nooit scripts uit en controleert de precieze Nuxt-JSON
 scriptmetadata; echt downloaden/publiceren blijft afhankelijk van de
 ongewijzigde afzonderlijke source-rechten- en reviewgates.
+
+### Selectorstabiliteit over 2–8 reeds vastgelegde catalogus-/aanbiedingspagina's
+
+Een operator kan meerdere afzonderlijke goedgekeurd vastgelegde HTML- en
+SHA-manifestparen van **één supermarkt én één paginatype** vergelijken:
+
+```bash
+node --experimental-strip-types scripts/retailer-replay-private-html-product.mjs \
+  --selector-stability /private/nieuw-stability.json \
+  /private/catalog1.html /private/catalog2.html
+```
+
+De engine herinspecteert *ieder* privébronbestand, weigert dubbele identieke
+HTML-opnamen en gemengde retailers/paginatypen, en bewaart uitsluitend in het
+exclusief gemaakte `0600`-reviewbestand welke CSS-selectors op **alle**
+onderzochte bronopnamen echt zijn aangetroffen. HTML-digests, UTC en gehashte
+bron-URL's verbinden voorstellen met de oorspronkelijke bestanden; afwijkende
+selectors worden geaggregeerd geteld. Stdout bevat slechts aantallen en SHA
+van het private archief. Geen voorgestelde selector wordt automatisch
+gepromoveerd, geen prijs gepubliceerd, geen HTTP-verzoek uitgevoerd.
