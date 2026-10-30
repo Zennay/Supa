@@ -416,3 +416,36 @@ test('PLUS and Deka link selectors require genuine observed store product paths,
   assert.equal(deka.published, undefined)
   assert.equal(deka.readyForIngestion, false)
 })
+
+test('same-merchant absolute and protocol-relative observed item links produce actual CSS selectors only', () => {
+  const html = [
+    '<a href="https://www.plus.nl/product/fictional-11">Valid absolute</a>',
+    '<a href="//www.plus.nl/product/fictional-22">Valid scheme-relative</a>',
+    '<a href="https://www.dekamarkt.nl/producten/foreign-33">Wrong merchant</a>',
+    '<a href="https://www.plus.nl/product/">Catalog root</a>',
+    '<a href="https://www.plus.nl/product/../admin">Traversal</a>',
+    '<a href="http://www.plus.nl/product/fictional-44">Wrong scheme</a>',
+    '<a href="https://other.example/product/fictional-55">Foreign host</a>',
+  ].join('')
+  const result = proposeOfflineRetailerSelectors({html, origin})
+  assert.equal(result.selectors.find(x =>
+    x.selector === 'a[href^="https://www.plus.nl/product/"]')?.instances, 1)
+  assert.equal(result.selectors.find(x =>
+    x.selector === 'a[href^="//www.plus.nl/product/"]')?.instances, 1)
+  assert.equal(result.selectors.some(x => x.selector === 'a[href^="/product/"]'), false)
+  assert.equal(result.selectors.length, 2)
+  assert.equal(result.readyForIngestion, false)
+
+  const deka = proposeOfflineRetailerSelectors({
+    html: '<a href="https://www.dekamarkt.nl/producten/fictional-123">Deka absolute</a>' +
+      '<a href="//www.dekamarkt.nl/producten/fictional-456">Deka scheme relative</a>' +
+      '<a href="https://www.plus.nl/product/foreign-1">Other store</a>',
+    origin: { ...origin, retailerId: 'dekamarkt',
+      url: 'https://www.dekamarkt.nl/producten' },
+  })
+  assert.equal(deka.selectors.length, 2)
+  assert.equal(deka.selectors.some(x =>
+    x.selector === 'a[href^="https://www.dekamarkt.nl/producten/"]'), true)
+  assert.equal(deka.selectors.some(x =>
+    x.selector === 'a[href^="//www.dekamarkt.nl/producten/"]'), true)
+})
