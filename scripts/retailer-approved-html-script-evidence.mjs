@@ -60,6 +60,12 @@ export function readAuthorizedHtmlScriptEvidence(html, sourceUrl = undefined) {
   try {
     const scanned = scanOfflineRetailerMarkup(html, { includeScripts: true })
     if (scanned.hasMetaRefresh) return invalid()
+    // Direct parsing of HTML with authoritative page identity must carry a
+    // source URL. Otherwise no caller can prove the base/canonical belongs
+    // to the retailer, even if the embedded Product JSON looks plausible.
+    if (sourceUrl === undefined &&
+        (scanned.baseHrefs.length || scanned.canonicalHrefs.length))
+      return invalid()
     // All capture/replay price paths supply the exact SHA-bound source URL.
     // A foreign live canonical/base may not be treated as retailer price.
     if (sourceUrl !== undefined &&

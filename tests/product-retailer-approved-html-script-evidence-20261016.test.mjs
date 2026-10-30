@@ -354,3 +354,17 @@ test('visible meta refresh prevents trusting JSON-LD prices even if markup conta
   assert.equal(inert.invalid,false)
   assert.equal(inert.jsonLdBlocks.length,0) // JSON-LD inside inert template is not executable
 })
+
+test('standalone script evidence requires provenance to verify declared page identity',()=>{
+  const html='<html><head><link rel="canonical" href="'+plusUrl+'">' +
+    '<script type="application/ld+json">'+JSON.stringify(plusProduct) +
+    '</script></head><body></body></html>'
+  assert.equal(readAuthorizedHtmlScriptEvidence(html).invalid,true)
+  const linked=readAuthorizedHtmlScriptEvidence(html,plusUrl)
+  assert.equal(linked.invalid,false)
+  assert.equal(linked.jsonLdBlocks.length,1)
+  assert.equal(readAuthorizedHtmlScriptEvidence(html,
+    'https://www.dekamarkt.nl/producten/fictional-123').invalid,true)
+  const noDeclared=html.replace('<link rel="canonical" href="'+plusUrl+'">','')
+  assert.equal(readAuthorizedHtmlScriptEvidence(noDeclared).invalid,false)
+})
