@@ -9,21 +9,17 @@ import { readAuthorizedHtmlScriptEvidence } from './retailer-approved-html-scrip
 import { parseSchemaOrgProductForPage } from '../src/data/schemaOrgProductPageSelection.ts'
 import { corroborateDekaNuxtProduct } from './retailer-approved-deka-nuxt-product.mjs'
 import { proposeOfflineRetailerSelectors } from './retailer-offline-selector-discovery.mjs'
-import { ambiguousRetailerRoute } from './retailer-source-route-safety.mjs'
+import { ambiguousRetailerRoute, isAllowedM1RetailerSourcePath } from './retailer-source-route-safety.mjs'
 import { compareOfflineSelectorProposals } from './retailer-private-selector-drift.mjs'
 
 const LIMIT = 2 * 1024 * 1024
 const HOST = Object.freeze({ plus: 'www.plus.nl', dekamarkt: 'www.dekamarkt.nl' })
-const CAPTURE_ROUTES = Object.freeze({
-  plus: { product: '/product/', catalog: '/producten', offers: '/aanbiedingen' },
-  dekamarkt: { product: '/producten/', catalog: '/producten/', offers: '/aanbiedingen' },
-})
+const CAPTURE_KINDS = new Set(['product','catalog','offers'])
+// A private replay must never reinterpret the route validated by the actual
+// authorized capture. In particular, Deka's canonical catalog /producten
+// is an approved listing root (and not a product detail), even without /.
 function allowedCaptureRoute(source, url) {
-  const prefix = CAPTURE_ROUTES[source.retailerId]?.[source.kind]
-  if (!prefix) return false
-  return prefix.endsWith('/') ? url.pathname.startsWith(prefix) &&
-    (source.kind !== 'product' || url.pathname.length > prefix.length) :
-    url.pathname === prefix || url.pathname.startsWith(prefix + '/')
+  return isAllowedM1RetailerSourcePath(source.retailerId,source.kind,url.pathname)
 }
 
 const fail = () => { throw Error('Private source replay refused: untrusted HTML or manifest') }
@@ -55,7 +51,7 @@ function admitManifest(record) {
       record.selectorReviewComplete !== false || record.releaseReady !== false ||
       record.publicSavingsClaimEligible !== false ||
       !record.source || !Object.hasOwn(HOST, record.source.retailerId) ||
-      !Object.hasOwn(CAPTURE_ROUTES[record.source.retailerId], record.source.kind) ||
+      !CAPTURE_KINDS.has(record.source.kind) ||
       typeof record.source.url !== 'string' ||
       typeof record.source.capturedAt !== 'string' ||
       typeof record.source.sha256 !== 'string' ||

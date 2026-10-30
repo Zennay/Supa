@@ -567,3 +567,17 @@ test('private synthetic HTML cannot copy SKU/price-bearing custom element tag na
     assert.equal((await verifyPrivateSyntheticHtmlFixture(filename,out)).verified,true)
   }
 })
+
+test('Deka canonical catalog root accepted by shared source capture route replays into SHA-private HTML',async t=>{
+  const {filename,dir,capture}=await archive(t,'dekamarkt','catalog')
+  assert.equal(capture.source.url,'https://www.dekamarkt.nl/producten')
+  const original=await replayPrivateSelectorHtmlSnapshot(filename)
+  assert.equal(original.source.kind,'catalog')
+  const out=join(dir,'deka-root-reviewed')
+  const created=await buildPrivateSyntheticHtmlFixture(filename,out)
+  assert.equal(created.created,true)
+  const manifest=JSON.parse(await readFile(join(out,'provenance.json'),'utf8'))
+  assert.equal(manifest.source.sha256,capture.source.sha256)
+  assert.equal(manifest.productionEnabled,false)
+  assert.equal((await verifyPrivateSyntheticHtmlFixture(filename,out)).verified,true)
+})
