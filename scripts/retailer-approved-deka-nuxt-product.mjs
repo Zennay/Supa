@@ -73,6 +73,15 @@ export function parseDekaNuxtFromAuthorizedHtml({ html, provenance, jsonLdBlocks
         !/^[a-f0-9]{64}$/.test(provenance.sha256) ||
         createHash('sha256').update(html,'utf8').digest('hex') !== provenance.sha256)
       return fail()
+    // A directly replayed price needs real historical UTC provenance.
+    // Date.parse normalizes nonexistent civil days (e.g. February 30).
+    const capturedAt = provenance.capturedAt
+    if (typeof capturedAt !== 'string' ||
+        !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,9})?Z$/.test(capturedAt)) return fail()
+    const instant = Date.parse(capturedAt)
+    if (!Number.isFinite(instant) || instant > Date.now() ||
+        new Date(instant).toISOString().slice(0,19) !== capturedAt.slice(0,19))
+      return fail()
     const scriptEvidence = readAuthorizedHtmlScriptEvidence(html, provenance.url)
     const values = scriptEvidence.nuxtPayload
     if (scriptEvidence.invalid || !values) return fail()

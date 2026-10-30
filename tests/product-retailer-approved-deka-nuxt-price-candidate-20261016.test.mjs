@@ -261,3 +261,19 @@ test('direct Deka corroboration does not trust a caller that hides present Nuxt 
     jsonLdBlocks:[fixture.jsonLdProduct],structured,nuxtPresent:false})
   assert.equal(result.type,'abstain')
 })
+
+test('standalone Deka HTML fallback refuses impossible and future source capture clocks', async () => {
+  const { parseDekaNuxtFromAuthorizedHtml } = await import('../scripts/retailer-approved-deka-nuxt-product.mjs')
+  const { createHash } = await import('node:crypto')
+  const page=html()
+  const baseline={supermarket:'dekamarkt',kind:'product',url,
+    capturedAt:time,sha256:createHash('sha256').update(page).digest('hex')}
+  for(const capturedAt of [
+    '2026-02-30T12:00:00Z','2025-02-29T12:00:00Z',
+    '2035-01-01T12:00:00Z','2026-10-30T25:00:00Z',
+  ]) {
+    const parsed=parseDekaNuxtFromAuthorizedHtml({html:page,
+      provenance:{...baseline,capturedAt},jsonLdBlocks:[fixture.jsonLdProduct]})
+    assert.equal(parsed.type,'abstain',capturedAt)
+  }
+})
