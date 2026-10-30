@@ -22,6 +22,16 @@ const scalar = (values, ref) => {
   const value = deref(values, ref)
   return ['string', 'number', 'boolean'].includes(typeof value) ? value : null
 }
+const SCHEMA_CONTEXT = new Set(['https://schema.org',
+  'https://schema.org/', 'http://schema.org', 'http://schema.org/'])
+function knownSchemaContext(context) {
+  if (typeof context === 'string') return SCHEMA_CONTEXT.has(context)
+  if (Array.isArray(context))
+    return context.length > 0 && context.every(knownSchemaContext)
+  return data(context) && Object.keys(context).length === 1 &&
+    SCHEMA_CONTEXT.has(context['@vocab'])
+}
+
 function oneDekaProduct(jsonLdBlocks) {
   // Deka's historical product page supplied a single flat JSON-LD Product
   // document. Graphs or multiple products must be independently reviewed.
@@ -29,7 +39,9 @@ function oneDekaProduct(jsonLdBlocks) {
   // Additional JSON-LD graphs may contain a contradictory Product even when
   // one flat Product already corroborates Nuxt. Do not silently ignore them.
   if (values.length > 8 || values.some(value =>
-      !data(value) || Object.hasOwn(value,'@graph'))) return null
+      !data(value) || Object.hasOwn(value,'@graph') ||
+      (Object.hasOwn(value,'@context') &&
+        !knownSchemaContext(value['@context'])))) return null
   const products = values.filter(value => value['@type'] === 'Product')
   return products.length === 1 ? products[0] : null
 }

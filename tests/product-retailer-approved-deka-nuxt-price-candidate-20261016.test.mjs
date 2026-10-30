@@ -310,3 +310,14 @@ test('direct Deka corroboration without Nuxt cannot publish caller-forged struct
     structured:claimed,nuxtPresent:false})
   assert.notEqual(result.observation?.currentPriceCents,1)
 })
+
+test('Deka fallback refuses product-shaped JSON-LD from a foreign vocabulary', async () => {
+  for(const context of ['https://malicious.invalid/schema',
+    {'@vocab':'https://malicious.invalid/'},null]) {
+    const invalid=structuredClone(fixture.jsonLdProduct)
+    invalid['@context']=context
+    const result=await captureApprovedProductPriceCandidate(options(html(fixture.nuxtPayload,invalid)))
+    assert.equal(result.status,'review_required',JSON.stringify(context))
+    assert.equal(result.observation,null)
+  }
+})
