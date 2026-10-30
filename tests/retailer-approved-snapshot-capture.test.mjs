@@ -182,3 +182,28 @@ test('impossible Gregorian UTC provenance is rejected before fetch', async () =>
   assert.equal(valid.published, false)
   assert.equal(calls, 1)
 })
+
+
+test('bounded capture cancels oversized network stream and refuses empty successful HTML', async () => {
+  let cancelled = 0
+  let pulls = 0
+  const body = new ReadableStream({
+    pull(controller) {
+      pulls++
+      controller.enqueue(new Uint8Array(1024 * 1024))
+    },
+    cancel() { cancelled++ },
+  })
+  await assert.rejects(captureApprovedRetailerPage({
+    source, permissionGate: gate, grant,
+    fetchFn: async () => new Response(body, {status: 200,
+      headers: {'content-type': 'text/html'}}),
+  }), /exceeds size budget/)
+  assert.equal(cancelled, 1)
+  assert.equal(pulls >= 3, true)
+  await assert.rejects(captureApprovedRetailerPage({
+    source, permissionGate: gate, grant,
+    fetchFn: async () => new Response('', {status: 200,
+      headers: {'content-type': 'text/html'}}),
+  }), /Empty HTML capture refused/)
+})
