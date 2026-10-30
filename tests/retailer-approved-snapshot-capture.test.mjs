@@ -901,3 +901,23 @@ test('raw source authority must not be rewritten by URL hostname percent or IDNA
     }
   }
 })
+
+
+test('raw HTML source URLs cannot launder control-byte aliases through URL normalization', async () => {
+  const aliases = [
+    'https:\t//www.plus.nl/producten',
+    'https://www.plus.\tnl/producten',
+    '/producten\n',
+    'https://www.plus.nl/producten\r',
+  ]
+  for (const alias of aliases) {
+    assert.equal(new URL(alias, url).href, url)
+    for (const tag of ['base', 'link rel="canonical"']) {
+      const html = '<html><head><' + tag + ' href="' + alias + '"></head><body>SYNTHETIC</body></html>'
+      await assert.rejects(captureApprovedRetailerPage({
+        source, permissionGate: gate, grant,
+        fetchFn: async () => new Response(html, { status: 200, headers: { 'content-type': 'text/html' } }),
+      }), /Untrusted HTML/, JSON.stringify(alias))
+    }
+  }
+})

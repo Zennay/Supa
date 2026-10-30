@@ -115,6 +115,9 @@ function checkedTarget(source) {
 // dot variants before comparing origins. A reviewed source must name the
 // literal retailer authority, not an equivalent-looking alias.
 function exactRawRetailerAuthority(raw, target) {
+  // The WHATWG parser strips CR/LF/TAB and edge C0 bytes from URLs.
+  // Such raw aliases are never direct evidence of the reviewed source.
+  if (/[\x00-\x1f\x7f]/.test(raw)) return false
   const match = /^(?:[a-z][a-z0-9+.-]*:)?\/\/([^/?#]*)/i.exec(raw)
   return !match || match[1].toLowerCase() === new URL(target).host.toLowerCase()
 }
