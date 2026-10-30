@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {scanOfflineRetailerMarkup} from '../scripts/retailer-offline-structural-scan.mjs'
+import {proposeOfflineRetailerSelectors} from '../scripts/retailer-offline-selector-discovery.mjs'
 
 const capture = json => '<html><head><script type="application/ld+json">'+
   JSON.stringify(json)+'</script></head><body><article class="product-card"></article></body></html>'
@@ -48,4 +49,38 @@ test('foreign nested ListItem.item type never promotes a product signal',()=>{
     '@type':'ItemList',itemListElement:[{'@type':'ListItem',position:1,
       item:{'@context':'https://foreign.invalid/','@type':'Product'}}]})
   assert.equal(scanOfflineRetailerMarkup(html).structuredSignals.schemaOrgProduct,false)
+})
+
+test('observed live Schema.org Product microdata supplies a non-JSON-LD product hint',()=>{
+  const html='<article itemscope itemtype="https://schema.org/Product">'+
+    '<span itemprop="name">SYNTHETIC PRODUCT</span></article>'
+  const report=scanOfflineRetailerMarkup(html)
+  assert.equal(report.structuredSignals.schemaOrgProduct,true)
+  assert.equal(report.structuredSignals.jsonLd,false)
+})
+for(const html of [
+  '<article itemtype="https://schema.org/Product">Mock</article>',
+  '<article itemscope itemtype="https://foreign.invalid/Product">Mock</article>',
+  '<article itemscope itemtype="https://schema.org/Product https://foreign.invalid/Product">Mock</article>',
+  '<template><article itemscope itemtype="https://schema.org/Product">Hidden</article></template>'
+]) {
+  test('untrusted or inert Product microdata cannot claim official structure '+html.slice(0,40),()=>{
+    const report=scanOfflineRetailerMarkup(html)
+    assert.equal(report.structuredSignals.schemaOrgProduct,false)
+  })
+}
+
+test('observed retailer microdata reaches private selector proposal without price approval',()=>{
+  const html='<html><body><article class="product-card" itemscope '+
+    'itemtype="https://schema.org/Product"><span itemprop="name">SYNTHETIC</span>'+
+    '</article></body></html>'
+  const report=proposeOfflineRetailerSelectors({html,origin:{
+    retailerId:'plus',url:'https://www.plus.nl/producten',
+    capturedAt:'2026-10-14T12:00:00.000Z'}})
+  assert.equal(report.structuredSignals.schemaOrgProduct,true)
+  assert.equal(report.structuredSignals.jsonLd,false)
+  assert.equal(report.readyForIngestion,false)
+  assert.equal(report.permissionVerified,false)
+  assert.equal(report.productionEnabled,false)
+  assert.equal(report.publicSavingsClaimEligible,false)
 })

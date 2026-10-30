@@ -197,6 +197,19 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
       }
     }
     if (!suppressed && !HIDDEN.has(tag) && tag !== 'script') {
+      // Schema.org microdata is an observed DOM alternative to JSON-LD.
+      // Only explicit live itemscope + exact official itemtype is a product
+      // hint. Never infer an item from similarly named foreign vocabularies.
+      if (values.has('itemscope') && typeof values.get('itemtype') === 'string') {
+        const types = values.get('itemtype').trim().split(/[ \t\n\f\r]+/);
+        const official = new Set(['https://schema.org/Product',
+          'http://schema.org/Product','https://schema.org/Thing',
+          'http://schema.org/Thing']);
+        if (types.includes('https://schema.org/Product') ||
+            types.includes('http://schema.org/Product')) {
+          if (types.every(type => official.has(type))) signals.schemaOrgProduct=true;
+        }
+      }
       // Retain the *actual* start tag only. Never reinterpret its attributes
       // as independent HTML elements, even if they contain "<span ...>".
       visible.push(html.slice(start, end + 1));
