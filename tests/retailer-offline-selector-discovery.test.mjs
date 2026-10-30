@@ -1224,3 +1224,16 @@ test('source-observed HTML named lowbar references make real price CSS discovera
     assert.equal(seen.productionEnabled,false)
   }
 })
+
+test('HTML-encoded and literal underscore former price labels cannot become current-price source evidence',()=>{
+  for(const wrapper of ['old_price','old&lowbar;price','previous_price','price_before','was_price','original_price']){
+    const html='<article class="product-card"><div class="'+wrapper+'">'+
+      '<span class="price_value" itemprop="price">SYNTHETIC_OLD</span></div></article>'
+    for(const [retailerId,url] of [['plus','https://www.plus.nl/producten'],['dekamarkt','https://www.dekamarkt.nl/aanbiedingen']]) {
+      const report=proposeOfflineRetailerSelectors({html,origin:{...origin,retailerId,url}})
+      assert.equal(report.selectors.some(x=>x.field==='price'),false,retailerId+' '+wrapper)
+      assert.ok(report.selectors.some(x=>x.field==='offer'&&x.selector==='div.'+wrapper.replace('&lowbar;','_')),retailerId+' '+wrapper)
+      assert.equal(report.productionEnabled,false)
+    }
+  }
+})

@@ -11,6 +11,10 @@ export const PUBLIC_OBSERVED_TOKEN_FIELDS = Object.freeze({
   // Source-observed old/was/before price labels are NOT a live price quote.
   'old-price':'offer', 'price-old':'offer', 'price-before':'offer',
   'previous-price':'offer', 'was-price':'offer', 'original-price':'offer',
+  // CSS frameworks often encode the same historical price labels with an
+  // underscore. These remain *former* prices, never live checkout quotes.
+  'old_price':'offer', 'price_old':'offer', 'price_before':'offer',
+  'previous_price':'offer', 'was_price':'offer', 'original_price':'offer',
   'offer-card':'offer', 'offer-label':'offer',
   'stock-label':'availability', 'stock-availability':'availability',
 })
@@ -20,5 +24,6 @@ export const isFormerPriceTag = tag => tag === 'del' || tag === 's' || tag === '
 
 const FORMER_PRICE_TOKENS = new Set([
   'old-price','price-old','price-before','previous-price','was-price','original-price',
+  'old_price','price_old','price_before','previous_price','was_price','original_price',
 ])
 export const isFormerPriceToken = token => FORMER_PRICE_TOKENS.has(token)
