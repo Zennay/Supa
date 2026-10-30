@@ -216,3 +216,35 @@ test('M1 imported source refuses symbolic HTML file with a valid-looking hash', 
     await assert.rejects(proposeFromM1CaptureDirectory(dir),/symlink path components not allowed/)
   } finally {await rm(dir,{recursive:true,force:true})}
 })
+
+test('pinned M1 manifest refuses duplicate or Unicode-aliased source identity keys', async () => {
+  const dir=await mkdtemp(join(tmpdir(),'supa-m1-duplicate-provenance-'))
+  try {
+    await mkdir(join(dir,'plus'))
+    await writeFile(join(dir,'plus','fictional-plus-catalog.html'),plusHtml)
+    const manifest=join(dir,'manifest.json')
+    const data={sourceCount:1,results:[{
+      ...source('plus','catalog',plusHtml),success:true,
+      finalUrl:'https://www.plus.nl/producten',
+    }]}
+    const valid=JSON.stringify(data)
+    assert.equal((await proposeAfter(valid)).analyzedSources,1)
+    const suspicious=[
+      valid.replace('"sourceCount":1','"sourceCount":1,"sourceCount":1'),
+      valid.replace('"sourceCount":1','"sourceCount":1,"\\u0073ourceCount":1'),
+      valid.replace('"sha256":"','"sha256":"'+ '0'.repeat(64)+'","sha256":"'),
+      valid.replace('"requestedUrl":"','"requestedUrl":"https://attacker.invalid","requestedUrl":"'),
+    ]
+    for (const raw of suspicious) {
+      await writeFile(manifest,raw)
+      await assert.rejects(proposeFromM1CaptureDirectory(dir),
+        /Offline selector review refused:/)
+    }
+    await writeFile(manifest,valid)
+    assert.equal((await proposeFromM1CaptureDirectory(dir)).analyzedSources,1)
+    async function proposeAfter(raw) {
+      await writeFile(manifest,raw)
+      return proposeFromM1CaptureDirectory(dir)
+    }
+  } finally {await rm(dir,{recursive:true,force:true})}
+})
