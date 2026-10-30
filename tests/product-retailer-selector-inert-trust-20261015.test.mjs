@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createHash } from 'node:crypto'
+import { isAllowedM1RetailerSourcePath } from '../scripts/retailer-source-route-safety.mjs'
 import { proposeRetailerSelectors } from '../scripts/retailer-snapshot-selector-proposals.mjs'
 
 function capture(html, at='2026-10-04T12:00:00Z') {
@@ -87,4 +88,22 @@ test('source URLs with credentials remain forbidden with no secret echo',()=>{
   const s=capture(html)
   s.requestedUrl='https://fake:FAKE_SECRET@www.plus.nl/producten'
   assert.throws(()=>proposeRetailerSelectors(s,html),/Offline selector review refused/)
+})
+
+test('M1 shared storefront source route gate matches both retailer capture families',()=>{
+  for(const [store,kind,path] of [
+    ['plus','product','/product/synthetic-42'],
+    ['plus','catalog','/producten'],['plus','catalog','/producten/'],
+    ['plus','offers','/aanbiedingen'],
+    ['dekamarkt','product','/producten/synthetic-42'],
+    ['dekamarkt','catalog','/producten/synthetic-catalog'],
+    ['dekamarkt','offers','/aanbiedingen'],
+  ]) assert.equal(isAllowedM1RetailerSourcePath(store,kind,path),true,path)
+  for(const [store,kind,path] of [
+    ['plus','product','/product/'],['plus','catalog','/checkout'],
+    ['plus','product','/product/%2fcheckout'],
+    ['dekamarkt','product','/producten/'],
+    ['dekamarkt','offers','/mijn-account'],
+    ['dekamarkt','product','/producten/%252fadmin'],
+  ]) assert.equal(isAllowedM1RetailerSourcePath(store,kind,path),false,path)
 })

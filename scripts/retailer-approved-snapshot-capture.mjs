@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { types as nodeTypes } from 'node:util'
 import { evaluateSourcePermissionGate } from './m1-check-source-permission-gate.mjs'
 import { scanOfflineRetailerMarkup } from './retailer-offline-structural-scan.mjs'
-import { ambiguousRetailerRoute } from './retailer-source-route-safety.mjs'
+import { ambiguousRetailerRoute, isAllowedM1RetailerSourcePath } from './retailer-source-route-safety.mjs'
 
 /**
  * A direct approved capture must not rely on getter/proxy fields that can
@@ -86,46 +86,27 @@ function inertCaptureRequest(options) {
 const MAX_BODY_BYTES = 2 * 1024 * 1024
 const TIMEOUT_MS = 10000
 const ROUTES = Object.freeze({
-  plus: {
-    host: 'www.plus.nl',
-    product: ['/product/'],
-    catalog: ['/producten', '/producten/'],
-    offers: ['/aanbiedingen', '/aanbiedingen/'],
-  },
-  dekamarkt: {
-    host: 'www.dekamarkt.nl',
-    product: ['/producten/'],
-    catalog: ['/producten/'],
-    offers: ['/aanbiedingen', '/aanbiedingen/'],
-  },
+  plus: {host:'www.plus.nl'},
+  dekamarkt: {host:'www.dekamarkt.nl'},
 })
 
 function checkedTarget(source) {
   if (!source || typeof source !== 'object') throw new Error('Missing source')
   const config = Object.hasOwn(ROUTES, source.supermarket) ? ROUTES[source.supermarket] : null
-  if (!config || !Object.hasOwn(config, source.kind)) {
+  if (!config || !['product','catalog','offers'].includes(source.kind)) {
     throw new Error('Retailer or capture type has no explicit adapter allowlist')
   }
   let target
   try { target = new URL(source.url) } catch { throw new Error('Malformed retailer source URL') }
-  // Product routes must identify an item, never an empty catalog root.
-  const route = config[source.kind].some(prefix =>
-    (source.kind !== 'product' && target.pathname === prefix) || (
-      prefix.endsWith('/') && target.pathname.startsWith(prefix) &&
-      (source.kind !== 'product' || (
-        target.pathname.length > prefix.length &&
-        target.pathname[prefix.length] !== '/'
-      ))
-    ))
+  // Preserve explicit error and reject before any transport is invoked.
+  if (ambiguousRetailerRoute(target.pathname))
+    throw new Error('Ambiguous retailer capture route')
+  const route=isAllowedM1RetailerSourcePath(
+    source.supermarket,source.kind,target.pathname)
   if (target.protocol !== 'https:' || target.hostname !== config.host ||
       target.port || target.username || target.password ||
       target.search || target.hash || target.href !== source.url || !route) {
     throw new Error('Retailer source outside exact approved HTTPS route')
-  }
-  // Encoded separators and dot segments can be interpreted differently by
-  // an upstream router/proxy. A source grant must map to one unambiguous path.
-  if (ambiguousRetailerRoute(target.pathname)) {
-    throw new Error('Ambiguous retailer capture route')
   }
   return target.href
 }

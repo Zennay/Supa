@@ -1,4 +1,4 @@
-import { ambiguousRetailerRoute } from './retailer-source-route-safety.mjs'
+import { ambiguousRetailerRoute, isAllowedM1RetailerSourcePath } from './retailer-source-route-safety.mjs'
 import { scanOfflineRetailerMarkup } from './retailer-offline-structural-scan.mjs'
 import { proposeOfflineRetailerSelectors, summarizeOfflineSelectorProposals, assertObservedRetailerHtmlIdentity, openingTags } from './retailer-offline-selector-discovery.mjs'
 import { parseUniqueKeyRetailerJson } from './retailer-private-unique-key-json.mjs'
@@ -52,29 +52,6 @@ function mapCandidateFields(suggestions) {
       })),
   ]))
 }
-// Historical M1 archives must obey the same explicit storefront route
-// families as current approved capture. URL host alone never proves a
-// product, catalog or offers source, especially on checkout/account paths.
-function approvedHistoricalRoute(supermarket, kind, path) {
-  if (ambiguousRetailerRoute(path)) return false
-  const route = (prefix, allowRoot) =>
-    (allowRoot && path === prefix.slice(0, -1)) ||
-    (allowRoot && path === prefix) ||
-    path.startsWith(prefix) && path.length > prefix.length &&
-      path[prefix.length] !== '/'
-  if (supermarket === 'plus') {
-    if (kind === 'product') return route('/product/', false)
-    if (kind === 'catalog') return route('/producten/', true)
-    if (kind === 'offers') return route('/aanbiedingen/', true)
-  }
-  if (supermarket === 'dekamarkt') {
-    if (kind === 'product') return route('/producten/', false)
-    if (kind === 'catalog') return route('/producten/', true)
-    if (kind === 'offers') return route('/aanbiedingen/', true)
-  }
-  return false
-}
-
 function validCapture(source, requireHash = true) {
   // Archived manifests are untrusted input, not objects allowed to execute
   // caller-supplied Proxy descriptor traps during provenance validation.
@@ -108,7 +85,7 @@ function validCapture(source, requireHash = true) {
   let url
   try { url = new URL(urlValue) } catch { reject('invalid source URL') }
   if (url.href !== urlValue ||
-      !approvedHistoricalRoute(supermarket,kind,url.pathname) ||
+      !isAllowedM1RetailerSourcePath(supermarket,kind,url.pathname) ||
       url.protocol !== 'https:' || url.hostname !== HOSTS[supermarket] ||
       url.port || url.username || url.password || url.search || url.hash) {
     reject('unapproved source host, URL or credentials')
