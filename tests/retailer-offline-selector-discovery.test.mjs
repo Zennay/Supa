@@ -39,6 +39,25 @@ test('proposes per-retailer candidate selectors from bounded synthetic HTML with
   assert.equal(sample, original)
 })
 
+test('historical retailer snapshots require observed allowed storefront routes', () => {
+  for (const retailerId of ['plus','dekamarkt']) {
+    const host = retailerId === 'plus' ? 'www.plus.nl' : 'www.dekamarkt.nl'
+    for (const path of ['/admin', '/checkout', '/mijn-account',
+                        '/producten/%2fadmin', '/producten/%252fadmin']) {
+      const originRecord = { ...origin, retailerId,
+        url: 'https://' + host + path }
+      assert.throws(() => proposeOfflineRetailerSelectors({
+        html: '<a href="/product/synthetic-123">Mock</a>', origin: originRecord,
+      }), /Invalid or oversized offline retailer snapshot/)
+    }
+  }
+  for (const path of ['/producten', '/aanbiedingen', '/product/synthetic-123']) {
+    const report = proposeOfflineRetailerSelectors({ html: '<div class="product-card"></div>',
+      origin: { ...origin, url: 'https://www.plus.nl' + path } })
+    assert.equal(report.readyForIngestion, false)
+  }
+})
+
 test('DekaMarkt and unknown research stores use the same normalized output without assuming a parser or license', () => {
   const html = '<html><body><article class="product-card"><a href="/producten/item/22"><h3 class="product-title">Test</h3></a><span data-testid="price-value">9,99</span></article></body></html>'
   for (const [retailerId, url] of [

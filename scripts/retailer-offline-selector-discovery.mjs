@@ -56,6 +56,17 @@ function validSnapshotOrigin(origin) {
     const requiredHost = Object.hasOwn(KNOWN_MERCHANT_HOSTS, origin.retailerId)
       ? KNOWN_MERCHANT_HOSTS[origin.retailerId] : null
     if (requiredHost && url.hostname !== requiredHost) return false
+    // Existing private archives can be imported without traversing the live
+    // one-URL capture gate. Reject on-store checkout/admin routes and ambiguous
+    // encoded path separators rather than proposing false merchant products.
+    if (requiredHost) {
+      const path = url.pathname
+      const knownRoute = origin.retailerId === 'plus'
+        ? /^\/(?:product\/[^/]+|producten(?:\/.*)?|aanbiedingen(?:\/.*)?)$/.test(path)
+        : /^\/(?:producten(?:\/.*)?|aanbiedingen(?:\/.*)?)$/.test(path)
+      if (!knownRoute || /%(?:2f|5c|2e|25)/i.test(path) || path.includes('\\'))
+        return false
+    }
     return exact && url.protocol === 'https:' &&
       /^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/.test(url.hostname) &&
       isIP(url.hostname) === 0 &&
