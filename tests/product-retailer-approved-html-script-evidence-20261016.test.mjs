@@ -254,3 +254,42 @@ test('quoted DOCTYPE/Product declaration cannot impersonate authorized JSON-LD e
   assert.equal(accepted.status,'candidate_needs_review')
   assert.equal(accepted.publicSavingsClaimEligible,false)
 })
+
+test('literal Schema.org Product/Offer IRIs support a real private PLUS candidate, not fake external hosts', async () => {
+  const good=structuredClone(plusProduct)
+  good['@type']='https://schema.org/Product'
+  good.offers['@type']='https://schema.org/Offer'
+  const markup=script('type="application/ld+json"',good)
+  const parsed=readAuthorizedHtmlScriptEvidence(markup)
+  assert.equal(parsed.invalid,false)
+  assert.equal(parsed.jsonLdBlocks[0]['@type'],'Product')
+  assert.equal(parsed.jsonLdBlocks[0].offers['@type'],'Offer')
+  const review=await run('plus',markup)
+  assert.equal(review.status,'candidate_needs_review')
+  assert.equal(review.observation.currentPriceCents,199)
+  assert.equal(review.published,false)
+  const forged=structuredClone(good)
+  forged['@type']='https://example.invalid/Product'
+  const refused=await run('plus',script('type="application/ld+json"',forged))
+  assert.equal(refused.status,'review_required')
+  assert.equal(refused.observation,null)
+  forged['@type']='https://schema.org/product' // URI path is case-sensitive.
+  const wrongCase=await run('plus',script('type="application/ld+json"',forged))
+  assert.equal(wrongCase.status,'review_required')
+})
+
+test('private Deka source accepts exact Schema.org IRIs only when independent Nuxt price corroborates', async () => {
+  const ld=structuredClone(dekaFixture.jsonLdProduct)
+  ld['@type']='http://schema.org/Product'
+  ld.offers['@type']='https://schema.org/Offer'
+  const markup=dekaMarkup('id="__NUXT_DATA__" type="application/json"').replace(
+    JSON.stringify(dekaFixture.jsonLdProduct),JSON.stringify(ld))
+  const accepted=await run('dekamarkt',markup)
+  assert.equal(accepted.status,'candidate_needs_review')
+  assert.equal(accepted.observation.currentPriceCents,85)
+  assert.equal(accepted.published,false)
+  ld.offers.Price=0.01
+  const denied=await run('dekamarkt',dekaMarkup('id="__NUXT_DATA__" type="application/json"').replace(
+    JSON.stringify(dekaFixture.jsonLdProduct),JSON.stringify(ld)))
+  assert.equal(denied.status,'review_required')
+})

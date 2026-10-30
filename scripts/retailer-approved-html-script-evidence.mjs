@@ -12,6 +12,19 @@ const MAX_SCRIPT_BYTES = 1024 * 1024
 const MAX_HTML_BYTES = 2 * 1024 * 1024
 const MAX_JSONLD = 16
 
+// JSON-LD permits absolute Schema.org type IRIs as well as short terms.
+// Normalize only exact known Schema.org class IRIs for the legacy private
+// parsers, without changing the SHA-bound original HTML/capture bytes.
+// Arbitrary hosts or lookalike /Product URLs remain untrusted.
+function normalizeKnownSchemaType(value) {
+  const canonical = item => {
+    if (typeof item !== 'string') return item
+    const match = /^https?:\/\/schema\.org\/(Product|Offer|AggregateOffer)$/.exec(item)
+    return match ? match[1] : item
+  }
+  return Array.isArray(value) ? value.map(canonical) : canonical(value)
+}
+
 // Read the exact same quote-aware DOM-script boundaries as the offline
 // selector review, not a separate regex that could treat inert HTML as prices.
 // No raw HTML or private product values are returned to public callers.
@@ -47,7 +60,8 @@ export function readAuthorizedHtmlScriptEvidence(html) {
       if (Buffer.byteLength(content, 'utf8') > MAX_SCRIPT_BYTES ||
           jsonLdBlocks.length >= MAX_JSONLD) return invalid()
       try {
-        jsonLdBlocks.push(JSON.parse(content))
+        jsonLdBlocks.push(JSON.parse(content, (key, value) =>
+          key === '@type' ? normalizeKnownSchemaType(value) : value))
       } catch { return invalid() }
     }
     if (id === '__NUXT_DATA__') {

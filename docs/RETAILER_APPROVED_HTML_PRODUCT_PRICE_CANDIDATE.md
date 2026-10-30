@@ -447,3 +447,13 @@ mee. Alleen daadwerkelijk waargenomen klassen en attributen leiden tot een
 voorstel; de engine verzint geen shadow-root-inhoud of niet-waargenomen
 CSS-paden. Dezelfde SHA-gebonden private stabiliteitsanalyse werkt voor deze
 webcomponenten, zonder publicatie of live scrape.
+
+### Schema.org volledige type-URL's in de privé-prijsparser
+
+JSON-LD laat naast `"@type": "Product"` ook de exact herkenbare class-IRI
+`"@type": "https://schema.org/Product"` toe (evenzo voor `Offer`). De
+bronadapter normaliseert uitsluitend deze expliciete Schema.org-klassen naar
+de bekende private parsertermen. De SHA-256 blijft berekend over het
+**ongewijzigde originele HTML**; willekeurige `/Product`-URL's op andere
+hosts, afwijkende hoofdletterspelling in de IRI-path en strijdige Deka Nuxt
+prijs blijven geweigerd. Dit verleent geen extra bronrechten of publicatie.
