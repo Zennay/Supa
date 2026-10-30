@@ -44,6 +44,12 @@ test('Figma Planner 3359:4896 meal rows and total card keep real state and make 
     assert.equal((html.match(/<span class="hifi-meal-thumb" aria-hidden="true"><img /g) ?? []).length, 1)
     assert.match(html, /<strong class="hifi-total-label">Totaal<\/strong>/)
     assert.match(html, /Prijs onbekend/)
+    // Mobile budget shortcuts use the persisted budget and no unverified totals.
+    assert.match(html, /aria-label="Snel weekbudget instellen"/)
+    assert.match(html, /Weekbudget: /)
+    assert.match(html, /Winkelkosten nog onbekend/)
+    assert.equal((html.match(/class="planner-mobile-budget-options"/g) ?? []).length, 1)
+    assert.equal((html.match(/aria-pressed="true"/g) ?? []).length >= 1, true)
     assert.match(html, /<summary>Bekijk berekening<\/summary>/)
     assert.match(html, /id="weekbudget-title"/)
     // Week strip shows the same original photo for the planned curated day.
@@ -55,6 +61,19 @@ test('Figma Planner 3359:4896 meal rows and total card keep real state and make 
     // Figma primary action routes to the real shopping list.
     assert.match(html, /<button type="button" class="hifi-planner-list-cta">Voeg planning toe aan boodschappenlijst<\/button>/)
     assert.doesNotMatch(html, /Potentiele besparing|Potentiële besparing|Supavoordeel|bespaar tot/i)
+    // With a complete user-owned basket, the mobile summary is exact.
+    // With an unresolved line, only the provable minimum may be displayed.
+    const withBasket = (cents, unresolved) => renderToStaticMarkup(createElement(PlannerView, {
+      budget: 35, activeDays, plannedMeals: meals, recipes,
+      ownSource: { store: 'PLUS', observedAt: '2026-10-29T12:00:00Z' },
+      basketTotalCents: cents, basketUnresolvedLineCount: unresolved,
+      onBudgetChange() {}, onToggleDay() {}, onRecipeChange() {}, onReset() {},
+      onOpenShoppingList() {},
+    }))
+    assert.match(withBasket(2800, 0), /7,00 over/)
+    const incomplete = withBasket(3600, 1)
+    assert.match(incomplete, /overige prijzen onbekend/)
+    assert.doesNotMatch(incomplete, /1,00 over<\/small>/)
   } finally {
     await vite.close()
   }

@@ -240,6 +240,27 @@ export function PlannerView({
               <span> · {activeDays.length} van {plannedMeals.length} dagen</span>
             </p>
           </div>
+          <div className="planner-mobile-budget" role="group" aria-label="Snel weekbudget instellen">
+            <strong>Weekbudget: {euro.format(budget)}</strong>
+            <small aria-live="polite">
+              {trustedCents === null ? 'Winkelkosten nog onbekend'
+                : budgetKnown && exactRemainingCents !== null
+                  ? exactRemainingCents < 0
+                    ? `${euro.formatCents(-exactRemainingCents)} boven budget`
+                    : `${euro.formatCents(exactRemainingCents)} over`
+                  : knownMinimumOverrunCents !== null
+                    ? `Minimaal ${euro.formatCents(knownMinimumOverrunCents)} boven budget; overige prijzen onbekend`
+                    : 'Niet alle mandprijzen bekend'}
+            </small>
+            <div className="planner-mobile-budget-options">
+              {budgetOptions.map(option => (
+                <button key={option} type="button" aria-pressed={budget === option}
+                  onClick={() => onBudgetChange(option)}>
+                  {euro.format(option)}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="planner-mobile-jump-buttons">
             <button type="button" onClick={jumpToRecipe} aria-controls={`recipe-${quickDay}`}>
               {quickDayActive ? 'Kies recept voor' : 'Plan en kies recept voor'} {quickDay}
