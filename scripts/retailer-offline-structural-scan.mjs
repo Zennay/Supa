@@ -143,7 +143,9 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
           content: html.slice(end + 1, closing.index) });
       }
       if (trustedScriptContext && !values.has('src')) {
-        const type = values.get('type')?.toLowerCase();
+        // MIME type matching ignores surrounding ASCII whitespace, matching
+        // the already strict private JSON-LD/Nuxt source evidence reader.
+        const type = values.get('type')?.trim().toLowerCase();
         const id = values.get('id');
         const content = html.slice(end + 1, closing.index).trim();
         if (Buffer.byteLength(content, 'utf8') <= 1024 * 1024) {
