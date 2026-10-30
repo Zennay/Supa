@@ -49,6 +49,7 @@ function inert(value, depth = 0) {
 
 const permittedReasons = new Set([
   'not_a_product_page', 'missing_or_invalid_jsonld',
+  'unverified_schema_context',
   'product_identity_or_price_unverified', 'price_or_physical_pack_missing',
   'stale_or_invalid_capture_clock', 'availability_unverified',
 ])

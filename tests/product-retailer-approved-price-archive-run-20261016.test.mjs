@@ -63,6 +63,26 @@ test('one-call PLUS own-scraper path produces 0600 unreviewed archive without le
   assert.equal(archive.productionEnabled, false)
 })
 
+test('untrusted Schema.org vocabulary is archived as review-only with zero priced observations', async t => {
+  const dir = await temp(t)
+  const output = join(dir, 'untrusted-vocabulary.json')
+  const opts = await freshOptions()
+  const forged = syntheticProduct('InStock')
+  delete forged['@context']
+  opts.fetchFn = async () => new Response(
+    '<script type="application/ld+json">' + JSON.stringify(forged) + '</script>',
+    { status: 200, headers: { 'content-type': 'text/html' } })
+  const result = await captureAndArchiveApprovedRetailerProduct(opts, output)
+  assert.equal(result.archiveCreated, true)
+  assert.equal(result.candidateCount, 0)
+  assert.equal(result.reviewRequiredCount, 1)
+  const saved = JSON.parse(await readFile(output, 'utf8'))
+  assert.equal(saved.entries[0].reason, 'unverified_schema_context')
+  assert.equal(saved.entries[0].observation, null)
+  assert.equal(saved.published, false)
+  assert.equal((await stat(output)).mode & 0o777, 0o600)
+})
+
 test('real checked-in retailer rights stop the whole scraper→disk pipeline before any network or output', async t => {
   const dir = await temp(t)
   const output = join(dir, 'no-live.json')
