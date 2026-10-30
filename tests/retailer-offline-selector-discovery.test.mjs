@@ -198,3 +198,26 @@ test('UTF-8 encoded JSON-LD is byte-bounded rather than incorrectly using charac
   assert.equal(result.structuredSignals.schemaOrgProduct, false)
   assert.equal(result.productionEnabled, false)
 })
+
+test('direct selector entrypoint rejects getter, inherited and Proxy provenance with no execution', () => {
+  const html = '<article class="product-card"><span class="price-value">SYNTHETIC</span></article>'
+  let hits = 0
+  const badOrigin = Object.defineProperty({url: origin.url, capturedAt: origin.capturedAt}, 'retailerId', {
+    enumerable: true, get() { hits++; throw Error('origin getter ran') },
+  })
+  assert.throws(() => proposeOfflineRetailerSelectors({html, origin: badOrigin}), /Invalid or oversized/)
+  const inherited = Object.create({ retailerId: 'plus' })
+  inherited.url = origin.url
+  inherited.capturedAt = origin.capturedAt
+  assert.throws(() => proposeOfflineRetailerSelectors({html, origin: inherited}), /Invalid or oversized/)
+  const proxy = new Proxy(origin, {get() { hits++; throw Error('proxy getter ran') }})
+  assert.throws(() => proposeOfflineRetailerSelectors({html, origin: proxy}), /Invalid or oversized/)
+  const getterTop = Object.defineProperty({origin}, 'html', {get() {hits++;throw Error('html getter ran')}})
+  assert.throws(() => proposeOfflineRetailerSelectors(getterTop), /Invalid or oversized/)
+  const proxyTop = new Proxy({html,origin},{get() {hits++;throw Error('top proxy getter ran')}})
+  assert.throws(() => proposeOfflineRetailerSelectors(proxyTop), /Invalid or oversized/)
+  assert.equal(hits,0)
+  const good = proposeOfflineRetailerSelectors({html,origin})
+  assert.equal(good.productionEnabled,false)
+  assert.ok(good.selectors.some(s => s.field === 'product'))
+})

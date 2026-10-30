@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { isIP } from 'node:net'
+import { types as nodeTypes } from 'node:util'
 import { scanOfflineRetailerMarkup } from './retailer-offline-structural-scan.mjs'
 
 // Offline-first DOM selector proposal. NEVER downloads a page, executes scripts,
@@ -17,6 +18,21 @@ const FIELD_RULES = Object.freeze({
   offer: /(?:^|[-_])(offer|deal|sale|discount|promo)(?:$|[-_])/i,
   availability: /(?:^|[-_])(stock|available|availability|inventory)(?:$|[-_])/i,
 })
+
+function inertRecord(value, keys) {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || nodeTypes.isProxy(value)) return null
+  const proto = Object.getPrototypeOf(value)
+  if (proto !== Object.prototype && proto !== null) return null
+  const descriptors = Object.getOwnPropertyDescriptors(value)
+  if (Reflect.ownKeys(descriptors).some(k => typeof k !== 'string' || !keys.includes(k))) return null
+  const clean = Object.create(null)
+  for (const key of keys) {
+    const d = descriptors[key]
+    if (!d || !Object.hasOwn(d, 'value') || typeof d.value !== 'string') return null
+    clean[key] = d.value
+  }
+  return clean
+}
 
 function validSnapshotOrigin(origin) {
   if (!origin || typeof origin !== 'object' || Array.isArray(origin)) return false
@@ -123,7 +139,22 @@ function recordSelector(counters, field, selector, tag) {
   else counters.set(key, { field, selector, tag, instances: 1 })
 }
 
-export function proposeOfflineRetailerSelectors({ html, origin } = {}) {
+export function proposeOfflineRetailerSelectors(options = {}) {
+  // Inspect own DATA descriptors before reading untrusted provenance/HTML.
+  // Never run a caller getter, inherited identity or Proxy trap.
+  if (!options || typeof options !== 'object' || Array.isArray(options) ||
+      nodeTypes.isProxy(options) || ![Object.prototype, null].includes(Object.getPrototypeOf(options))) {
+    throw new Error('Invalid or oversized offline retailer snapshot')
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(options)
+  if (Reflect.ownKeys(descriptors).some(k => typeof k !== 'string' || !['html','origin'].includes(k)) ||
+      !Object.hasOwn(descriptors.html ?? {}, 'value') ||
+      !Object.hasOwn(descriptors.origin ?? {}, 'value') ||
+      typeof descriptors.html.value !== 'string') {
+    throw new Error('Invalid or oversized offline retailer snapshot')
+  }
+  const html = descriptors.html.value
+  const origin = inertRecord(descriptors.origin.value, ['retailerId','url','capturedAt'])
   if (!validSnapshotOrigin(origin) ||
       typeof html !== 'string' ||
       Buffer.byteLength(html, 'utf8') > MAX_HTML_BYTES ||
