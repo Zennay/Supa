@@ -467,6 +467,34 @@ async function archivedSelectorPage(t, supermarket, kind, sourceUrl, markup) {
   return htmlPath
 }
 
+test('PLUS/Deka real absolute link CSS selectors survive private SHA-pinned drift replay', async t => {
+  const supermarkets = [
+    ['plus','https://www.plus.nl/producten','/product/'],
+    ['dekamarkt','https://www.dekamarkt.nl/aanbiedingen','/producten/'],
+  ]
+  for (const [supermarket, url, productPrefix] of supermarkets) {
+    const host = new URL(url).host
+    const original = '<html><body><a href="https://' + host +
+      productPrefix + 'synthetic-123">Synthetic</a></body></html>'
+    const changed = '<html><body><a href="//' + host +
+      productPrefix + 'synthetic-456">Synthetic</a></body></html>'
+    const before = await archivedSelectorPage(t, supermarket,
+      supermarket === 'plus' ? 'catalog' : 'offers', url, original)
+    const after = await archivedSelectorPage(t, supermarket,
+      supermarket === 'plus' ? 'catalog' : 'offers', url, changed)
+    const review = await replayPrivateSelectorHtmlSnapshot(before)
+    assert.equal(review.proposals.selectors.some(s =>
+      s.selector === 'a[href^="https://' + host + productPrefix + '"]'), true)
+    const drift = await comparePrivateSelectorHtmlSnapshots(before, after)
+    assert.equal(drift.mode, 'private-offline-selector-drift-alert')
+    assert.equal(drift.newSelectorCandidates, 1)
+    assert.equal(drift.missingSelectorCandidates, 1)
+    assert.equal(drift.priceExtractionEnabled, undefined)
+    assert.equal(drift.productionEnabled, false)
+    assert.doesNotMatch(JSON.stringify(drift), /synthetic|www\.plus|www\.dekamarkt/i)
+  }
+})
+
 test('PLUS catalog HTML can be SHA-replayed into a private selector review without price claims', async t => {
   const html = '<html><article class="product-card"><h3 class="product-name">Synthetic product</h3>' +
     '<span class="offer-price">3,25</span></article></html>'
