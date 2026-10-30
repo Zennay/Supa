@@ -212,7 +212,17 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
   const sha256 = createHash('sha256').update(html, 'utf8').digest('hex')
   // Inspect real HTML element boundaries; never infer signal tags from
   // comments, attributes, script strings or inert DOM containers.
-  const { visible, structuredSignals } = scanOfflineRetailerMarkup(html)
+  const { visible, structuredSignals, baseHrefs } = scanOfflineRetailerMarkup(html)
+  // Live HTML base href changes the browser resolution of relative product
+  // links. Foreign or malformed bases cannot become store product evidence.
+  if (baseHrefs.length) {
+    let base
+    try { base = new URL(staticAttributeValue(baseHrefs[0]), origin.url) }
+    catch { throw new Error('Untrusted HTML base URL') }
+    const expected = new URL(origin.url)
+    if (base.origin !== expected.origin || base.username || base.password ||
+        base.protocol !== 'https:') throw new Error('Untrusted HTML base URL')
+  }
 
   const candidates = new Map()
   let inspectedTags = 0
