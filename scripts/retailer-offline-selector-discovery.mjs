@@ -233,8 +233,9 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
   const sha256 = createHash('sha256').update(html, 'utf8').digest('hex')
   // Inspect real HTML element boundaries; never infer signal tags from
   // comments, attributes, script strings or inert DOM containers.
-  const { visible, structuredSignals, baseHrefs, canonicalHrefs, hasMetaRefresh } = scanOfflineRetailerMarkup(html)
+  const { visible, structuredSignals, baseHrefs, canonicalHrefs, hasMetaRefresh, hasMetaNoStore } = scanOfflineRetailerMarkup(html)
   if (hasMetaRefresh) throw new Error('Untrusted HTML redirect evidence')
+  if (hasMetaNoStore) throw new Error('Untrusted HTML no-store archival directive')
   // Live HTML base href changes the browser resolution of relative product
   // links. Foreign or malformed bases cannot become store product evidence.
   let documentBaseUrl = origin.url
