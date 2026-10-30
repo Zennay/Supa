@@ -6,6 +6,9 @@ const designPricePerPerson: Record<string, number> = {
   'supa-fried-rice': 4.25,
   'supa-thai': 3.7,
   'supa-bao': 6.2,
+  'supa-katsu': 4.8,
+  'supa-quesadillas': 3.75,
+  'supa-veg-pasta': 3.3,
 }
 
 const format = { format: (value: number) => `€${value.toFixed(2).replace('.', ',')}` }

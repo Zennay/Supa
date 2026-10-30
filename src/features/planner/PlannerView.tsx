@@ -17,6 +17,8 @@ import './planner.css'
 const budgetOptions = [30, 35, 40]
 
 type PlannerViewProps = {
+  /** Open the recipe picker for an open day ('Toevoegen aan planner'). */
+  onPickRecipe: (day: string) => void
   budget: number
   activeDays: string[]
   plannedMeals: PlannedMeal[]
@@ -43,6 +45,7 @@ type PlannerViewProps = {
 }
 
 export function PlannerView({
+  onPickRecipe,
   budget,
   activeDays,
   plannedMeals,
@@ -150,7 +153,7 @@ export function PlannerView({
       <HiFiPlannerWeekCard
         plannedMeals={plannedMeals}
         activeDays={activeDays}
-        onToggleDay={onToggleDay}
+        onToggleDay={day => activeDays.includes(day) ? onToggleDay(day) : onPickRecipe(day)}
         dayImages={dayImages}
       />
 
@@ -200,7 +203,7 @@ export function PlannerView({
                     </span>
                   : <span className="meal-copy hifi-meal-empty">
                       <strong>Voeg nu iets toe aan de planner</strong>
-                      <small>{recipe.title} staat klaar</small>
+                      <small>Kies een recept</small>
                     </span>}
                 {active
                   ? <button
@@ -217,7 +220,7 @@ export function PlannerView({
                       type="button"
                       className="plan-check hifi-meal-add"
                       aria-label={`${item.day} aan planning toevoegen`}
-                      onClick={() => onToggleDay(item.day)}
+                      onClick={() => onPickRecipe(item.day)}
                     >
                       +
                     </button>}

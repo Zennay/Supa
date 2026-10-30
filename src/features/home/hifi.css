@@ -341,3 +341,13 @@ body { background: #e9eeec; }
 .hifi-store.selected { box-shadow: 0 0 0 3px #f3f4f6, 0 0 0 6px #7ff5d1; }
 .hifi-store-check { position: absolute; right: -2px; bottom: -2px; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; background: #7ff5d1; }
 .hifi-store:focus-visible { outline: 3px solid #005135; outline-offset: 4px; }
+
+/* Producten: heart in the header and the supermarket filter (store button). */
+.hifi-products-heading { display: flex; align-items: center; justify-content: space-between; }
+.hifi-products-heading .hifi-page-title { margin: 0; font: 600 18px/1.2 Poppins, -apple-system, BlinkMacSystemFont, 'SF Pro', Inter, sans-serif; }
+.hifi-heart-toggle { width: 36px; height: 36px; border: 0; background: transparent; color: #262527; display: grid; place-items: center; cursor: pointer; }
+.hifi-heart-toggle[aria-pressed=true] { color: #36c693; }
+.hifi-store-filter { display: flex; gap: 10px; flex-wrap: wrap; padding: 12px; border-radius: 15px; background: #fff; }
+.hifi-store-filter button { width: 48px; height: 48px; padding: 0; border: 0; border-radius: 12px; background: none; cursor: pointer; opacity: .55; }
+.hifi-store-filter button.selected { opacity: 1; box-shadow: 0 0 0 3px #7ff5d1; }
+.hifi-store-filter img { width: 48px; height: 48px; object-fit: contain; border-radius: 12px; }
