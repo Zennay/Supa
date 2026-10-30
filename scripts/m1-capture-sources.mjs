@@ -4,6 +4,8 @@ import { pathToFileURL } from 'node:url'
 import path from 'node:path'
 
 import { evaluateSourcePermissionGate } from './m1-check-source-permission-gate.mjs'
+import { isAllowedM1RetailerSourcePath } from './retailer-source-route-safety.mjs'
+import { scanOfflineRetailerMarkup } from './retailer-offline-structural-scan.mjs'
 
 export const SOURCES = [
   {
@@ -76,20 +78,23 @@ export function validateSources(sources = SOURCES) {
     ids.add(source.id)
 
     const host = expectedHost(source.supermarket)
+    if (!SUPPORTED_KINDS.has(source.kind)) {
+      throw new Error(`Unsupported source kind: ${source.kind}`)
+    }
     const url = new URL(source.url)
     if (
       url.protocol !== 'https:' ||
       url.hostname !== host ||
       url.port !== '' ||
       url.username !== '' ||
-      url.password !== ''
+      url.password !== '' ||
+      url.search !== '' || url.hash !== '' ||
+      url.href !== source.url ||
+      !isAllowedM1RetailerSourcePath(source.supermarket, source.kind, url.pathname)
     ) {
       throw new Error(
         `Source does not match supermarket allowlist (${source.supermarket} -> https://${host}): ${source.url}`,
       )
-    }
-    if (!SUPPORTED_KINDS.has(source.kind)) {
-      throw new Error(`Unsupported source kind: ${source.kind}`)
     }
   }
   return true
@@ -109,6 +114,25 @@ function isHtmlContentType(value) {
   return mediaType === 'text/html' || mediaType === 'application/xhtml+xml'
 }
 
+// A capture is a retained source artifact, not just a transient response.
+// Refuse wrong encodings, archive opt-outs and redirects before writing bytes.
+// This helper has NO I/O and can be exercised with synthetic source HTML.
+export function assertArchivableRetailerHtml(body, contentType) {
+  if (!isHtmlContentType(contentType) || typeof body !== 'string' ||
+      !body || body.startsWith('\uFEFF') || body.includes('\u0000') ||
+      Buffer.byteLength(body, 'utf8') > MAX_BYTES) {
+    throw new Error('Unacceptable retailer HTML source bytes')
+  }
+  const parameters = contentType.split(';').slice(1).map(p=>p.trim()).filter(Boolean)
+  if (!parameters.every(p=>/^charset\s*=\s*["']?utf-?8["']?$/i.test(p)) ||
+      parameters.length > 1) throw new Error('Ambiguous retailer HTML charset')
+  const scanned = scanOfflineRetailerMarkup(body)
+  if (scanned.hasMetaRefresh || scanned.hasMetaNoStore ||
+      scanned.hasMetaNoArchive || scanned.hasConflictingCharset)
+    throw new Error('Retailer HTML disallows reliable snapshot archival')
+  return Buffer.byteLength(body, 'utf8')
+}
+
 async function captureSource(source, rootDir) {
   const capturedAt = new Date().toISOString()
   const controller = new AbortController()
@@ -126,7 +150,8 @@ async function captureSource(source, rootDir) {
 
   try {
     const response = await fetch(source.url, {
-      redirect: 'follow',
+      // Never follow an unapproved hostname or path before URL verification.
+      redirect: 'error',
       signal: controller.signal,
       headers: {
         accept: 'text/html,application/xhtml+xml',
@@ -163,8 +188,17 @@ async function captureSource(source, rootDir) {
       throw new Error(`Declared response size exceeded ${MAX_BYTES} bytes: ${contentLength}`)
     }
 
-    const body = await response.text()
-    const bytes = Buffer.byteLength(body, 'utf8')
+    // Refuse error/anti-bot/JSON responses BEFORE retaining raw HTML bytes.
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    if (!isHtmlContentType(contentType))
+      throw new Error(`Unexpected content type: ${contentType || 'missing'}`)
+
+    const raw = new Uint8Array(await response.arrayBuffer())
+    if (raw.byteLength > MAX_BYTES) throw new Error('Retailer HTML response exceeded cap')
+    if (raw.length >= 3 && raw[0] === 0xef && raw[1] === 0xbb && raw[2] === 0xbf)
+      throw new Error('Retailer HTML BOM not allowed')
+    const body = new TextDecoder('utf-8', { fatal: true }).decode(raw)
+    const bytes = assertArchivableRetailerHtml(body, contentType)
     Object.assign(metadata, {
       finalUrl: response.url,
       status: response.status,
@@ -183,13 +217,6 @@ async function captureSource(source, rootDir) {
     const dir = path.join(rootDir, source.supermarket)
     await mkdir(dir, { recursive: true })
     await writeFile(path.join(dir, `${source.id}.html`), body, 'utf8')
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`)
-    }
-    if (!isHtmlContentType(contentType)) {
-      throw new Error(`Unexpected content type: ${contentType || 'missing'}`)
-    }
 
     return { ...metadata, success: true }
   } catch (error) {
