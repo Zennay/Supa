@@ -52,6 +52,29 @@ function mapCandidateFields(suggestions) {
       })),
   ]))
 }
+// Historical M1 archives must obey the same explicit storefront route
+// families as current approved capture. URL host alone never proves a
+// product, catalog or offers source, especially on checkout/account paths.
+function approvedHistoricalRoute(supermarket, kind, path) {
+  if (ambiguousRetailerRoute(path)) return false
+  const route = (prefix, allowRoot) =>
+    (allowRoot && path === prefix.slice(0, -1)) ||
+    (allowRoot && path === prefix) ||
+    path.startsWith(prefix) && path.length > prefix.length &&
+      path[prefix.length] !== '/'
+  if (supermarket === 'plus') {
+    if (kind === 'product') return route('/product/', false)
+    if (kind === 'catalog') return route('/producten/', true)
+    if (kind === 'offers') return route('/aanbiedingen/', true)
+  }
+  if (supermarket === 'dekamarkt') {
+    if (kind === 'product') return route('/producten/', false)
+    if (kind === 'catalog') return route('/producten/', true)
+    if (kind === 'offers') return route('/aanbiedingen/', true)
+  }
+  return false
+}
+
 function validCapture(source, requireHash = true) {
   // Archived manifests are untrusted input, not objects allowed to execute
   // caller-supplied Proxy descriptor traps during provenance validation.
@@ -74,11 +97,18 @@ function validCapture(source, requireHash = true) {
       typeof id !== 'string' || !/^[a-z0-9][a-z0-9._-]{0,99}$/i.test(id) ||
       (requireHash ? (typeof expectedSha !== 'string' || !/^[a-f0-9]{64}$/.test(expectedSha)) : (expectedSha !== undefined && (typeof expectedSha !== 'string' || !/^[a-f0-9]{64}$/.test(expectedSha)))) ||
       typeof capturedAt !== 'string' ||
-      !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,9})?Z$/.test(capturedAt) ||
-      (!Number.isFinite(Date.parse(capturedAt)) || Date.parse(capturedAt) > Date.now())) reject('invalid capture identity/hash/timestamp')
+      !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,9})?Z$/.test(capturedAt)) reject('invalid capture identity/hash/timestamp')
+  // Date.parse silently rolls nonexistent calendar dates into a later month.
+  // Bind archival provenance to its original UTC civil day/time, not a
+  // normalized clock that was never actually observed.
+  const timestamp = Date.parse(capturedAt)
+  if (!Number.isFinite(timestamp) || timestamp > Date.now() ||
+      new Date(timestamp).toISOString().slice(0,19) !== capturedAt.slice(0,19))
+    reject('invalid capture Gregorian UTC timestamp')
   let url
   try { url = new URL(urlValue) } catch { reject('invalid source URL') }
-  if (url.href !== urlValue || ambiguousRetailerRoute(url.pathname) ||
+  if (url.href !== urlValue ||
+      !approvedHistoricalRoute(supermarket,kind,url.pathname) ||
       url.protocol !== 'https:' || url.hostname !== HOSTS[supermarket] ||
       url.port || url.username || url.password || url.search || url.hash) {
     reject('unapproved source host, URL or credentials')

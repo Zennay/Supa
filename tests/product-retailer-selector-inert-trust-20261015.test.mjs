@@ -40,6 +40,38 @@ test('correct SHA does not authorize observation timestamps from the future',()=
   assert.throws(()=>proposeRetailerSelectors(capture(html,'2035-01-01T00:00:00Z'),html),
     /Offline selector review refused/)
 })
+test('historic archived selector source rejects impossible UTC civil dates, retaining genuine leap days',()=>{
+  const html='<article class="product-card"></article>'
+  for(const at of [
+    '2026-02-30T12:00:00Z', '2025-02-29T12:00:00Z',
+    '1900-02-29T12:00:00Z', '2026-04-31T12:00:00Z',
+  ]) assert.throws(()=>proposeRetailerSelectors(capture(html,at),html),
+    /Offline selector review refused/,at)
+  const leap=proposeRetailerSelectors(capture(html,'2024-02-29T12:00:00Z'),html)
+  assert.equal(leap.readyForScraping,false)
+  assert.equal(leap.publicationAllowed,false)
+})
+
+test('historic archiver cannot label checkout/admin/foreign retailer routes as reviewed M1 source',()=>{
+  const html='<article class="product-card"></article>'
+  for(const [supermarket,kind,requestedUrl] of [
+    ['plus','catalog','https://www.plus.nl/checkout'],
+    ['plus','product','https://www.plus.nl/admin'],
+    ['plus','product','https://www.plus.nl/product/'],
+    ['plus','product','https://www.plus.nl/product/%2fadmin'],
+    ['plus','catalog','https://www.plus.nl/producten/%2e%2e/checkout'],
+    ['dekamarkt','offers','https://www.dekamarkt.nl/mijn-account'],
+    ['dekamarkt','product','https://www.dekamarkt.nl/producten/'],
+  ]) {
+    const candidate={...capture(html),supermarket,kind,requestedUrl}
+    assert.throws(()=>proposeRetailerSelectors(candidate,html),
+      /Offline selector review refused/,requestedUrl)
+  }
+  const allowed={...capture(html),kind:'product',
+    requestedUrl:'https://www.plus.nl/product/synthetic-abc'}
+  assert.equal(proposeRetailerSelectors(allowed,html).readyForScraping,false)
+})
+
 test('tampering HTML after SHA validation still refuses selector review',()=>{
   const html='<div class="product-card"></div>'
   const source=capture(html)
