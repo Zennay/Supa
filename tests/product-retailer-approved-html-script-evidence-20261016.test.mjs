@@ -62,6 +62,26 @@ test('exact script type/id admit valid PLUS JSON-LD and Deka Nuxt, mixed attribu
   assert.deepEqual(deka.nuxtPayload, dekaFixture.nuxtPayload)
 })
 
+test('private JSON-LD and Nuxt price evidence never bypasses the HTML archive directive gate', async () => {
+  const realScript=script('type="application/ld+json"',plusProduct)
+  const page=tag=>'<html><head>'+tag+'</head><body>'+realScript+'</body></html>'
+  for (const meta of [
+    '<meta http-equiv="Cache-Control" content="max-age=0; no-store">',
+    '<meta name="robots" content="index, noarchive">',
+    '<meta name="Googlebot" content="NOARCHIVE">',
+    '<meta charset="windows-1252">',
+  ]) {
+    const direct=readAuthorizedHtmlScriptEvidence(page(meta),plusUrl)
+    assert.equal(direct.invalid,true,meta)
+    assert.deepEqual(direct.jsonLdBlocks,[])
+    await assert.rejects(run('plus',page(meta)),
+      /(?:HTML disallows snapshot archival|HTML charset)/,meta)
+    const inert=readAuthorizedHtmlScriptEvidence(page('<template>'+meta+'</template>'),plusUrl)
+    assert.equal(inert.invalid,false,meta)
+    assert.equal(inert.jsonLdBlocks.length,1)
+  }
+})
+
 test('a data-type/aria-type alias must NOT impersonate an actual JSON-LD type', () => {
   for (const attr of ['data-type="application/ld+json"',
     'aria-type="application/ld+json"',

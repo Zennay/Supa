@@ -59,7 +59,11 @@ export function readAuthorizedHtmlScriptEvidence(html, sourceUrl = undefined) {
   let elements
   try {
     const scanned = scanOfflineRetailerMarkup(html, { includeScripts: true })
-    if (scanned.hasMetaRefresh) return invalid()
+    // The standalone JSON-LD/Nuxt evidence reader may be called outside the
+    // capture path. It must enforce the same source-retention and UTF-8
+    // directives, or it could turn a denied HTML page into price evidence.
+    if (scanned.hasMetaRefresh || scanned.hasMetaNoStore ||
+        scanned.hasMetaNoArchive || scanned.hasConflictingCharset) return invalid()
     // Direct parsing of HTML with authoritative page identity must carry a
     // source URL. Otherwise no caller can prove the base/canonical belongs
     // to the retailer, even if the embedded Product JSON looks plausible.
