@@ -224,7 +224,8 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
   const html = descriptors.html.value
   const origin = inertRecord(descriptors.origin.value, ['retailerId','url','capturedAt'])
   if (!validSnapshotOrigin(origin) ||
-      typeof html !== 'string' ||
+      typeof html !== 'string' || html.startsWith('\uFEFF') ||
+      html.includes('\u0000') ||
       Buffer.byteLength(html, 'utf8') > MAX_HTML_BYTES ||
       Buffer.from(html, 'utf8').toString('utf8') !== html) {
     throw new Error('Invalid or oversized offline retailer snapshot')
