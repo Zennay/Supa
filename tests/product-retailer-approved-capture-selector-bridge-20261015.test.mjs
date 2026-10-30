@@ -345,3 +345,22 @@ test('single synthetic approved PLUS/Deka capture retains observed sale/price/pa
     assert.equal(review.publicSavingsClaimEligible,false)
   }
 })
+
+test('observed struck-through price is only an offer review hint in both-store injected capture',async()=>{
+  for(const [supermarket,kind,url] of [
+    ['plus','catalog','https://www.plus.nl/producten'],
+    ['dekamarkt','offers','https://www.dekamarkt.nl/aanbiedingen']]){
+    const html='<article><del class="price-value" itemprop="price">PRIVATE_9.99</del>'+
+      '<ins class="price-value" itemprop="price">PRIVATE_7.99</ins></article>'
+    const review=await captureToPrivateSelectorReview({source:{supermarket,kind,url},
+      grant:consent(supermarket,kind,url),permissionGate:syntheticGate(),capturedAt:at,
+      fetchFn:async()=>new Response(html,{status:200,headers:{'content-type':'text/html'}}),
+    })
+    for(const selector of ['del.price-value','del[itemprop="price"]'])
+      assert.equal(review.selectorProposals.find(x=>x.selector===selector)?.field,'offer',selector)
+    for(const selector of ['ins.price-value','ins[itemprop="price"]'])
+      assert.equal(review.selectorProposals.find(x=>x.selector===selector)?.field,'price',selector)
+    assert.equal(review.currentPricesExtracted,false)
+    assert.doesNotMatch(JSON.stringify(review),/PRIVATE_9\.99|PRIVATE_7\.99/)
+  }
+})

@@ -624,3 +624,22 @@ test('PLUS/Deka catalog or offers retain observed ins/del/small price, promotion
     assert.equal((await verifyPrivateSyntheticHtmlFixture(filename,out)).verified,true)
   }
 })
+
+test('private synthetic Deka/PLUS offer fixture retains old-price hint separately from current-price selector',async t=>{
+  for(const retailerId of ['plus','dekamarkt']){
+    const html='<article><del class="price-value" itemprop="price">PRIVATE_9.99</del>'+
+      '<ins class="price-value" itemprop="price">PRIVATE_7.99</ins></article>'
+    const {filename,dir,capture}=await archive(t,retailerId,retailerId==='plus'?'catalog':'offers',html)
+    const output=join(dir,'old-vs-current-price')
+    await buildPrivateSyntheticHtmlFixture(filename,output)
+    const sanitized=await readFile(join(output,'synthetic-structure.html'),'utf8')
+    const replay=proposeOfflineRetailerSelectors({html:sanitized,origin:{
+      retailerId,url:capture.source.url,capturedAt:capture.source.capturedAt}})
+    for(const selector of ['del.price-value','del[itemprop="price"]'])
+      assert.equal(replay.selectors.find(x=>x.selector===selector)?.field,'offer',selector)
+    for(const selector of ['ins.price-value','ins[itemprop="price"]'])
+      assert.equal(replay.selectors.find(x=>x.selector===selector)?.field,'price',selector)
+    assert.doesNotMatch(sanitized,/PRIVATE_9\.99|PRIVATE_7\.99/)
+    assert.equal((await verifyPrivateSyntheticHtmlFixture(filename,output)).verified,true)
+  }
+})

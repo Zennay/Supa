@@ -101,7 +101,9 @@ function publicReviewSelector(row, retailerId) {
   if (GENERIC_SELECTOR.test(row.selector)) return true
   const schemaProperty = SCHEMA_PROP_SELECTOR.exec(row.selector)
   if (schemaProperty) return Object.hasOwn(SCHEMA_FIELDS, schemaProperty[2]) &&
-    SCHEMA_FIELDS[schemaProperty[2]] === row.field
+    (SCHEMA_FIELDS[schemaProperty[2]] === row.field ||
+      (schemaProperty[1] === 'del' && row.field === 'offer' &&
+        SCHEMA_FIELDS[schemaProperty[2]] === 'price'))
   const testId = GENERIC_TEST_ID_SELECTOR.exec(row.selector)
   if (testId) return Object.hasOwn(GENERIC_TEST_ID_FIELDS, testId[2]) &&
     GENERIC_TEST_ID_FIELDS[testId[2]] === row.field

@@ -832,3 +832,20 @@ test('offline operator summary never exposes private SKU-bearing custom componen
   assert.ok(publicReport.privateSelectorCount>=2)
   assert.equal(publicReport.readyForIngestion,false)
 })
+
+test('struck-through old shelf price is observed only as an offer hint, never a current-price selector',()=>{
+  const html='<article class="product-card">' +
+    '<del class="price-value" itemprop="price">PRIVATE_OLD_3.99</del>'+
+    '<ins class="price-value" itemprop="price">PRIVATE_NEW_2.49</ins></article>'
+  for(const [retailerId,url] of [
+    ['plus','https://www.plus.nl/producten'],
+    ['dekamarkt','https://www.dekamarkt.nl/aanbiedingen']]){
+    const report=proposeOfflineRetailerSelectors({html,origin:{...origin,retailerId,url}})
+    for(const selector of ['del.price-value','del[itemprop="price"]'])
+      assert.equal(report.selectors.find(row=>row.selector===selector)?.field,'offer',retailerId+' '+selector)
+    for(const selector of ['ins.price-value','ins[itemprop="price"]'])
+      assert.equal(report.selectors.find(row=>row.selector===selector)?.field,'price',retailerId+' '+selector)
+    assert.doesNotMatch(JSON.stringify(report),/PRIVATE_OLD|PRIVATE_NEW/)
+    assert.equal(report.readyForIngestion,false)
+  }
+})

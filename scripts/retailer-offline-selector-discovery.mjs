@@ -217,6 +217,10 @@ function observedProductHrefPrefix(origin, href, documentBaseUrl) {
 }
 
 function recordSelector(counters, field, selector, tag) {
+  // HTML <del> is a struck-through *previous* price. Even when the captured
+  // retailer uses price-value / itemprop=price, it must not produce a current
+  // price candidate. Keep the observed structure as an unapproved offer hint.
+  if (tag === 'del' && field === 'price') field = 'offer'
   const key = field + '\u0000' + selector
   const prior = counters.get(key)
   if (prior) prior.instances += 1
@@ -443,7 +447,9 @@ export function summarizeOfflineSelectorProposals(report) {
     if (!isSafeStructuralReviewTag(tag)) return false
     if (row.field === 'product' && MICRODATA_PRODUCT.test(row.selector)) return true
     if (Object.entries(SCHEMA_ITEMPROP_FIELDS).some(([prop,field]) =>
-      row.field === field && row.selector.endsWith('[itemprop="'+prop+'"]') &&
+      (row.field === field || row.field === 'offer' && field === 'price' &&
+        row.selector.startsWith('del[itemprop="')) &&
+      row.selector.endsWith('[itemprop="'+prop+'"]') &&
       /^(?:article|a|div|li|section|span|h[1-6]|p|strong|ins|del|small|meta|link|data|time)\[itemprop="/.test(row.selector)))
       return true
     if (row.field === 'product' &&
