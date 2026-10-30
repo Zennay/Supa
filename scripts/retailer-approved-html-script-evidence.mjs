@@ -28,6 +28,39 @@ function normalizeKnownSchemaType(value) {
   return Array.isArray(value) ? value.map(canonical) : canonical(value)
 }
 
+// Priced Product must be linked to an official Schema.org context, not just
+// a convenient bare @type. Inspect raw JSON-LD before type canonicalization.
+const officialContexts = new Set(['https://schema.org','https://schema.org/',
+  'http://schema.org','http://schema.org/'])
+function officialContext(v) {
+  if (typeof v === 'string') return officialContexts.has(v)
+  if (Array.isArray(v)) return v.length > 0 && v.every(officialContext)
+  return v && typeof v === 'object' && Object.keys(v).length === 1 &&
+    Object.hasOwn(v, '@vocab') && officialContexts.has(v['@vocab'])
+}
+function verifyProductContexts(root) {
+  let count = 0, visited = 0
+  function walk(v, inherited = false, depth = 0) {
+    if (++visited > 256 || depth > 8) return false
+    if (Array.isArray(v)) return v.length <= 128 &&
+      v.every(child => walk(child, inherited, depth + 1))
+    if (!v || typeof v !== 'object') return true
+    const own = Object.hasOwn(v, '@context')
+    if (own && !officialContext(v['@context'])) return false
+    const type = v['@type']
+    const types = Array.isArray(type) ? type : [type]
+    const absolute = types.some(t => t === 'https://schema.org/Product' ||
+      t === 'http://schema.org/Product')
+    if (types.includes('Product') || absolute) {
+      if (!(inherited || own || absolute)) return false
+      count++
+    }
+    return !Object.hasOwn(v, '@graph') ||
+      (Array.isArray(v['@graph']) && walk(v['@graph'], inherited || own, depth + 1))
+  }
+  return { valid: walk(root), count }
+}
+
 // Read the exact same quote-aware DOM-script boundaries as the offline
 // selector review, not a separate regex that could treat inert HTML as prices.
 // No raw HTML or private product values are returned to public callers.
@@ -75,7 +108,7 @@ export function readAuthorizedHtmlScriptEvidence(html, sourceUrl = undefined) {
   const jsonLdBlocks = []
   let nuxtPayload = null
   let nuxtSeen = false
-  let count = 0
+  let count = 0, verifiedProducts = 0, contextsValid = true
   for (const element of elements) {
     if (++count > MAX_SCRIPT_TAGS || element.rawAttributeLength > 1500) return invalid()
     const attr = element.attrs
@@ -97,6 +130,9 @@ export function readAuthorizedHtmlScriptEvidence(html, sourceUrl = undefined) {
         // The shared bounded decoder rejects duplicates, including Unicode-
         // escaped aliases, before any Product/Offer price is considered.
         const owned = parseUniqueKeyRetailerJson(content)
+        const proof = verifyProductContexts(owned)
+        contextsValid &&= proof.valid
+        verifiedProducts += proof.count
         jsonLdBlocks.push(JSON.parse(JSON.stringify(owned), (key, value) =>
           key === '@type' ? normalizeKnownSchemaType(value) : value))
       } catch { return invalid() }
@@ -113,5 +149,6 @@ export function readAuthorizedHtmlScriptEvidence(html, sourceUrl = undefined) {
       } catch { return invalid() }
     }
   }
-  return { invalid: false, jsonLdBlocks, nuxtPayload }
+  return { invalid: false, jsonLdBlocks, nuxtPayload,
+    verifiedSchemaProductContexts: contextsValid && verifiedProducts > 0 }
 }

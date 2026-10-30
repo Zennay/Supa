@@ -11,7 +11,7 @@ import { writePrivateRetailerPriceSnapshot } from
 // No real retailer URLs requested: only fictional in-memory Response.
 const url = 'https://www.plus.nl/product/fictional-packet-111'
 const product = (availability = 'InStock') => ({
-  '@type': 'Product', name: 'Fictional ingredient', url, sku: '111',
+  '@context': 'https://schema.org', '@type': 'Product', name: 'Fictional ingredient', url, sku: '111',
   weight: { value: '600 g' },
   offers: { '@type': 'Offer', price: '3.25', priceCurrency: 'EUR',
     availability: 'https://schema.org/' + availability },

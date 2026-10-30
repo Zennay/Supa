@@ -114,6 +114,38 @@ test('existing Deka SSR pages with uppercase Price or missing pack do NOT become
   assert.equal(result.reason, 'price_or_physical_pack_missing')
 })
 
+test('contextless or foreign-context Product is never priced from authorized HTML', async () => {
+  for (const store of ['plus', 'dekamarkt']) {
+    const original = product(store)
+    const noContext = { ...original }
+    delete noContext['@context']
+    for (const forged of [
+      noContext,
+      { ...original, '@context': 'https://retailer.invalid/vocab' },
+      { '@context': 'https://schema.org', '@graph': [
+        { '@type': 'Product', ...noContext, '@context': 'https://retailer.invalid/vocab' },
+      ] },
+      { '@context': 'https://schema.org', '@graph': [
+        { ...original, url: urls[store].replace('fictional-', 'another-') },
+        { ...noContext, '@context': 'https://retailer.invalid/vocab' },
+      ] },
+    ]) {
+      const result = await captureApprovedProductPriceCandidate(options(store, html(forged)))
+      assert.equal(result.status, 'review_required', store)
+      assert.equal(result.observation, null)
+      assert.equal(result.published, false)
+    }
+  }
+})
+
+test('official absolute Schema.org type is accepted without a short-term context', async () => {
+  const record = { ...product('plus'), '@type': 'https://schema.org/Product' }
+  delete record['@context']
+  const result = await captureApprovedProductPriceCandidate(options('plus', html(record)))
+  assert.equal(result.status, 'candidate_needs_review')
+  assert.equal(result.observation.currentPriceCents, 249)
+})
+
 test('mixed JSON-LD blocks select exact Product URL, never cheapest related product', async () => {
   const related = product('plus', '0.01')
   related.url = 'https://www.plus.nl/product/other-456'

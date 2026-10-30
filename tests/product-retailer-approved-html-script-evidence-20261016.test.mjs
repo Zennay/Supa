@@ -12,7 +12,7 @@ const dekaFixture = JSON.parse(await readFile(
   new URL('../fixtures/m1/dekamarkt-product-halfvolle-melk.v1.json', import.meta.url),
   'utf8'))
 const plusProduct = {
-  '@type': 'Product', name: 'Fictional 500g', sku: '123', url: plusUrl,
+  '@context': 'https://schema.org', '@type': 'Product', name: 'Fictional 500g', sku: '123', url: plusUrl,
   weight: { value: '500 g' },
   offers: { '@type': 'Offer', price: '1.99', priceCurrency: 'EUR',
     availability: 'https://schema.org/InStock' },

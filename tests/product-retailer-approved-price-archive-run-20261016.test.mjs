@@ -8,7 +8,7 @@ import { captureAndArchiveApprovedRetailerProduct } from
 
 const url = 'https://www.plus.nl/product/test-771'
 const syntheticProduct = stock => ({
-  '@type': 'Product', sku: '771', url,
+  '@context': 'https://schema.org', '@type': 'Product', sku: '771', url,
   name: 'Synthetic product, not on sale',
   weight: { value: '250 g' },
   offers: { '@type': 'Offer', price: '1.49', priceCurrency: 'EUR',

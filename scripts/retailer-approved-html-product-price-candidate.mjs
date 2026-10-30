@@ -84,6 +84,13 @@ function priceReviewFromAuthorizedCapture(captured) {
   if (scripts.invalid || blocks.length === 0 || blocks.length > MAX_JSONLD_BLOCKS) {
     return unavailable('missing_or_invalid_jsonld', captured)
   }
+  // Historical Deka SSR lacked @context but corroborates its single Product
+  // independently with the exact Nuxt SKU/price/pack. Keep that narrow
+  // review-only fallback; contextless PLUS and Deka without Nuxt abstain.
+  const historicalDekaNuxt = provenance.supermarket === 'dekamarkt' &&
+    scripts.nuxtPayload !== null
+  if (scripts.verifiedSchemaProductContexts !== true && !historicalDekaNuxt)
+    return unavailable('unverified_schema_context', captured)
   // All blocks are reviewed together: a second conflicting Product cannot be
   // ignored just because the first one offers a temptingly cheap price.
   let parsed = parseSchemaOrgProductForPage(blocks, provenance)
