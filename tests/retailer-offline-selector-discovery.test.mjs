@@ -338,3 +338,28 @@ test('offline CSS class proposals count actual matching tags once and respect HT
   assert.equal(report.readyForIngestion, false)
   assert.equal(report.permissionVerified, false)
 })
+
+
+  assert.equal(product?.instances, 2)
+  assert.equal(price?.instances, 2)
+  assert.equal(report.selectors.some(s => s.selector === 'article.price-value'), false)
+  assert.equal(report.readyForIngestion, false)
+  assert.equal(report.permissionVerified, false)
+})
+
+
+test('structural selector evidence never advertises duplicate-key JSON-LD or Nuxt as verified source signals', () => {
+  const html = [
+    '<html><body>',
+    '<script type="application/ld+json">{\"@type\":\"Thing\",\"\\u0040type\":\"Product\"}</script>',
+    '<script id="__NUXT_DATA__" type="application/json">[{\"productId\":7,\"productId\":8}]</script>',
+    '<span class="product-name">Inert text</span>',
+    '</body></html>',
+  ].join('')
+  const report = proposeOfflineRetailerSelectors({ html, origin })
+  assert.equal(report.structuredSignals.jsonLd, false)
+  assert.equal(report.structuredSignals.schemaOrgProduct, false)
+  assert.equal(report.structuredSignals.nuxtData, false)
+  assert.equal(report.selectors.some(x => x.field === 'name'), true)
+  assert.equal(report.permissionVerified, false)
+})
