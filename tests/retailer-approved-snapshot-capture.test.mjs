@@ -553,3 +553,27 @@ test('HTTP 200 Content-Range cannot launder a partial document into a complete s
   }),/Partial retailer HTML representation refused/)
   assert.equal(cancelled,true)
 })
+
+test('live HTML charset declarations cannot contradict the UTF-8 source byte identity', async () => {
+  const item='<a href="/product/synthetic-111">SYNTHETIC café</a>'
+  const page=meta=>'<html><head>'+meta+'</head><body>'+item+'</body></html>'
+  for(const meta of [
+    '<meta charset="windows-1252">',
+    '<meta charset="ISO-8859-1">',
+    '<meta http-equiv="Content-Type" content="text/html; charset=latin1">',
+    '<meta http-equiv="Content-Type" content="text/html; charset=utf-8; charset=latin1">',
+  ]) {
+    await assert.rejects(captureApprovedRetailerPage({
+      source,permissionGate:gate,grant,
+      fetchFn:async()=>new Response(page(meta),{status:200,
+        headers:{'content-type':'text/html'}}),
+    }),/Untrusted retailer HTML charset/)
+  }
+  const allowed=await captureApprovedRetailerPage({
+    source,permissionGate:gate,grant,
+    fetchFn:async()=>new Response(page('<meta charset="UTF-8">'),{status:200,
+      headers:{'content-type':'text/html'}}),
+  })
+  assert.equal(allowed.published,false)
+  assert.equal(allowed.readyForIngestion,false)
+})
