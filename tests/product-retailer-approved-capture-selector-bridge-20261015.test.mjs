@@ -164,3 +164,29 @@ test('synthetic consent-scoped capture bridge returns reviewed-safe absolute ite
   assert.equal(result.readyForIngestion, false)
   assert.equal(result.sourceRightsForPublicationVerified, false)
 })
+
+test('actual consent-injected capture refuses cross-origin live HTML base before returning source hints', async () => {
+  const url='https://www.plus.nl/producten'
+  const request={
+    source:{supermarket:'plus',kind:'catalog',url},
+    permissionGate:syntheticGate(),
+    grant:consent('plus','catalog',url),capturedAt:at,
+  }
+  let calls=0
+  const bad='<html><head><base href="https://foreign.example/"></head><body>' +
+    '<a href="/product/synthetic-123">Misleading product</a></body></html>'
+  await assert.rejects(captureToPrivateSelectorReview({...request,
+    fetchFn: async()=>{calls++;return new Response(bad,{status:200,
+      headers:{'content-type':'text/html'}})}}),
+    /Untrusted HTML base URL/)
+  assert.equal(calls,1)
+  const good=bad.replace('https://foreign.example/','https://www.plus.nl/')
+  const admitted=await captureToPrivateSelectorReview({...request,
+    fetchFn:async()=>{calls++;return new Response(good,{status:200,
+      headers:{'content-type':'text/html'}})}})
+  assert.equal(calls,2)
+  assert.equal(admitted.selectorProposals.some(s=>
+    s.selector==='a[href^="/product/"]'),true)
+  assert.equal(admitted.readyForIngestion,false)
+  assert.doesNotMatch(JSON.stringify(admitted),/synthetic-123|foreign.example/)
+})
