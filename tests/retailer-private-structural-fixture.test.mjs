@@ -436,3 +436,22 @@ test('real microdata selector survives SHA-bound private archive to synthetic to
     assert.equal((await verifyPrivateSyntheticHtmlFixture(filename,result)).verified,true)
   }
 })
+
+test('anchor-backed Product microdata survives private source to review-only HTML export',async t=>{
+  const source='<html><head><meta charset="UTF-8"></head><body>'+
+    '<a itemscope itemtype="https://schema.org/Product" '+
+    'href="/product/private-do-not-export"><span itemprop="name">'+
+    'PRIVATE_ANCHOR_NAME</span></a></body></html>'
+  const {filename,dir,capture}=await archive(t,'plus','catalog',source)
+  const out=join(dir,'microdata-anchor')
+  const built=await buildPrivateSyntheticHtmlFixture(filename,out)
+  assert.equal(built.productionEnabled,false)
+  const html=await readFile(join(out,'synthetic-structure.html'),'utf8')
+  assert.match(html,/a itemscope itemtype="https:\/\/schema.org\/Product"/)
+  assert.doesNotMatch(html,/PRIVATE_ANCHOR_NAME|private-do-not-export/)
+  const replay=proposeOfflineRetailerSelectors({html,origin:{
+    retailerId:'plus',url:capture.source.url,capturedAt:capture.source.capturedAt}})
+  assert.ok(replay.selectors.some(x=>x.field==='product'&&
+    x.selector==='a[itemtype="https://schema.org/Product"]'))
+  assert.equal((await verifyPrivateSyntheticHtmlFixture(filename,out)).verified,true)
+})

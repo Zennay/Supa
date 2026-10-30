@@ -12,7 +12,7 @@ import { types as nodeTypes } from 'node:util'
 import { isPublicMerchantProductHrefSelector } from './retailer-public-product-href-selectors.mjs'
 
 const FIELDS=['product','name','price','pack','offer','availability']
-const MICRODATA_PRODUCT = /^(?:article|section|div|li)\[itemtype="https?:\/\/schema\.org\/Product"\]$/
+const MICRODATA_PRODUCT = /^(?:article|section|div|li|a)\[itemtype="https?:\/\/schema\.org\/Product"\]$/
 
 const SIGNALS=['schemaOrgProduct','nextData','nuxtData','jsonLd']
 const KEYS=['schemaVersion','mode','source','bytes','scannedTags','structuredSignals',

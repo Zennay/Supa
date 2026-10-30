@@ -136,3 +136,16 @@ test('review-only selector drift compares observed product microdata without pro
   assert.equal(change.productionEnabled,false)
   assert.doesNotMatch(JSON.stringify(change),/PRIVATE NAME|https:\/\/schema.org/)
 })
+
+test('source-observed product-card anchor microdata yields a real review selector',()=>{
+  const html='<html><body><a href="/product/private-321" itemscope '+
+    'itemtype="https://schema.org/Product" itemprop="item">'+
+    '<span itemprop="name">SYNTHETIC PRICELESS</span></a></body></html>'
+  const origin={retailerId:'plus',url:'https://www.plus.nl/producten',
+    capturedAt:'2026-10-14T12:00:00.000Z'}
+  const report=proposeOfflineRetailerSelectors({html,origin})
+  assert.ok(report.selectors.some(x=>x.field==='product'&&
+    x.selector==='a[itemtype="https://schema.org/Product"]'))
+  assert.equal(report.readyForIngestion,false)
+  assert.equal(report.productionEnabled,false)
+})

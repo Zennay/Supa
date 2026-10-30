@@ -11,7 +11,7 @@ const MAX_HTML_BYTES = 2 * 1024 * 1024
 const MAX_TAGS = 25000
 const MAX_SELECTORS = 24
 const STATIC_NAME = /^[a-z][a-z0-9_-]{1,59}$/i
-const MICRODATA_PRODUCT = /^(?:article|section|div|li)\[itemtype="https?:\/\/schema\.org\/Product"\]$/
+const MICRODATA_PRODUCT = /^(?:article|section|div|li|a)\[itemtype="https?:\/\/schema\.org\/Product"\]$/
 
 const KNOWN_MERCHANT_HOSTS = Object.freeze({ plus: 'www.plus.nl', dekamarkt: 'www.dekamarkt.nl' })
 const FIELD_RULES = Object.freeze({
@@ -319,7 +319,7 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
     // A source-observed Schema.org itemscope is a useful product-container
     // selector even on catalogs without classes, test IDs or product links.
     // Never synthesize this selector if the original DOM does not contain it.
-    if (['article','section','div','li'].includes(tag) && attrs.has('itemscope')) {
+    if (['article','section','div','li','a'].includes(tag) && attrs.has('itemscope')) {
       const itemtype = staticAttributeValue(attrs.get('itemtype'))
       const microdata = tag + '[itemtype="' + itemtype + '"]'
       if (itemtype && MICRODATA_PRODUCT.test(microdata))

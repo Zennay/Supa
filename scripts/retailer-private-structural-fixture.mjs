@@ -10,7 +10,7 @@ import { replayPrivateProductHtmlSnapshot, replayPrivateSelectorHtmlSnapshot } f
 import { summarizeOfflineSelectorProposals, proposeOfflineRetailerSelectors } from './retailer-offline-selector-discovery.mjs'
 import { assertNoSymlinkedM3OutputParents } from './m3-source-output-preservation.mjs'
 const FIELD = new Set(['product','name','price','pack','offer','availability'])
-const MICRODATA_PRODUCT = /^(article|section|div|li)\[itemtype="(https?:\/\/schema\.org\/Product)"\]$/
+const MICRODATA_PRODUCT = /^(article|section|div|li|a)\[itemtype="(https?:\/\/schema\.org\/Product)"\]$/
 
 const TAG = /^(article|section|div|span|p|li|h[1-6]|a)\.([a-z][a-z0-9_-]{0,58})$/i
 const ATTRIBUTE = /^(article|section|div|span|p|li|h[1-6])\[(data-testid|itemprop)="([a-z][a-z0-9_-]{1,59})"\]$/i
