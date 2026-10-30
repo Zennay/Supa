@@ -869,3 +869,20 @@ test('actual title/price tokens never create phantom product-container selectors
     assert.equal(report.readyForIngestion,false)
   }
 })
+
+test('HTML class or test-id named like JavaScript Object prototype cannot crash or invent source fields',()=>{
+  const html='<section class="constructor toString hasOwnProperty product-card">'+
+    '<span data-testid="constructor" class="product-name">PRIVATE_NAME</span>'+
+    '<span data-testid="toString" class="price-value">PRIVATE_PRICE</span></section>'
+  for(const [retailerId,url] of [
+    ['plus','https://www.plus.nl/producten'],
+    ['dekamarkt','https://www.dekamarkt.nl/aanbiedingen']]){
+    const report=proposeOfflineRetailerSelectors({html,origin:{...origin,retailerId,url}})
+    assert.ok(report.selectors.some(x=>x.selector==='section.product-card'&&x.field==='product'))
+    assert.ok(report.selectors.some(x=>x.selector==='span.product-name'&&x.field==='name'))
+    assert.ok(report.selectors.some(x=>x.selector==='span.price-value'&&x.field==='price'))
+    assert.equal(report.selectors.some(x=>typeof x.field!=='string'),false)
+    assert.equal(report.readyForIngestion,false)
+    assert.doesNotMatch(JSON.stringify(report),/PRIVATE_NAME|PRIVATE_PRICE/)
+  }
+})

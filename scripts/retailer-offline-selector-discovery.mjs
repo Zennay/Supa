@@ -330,7 +330,8 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
     const classes = (staticAttributeValue(attrs.get('class')) ?? '').split(/[ \t\n\f\r]+/)
     const values = [...new Set(classes.filter(x => STATIC_NAME.test(x)))].slice(0, 20)
     for (const name of values) {
-      const exact = PUBLIC_OBSERVED_TOKEN_FIELDS[name]
+      const exact = Object.hasOwn(PUBLIC_OBSERVED_TOKEN_FIELDS,name)
+        ? PUBLIC_OBSERVED_TOKEN_FIELDS[name] : null
       if (exact) recordSelector(candidates, exact, tag + '.' + name, tag)
       else for (const [field, rule] of Object.entries(FIELD_RULES)) {
         if (rule.test(name)) recordSelector(candidates, field, tag + '.' + name, tag)
@@ -343,7 +344,8 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
         recordSelector(candidates,SCHEMA_ITEMPROP_FIELDS[token],
           tag + '[itemprop="' + token + '"]',tag)
       } else {
-        const exact = PUBLIC_OBSERVED_TOKEN_FIELDS[token]
+        const exact = Object.hasOwn(PUBLIC_OBSERVED_TOKEN_FIELDS,token)
+          ? PUBLIC_OBSERVED_TOKEN_FIELDS[token] : null
         if (exact) recordSelector(candidates, exact,
           tag + '[' + name + '="' + token + '"]', tag)
         else for (const [field, rule] of Object.entries(FIELD_RULES)) {
@@ -464,7 +466,8 @@ export function summarizeOfflineSelectorProposals(report) {
     const match = /^[a-z][a-z0-9-]{0,30}(?:\.([a-z][a-z0-9_-]{1,59})|\[(?:data-testid|itemprop)="([a-z][a-z0-9_-]{1,59})"\])$/.exec(row.selector)
     if (!match) return false
     const token = match[1] ?? match[2]
-    const exact = PUBLIC_OBSERVED_TOKEN_FIELDS[token]
+    const exact = Object.hasOwn(PUBLIC_OBSERVED_TOKEN_FIELDS,token)
+      ? PUBLIC_OBSERVED_TOKEN_FIELDS[token] : null
     if (exact) return row.field === exact ||
       (tag === 'del' && exact === 'price' && row.field === 'offer')
     return PUBLIC_GENERIC_TOKENS.has(token)
