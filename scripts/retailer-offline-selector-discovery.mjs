@@ -165,7 +165,7 @@ function staticAttributeValue(value) {
 // A catalog navigation link to the catalog root is not evidence for a
 // product-card href selector. Restrict observed paths to the actual store:
 // PLUS uses /product/, whereas /producten/ is Deka's product item route.
-function observedProductHrefPrefix(origin, href) {
+function observedProductHrefPrefix(origin, href, documentBaseUrl) {
   if (typeof href !== 'string') return null
   const paths = origin.retailerId === 'plus' ? ['/product/']
     : origin.retailerId === 'dekamarkt' ? ['/producten/']
@@ -176,18 +176,22 @@ function observedProductHrefPrefix(origin, href) {
     // Only propose a CSS href-prefix that actually appeared in the captured
     // DOM. Absolute and protocol-relative same-store links are ordinary HTML;
     // never invent a root-relative selector for them.
+    // Exact relative forms in real DOM href attributes are valid evidence
+    // only if resolution against the document's effective base stays within
+    // this merchant's product route. Do not fabricate root-relative hrefs.
     const formats = [prefix]
-    if (host) formats.push('https://' + host + prefix, '//' + host + prefix)
+    if (host) formats.push('https://' + host + prefix, '//' + host + prefix,
+      prefix.slice(1), '.' + prefix)
     for (const observed of formats) {
       if (!href.startsWith(observed)) continue
       try {
-        const target = new URL(href, origin.url)
+        const target = new URL(href, documentBaseUrl)
         const base = new URL(origin.url)
         const slug = target.pathname.slice(prefix.length)
         if (target.origin !== base.origin || target.username || target.password ||
             !target.pathname.startsWith(prefix) ||
             !slug || slug.startsWith('/') ||
-            /%(?:2f|5c)/i.test(slug)) return null
+            /%(?:2f|5c|2e|25)/i.test(slug)) return null
         return observed
       } catch { return null }
     }
@@ -232,6 +236,7 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
   if (hasMetaRefresh) throw new Error('Untrusted HTML redirect evidence')
   // Live HTML base href changes the browser resolution of relative product
   // links. Foreign or malformed bases cannot become store product evidence.
+  let documentBaseUrl = origin.url
   if (baseHrefs.length) {
     // Offline archives must validate browser-facing href provenance too.
     const href = baseHrefs[0]
@@ -243,6 +248,7 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
     const expected = new URL(origin.url)
     if (base.origin !== expected.origin || base.username || base.password ||
         base.protocol !== 'https:') throw new Error('Untrusted HTML base URL')
+    documentBaseUrl = base.href
   }
 
   // An explicit canonical page identity belonging to another domain makes
@@ -306,11 +312,11 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
     }
     if (tag === 'a') {
       const href = staticAttributeValue(attrs.get('href'))
-      const observed = observedProductHrefPrefix(origin, href)
+      const observed = observedProductHrefPrefix(origin, href, documentBaseUrl)
       if (observed) {
         recordSelector(candidates, 'product', 'a[href^="' + observed + '"]', tag)
         productHrefInstances++
-        const product = new URL(href, origin.url)
+        const product = new URL(href, documentBaseUrl)
         distinctProductPaths.add(product.pathname.replace(/\/$/, ''))
       }
     }

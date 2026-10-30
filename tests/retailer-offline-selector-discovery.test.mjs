@@ -540,6 +540,36 @@ test('source-observed named HTML href entities yield actual DOM-equivalent produ
   assert.doesNotMatch(JSON.stringify(review), /mock-111|mock-222|not-real/i)
 })
 
+test('resolves only source-observed relative product links under effective HTML base', () => {
+  for (const [retailerId, host, itemRoot] of [
+    ['plus', 'www.plus.nl', 'product/'],
+    ['dekamarkt', 'www.dekamarkt.nl', 'producten/'],
+  ]) {
+    const source = { retailerId, capturedAt: origin.capturedAt,
+      url: 'https://' + host + '/aanbiedingen/week' }
+    const html = '<html><head><base href="/"></head><body>' +
+      '<a href="' + itemRoot + 'synthetic-abc">Synthetic product</a>' +
+      '<a href="./' + itemRoot + 'synthetic-xyz">Synthetic product</a>' +
+      '<a href="' + itemRoot + '%252fescape">Ambiguous double-encoded</a>' +
+      '<a href="' + itemRoot + '%2etrick">Encoded dot</a>' +
+      '</body></html>'
+    const report = proposeOfflineRetailerSelectors({ html, origin: source }, true)
+    assert.equal(report.selectors.find(x =>
+      x.selector === 'a[href^="' + itemRoot + '"]')?.instances, 1)
+    assert.equal(report.selectors.find(x =>
+      x.selector === 'a[href^="./' + itemRoot + '"]')?.instances, 1)
+    assert.equal(report.observedProductLinkOccurrences, 2)
+    assert.equal(report.distinctObservedProductPaths, 2)
+    assert.equal(report.readyForIngestion, false)
+    assert.doesNotMatch(JSON.stringify(report), /synthetic-abc|synthetic-xyz/i)
+    const withoutBase = html.replace('<base href="/">','')
+    const invalid = proposeOfflineRetailerSelectors({
+      html: withoutBase, origin: source,
+    })
+    assert.equal(invalid.selectors.filter(x => x.field === 'product').length, 0)
+  }
+})
+
 test('offline archive cannot forge same-store SKU identity or entity-encoded base', () => {
   const cases = [
     { canonical: '/product/different-sku' },

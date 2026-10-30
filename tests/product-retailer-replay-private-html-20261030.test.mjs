@@ -541,6 +541,34 @@ test('historical SHA-pinned private catalog cannot promote another same-store ca
   await assert.rejects(stat(output), /ENOENT/)
 })
 
+test('captured 0600 catalog HTML base preserves observed relative product selectors end-to-end', async t => {
+  for (const [retailerId, host, prefix] of [
+    ['plus', 'www.plus.nl', 'product/'],
+    ['dekamarkt', 'www.dekamarkt.nl', 'producten/'],
+  ]) {
+    const url = 'https://' + host + '/aanbiedingen/week'
+    const html = '<html><head><base href="/"></head><body>' +
+      '<a href="' + prefix + 'fictional-101">SYNTHETIC</a>' +
+      '</body></html>'
+    const changed = '<html><head><base href="/"></head><body>' +
+      '<a href="./' + prefix + 'fictional-202">SYNTHETIC</a>' +
+      '</body></html>'
+    const before = await archivedSelectorPage(t, retailerId, 'offers', url, html)
+    const after = await archivedSelectorPage(t, retailerId, 'offers', url, changed)
+    const review = await replayPrivateSelectorHtmlSnapshot(before)
+    assert.equal(review.proposals.selectors.some(x =>
+      x.selector === 'a[href^="' + prefix + '"]'), true)
+    assert.equal(review.source.retailerId, retailerId)
+    assert.equal(review.priceExtractionEnabled, false)
+    assert.equal(review.productionEnabled, false)
+    const drift = await comparePrivateSelectorHtmlSnapshots(before, after)
+    assert.equal(drift.newSelectorCandidates, 1)
+    assert.equal(drift.missingSelectorCandidates, 1)
+    assert.equal(drift.automatedSelectorPromotion, false)
+    assert.doesNotMatch(JSON.stringify(drift), /fictional-101|fictional-202/i)
+  }
+})
+
 test('Deka offers and PLUS catalog selectors support offline drift but reject mixed URLs/kinds', async t => {
   const dekaUrl = 'https://www.dekamarkt.nl/aanbiedingen'
   const beforeMarkup = '<html><article class="offer-card"><span class="offer-price">1.99</span></article></html>'
