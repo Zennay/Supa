@@ -349,3 +349,26 @@ test('captured HTML requires unambiguous UTF-8 charset before trusting price pro
     }), /charset/)
   }
 })
+
+test('transport refuses BOM and NUL HTML whose decoded DOM could differ from SHA bytes', async () => {
+  const badBodies = [
+    Buffer.from([0xef, 0xbb, 0xbf, ...Buffer.from('<html>synthetic</html>')]),
+    Buffer.from('<html>before\u0000after</html>', 'utf8'),
+  ]
+  for (const body of badBodies) {
+    await assert.rejects(captureApprovedRetailerPage({
+      source, permissionGate: gate, grant,
+      fetchFn: async () => new Response(body, {
+        headers: { 'content-type': 'text/html; charset=utf-8' },
+      }),
+    }), /Ambiguous HTML/)
+  }
+  const html = '<html><body>legitimate Unicode café</body></html>'
+  const allowed = await captureApprovedRetailerPage({
+    source, permissionGate: gate, grant,
+    fetchFn: async () => new Response(html, {
+      headers: { 'content-type': 'text/html; charset=utf-8' },
+    }),
+  })
+  assert.equal(allowed.source.sha256, createHash('sha256').update(html).digest('hex'))
+})
