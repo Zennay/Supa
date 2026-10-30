@@ -490,6 +490,29 @@ test('PLUS catalog HTML can be SHA-replayed into a private selector review witho
     createHash('sha256').update(await readFile(review)).digest('hex'))
 })
 
+test('historical SHA-pinned private catalog cannot promote another same-store canonical SKU', async t => {
+  // Simulates a previously archived 0600 HTML+manifest pair before the strict
+  // live transport safeguard was introduced. No retailer HTTP is performed.
+  const original = '<html><body><a href="/product/mock-111">SYNTHETIC</a></body></html>'
+  const file = await archivedSelectorPage(t, 'plus', 'catalog',
+    'https://www.plus.nl/producten', original)
+  const forged = '<html><head><link rel="canonical" href="/product/mock-222"></head>' +
+    '<body><a href="/product/mock-111">SYNTHETIC</a></body></html>'
+  const manifestFile = file + '.manifest.json'
+  const manifest = JSON.parse(await readFile(manifestFile, 'utf8'))
+  manifest.bytes = Buffer.byteLength(forged)
+  manifest.source.sha256 = createHash('sha256').update(forged).digest('hex')
+  await writeFile(file, forged)
+  await writeFile(manifestFile, JSON.stringify(manifest, null, 2) + '\n')
+  assert.equal((await stat(file)).mode & 0o777, 0o600)
+  await assert.rejects(replayPrivateSelectorHtmlSnapshot(file),
+    /Untrusted HTML canonical source URL/)
+  const output = file.replace('captured.html','forged-selector-review.json')
+  await assert.rejects(savePrivateSelectorHtmlReview(file, output),
+    /Untrusted HTML canonical source URL/)
+  await assert.rejects(stat(output), /ENOENT/)
+})
+
 test('Deka offers and PLUS catalog selectors support offline drift but reject mixed URLs/kinds', async t => {
   const dekaUrl = 'https://www.dekamarkt.nl/aanbiedingen'
   const beforeMarkup = '<html><article class="offer-card"><span class="offer-price">1.99</span></article></html>'
