@@ -49,26 +49,91 @@ function attributes(text) {
   return result
 }
 
+
+// CSS/template fallback markup and HTML comments are never executable product
+// evidence. Prefer an explicit refusal to trusting hidden or malformed data.
+function visibleStructuredScripts(html) {
+  const stripped = html.replace(/<!--[\s\S]*?-->/g, '')
+  if (stripped.includes('<!--') || stripped.includes('-->')) return null
+  let markup = stripped
+  for (const tag of ['template', 'noscript', 'textarea', 'svg', 'style', 'title', 'xmp', 'iframe']) {
+    const opening = new RegExp('<' + tag + '\\b', 'gi')
+    const closing = new RegExp('<\\/' + tag + '\\s*>', 'gi')
+    const beforeOpen = [...markup.matchAll(opening)].length
+    const beforeClose = [...markup.matchAll(closing)].length
+    if (beforeOpen !== beforeClose) return null
+    const pair = new RegExp('<' + tag + '\\b[^>]*>[\\s\\S]*?<\\/' + tag + '\\s*>', 'gi')
+    markup = markup.replace(pair, '')
+    if (opening.test(markup) || closing.test(markup)) return null
+  }
+  return markup
+}
+
+
+// Scan actual HTML opening tags, not a '<script>' string inside a quoted
+// attribute of another element. Script text is raw until its closing tag.
+function scriptElements(markup) {
+  const scripts = []
+  let pos = 0
+  while (pos < markup.length) {
+    const start = markup.indexOf('<', pos)
+    if (start < 0) break
+    const token = /^<\/?([a-z][a-z0-9-]*)\b/i.exec(markup.slice(start))
+    if (!token) { pos = start + 1; continue }
+    const isClose = markup[start + 1] === '/'
+    let quote = null
+    let end = -1
+    for (let i = start + token[0].length; i < markup.length; i++) {
+      const ch = markup[i]
+      if (quote) { if (ch === quote) quote = null }
+      else if (ch === '"' || ch === "'") quote = ch
+      else if (ch === '>') { end = i; break }
+      else if (ch === '<') return null
+    }
+    if (end < 0) return null
+    pos = end + 1
+    if (token[1].toLowerCase() !== 'script') continue
+    if (isClose) return null
+    const closer = /<\/script\s*>/gi
+    closer.lastIndex = pos
+    const found = closer.exec(markup)
+    if (!found) return null
+    scripts.push({
+      attrs: markup.slice(start + token[0].length, end),
+      content: markup.slice(pos, found.index),
+    })
+    if (scripts.length > MAX_SCRIPT_TAGS) return null
+    pos = closer.lastIndex
+  }
+  return scripts
+}
+
 export function readAuthorizedHtmlScriptEvidence(html) {
   if (typeof html !== 'string' ||
       Buffer.byteLength(html, 'utf8') > MAX_HTML_BYTES) {
     return { invalid: true, jsonLdBlocks: [], nuxtPayload: null }
   }
   const invalid = () => ({ invalid: true, jsonLdBlocks: [], nuxtPayload: null })
+  const visible = visibleStructuredScripts(html)
+  if (visible === null) return invalid()
+  const elements = scriptElements(visible)
+  if (elements === null) return invalid()
   const jsonLdBlocks = []
   let nuxtPayload = null
   let nuxtSeen = false
   let count = 0
-  const scriptPattern = /<script\b([^<>]{0,1500})>([\s\S]*?)<\/script\s*>/gi
-  for (const match of html.matchAll(scriptPattern)) {
-    if (++count > MAX_SCRIPT_TAGS) return invalid()
-    const attr = attributes(match[1])
+  for (const element of elements) {
+    if (++count > MAX_SCRIPT_TAGS || element.attrs.length > 1500) return invalid()
+    const attr = attributes(element.attrs)
     if (!attr) return invalid()
     const type = attr.get('type')?.trim().toLowerCase()
     const id = attr.get('id')
-    const content = match[2].trim()
+    const content = element.content.trim()
     // Never use remote script-src content as embedded structured evidence.
-    if (attr.has('src')) continue
+    if (attr.has('src')) {
+      if (type === 'application/ld+json' || id === '__NUXT_DATA__') return invalid()
+      continue
+    }
     if (type === 'application/ld+json') {
       if (Buffer.byteLength(content, 'utf8') > MAX_SCRIPT_BYTES ||
           jsonLdBlocks.length >= MAX_JSONLD) return invalid()

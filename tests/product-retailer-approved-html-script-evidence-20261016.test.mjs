@@ -131,3 +131,67 @@ test('unparseable JSON-LD and Nuxt reject instead of returning a price', async (
     script('type="application/ld+json"', dekaFixture.jsonLdProduct))
   assert.equal(deka.status, 'review_required')
 })
+
+test('hidden comment/template/textarea/noscript scripts never supply product prices', async () => {
+  const productMarkup = script('type="application/ld+json"', plusProduct)
+  for (const hidden of [
+    '<!--' + productMarkup + '-->',
+    '<template>' + productMarkup + '</template>',
+    '<noscript>' + productMarkup + '</noscript>',
+    '<textarea>' + productMarkup + '</textarea>',
+    '<svg>' + productMarkup + '</svg>',
+  ]) {
+    const evidence = readAuthorizedHtmlScriptEvidence(hidden)
+    assert.equal(evidence.invalid, false)
+    assert.equal(evidence.jsonLdBlocks.length, 0)
+    const result = await run('plus', hidden)
+    assert.equal(result.status, 'review_required')
+    assert.equal(result.observation, null)
+  }
+  const safe = await run('plus', '<!--' +
+    script('type="application/ld+json"', { ...plusProduct, name: 'fake cheap' }) +
+    '-->' + productMarkup)
+  assert.equal(safe.status, 'candidate_needs_review')
+  assert.equal(safe.observation.currentPriceCents, 199)
+})
+
+test('unclosed inert markup and external script evidence fail closed', async () => {
+  const valid = script('type="application/ld+json"', plusProduct)
+  for (const malformed of [
+    '<!--' + valid,
+    '<template>' + valid,
+    '<textarea>' + valid,
+    '<script type="application/ld+json">{}',
+    '<script src="/fake" type="application/ld+json"></script>' + valid,
+    '<script src="/fake" id="__NUXT_DATA__"></script>' + valid,
+  ]) {
+    const read = readAuthorizedHtmlScriptEvidence(malformed)
+    assert.equal(read.invalid, true)
+    const result = await run('plus', malformed)
+    assert.equal(result.status, 'review_required')
+    assert.equal(result.observation, null)
+    assert.equal(result.publicSavingsClaimEligible, false)
+  }
+})
+
+test('script-looking text in a quoted HTML attribute or inert style/title is not DOM evidence', async () => {
+  const real = script('type="application/ld+json"', plusProduct)
+  for (const markup of [
+    '<div data-source-note=\'' + real + '\'>not an HTML script element</div>',
+    '<style>' + real + '</style>',
+    '<title>' + real + '</title>',
+    '<xmp>' + real + '</xmp>',
+    '<iframe>' + real + '</iframe>',
+  ]) {
+    const parsed = readAuthorizedHtmlScriptEvidence(markup)
+    assert.equal(parsed.invalid, false)
+    assert.equal(parsed.jsonLdBlocks.length, 0)
+    const outcome = await run('plus', markup)
+    assert.equal(outcome.status, 'review_required')
+    assert.equal(outcome.observation, null)
+  }
+  const accepted = await run('plus', '<div data-source-note=\'' +
+    real + '\'>not data</div>' + real)
+  assert.equal(accepted.status, 'candidate_needs_review')
+  assert.equal(accepted.observation.currentPriceCents, 199)
+})

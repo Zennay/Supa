@@ -119,3 +119,14 @@ De uitvoer bestaat uitsluitend uit geaggregeerde aantallen en `reviewRequired`;
 de parser promoot geen CSS-selector, doet geen HTTP en maakt geen winkelprijs
 beschikbaar voor gebruikers. De bestaande `retailer-private-selector-drift.mjs`
 is de validator van die verschillen.
+
+### Geen script-bewijs uit verborgen HTML
+
+De prijs-/Nuxt-brug doorloopt uitsluitend echte HTML-`script`-tags. Een
+`<script>` in een HTML-comment, een `template`, `noscript`, `textarea`,
+`svg`, `style`, `title`, `xmp`, `iframe` of in een geciteerd HTML-attribuut is
+geen live productbewijs. Malformeerde inert-containergrenzen en een externe
+`src` die een relevante JSON-LD/Nuxt-tag nabootst, worden fail-closed
+geweigerd. Synthetische positieve en negatieve contracttests bewijzen dat
+gewone PLUS-JSON-LD en Deka Nuxt corroboratie werkzaam blijven; er is geen
+nieuwe echte bronpagina gecaptured of winkelprijs gepubliceerd.
