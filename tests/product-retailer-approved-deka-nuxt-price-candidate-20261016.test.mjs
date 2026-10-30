@@ -210,3 +210,25 @@ test('Deka matches physically identical 1000 ml and 1 liter when both price spel
   assert.equal(wrongDimension.status,'review_required')
   assert.equal(wrongDimension.observation,null)
 })
+
+test('Deka Nuxt and JSON-LD cannot agree their way around a foreign canonical/base source',async()=>{
+  const original=html()
+  for (const meta of [
+    '<link rel="canonical" href="https://www.plus.nl/product/fictional-123">',
+    '<base href="https://foreign.example/">',
+    '<link rel="canonical" href="http://www.dekamarkt.nl/producten/">',
+  ]) {
+    const result=await captureApprovedProductPriceCandidate(options(
+      original.replace('<head>','<head>'+meta)))
+    assert.equal(result.status,'review_required')
+    assert.equal(result.reason,'missing_or_invalid_jsonld')
+    assert.equal(result.observation,null)
+    assert.equal(result.published,false)
+  }
+  const correct=original.replace('<head>',
+    '<head><link rel="canonical" href="'+url+'">')
+  const valid=await captureApprovedProductPriceCandidate(options(correct))
+  assert.equal(valid.status,'candidate_needs_review')
+  assert.equal(valid.observation.currentPriceCents,85)
+  assert.equal(valid.verifiedCurrentCheckoutPrice,false)
+})
