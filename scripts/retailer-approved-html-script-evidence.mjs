@@ -55,10 +55,13 @@ function verifyProductContexts(root) {
       if (!(inherited || own || absolute)) return false
       count++
     }
-    // Match the actual Schema.org nested-Product places used by the private
-    // page parser and offline structural scanner. An unapproved nested
-    // @context blocks the whole price candidate, not only the visible node.
-    for (const key of ['@graph', 'mainEntity', 'itemListElement', 'item']) {
+    // Validate the entire Product/Offer evidence chain. Schema.org context
+    // can be overridden *inside* offers or priceSpecification: ignoring that
+    // child would label a foreign-vocabulary price as an official EUR Offer.
+    // Also traverse the actual nested Product locations from the offline
+    // scanner, staying bounded and refusing ambiguous local context overrides.
+    for (const key of ['@graph', 'mainEntity', 'itemListElement', 'item',
+                       'offers', 'priceSpecification', 'weight', 'size']) {
       if (!Object.hasOwn(v, key)) continue
       const child = v[key]
       if (key === '@graph' && !Array.isArray(child)) return false

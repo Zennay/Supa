@@ -431,3 +431,27 @@ test('nested URL-less recommendation never becomes the product-page price',async
   assert.equal(saved.priceReview.observation,null)
   assert.equal(saved.published,false)
 })
+
+test('a foreign JSON-LD Offer or PriceSpecification context cannot redefine the source price',async t=>{
+  const product={
+    '@context':'https://schema.org','@type':'Product',url:targets.plus,
+    name:'SYNTHETIC SOURCE PRICE',weight:{value:'500 g'},
+    offers:{'@type':'Offer',price:'0.01',priceCurrency:'EUR',
+      availability:'https://schema.org/InStock',
+      priceSpecification:{'@type':'PriceSpecification',priceCurrency:'EUR'}},
+  }
+  for(const kind of ['offers','priceSpecification']){
+    const variant=structuredClone(product)
+    if(kind==='offers') variant.offers['@context']='https://untrusted.example'
+    else variant.offers.priceSpecification['@context']='https://untrusted.example'
+    const html='<html><head><script type="application/ld+json">'+
+      JSON.stringify(variant)+'</script></head><body><article class="product-card">SYNTHETIC</article></body></html>'
+    const file=join(await folder(t),kind+'.json')
+    const status=await archive(options('plus',html),file)
+    const saved=JSON.parse(await readFile(file,'utf8'))
+    assert.equal(status.candidateCount,0,'foreign '+kind)
+    assert.equal(saved.priceReview.reason,'unverified_schema_context',kind)
+    assert.equal(saved.priceReview.observation,null)
+    assert.equal(saved.published,false)
+  }
+})
