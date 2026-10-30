@@ -214,6 +214,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   )
   const isHiFiView = tab === 'home' || tab === 'recipes' || tab === 'products'
   const [pickerDay, setPickerDay] = useState<string | null>(null)
+  const [plannerReturnDay, setPlannerReturnDay] = useState<string | null>(null)
   const catalogProducts = useDesignProducts()
   const navigate = (next: Tab) => {
     setPickerDay(null)
@@ -695,7 +696,11 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         )}
         {tab === 'planner' && pickerDay === null && (
           <PlannerView
-            onPickRecipe={setPickerDay}
+            onPickRecipe={day => {
+              setPlannerReturnDay(day)
+              setPickerDay(day)
+            }}
+            preferredFocusedDay={plannerReturnDay ?? undefined}
             budget={budget}
             activeDays={activeDays}
             plannedMeals={plannedMeals}

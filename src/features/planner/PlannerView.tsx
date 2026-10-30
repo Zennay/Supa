@@ -18,6 +18,8 @@ import './planner.css'
 const budgetOptions = [30, 35, 40]
 
 type PlannerViewProps = {
+  /** The day selected before an unmount into the recipe picker. */
+  preferredFocusedDay?: string
   /** Open the recipe picker for an open day ('Toevoegen aan planner'). */
   onPickRecipe: (day: string) => void
   budget: number
@@ -46,6 +48,7 @@ type PlannerViewProps = {
 }
 
 export function PlannerView({
+  preferredFocusedDay,
   onPickRecipe,
   budget,
   activeDays,
@@ -73,7 +76,7 @@ export function PlannerView({
 }: PlannerViewProps) {
   // The mobile selector is ephemeral; only the canonical App callbacks
   // change the actual planned day and recipe. Respect main's recipe picker.
-  const [focusedDay, setFocusedDay] = useState('')
+  const [focusedDay, setFocusedDay] = useState(() => preferredFocusedDay ?? '')
   const quickDay = plannedMeals.some(({ day }) => day === focusedDay)
     ? focusedDay
     : (plannedMeals.find(({ day }) => activeDays.includes(day))?.day ?? plannedMeals[0]?.day ?? '')

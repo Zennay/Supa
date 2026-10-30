@@ -57,6 +57,18 @@ test('Figma Planner 3359:4896 meal rows and total card keep real state and make 
     }))
     assert.doesNotMatch(nothingActive, /id="planner-mobile-quick-recipe"/)
     assert.match(nothingActive, /alleen een dag kiezen verandert je planning niet/)
+    // A recipe picker unmounts Planner. Returning should keep that exact day
+    // selected without auto-adding the day before a recipe was chosen.
+    const returned = renderToStaticMarkup(createElement(PlannerView, {
+      preferredFocusedDay: inactiveDay,
+      budget: 35, activeDays, plannedMeals: meals, recipes,
+      basketTotalCents: null, basketUnresolvedLineCount: 0,
+      onPickRecipe() {}, onBudgetChange() {}, onToggleDay() {},
+      onRecipeChange() {}, onReset() {},
+    }))
+    assert.match(returned, new RegExp('<strong>' + inactiveDay + '</strong> · Nog niet ingepland'))
+    assert.match(returned, /Plan .* eerst; alleen een dag kiezen verandert je planning niet/)
+    assert.doesNotMatch(returned, /id="planner-mobile-quick-recipe"/)
     assert.match(html, /aria-label="Snel weekbudget instellen"/)
     assert.match(html, /Weekbudget: /)
     assert.match(html, /Winkelkosten nog onbekend/)
