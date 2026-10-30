@@ -1,3 +1,5 @@
+import { parseUniqueKeyRetailerJson } from './retailer-private-unique-key-json.mjs'
+
 /**
  * Static, bounded HTML token scan for OFFLINE selector *proposals*.
  * Script JSON and quoted markup are never executed or promoted as prices.
@@ -146,7 +148,10 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
         const content = html.slice(end + 1, closing.index).trim();
         if (Buffer.byteLength(content, 'utf8') <= 1024 * 1024) {
           let parsed = null;
-          try { parsed = JSON.parse(content); } catch {}
+          // A structural Product/SSR signal must meet the same unambiguous
+          // JSON grammar as the private priced evidence reader. Duplicate
+          // keys (including escaped aliases) must not create false proof.
+          try { parsed = parseUniqueKeyRetailerJson(content); } catch {}
           if (type === 'application/ld+json' && parsed !== null) {
             signals.jsonLd = true;
             if (hasProduct(parsed)) signals.schemaOrgProduct = true;
