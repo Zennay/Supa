@@ -389,3 +389,13 @@ wordt uitsluitend gevormd uit daadwerkelijk gemeten attributen in iedere
 opname; ook hier blijven selectoruniciteit en geschiktheid onbewezen en is
 een menselijke review verplicht. Dit geldt voor de M1 catalogus-/aanbiedingsroute,
 niet voor automatische live prijsverwerking.
+
+### Corroboratie van fysiek gelijke verpakkingen
+
+DekaMarkt Nuxt en dezelfde pagina's Schema.org-product kunnen exact dezelfde
+inhoud als `1 liter` en `1000 ml` vermelden. De private prijsbrug vergelijkt
+nu de fysieke dimensie en hoeveelheid (eveneens `1 kg` versus `1000 g`)
+met identieke multipackaantallen, zonder een verschil in naam, SKU,
+beschikbaarheid of onafhankelijke prijscorroboratie te negeren. `750 ml` tegen
+`1 liter` en gewicht tegen volume blijven review-weigeringen. Het originele
+onafhankelijke QA-scenario uit PR #3572 is 3/3 groen nagebootst op deze code.

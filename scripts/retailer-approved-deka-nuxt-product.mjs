@@ -125,6 +125,28 @@ export function parseDekaNuxtFromAuthorizedHtml({ html, provenance, jsonLdBlocks
   }
 }
 
+// Schema.org and Nuxt may express the SAME physical single pack as
+// 1000 ml vs 1 liter (or 1000 g vs 1 kg). Compare dimensions and exact
+// physical quantity, never the lexical unit label; multipack item counts
+// must also match so 2x500 ml cannot silently equal one 1-litre pack.
+function equivalentPhysicalPack(a, b) {
+  if (!a || !b || typeof a.amount !== 'number' || typeof b.amount !== 'number') return false
+  const dimensions = {g:'mass',kg:'mass',ml:'volume',l:'volume',piece:'piece'}
+  const factors = {g:1,kg:1000,ml:1,l:1000,piece:1}
+  if (!Object.hasOwn(dimensions,a.unit) || !Object.hasOwn(dimensions,b.unit) ||
+      dimensions[a.unit] !== dimensions[b.unit]) return false
+  const left = normalizePackText(a.rawText)
+  const right = normalizePackText(b.rawText)
+  if (left.amount === null || right.amount === null || left.count !== right.count ||
+      left.amount !== a.amount || right.amount !== b.amount ||
+      left.unit !== a.unit || right.unit !== b.unit) return false
+  const amountA = a.amount * factors[a.unit]
+  const amountB = b.amount * factors[b.unit]
+  return Number.isFinite(amountA) && Number.isFinite(amountB) &&
+    amountA > 0 && Number.isSafeInteger(Math.round(amountA * 1000)) &&
+    Math.abs(amountA - amountB) < 1e-9
+}
+
 /**
  * A fully parseable JSON-LD Offer is not grounds to ignore the same page's
  * Nuxt product/price. If both claim to describe this Deka SKU, all concrete
@@ -147,8 +169,7 @@ export function corroborateDekaNuxtProduct({ html, provenance, jsonLdBlocks,
           a.currentPriceCents !== b.currentPriceCents) ||
         (a.currency !== null && a.currency !== b.currency) ||
         (a.availability !== 'unknown' && a.availability !== b.availability) ||
-        (a.pack.amount !== null && (a.pack.amount !== b.pack.amount ||
-          a.pack.unit !== b.pack.unit))) return fail()
+        (a.pack.amount !== null && !equivalentPhysicalPack(a.pack, b.pack))) return fail()
   }
   return fallback
 }

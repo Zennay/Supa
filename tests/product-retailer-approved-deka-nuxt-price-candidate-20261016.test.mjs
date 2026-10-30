@@ -188,3 +188,25 @@ test('Deka rejects case-variant stock and price-spec evidence that conflicts wit
   assert.equal(extra.status, 'review_required')
   assert.equal(extra.observation, null)
 })
+
+test('Deka matches physically identical 1000 ml and 1 liter when both price spellings corroborate Nuxt', async () => {
+  const ld = structuredClone(fixture.jsonLdProduct)
+  ld.url = url
+  ld.sku = '115873'
+  ld.weight = { value: '1000 ml' }
+  ld.offers.price = '0.85'
+  ld.offers.Price = 0.85
+  const result = await captureApprovedProductPriceCandidate(options(html(undefined,ld)))
+  assert.equal(result.status,'candidate_needs_review')
+  assert.equal(result.observation.currentPriceCents,85)
+  assert.equal(result.publicSavingsClaimEligible,false)
+  assert.equal(result.published,false)
+  ld.weight = {value:'750 ml'}
+  const mismatch = await captureApprovedProductPriceCandidate(options(html(undefined,ld)))
+  assert.equal(mismatch.status,'review_required')
+  assert.equal(mismatch.observation,null)
+  ld.weight = {value:'1 kg'}
+  const wrongDimension = await captureApprovedProductPriceCandidate(options(html(undefined,ld)))
+  assert.equal(wrongDimension.status,'review_required')
+  assert.equal(wrongDimension.observation,null)
+})
