@@ -12,6 +12,8 @@ import { types as nodeTypes } from 'node:util'
 import { isPublicMerchantProductHrefSelector } from './retailer-public-product-href-selectors.mjs'
 
 const FIELDS=['product','name','price','pack','offer','availability']
+const MICRODATA_PRODUCT = /^(?:article|section|div|li)\[itemtype="https?:\/\/schema\.org\/Product"\]$/
+
 const SIGNALS=['schemaOrgProduct','nextData','nuxtData','jsonLd']
 const KEYS=['schemaVersion','mode','source','bytes','scannedTags','structuredSignals',
   'selectors','humanReviewRequired','readyForIngestion','permissionVerified',
@@ -58,8 +60,9 @@ function canonical(report) {
       !FIELDS.includes(s.field)||s.status!=='needs-human-review'||
       typeof s.selector!=='string'||s.selector.length>200||
       !(/^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9_-]*|\[(?:data-testid|itemprop)="[a-z][a-z0-9_-]*"\])$/i.test(s.selector) ||
-        (s.field === 'product' &&
-          isPublicMerchantProductHrefSelector(report.source.retailerId, s.selector)))||
+        (s.field === 'product' && (
+          isPublicMerchantProductHrefSelector(report.source.retailerId, s.selector) ||
+          MICRODATA_PRODUCT.test(s.selector))))||
       !integer(s.instances,25000)||s.instances<1)fail()
     const id=JSON.stringify([s.field,s.selector])
     if(out.has(id))fail()

@@ -10,6 +10,8 @@ import { replayPrivateProductHtmlSnapshot, replayPrivateSelectorHtmlSnapshot } f
 import { summarizeOfflineSelectorProposals, proposeOfflineRetailerSelectors } from './retailer-offline-selector-discovery.mjs'
 import { assertNoSymlinkedM3OutputParents } from './m3-source-output-preservation.mjs'
 const FIELD = new Set(['product','name','price','pack','offer','availability'])
+const MICRODATA_PRODUCT = /^(article|section|div|li)\[itemtype="(https?:\/\/schema\.org\/Product)"\]$/
+
 const TAG = /^(article|section|div|span|p|li|h[1-6]|a)\.([a-z][a-z0-9_-]{0,58})$/i
 const ATTRIBUTE = /^(article|section|div|span|p|li|h[1-6])\[(data-testid|itemprop)="([a-z][a-z0-9_-]{1,59})"\]$/i
 const refuse = () => { throw Error('Private synthetic structural fixture refused') }
@@ -22,6 +24,10 @@ function elementFor(row, retailerId) {
   match = ATTRIBUTE.exec(row.selector)
   if (match) return '<'+match[1].toLowerCase()+' '+match[2]+'="'+match[3]+
     '" data-synthetic="true">SYNTHETIC STRUCTURE</'+match[1].toLowerCase()+'>'
+  match=MICRODATA_PRODUCT.exec(row.selector)
+  if (row.field === 'product' && match)
+    return '<'+match[1]+' itemscope itemtype="'+match[2]+
+      '" data-synthetic="true">SYNTHETIC STRUCTURE</'+match[1]+'>'
   if (row.field === 'product' &&
       isPublicMerchantProductHrefSelector(retailerId, row.selector)) {
     const root = /^a\[href\^="([^"<>]+)"\]$/.exec(row.selector)?.[1]

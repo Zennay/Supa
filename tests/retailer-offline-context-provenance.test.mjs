@@ -1,7 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {scanOfflineRetailerMarkup} from '../scripts/retailer-offline-structural-scan.mjs'
-import {proposeOfflineRetailerSelectors} from '../scripts/retailer-offline-selector-discovery.mjs'
+import {compareOfflineSelectorProposals} from '../scripts/retailer-private-selector-drift.mjs'
+import {proposeOfflineRetailerSelectors,summarizeOfflineSelectorProposals} from '../scripts/retailer-offline-selector-discovery.mjs'
 
 const capture = json => '<html><head><script type="application/ld+json">'+
   JSON.stringify(json)+'</script></head><body><article class="product-card"></article></body></html>'
@@ -83,4 +84,55 @@ test('observed retailer microdata reaches private selector proposal without pric
   assert.equal(report.permissionVerified,false)
   assert.equal(report.productionEnabled,false)
   assert.equal(report.publicSavingsClaimEligible,false)
+})
+
+test('source-observed retail microdata creates a reviewable product container selector',()=>{
+  for(const [retailerId,host,type] of [
+    ['plus','www.plus.nl','https://schema.org/Product'],
+    ['dekamarkt','www.dekamarkt.nl','http://schema.org/Product']]) {
+    const html='<html><body><article itemscope itemtype="'+type+'">'+
+      '<span itemprop="name">SECRET PRIVATE PRODUCT</span>'+
+      '</article></body></html>'
+    const report=proposeOfflineRetailerSelectors({html,origin:{
+      retailerId,url:'https://'+host+'/producten',
+      capturedAt:'2026-10-14T12:00:00.000Z'}})
+    const selector='article[itemtype="'+type+'"]'
+    assert.ok(report.selectors.some(x=>x.field==='product'&&x.selector===selector))
+    const safe=summarizeOfflineSelectorProposals(report)
+    assert.ok(safe.selectors.some(x=>x.field==='product'&&x.selector===selector))
+    assert.equal(report.productionEnabled,false)
+    assert.equal(report.readyForIngestion,false)
+    assert.doesNotMatch(JSON.stringify(safe),/SECRET PRIVATE PRODUCT/)
+  }
+})
+test('never invents product-container selectors from missing, mixed or inert microdata',()=>{
+  const snippets=[
+    '<article itemtype="https://schema.org/Product"></article>',
+    '<article itemscope itemtype="https://other.invalid/Product"></article>',
+    '<article itemscope itemtype="https://schema.org/Product https://other.invalid/Thing"></article>',
+    '<template><article itemscope itemtype="https://schema.org/Product"></article></template>',
+  ]
+  for(const markup of snippets) {
+    const report=proposeOfflineRetailerSelectors({html:'<html><body>'+markup+'</body></html>',
+      origin:{retailerId:'plus',url:'https://www.plus.nl/producten',
+        capturedAt:'2026-10-14T12:00:00.000Z'}})
+    assert.ok(!report.selectors.some(row=>row.field==='product'&&row.selector.includes('itemtype')))
+  }
+})
+
+test('review-only selector drift compares observed product microdata without promoting it',()=>{
+  const oldHtml='<html><body><article class="product-card"></article></body></html>'
+  const newHtml='<html><body><article itemscope itemtype="https://schema.org/Product">'+
+    '<span itemprop="name">PRIVATE NAME</span></article></body></html>'
+  const origin={retailerId:'plus',url:'https://www.plus.nl/producten',
+    capturedAt:'2026-10-14T12:00:00.000Z'}
+  const before=proposeOfflineRetailerSelectors({html:oldHtml,origin})
+  const after=proposeOfflineRetailerSelectors({html:newHtml,origin:{
+    ...origin,capturedAt:'2026-10-15T12:00:00.000Z'}})
+  const change=compareOfflineSelectorProposals(before,after)
+  assert.equal(change.newSelectorCandidates>0,true)
+  assert.equal(change.perField.product.new>0,true)
+  assert.equal(change.automatedSelectorPromotion,false)
+  assert.equal(change.productionEnabled,false)
+  assert.doesNotMatch(JSON.stringify(change),/PRIVATE NAME|https:\/\/schema.org/)
 })

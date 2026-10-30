@@ -417,3 +417,22 @@ test('same-time changed HTML is stale and older v1 pairs do not promote newer v1
   await toLegacy(newDir)
   await assert.rejects(comparePrivateSyntheticFixturePairs(...args))
 })
+
+test('real microdata selector survives SHA-bound private archive to synthetic topology and replay',async t=>{
+  for(const retailer of ['plus','dekamarkt']) {
+    const src='<html><head><meta charset="UTF-8"></head><body>'+
+      '<article itemscope itemtype="https://schema.org/Product">'+
+      '<span itemprop="name">PRIVATE_NAME_DO_NOT_EXPORT</span></article></body></html>'
+    const {filename,dir,capture}=await archive(t,retailer,retailer==='plus'?'catalog':'offers',src)
+    const result=join(dir,'microdata-synthetic')
+    await buildPrivateSyntheticHtmlFixture(filename,result)
+    const html=await readFile(join(result,'synthetic-structure.html'),'utf8')
+    const selector='article[itemtype="https://schema.org/Product"]'
+    assert.match(html,/itemscope itemtype="https:\/\/schema.org\/Product"/)
+    assert.doesNotMatch(html,/PRIVATE_NAME_DO_NOT_EXPORT/)
+    const roundtrip=proposeOfflineRetailerSelectors({html,origin:{
+      retailerId:retailer,url:capture.source.url,capturedAt:capture.source.capturedAt}})
+    assert.ok(roundtrip.selectors.some(x=>x.field==='product'&&x.selector===selector))
+    assert.equal((await verifyPrivateSyntheticHtmlFixture(filename,result)).verified,true)
+  }
+})
