@@ -661,3 +661,16 @@ test('duplicated HTML class tokens count one DOM element and never crowd out dis
     assert.equal(result.readyForScraping,false)
   }
 })
+
+test('actual HTML named Tab and NewLine class separators are shared by both offline readers',()=>{
+  for(const retailer of ['plus','dekamarkt']){
+    const html='<article class="product-card&Tab;price-label&NewLine;pack-size">SYNTHETIC</article>'
+    const result=proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',html),html)
+    for(const selector of ['article.product-card','article.price-label','article.pack-size'])
+      assert.equal(result.proposedSelectors.some(x=>x.selector===selector),true,retailer+' '+selector)
+    assert.equal(result.currentPricesExtracted,false)
+    const nested='<article class="product-card&amp;Tab;price-label">SYNTHETIC</article>'
+    const decoy=proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',nested),nested)
+    assert.equal(decoy.proposedSelectors.some(x=>x.selector==='article.price-label'),false,retailer)
+  }
+})

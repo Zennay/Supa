@@ -170,8 +170,8 @@ export function staticAttributeValue(value) {
   if (typeof value !== 'string') return value
   // A browser decodes named and numeric references in a SINGLE pass. Two
   // sequential replacements can invent Product selectors from &amp;#117;.
-  const named = Object.freeze({ sol: '/', colon: ':', amp: '&' })
-  return value.replace(/&(sol|colon|amp);|&#(?:[xX]([0-9a-fA-F]{1,6})|([0-9]{1,7}));/g,
+  const named = Object.freeze({ sol: '/', colon: ':', amp: '&', Tab: '\t', NewLine: '\n' })
+  return value.replace(/&(sol|colon|amp|Tab|NewLine);|&#(?:[xX]([0-9a-fA-F]{1,6})|([0-9]{1,7}));/g,
     (raw, name, hex, decimal) => {
       if (name !== undefined) return named[name]
       const point = Number.parseInt(hex ?? decimal, hex === undefined ? 10 : 16)
