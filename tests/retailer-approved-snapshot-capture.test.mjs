@@ -872,3 +872,32 @@ test('a same-host HTML base cannot silently rebase reviewed product links to a d
     assert.equal(proof.published, false)
   }
 })
+
+
+test('raw source authority must not be rewritten by URL hostname percent or IDNA normalization', async () => {
+  const aliases = [
+    'https://%77ww.plus.nl/producten',
+    'https://www.%70lus.nl/producten',
+    'https://www．plus.nl/producten',
+    '//%77ww.plus.nl/producten',
+  ]
+  for (const alias of aliases) {
+    assert.equal(new URL(alias, url).origin, new URL(url).origin)
+    const variants = [
+      { headers: { 'content-location': alias }, html: '<html>SYNTHETIC</html>' },
+      { headers: { link: '<' + alias + '>; rel=canonical' }, html: '<html>SYNTHETIC</html>' },
+      { headers: {}, html: '<html><head><base href="' + alias + '"></head><body>SYNTHETIC</body></html>' },
+      { headers: {}, html: '<html><head><link rel="canonical" href="' + alias + '"></head><body>SYNTHETIC</body></html>' },
+    ]
+    for (const variant of variants) {
+      // Fetch Headers are ByteString-only; the Unicode host alias is a
+      // browser-DOM case rather than a valid raw HTTP header value.
+      if (alias.includes('．') && Object.keys(variant.headers).length) continue
+      await assert.rejects(captureApprovedRetailerPage({
+        source, permissionGate: gate, grant,
+        fetchFn: async () => new Response(variant.html, { status: 200,
+          headers: { 'content-type': 'text/html', ...variant.headers } }),
+      }), /source identity refused|Untrusted HTML/, alias)
+    }
+  }
+})

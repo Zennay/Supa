@@ -111,6 +111,14 @@ function checkedTarget(source) {
   return target.href
 }
 
+// WHATWG URL normalization decodes percent-escaped host bytes and IDNA
+// dot variants before comparing origins. A reviewed source must name the
+// literal retailer authority, not an equivalent-looking alias.
+function exactRawRetailerAuthority(raw, target) {
+  const match = /^(?:[a-z][a-z0-9+.-]*:)?\/\/([^/?#]*)/i.exec(raw)
+  return !match || match[1].toLowerCase() === new URL(target).host.toLowerCase()
+}
+
 function assertDocumentSourceIdentity(html, target) {
   // The HTTP 200 destination is not sufficient source provenance: HTML may
   // navigate the browser or rebase relative links to a different storefront.
@@ -123,7 +131,8 @@ function assertDocumentSourceIdentity(html, target) {
   for (const href of document.baseHrefs) {
     // The browser resolves HTML character references before interpreting
     // href. Never validate their undecoded source text as a safe URL.
-    if (typeof href !== 'string' || !href || href.length > 2048 || (href.includes('&') || ambiguousRetailerRoute(href))) {
+    if (typeof href !== 'string' || !href || href.length > 2048 || (href.includes('&') || ambiguousRetailerRoute(href) ||
+        !exactRawRetailerAuthority(href, target))) {
       throw new Error('Untrusted HTML base URL')
     }
     let destination
@@ -146,7 +155,8 @@ function assertDocumentSourceIdentity(html, target) {
     }
   }
   for (const href of document.canonicalHrefs) {
-    if (typeof href !== 'string' || !href || href.length > 2048 || (href.includes('&') || ambiguousRetailerRoute(href))) {
+    if (typeof href !== 'string' || !href || href.length > 2048 || (href.includes('&') || ambiguousRetailerRoute(href) ||
+        !exactRawRetailerAuthority(href, target))) {
       throw new Error('Untrusted HTML canonical source URL')
     }
     let destination
@@ -188,7 +198,8 @@ function permittedForCapture(gate, source, grant, target) {
 
 function sameRetailerContentLocation(raw, source) {
   if (typeof raw !== 'string' || !raw || raw.length > 2048 ||
-      raw.includes('&') || ambiguousRetailerRoute(raw))
+      raw.includes('&') || ambiguousRetailerRoute(raw) ||
+      !exactRawRetailerAuthority(raw, source))
     return false
   let claimed
   try { claimed = new URL(raw, source) } catch { return false }
