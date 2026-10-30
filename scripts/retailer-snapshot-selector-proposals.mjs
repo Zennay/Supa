@@ -1,5 +1,6 @@
 import { ambiguousRetailerRoute, isAllowedM1RetailerSourcePath } from './retailer-source-route-safety.mjs'
 import { scanOfflineRetailerMarkup } from './retailer-offline-structural-scan.mjs'
+import { admittedJsonScriptType, admittedRetailerScriptId } from './retailer-json-script-mime.mjs'
 import { proposeOfflineRetailerSelectors, summarizeOfflineSelectorProposals, assertObservedRetailerHtmlIdentity, openingTags } from './retailer-offline-selector-discovery.mjs'
 import { parseUniqueKeyRetailerJson } from './retailer-private-unique-key-json.mjs'
 import { decodeExactRetailerHtmlBytes } from './retailer-private-html-byte-identity.mjs'
@@ -180,11 +181,14 @@ export function proposeRetailerSelectors(source, html) {
   // inside <style>, inert SVG or quoted attribute values. Never execute JS.
   for(const script of document.scripts){
     if(script.attrs.has('src')) continue
-    const scriptType=script.attrs.get('type')?.trim().toLowerCase()
+    // Browser-decoded script MIME/ID is shared with strict private evidence.
+    // Only exact UTF-8 JSON types qualify as review signals; no prices.
+    const scriptType=admittedJsonScriptType(script.attrs.get('type'))
     if(scriptType==='application/ld+json'){
       if(!jsonLdShape(script.content,jsonLdTypes,jsonLdKeys)) invalidJsonLdCount++
     }
-    if(script.attrs.get('id')==='__NUXT_DATA__')
+    if(admittedRetailerScriptId(script.attrs.get('id'))==='__NUXT_DATA__' &&
+        (scriptType === undefined || scriptType === 'application/json'))
       scripts.push('nuxt-data-script')
   }
   // Every class candidate must correspond to an actual visible opening tag,

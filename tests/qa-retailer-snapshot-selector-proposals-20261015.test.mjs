@@ -502,3 +502,35 @@ test('legacy M1 source identity never executes Proxy descriptor traps or accepts
   assert.throws(()=>proposeRetailerSelectors(inherited,html),/Offline selector review refused:/)
   assert.equal(proposeRetailerSelectors(good,html).publicationAllowed,false)
 })
+
+test('historical source inspector decodes real JSON-LD MIME and Nuxt ID just like private DOM reader',()=>{
+  for(const retailer of ['plus','dekamarkt']){
+    const html='<script type="application/ld+json&#59;charset=utf-8">'+
+      '{"@context":"https://schema.org","@type":"Product","name":"PRIVATE_ONLY"}</script>'+
+      '<script type="application/json" id="__NUXT&#95;DATA__">[42]</script>'
+    const report=proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',html),html)
+    assert.deepEqual(report.embeddedSignals.jsonLdTypes,['Product'])
+    assert.equal(report.embeddedSignals.nuxtDataScriptPresent,true)
+    assert.equal(report.embeddedSignals.invalidJsonLdCount,0)
+    assert.equal(report.currentPricesExtracted,false)
+    assert.equal(report.readyForScraping,false)
+    assert.equal(report.publicationAllowed,false)
+    const forged=html.replace('ld+json&#59;charset=utf-8','ld+json&#59;charset=latin1')
+    const invalid=proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',forged),forged)
+    assert.deepEqual(invalid.embeddedSignals.jsonLdTypes,[])
+    assert.equal(invalid.currentPricesExtracted,false)
+  }
+})
+
+test('legacy Nuxt script ID alone never proves JSON SSR when MIME is JavaScript or malformed',()=>{
+  const sourceHtml=(type,id='__NUXT_DATA__')=>'<script id="'+id+'" type="'+type+'">[42]</script>'
+  for(const type of ['text/javascript','application/ld+json','application/json; charset=latin1','application/json; charset=UTF-8; charset=UTF-8']){
+    const html=sourceHtml(type)
+    const report=proposeRetailerSelectors(source('dekamarkt','offers',html),html)
+    assert.equal(report.embeddedSignals.nuxtDataScriptPresent,false,type)
+    assert.equal(report.readyForScraping,false)
+  }
+  const hidden=sourceHtml('application/json','__NUXT&amp;#95;DATA__')
+  assert.equal(proposeRetailerSelectors(source('dekamarkt','offers',hidden),hidden)
+    .embeddedSignals.nuxtDataScriptPresent,false)
+})
