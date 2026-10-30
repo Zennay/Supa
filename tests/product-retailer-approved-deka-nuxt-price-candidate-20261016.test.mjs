@@ -230,3 +230,20 @@ test('Deka Nuxt and JSON-LD cannot agree their way around a foreign canonical/ba
   assert.equal(valid.observation.currentPriceCents,85)
   assert.equal(valid.verifiedCurrentCheckoutPrice,false)
 })
+
+test('direct Deka fallback refuses caller JSON-LD substituted for different captured HTML', async () => {
+  const { parseDekaNuxtFromAuthorizedHtml } = await import('../scripts/retailer-approved-deka-nuxt-product.mjs')
+  const { createHash } = await import('node:crypto')
+  const honest = html()
+  const altered = structuredClone(fixture.jsonLdProduct)
+  altered.offers.Price = 0.01
+  const forgedPage = html(fixture.nuxtPayload, altered)
+  const source = body => ({supermarket:'dekamarkt',kind:'product',url,
+    capturedAt:time,sha256:createHash('sha256').update(body).digest('hex')})
+  const positive = parseDekaNuxtFromAuthorizedHtml({html:honest,provenance:source(honest),jsonLdBlocks:[fixture.jsonLdProduct]})
+  assert.equal(positive.type,'observation')
+  const swapped = parseDekaNuxtFromAuthorizedHtml({html:forgedPage,provenance:source(forgedPage),jsonLdBlocks:[fixture.jsonLdProduct]})
+  assert.equal(swapped.type,'abstain')
+  const wrongHash = parseDekaNuxtFromAuthorizedHtml({html:honest,provenance:{...source(honest),sha256:'0'.repeat(64)},jsonLdBlocks:[fixture.jsonLdProduct]})
+  assert.equal(wrongHash.type,'abstain')
+})

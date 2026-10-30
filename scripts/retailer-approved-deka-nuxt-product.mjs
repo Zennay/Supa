@@ -7,6 +7,7 @@
  * fallback is needed because DekaMarkt's observed SSR JSON-LD used "Price"
  * (capital P), which the generic schema.org parser deliberately does not trust.
  */
+import { createHash } from 'node:crypto'
 import { normalizeMoneyToCents, normalizePackText } from '../src/data/normalize.ts'
 import { validateRawProductObservation } from '../src/data/ingestion.ts'
 import { normalizeSchemaOrgAvailability } from '../src/data/schemaOrgProduct.ts'
@@ -66,6 +67,12 @@ export function parseDekaNuxtFromAuthorizedHtml({ html, provenance, jsonLdBlocks
         parsedUrl.search || parsedUrl.hash ||
         parsedUrl.href !== provenance.url) return fail()
 
+    // Direct offline fallback can be called without the checked HTTP bridge.
+    // Bind provenance and corroboration to the SAME captured HTML bytes.
+    if (typeof provenance.sha256 !== 'string' ||
+        !/^[a-f0-9]{64}$/.test(provenance.sha256) ||
+        createHash('sha256').update(html,'utf8').digest('hex') !== provenance.sha256)
+      return fail()
     const scriptEvidence = readAuthorizedHtmlScriptEvidence(html, provenance.url)
     const values = scriptEvidence.nuxtPayload
     if (scriptEvidence.invalid || !values) return fail()
@@ -99,7 +106,9 @@ export function parseDekaNuxtFromAuthorizedHtml({ html, provenance, jsonLdBlocks
     if (!Number.isSafeInteger(cents) || cents <= 0 ||
         pack.amount === null || pack.unit === 'unknown') return fail()
 
-    const ld = oneDekaProduct(jsonLdBlocks)
+    // Never trust separately supplied JSON-LD as evidence for this page:
+    // another document could otherwise corroborate a conflicting Nuxt price.
+    const ld = oneDekaProduct(scriptEvidence.jsonLdBlocks)
     const offer = ld?.offers
     if (!ld || !data(offer) || ld.name !== name ||
         String(ld.mpn) !== expectedId || offer.priceCurrency !== 'EUR' ||
