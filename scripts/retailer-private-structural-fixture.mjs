@@ -12,6 +12,13 @@ import { replayPrivateProductHtmlSnapshot, replayPrivateSelectorHtmlSnapshot } f
 import { summarizeOfflineSelectorProposals, proposeOfflineRetailerSelectors } from './retailer-offline-selector-discovery.mjs'
 import { assertNoSymlinkedM3OutputParents } from './m3-source-output-preservation.mjs'
 const FIELD = new Set(['product','name','price','pack','offer','availability'])
+// Field coverage is only structural evidence. A successful private replay
+// never certifies source rights, current checkout prices or ingestion.
+const REVIEW_ONLY_RECEIPT = Object.freeze({
+  selectorReviewOnly:true,humanReviewRequired:true,
+  sourceRightsForPublicationVerified:false,verifiedCurrentCheckoutPrice:false,
+  readyForIngestion:false,publicSavingsClaimEligible:false,
+})
 
 // Match the same bounded retailer web components as the offline scanner.
 // Modern store listings often wrap cards, pack sizes and price labels in
@@ -153,7 +160,7 @@ export async function buildPrivateSyntheticHtmlFixture(htmlFile, newDirectory) {
   }
   return {created:true,htmlSha256:manifest.syntheticHtmlSha256,
     syntheticNodes:manifest.syntheticNodes,fieldCoverage,
-    productionEnabled:false,published:false}
+    ...REVIEW_ONLY_RECEIPT,productionEnabled:false,published:false}
 }
 // Read the original output as a bounded, same-inode private file. Do not
 // accept altered fixtures by recomputing only a self-declared manifest hash.
@@ -208,7 +215,7 @@ export async function verifyPrivateSyntheticHtmlFixture(htmlFile, directory) {
     refuse()
   return {verified:true,syntheticNodes:manifest.syntheticNodes,
     htmlSha256:manifest.syntheticHtmlSha256,fieldCoverage,
-    productionEnabled:false,published:false}
+    ...REVIEW_ONLY_RECEIPT,productionEnabled:false,published:false}
 }
 function pairManifest(plus, deka, schemaVersion=2) {
   return {schemaVersion,kind:'synthetic-two-retailer-private-fixtures',
@@ -249,7 +256,7 @@ export async function verifyPrivateSyntheticFixturePair(plusFile,dekaFile,direct
     fieldCoverageByRetailer,
     allFieldsCoveredByBoth:Object.values(fieldCoverageByRetailer)
       .every(fields=>Object.values(fields).every(Boolean)),
-    productionEnabled:false,published:false}
+    ...REVIEW_ONLY_RECEIPT,productionEnabled:false,published:false}
 }
 
 // Compare two fully verified private capture pairs without revealing retailer
@@ -334,7 +341,7 @@ export async function buildPrivateSyntheticFixturePair(plusFile,dekaFile,newDire
   return {created:true,retailers:2,
     fieldCoverageByRetailer:verifiedPair.fieldCoverageByRetailer,
     allFieldsCoveredByBoth:verifiedPair.allFieldsCoveredByBoth,
-    productionEnabled:false,published:false}
+    ...REVIEW_ONLY_RECEIPT,productionEnabled:false,published:false}
 }
 
 if(process.argv[1] && import.meta.url===pathToFileURL(resolve(process.argv[1])).href) {

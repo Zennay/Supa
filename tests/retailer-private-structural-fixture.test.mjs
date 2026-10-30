@@ -828,3 +828,28 @@ test('private pair coverage distinguishes an incomplete source without treating 
   assert.equal(verified.productionEnabled,false)
   assert.doesNotMatch(JSON.stringify(verified),/PRIVATE_NAME|PRIVATE_PRICE|PRIVATE_PACK/)
 })
+
+test('even complete two-store selector coverage never opens real price or rights gates',async t=>{
+  const html='<article class="product-card">'+
+    '<span class="product-name">PRIVATE_NAME</span>'+
+    '<span class="price-value">PRIVATE_PRICE</span>'+
+    '<span class="pack-size">PRIVATE_PACK</span>'+
+    '<span class="offer-label">PRIVATE_OFFER</span>'+
+    '<span class="stock-label">PRIVATE_STOCK</span></article>'
+  const plus=await archive(t,'plus','catalog',html)
+  const deka=await archive(t,'dekamarkt','offers',html)
+  const out=join(plus.dir,'coverage-not-production')
+  const created=await buildPrivateSyntheticFixturePair(plus.filename,deka.filename,out)
+  const checked=await verifyPrivateSyntheticFixturePair(plus.filename,deka.filename,out)
+  for(const receipt of [created,checked]){
+    assert.equal(receipt.allFieldsCoveredByBoth,true)
+    assert.equal(receipt.humanReviewRequired,true)
+    assert.equal(receipt.selectorReviewOnly,true)
+    assert.equal(receipt.sourceRightsForPublicationVerified,false)
+    assert.equal(receipt.verifiedCurrentCheckoutPrice,false)
+    assert.equal(receipt.readyForIngestion,false)
+    assert.equal(receipt.publicSavingsClaimEligible,false)
+    assert.equal(receipt.productionEnabled,false)
+    assert.equal(receipt.published,false)
+  }
+})
