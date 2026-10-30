@@ -674,3 +674,19 @@ test('actual HTML named Tab and NewLine class separators are shared by both offl
     assert.equal(decoy.proposedSelectors.some(x=>x.selector==='article.price-label'),false,retailer)
   }
 })
+
+test('M1 snapshot JSON-LD never reports partial Product evidence when a graph exceeds the scan budget',()=>{
+  for(const retailer of ['plus','dekamarkt']) {
+    const run=record=>{const html='<script type="application/ld+json">'+JSON.stringify(record)+'</script>';return proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',html),html).embeddedSignals}
+    const largeGraph={'@context':'https://schema.org','@graph':[{'@type':'Product',offers:{'@type':'Offer',price:1.99}},...Array.from({length:102},(_,i)=>({'@type':'WebPage',url:'https://example.test/'+i}))]}
+    const tall={ '@context':'https://schema.org','@type':'Product',offers:{'@type':'Offer',price:3.99}}
+    for(const [label,payload] of [['graph',largeGraph],['keys',{'@context':'https://schema.org','@type':'Product',sku:'PRIVATE',...Object.fromEntries(Array.from({length:105},(_,i)=>['padding'+i,i]))}]]) {
+      const signals=run(payload)
+      assert.equal(signals.invalidJsonLdCount,1,retailer+' '+label)
+      assert.deepEqual(signals.jsonLdTypes,[],retailer+' '+label)
+      assert.deepEqual(signals.jsonLdKeys,[],retailer+' '+label)
+    }
+    assert.deepEqual(run(tall).jsonLdTypes,['Offer','Product'])
+    assert.equal(run(tall).invalidJsonLdCount,0)
+  }
+})

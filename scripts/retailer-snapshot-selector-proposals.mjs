@@ -114,12 +114,21 @@ function jsonLdShape(text, types, keys) {
   // Duplicate JSON-LD members cannot become apparently verified source
   // attributes through JSON.parse's last-key-wins behavior.
   try { value = parseUniqueKeyRetailerJson(text) } catch { return false }
+  if (!value || typeof value !== 'object') return false
+  // Commit signals only after the ENTIRE bounded graph passes; a partial
+  // 100-node preview must never masquerade as complete source evidence.
+  const observedTypes = new Set()
+  const observedKeys = new Set()
+  let visited = 0
   const visit = (node, depth = 0, inheritedSchema = false) => {
-    if (depth > 12 || !node || typeof node !== 'object') return
+    if (depth > 12 || ++visited > 256) throw new Error('JSON-LD graph budget exceeded')
+    if (!node || typeof node !== 'object') return
     if (Array.isArray(node)) {
-      node.slice(0,100).forEach(child => visit(child,depth+1,inheritedSchema))
+      if (node.length > 100) throw new Error('JSON-LD array budget exceeded')
+      node.forEach(child => visit(child,depth+1,inheritedSchema))
       return
     }
+    if (Object.keys(node).length > 100) throw new Error('JSON-LD fields budget exceeded')
     const declaresContext = Object.hasOwn(node,'@context')
     const localContextOfficial = declaresContext && !!schemaVocabulary(node['@context'])
     const trusted = declaresContext ? localContextOfficial : inheritedSchema
@@ -131,15 +140,15 @@ function jsonLdShape(text, types, keys) {
     const retailFields=!foreignContext && classes.some(type => typeof type === 'string' &&
       /^(?:https?:\/\/schema\.org\/)?(Product|Offer|AggregateOffer|PriceSpecification|QuantitativeValue)$/.test(type) &&
       (trusted || (!declaresContext && /^https?:\/\/schema\.org\//.test(type))))
-    for (const [key,child] of Object.entries(node).slice(0,100)) {
+    for (const [key,child] of Object.entries(node)) {
       if (ALLOWED_JSONLD_KEYS.has(key) &&
-          ((trusted && key.startsWith('@')) || retailFields)) keys.add(key)
+          ((trusted && key.startsWith('@')) || retailFields)) observedKeys.add(key)
       if (key === '@type') {
         for(const type of (Array.isArray(child)?child:[child])) {
           if(typeof type !== 'string') continue
           const match=/^(?:https?:\/\/schema\.org\/)?(Product|Offer|AggregateOffer|ItemList|WebPage)$/.exec(type)
           if(match && (trusted || (!declaresContext && type !== match[1])))
-            types.add(match[1])
+            observedTypes.add(match[1])
         }
       }
       // Walk only Schema.org graph/retail relationships. Arbitrary private
@@ -151,7 +160,9 @@ function jsonLdShape(text, types, keys) {
         visit(child,depth+1,trusted)
     }
   }
-  visit(value)
+  try { visit(value) } catch { return false }
+  for (const type of observedTypes) types.add(type)
+  for (const key of observedKeys) keys.add(key)
   return true
 }
 
