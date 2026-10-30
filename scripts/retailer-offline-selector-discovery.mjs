@@ -279,6 +279,12 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
   let inspectedTags = 0
   const ancestorStack = []
   const voidTags = new Set(['area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr'])
+  // The HTML parser automatically ends an open <p> when a block element
+  // starts. Without this, a stale-price paragraph can incorrectly suppress
+  // a genuinely separate current-price sibling on retailer listing pages.
+  const closesParagraph = new Set(['address','article','aside','blockquote','div','dl',
+    'fieldset','footer','form','h1','h2','h3','h4','h5','h6','header','hgroup',
+    'hr','main','menu','nav','ol','p','pre','search','section','table','ul'])
   for (const match of openingTags(visible, true)) {
     if (match.closing) {
       // Browsers ignore unmatched ordinary closing tags. Do not clear a
@@ -291,6 +297,19 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
       throw new Error('Offline selector scan exceeded bounded tag budget')
     }
     const tag = match.tag
+    if (closesParagraph.has(tag)) {
+      const paragraph=ancestorStack.findLastIndex(row=>row.tag==='p')
+      if (paragraph>=0) ancestorStack.length=paragraph
+    }
+    if (tag==='li') {
+      const prior=ancestorStack.findLastIndex(row=>row.tag==='li')
+      // An inner <ul>/<ol>/<menu> starts a genuinely nested list; its
+      // <li> children remain inside the outer item and inherit former-price
+      // context. Only siblings under the SAME list implicitly close a <li>.
+      if (prior>=0 && !ancestorStack.slice(prior+1)
+        .some(row=>row.tag==='ul'||row.tag==='ol'||row.tag==='menu'))
+        ancestorStack.length=prior
+    }
     const standardCandidate = ['article', 'a', 'div', 'li', 'section', 'span',
       'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'strong', 'ins', 'del', 's', 'strike', 'small', 'meta', 'link', 'data', 'time'].includes(tag)
     // Real SPA/retailer custom elements are valid HTML with a hyphenated

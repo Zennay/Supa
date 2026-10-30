@@ -1091,3 +1091,21 @@ test('browser-valid semicolonless numeric HTML script id/MIME evidence stays con
     assert.equal(proposeOfflineRetailerSelectors({html,origin}).structuredSignals.jsonLd,false,invalid)
   }
 })
+
+test('real browser implied paragraph/list-item endings restore independent source-observed current prices',()=>{
+  const fixtures=[
+    '<article><p class="old-price">SYNTHETIC_OLD<div class="price-value">SYNTHETIC_CURRENT</div></article>',
+    '<ul><li class="old-price">SYNTHETIC_OLD<li class="price-value">SYNTHETIC_CURRENT</li></ul>',
+  ]
+  for(const [retailerId,url] of [['plus','https://www.plus.nl/producten'],['dekamarkt','https://www.dekamarkt.nl/aanbiedingen']]) {
+    for(const html of fixtures) {
+      const result=proposeOfflineRetailerSelectors({html,origin:{...origin,retailerId,url}})
+      assert.ok(result.selectors.some(x=>x.field==='price'&&x.selector.endsWith('.price-value')),retailerId+' '+html)
+      assert.equal(result.readyForIngestion,false)
+      assert.equal(result.productionEnabled,false)
+    }
+    const nested='<ul><li class="old-price"><ul><li class="price-value">SYNTHETIC_OLD_NESTED</li></ul></li></ul>'
+    const excluded=proposeOfflineRetailerSelectors({html:nested,origin:{...origin,retailerId,url}})
+    assert.equal(excluded.selectors.some(x=>x.field==='price'),false,retailerId)
+  }
+})

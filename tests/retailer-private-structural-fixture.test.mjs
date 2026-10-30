@@ -938,3 +938,22 @@ test('genuine observed generic stock-availability class survives private two-sto
   }
   assert.equal(verified.productionEnabled,false)
 })
+
+test('two-store private synthetic pair keeps genuine current price after HTML implied paragraph close',async t=>{
+  const html='<html><body><article class="product-card"><p class="old-price">SYNTHETIC_OLD'+
+    '<div class="price-value">SYNTHETIC_CURRENT</div><span class="pack-size">SYNTHETIC_PACK</span></article></body></html>'
+  const plus=await archive(t,'plus','catalog',html),deka=await archive(t,'dekamarkt','offers',html)
+  const out=join(plus.dir,'browser-implied-price-pair')
+  const built=await buildPrivateSyntheticFixturePair(plus.filename,deka.filename,out)
+  const verified=await verifyPrivateSyntheticFixturePair(plus.filename,deka.filename,out)
+  assert.equal(built.created,true)
+  assert.equal(verified.verified,true)
+  for(const store of ['plus','dekamarkt']) {
+    assert.equal(verified.fieldCoverageByRetailer[store].price,true,store)
+    const synthetic=await readFile(join(out,store,'synthetic-structure.html'),'utf8')
+    assert.match(synthetic,/class="price-value"/,store)
+    assert.doesNotMatch(synthetic,/SYNTHETIC_CURRENT|SYNTHETIC_OLD/)
+  }
+  assert.equal(built.publicSavingsClaimEligible,false)
+  assert.equal(built.productionEnabled,false)
+})
