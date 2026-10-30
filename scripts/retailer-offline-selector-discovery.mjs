@@ -154,18 +154,27 @@ function observedProductHrefPrefix(origin, href) {
   const paths = origin.retailerId === 'plus' ? ['/product/']
     : origin.retailerId === 'dekamarkt' ? ['/producten/']
     : ['/product/', '/producten/'] // other offline research sources
+  const host = Object.hasOwn(KNOWN_MERCHANT_HOSTS, origin.retailerId)
+    ? KNOWN_MERCHANT_HOSTS[origin.retailerId] : null
   for (const prefix of paths) {
-    if (!href.startsWith(prefix)) continue
-    try {
-      const target = new URL(href, origin.url)
-      const base = new URL(origin.url)
-      const slug = target.pathname.slice(prefix.length)
-      if (target.origin !== base.origin ||
-          !target.pathname.startsWith(prefix) ||
-          !slug || slug.startsWith('/') ||
-          /%(?:2f|5c)/i.test(slug)) return null
-      return prefix
-    } catch { return null }
+    // Only propose a CSS href-prefix that actually appeared in the captured
+    // DOM. Absolute and protocol-relative same-store links are ordinary HTML;
+    // never invent a root-relative selector for them.
+    const formats = [prefix]
+    if (host) formats.push('https://' + host + prefix, '//' + host + prefix)
+    for (const observed of formats) {
+      if (!href.startsWith(observed)) continue
+      try {
+        const target = new URL(href, origin.url)
+        const base = new URL(origin.url)
+        const slug = target.pathname.slice(prefix.length)
+        if (target.origin !== base.origin || target.username || target.password ||
+            !target.pathname.startsWith(prefix) ||
+            !slug || slug.startsWith('/') ||
+            /%(?:2f|5c)/i.test(slug)) return null
+        return observed
+      } catch { return null }
+    }
   }
   return null
 }
