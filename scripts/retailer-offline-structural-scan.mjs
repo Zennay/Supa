@@ -10,6 +10,10 @@ import { parseUniqueKeyRetailerJson } from './retailer-private-unique-key-json.m
 const RAW = new Set(['script','style','textarea','title','xmp','iframe','noembed','noframes']);
 const HIDDEN = new Set(['template','noscript','svg','head','style','textarea','title','xmp','iframe','noembed','noframes']);
 const VOID = new Set(['area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr']);
+// HTML implicitly ends head at body content, even without explicit body/head end.
+// This keeps observed product markup visible while retaining head metadata.
+const HEAD_ALLOWED = new Set(['html','head','base','basefont','bgsound',
+  'link','meta','title','style','script','noscript','template']);
 
 function attrs(raw) {
   const result = new Map();
@@ -190,10 +194,10 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
       continue;
     }
     const values = attrs(attrText);
-    // HTML permits an omitted </head> when <body> starts. This is the one
-    // implicit close we can prove statically without a complete DOM parser;
-    // nested inert/template contexts still fail closed.
-    if (tag === 'body' && hidden.length === 1 && hidden[0] === 'head') hidden.pop();
+    // An ordinary body-content tag also ends head in the browser tree.
+    // Never reopen hidden template/noscript subtrees as live markup.
+    if (hidden.length === 1 && hidden[0] === 'head' &&
+        (tag === 'body' || !HEAD_ALLOWED.has(tag))) hidden.pop();
     // HTML plaintext mode consumes the rest of the document as literal text;
     // even a matching </plaintext> is not a real closing tag in the DOM.
     // Ignore any apparent script/selector tags following it.
