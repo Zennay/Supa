@@ -707,6 +707,20 @@ test('captured HTML archival directives disallow semicolon no-store and robots n
   assert.equal(benign.readyForIngestion,false)
 })
 
+test('HTML character-referenced meta controls cannot disguise archival opt-outs', () => {
+  const page=meta=>'<html><head>'+meta+'</head><body><a href="/product/synthetic-12">SYNTHETIC</a></body></html>'
+  for (const meta of [
+    '<meta name="ro&#98;ots" content="no&#97;rchive">',
+    '<meta name="robots" content="no&#x61;rchive">',
+    '<meta http-equiv="Cache&#45;Control" content="no&#45;store">',
+    '<meta http-equiv="Refre&#115;h" content="0;url=/checkout">',
+  ]) assert.throws(()=>proposeOfflineRetailerSelectors({html:page(meta),origin}),
+    /Untrusted HTML/,meta)
+  const inert=proposeOfflineRetailerSelectors({html:page('<template><meta name="robots" content="no&#97;rchive"></template>'),origin})
+  assert.equal(inert.readyForIngestion,false)
+  assert.equal(inert.selectors.some(x=>x.field==='product'),true)
+})
+
 test('in-memory selector proposals refuse HTML BOM/NUL that browser parsing would normalize', () => {
   const origin={retailerId:'plus',url:'https://www.plus.nl/producten',
     capturedAt:'2026-10-14T12:00:00.000Z'}

@@ -559,6 +559,17 @@ test('real capture path refuses semicolon cache no-store and robots noarchive, b
   }
 })
 
+test('source capture refuses HTML entity-encoded robots and cache directives before archival', async () => {
+  const page=meta=>'<html><head>'+meta+'</head><body><a href="/product/synthetic-12">SYNTHETIC</a></body></html>'
+  for (const meta of [
+    '<meta name="ro&#98;ots" content="no&#97;rchive">',
+    '<meta http-equiv="Cache&#45;Control" content="no&#45;store">',
+  ]) await assert.rejects(captureApprovedRetailerPage({
+    source,permissionGate:gate,grant,
+    fetchFn:async()=>new Response(page(meta),{status:200,headers:{'content-type':'text/html'}}),
+  }),/HTML disallows snapshot archival/,meta)
+})
+
 test('HTTP 200 Content-Range cannot launder a partial document into a complete snapshot', async () => {
   let cancelled=false
   const fragment='<html><body>PARTIAL SYNTHETIC'

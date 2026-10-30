@@ -57,6 +57,19 @@ function tagEnd(html, start) {
   throw new Error('Unterminated offline tag');
 }
 
+// Meta controls are interpreted by browsers after HTML entity decoding.
+// Numeric entities and common ASCII named entities are decoded only for
+// security-related metadata; unresolved entities fail closed below.
+function decodedMeta(raw) {
+  if (typeof raw !== 'string') return raw;
+  const named={Tab:'\t',NewLine:'\n',comma:',',semi:';',colon:':',amp:'&'};
+  return raw.replace(/&#(?:x([0-9a-f]{1,6})|([0-9]{1,7}));?/gi,(original,h,d)=>{
+    const n=parseInt(h??d,h===undefined?10:16);
+    return n>0 && n<=0x10ffff && !(n>=0xd800 && n<=0xdfff)
+      ? String.fromCodePoint(n) : original;
+  }).replace(/&(Tab|NewLine|comma|semi|colon|amp);/g,(raw,key)=>named[key]??raw);
+}
+
 function isType(record, type) {
   if (!record || typeof record !== 'object') return false;
   const t = record['@type'];
@@ -149,6 +162,19 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
     // Ignore any apparent script/selector tags following it.
     if (tag === 'plaintext') break;
     const suppressed = hidden.length > 0;
+    if (tag === 'meta' && (hidden.length === 0 ||
+        hidden.length === 1 && hidden[0] === 'head')) {
+      for (const key of ['name','http-equiv','content','charset']) {
+        if (values.has(key)) values.set(key,decodedMeta(values.get(key)));
+      }
+      if (['name','http-equiv'].some(key => values.get(key)?.includes('&')))
+        throw new Error('Ambiguous HTML meta control');
+      const content=values.get('content');
+      if (typeof content === 'string' && content.includes('&') &&
+          (/^(?:robots|googlebot|bingbot)$/i.test(values.get('name')??'') ||
+           /^(?:cache-control|refresh|content-type)$/i.test(values.get('http-equiv')??'')))
+        throw new Error('Ambiguous HTML meta content');
+    }
     if (tag === 'base' && (hidden.length === 0 ||
         hidden.length === 1 && hidden[0] === 'head') &&
         values.has('href')) {
