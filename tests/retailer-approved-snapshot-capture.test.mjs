@@ -536,3 +536,20 @@ test('live HTML meta no-store refuses archival without header no-store', async (
   assert.equal(allowed.published,false)
   assert.equal(allowed.readyForIngestion,false)
 })
+
+test('HTTP 200 Content-Range cannot launder a partial document into a complete snapshot', async () => {
+  let cancelled=false
+  const fragment='<html><body>PARTIAL SYNTHETIC'
+  const stream=new ReadableStream({
+    start(controller) { controller.enqueue(new TextEncoder().encode(fragment)) },
+    cancel() { cancelled=true },
+  })
+  await assert.rejects(captureApprovedRetailerPage({
+    source,permissionGate:gate,grant,
+    fetchFn:async()=>new Response(stream,{status:200,headers:{
+      'content-type':'text/html',
+      'content-range':'bytes 0-27/999',
+    }}),
+  }),/Partial retailer HTML representation refused/)
+  assert.equal(cancelled,true)
+})
