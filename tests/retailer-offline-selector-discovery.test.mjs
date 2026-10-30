@@ -472,3 +472,34 @@ test('live HTML base href cannot redirect source product anchors to another orig
   assert.throws(()=>proposeOfflineRetailerSelectors({html:duplicate, origin}),
     /Multiple live HTML base URLs/)
 })
+
+test('live canonical source URL cannot attribute foreign product pages to PLUS', () => {
+  const item='<body><a href="/product/synthetic-123">Synthetic item</a></body>'
+  for (const canonical of [
+    'https://other.example/product/foreign-5',
+    '//www.dekamarkt.nl/producten/foreign-6',
+    'http://www.plus.nl/product/synthetic-123',
+    'https://user@example.com/product/synthetic-456',
+  ]) {
+    const html='<html><head><link rel="canonical" href="'+canonical+'"></head>'+item+'</html>'
+    assert.throws(()=>proposeOfflineRetailerSelectors({html,origin}),
+      /Untrusted HTML canonical source URL/)
+  }
+  for (const canonical of [
+    'https://www.plus.nl/producten',
+    '/producten',
+  ]) {
+    const html='<html><head><link rel="canonical" href="'+canonical+'"></head>'+item+'</html>'
+    const result=proposeOfflineRetailerSelectors({html,origin})
+    assert.equal(result.selectors.find(x=>x.selector==='a[href^="/product/"]')?.instances,1)
+    assert.doesNotMatch(JSON.stringify(result),/canonical|synthetic-123/)
+  }
+  const inert='<html><head><template><link rel="canonical" href="https://other.example/"></template></head>'+item+'</html>'
+  assert.equal(proposeOfflineRetailerSelectors({html:inert,origin}).selectors.length,1)
+  const duplicate='<html><head><link rel="canonical" href="/producten"><link rel="canonical" href="/producten"></head>'+item+'</html>'
+  assert.throws(()=>proposeOfflineRetailerSelectors({html:duplicate,origin}),
+    /Ambiguous canonical retailer source URL/)
+  const empty='<html><head><link rel="canonical"></head>'+item+'</html>'
+  assert.throws(()=>proposeOfflineRetailerSelectors({html:empty,origin}),
+    /Ambiguous canonical retailer source URL/)
+})
