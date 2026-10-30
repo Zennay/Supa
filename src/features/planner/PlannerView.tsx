@@ -5,6 +5,7 @@ import { buildIngredientReuseInsight } from '../../domain/ingredientReuse.ts'
 import { HiFiReuseStrip } from './HiFiReuseStrip.tsx'
 import { assessPlannerBudget, getBudgetState } from '../../domain/planner'
 import { euro } from '../../lib/money'
+import { flyToCart } from '../home/flyToCart'
 import { pricePerPersonLabel } from '../recipes/recipePricePerPerson'
 import { plannerKnownMinimumOverrunCents } from './plannerKnownMinimumOverrun.ts'
 import { parseCustomWeekBudgetCents, validCustomWeekBudgetEuros } from './customWeekBudget.ts'
@@ -133,6 +134,19 @@ export function PlannerView({
     ? buildIngredientReuseInsight({ plan: plannedMeals, recipes: ingredientRecipes, activeDays })
     : null, [hasIngredientData, plannedMeals, ingredientRecipes, activeDays])
 
+  // Per-person prices of the planned meals, two servings each.
+  const activeMeals = plannedMeals.flatMap(meal => {
+    if (!activeDays.includes(meal.day)) return []
+    const recipe = recipes.find(candidate => candidate.id === meal.recipeId)
+    if (!recipe) return []
+    const label = pricePerPersonLabel(recipe)
+    const pp = label ? Number(label.replace('€', '').replace(',', '.').replace(' p.p.', '')) : null
+    return [{ day: meal.day, recipe, pp }]
+  })
+  const estimate = activeMeals.length > 0 && activeMeals.every(item => item.pp !== null)
+    ? activeMeals.reduce((sum, item) => sum + (item.pp as number) * item.recipe.servings, 0)
+    : null
+
   const dayImages = useMemo(() => Object.fromEntries(plannedMeals.flatMap(meal => {
     const image = figmaPlannerThumbs[meal.recipeId]
     return image ? [[meal.day, image]] : []
@@ -250,13 +264,10 @@ export function PlannerView({
         <div className="budget-summary hifi-total-row">
           <span>
             <strong className="hifi-total-label">Totaal</strong>
-            <small>{activeDays.length} maaltijden actief</small>
+            <small>{activeMeals.length} {activeMeals.length === 1 ? 'maaltijd' : 'maaltijden'}</small>
           </span>
           <strong className="hifi-total-amount">
-            {plannedCost === null
-              ? 'Prijs onbekend'
-              : budgetKnown ? euro.format(plannedCost)
-                : `min. ${euro.format(plannedCost)}`}
+            {estimate === null ? 'Prijs onbekend' : euro.format(estimate)}
           </strong>
         </div>
         <hr className="hifi-total-divider" />
@@ -267,31 +278,40 @@ export function PlannerView({
           </span>
           <strong id="weekbudget-title">{euro.format(budget)}</strong>
         </div>
-        <span
-          className={
-            budgetKnown && budgetAssessment?.status === 'known' && budgetAssessment.budgetState.overBudget
-              ? 'budget-status warning'
-              : budgetKnown
-                ? 'budget-status'
-                : 'budget-status warning'
-          }
-          aria-live="polite"
-        >
-          {trustedCents === null
-            ? 'Prijs onbekend · nog geen eigen winkelbron'
-            : budgetKnown
-            ? exactRemainingCents === null
-              ? 'Budgetgegevens controleren'
-              : exactRemainingCents < 0
-                ? `${euro.formatCents(-exactRemainingCents)} boven budget`
-                : `${euro.formatCents(exactRemainingCents)} over`
-            : knownMinimumOverrunCents !== null
-              ? `Minimaal ${euro.formatCents(knownMinimumOverrunCents)} boven budget · ${unresolvedCount} ${unresolvedCount === 1 ? 'mandregel' : 'mandregels'} open`
-              : `${unresolvedCount} ${unresolvedCount === 1 ? 'mandregel' : 'mandregels'} open`}
-        </span>
+        {estimate !== null && (
+          <span className={estimate > budget ? 'budget-status warning' : 'budget-status'} aria-live="polite">
+            {estimate > budget
+              ? `${euro.format(estimate - budget)} boven budget`
+              : `${euro.format(budget - estimate)} over`}
+          </span>
+        )}
 
         <details className="hifi-planner-calc">
           <summary>Bekijk berekening</summary>
+          {activeMeals.length === 0
+            ? <p className="hifi-calc-empty">Plan een maaltijd om je totaal te zien.</p>
+            : <ul className="hifi-calc-list" aria-label="Berekening per maaltijd">
+                {activeMeals.map(({ day, recipe, pp }) => (
+                  <li key={day}>
+                    <span>
+                      <strong>{recipe.title}</strong>
+                      <small>{pp === null ? 'Prijs onbekend' : `${euro.format(pp)} p.p. × ${recipe.servings} personen`}</small>
+                    </span>
+                    <b>{pp === null ? '—' : euro.format(pp * recipe.servings)}</b>
+                  </li>
+                ))}
+                <li className="hifi-calc-sum">
+                  <span><strong>Totaal</strong></span>
+                  <b>{estimate === null ? '—' : euro.format(estimate)}</b>
+                </li>
+              </ul>}
+          {estimate !== null && (
+            <div className="budget-progress" role="progressbar" aria-label="Gepland deel van het weekbudget"
+              aria-valuemin={0} aria-valuemax={budget} aria-valuenow={Math.min(estimate, budget)}>
+              <span style={{ width: `${Math.min(100, (estimate / budget) * 100)}%` }} />
+            </div>
+          )}
+
           <div className="budget-options" aria-label="Kies je weekbudget">
             {budgetOptions.map((option) => (
               <button
@@ -344,48 +364,14 @@ export function PlannerView({
               </form>
             )}
           </div>
-
-          {plannedCost !== null && budgetState !== null
-            ? <div
-                className="budget-progress"
-                role="progressbar"
-                aria-label={budgetKnown ? 'Gepland deel van het weekbudget' : 'Bekend minimum van het weekbudget'}
-                aria-valuemin={0}
-                aria-valuemax={budget}
-                aria-valuenow={Math.min(plannedCost, budget)}
-              >
-                <span style={{ width: `${budgetState.usage * 100}%` }} />
-              </div>
-            : <p className="disclaimer" role="status">
-                Geen budgetbalk berekend: er zijn nog geen complete, zelf gecontroleerde winkelprijzen.
-              </p>}
-
-          {trustedCents !== null && ownSource && <p className="disclaimer" role="status">
-            Privécontrole: {ownSource.store} · eigen winkelopname {ownSource.observedAt}.
-            Het getoonde budgetbedrag gebruikt jouw volledige, persoonlijk bevestigde winkelmand
-            in plaats van de Supa-voorbeeldprijzen. Geen kassagarantie of publieke besparingsclaim.
-          </p>}
-          {trustedCents === null && <p className="disclaimer" role="status">
-            Je weekbudget is ingesteld, maar de werkelijke mandprijs is onbekend.
-            Supa rekent voorbeeldcatalogusprijzen niet mee als jouw uitgaven.
-            Open Vergelijk om eigen actuele winkelproducten, verpakkingen en prijzen te controleren.
-          </p>}
-          {trustedCents !== null && <p className="disclaimer">
-            {budgetKnown
-              ? <>Dit bedrag komt uit jouw persoonlijk bevestigde winkelbron
-                  en dezelfde fysieke verpakkingsberekening als Vergelijk.</>
-              : <>Nog {unresolvedCount} {unresolvedCount === 1 ? 'productmatch is' : 'productmatches zijn'}
-                  {' '}onopgelost; dit is uitsluitend het bekende minimum.
-                  {knownMinimumOverrunCents !== null
-                    ? <> De huidige eigen bronkosten liggen minimaal {euro.formatCents(knownMinimumOverrunCents)} boven budget. Het werkelijke tekort kan groter zijn.</>
-                    : <> Supa kan nog niet bepalen of je binnen budget zit.</>}
-                </>}
-          </p>}
         </details>
       </section>
 
       {/* Figma Planner primary action under the total card. */}
-      <button type="button" className="hifi-planner-list-cta" onClick={onOpenShoppingList}
+      <button type="button" className="hifi-planner-list-cta" onClick={event => {
+        flyToCart(event.currentTarget)
+        window.setTimeout(onOpenShoppingList, 700)
+      }}
         disabled={activeDays.length === 0}>
         Voeg planning toe aan boodschappenlijst
       </button>

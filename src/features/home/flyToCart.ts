@@ -1,6 +1,6 @@
 /** Small dot that flies from a clicked button to the cart icon, then bumps the cart. */
 export function flyToCart(from: Element | null) {
-  const cart = document.querySelector('.hifi-cart')
+  const cart = document.querySelector('[data-cart-target]')
   if (!from || !cart || typeof (from as HTMLElement).getBoundingClientRect !== 'function') return
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
   const start = from.getBoundingClientRect()
