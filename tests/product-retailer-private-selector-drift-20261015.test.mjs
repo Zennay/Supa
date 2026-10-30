@@ -50,7 +50,7 @@ test('HTML body can change while selector proposals remain identical',()=>{
   assert.equal(report.missingSelectorCandidates,0)
 })
 test('Schema.org/JSONLD signal changes remain manual proposals, never valid price evidence',()=>{
-  const withJsonLd=original+'<script type="application/ld+json">{"@type":"Product"}</script>'
+  const withJsonLd=original+'<script type="application/ld+json">{"@context":"https://schema.org","@type":"Product"}</script>'
   const report=compareOfflineSelectorProposals(proposal(original),proposal(withJsonLd,whenB))
   assert.equal(report.structuredSignalFlips,2)
   assert.equal(report.permissionVerified,false)
