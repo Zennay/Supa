@@ -23,6 +23,7 @@ on:
       - "tests/product-retailer-approved-source-review-archive-20261030.test.mjs"
       - "scripts/retailer-approved-private-price-snapshot-store.mjs"
       - "scripts/retailer-approved-snapshot-capture.mjs"
+      - "tests/retailer-approved-snapshot-capture.test.mjs"
       - "src/data/schemaOrgProductPageSelection.ts"
       - "src/data/schemaOrgQuantitativePack.ts"
       - "scripts/retailer-json-script-mime.mjs"

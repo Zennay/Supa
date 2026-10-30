@@ -233,6 +233,18 @@ function sourceHttpFreshness(headers) {
   return true
 }
 
+// Fetch delivers already-decoded bytes while HTTP Content-Length may still
+// describe the compressed wire representation. Accept only a single known
+// encoding token; an arbitrary/multi-valued header must not disable the
+// identity byte-length integrity check.
+function trustedHttpContentEncoding(headers) {
+  const raw = headers?.get?.('content-encoding')
+  if (raw === null || raw === undefined) return 'identity'
+  if (typeof raw !== 'string') return null
+  const type = raw.trim().toLowerCase()
+  return ['identity', 'gzip', 'br', 'deflate'].includes(type) ? type : null
+}
+
 async function collectBoundedBody(response) {
   if (!response?.body || typeof response.body.getReader !== 'function') {
     throw new Error('Missing streaming HTML body')
@@ -283,8 +295,9 @@ async function collectBoundedBody(response) {
   // A short or overlong 200 response must never become SHA-pinned evidence.
   // Fetch commonly decodes gzip/br while retaining the wire Content-Length:
   // in that case the decoded HTML bytes cannot be compared to wire length.
-  const encoding = response.headers?.get?.('content-encoding')
-  if ((!encoding || encoding.toLowerCase() === 'identity') &&
+  const encoding = trustedHttpContentEncoding(response.headers)
+  if (encoding === null) throw new Error('Unsupported or ambiguous retailer Content-Encoding')
+  if (encoding === 'identity' &&
       declared !== null && declared !== undefined &&
       Number(declared) !== bytes) {
     throw new Error('Incomplete HTML capture: declared length mismatch')
@@ -375,6 +388,12 @@ export async function captureApprovedRetailerPage(options = {}) {
       /^\s*attachment(?:\s*;|\s*$)/i.test(disposition)) {
     await closeRejectedBody()
     throw new Error('Retailer HTML response disallows snapshot archival')
+  }
+  // Refuse unknown or stacked transfer encodings before reading a body:
+  // otherwise an invented Content-Encoding could conceal a truncated 200.
+  if (trustedHttpContentEncoding(response.headers) === null) {
+    await closeRejectedBody()
+    throw new Error('Unsupported or ambiguous retailer Content-Encoding')
   }
   let body
   try { body = await collectBoundedBody(response) }

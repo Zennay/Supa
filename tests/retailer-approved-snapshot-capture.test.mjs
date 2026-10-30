@@ -617,3 +617,35 @@ test('entity-encoded canonical rel cannot launder the wrong captured retailer pa
     fetchFn:async()=>new Response(html,{status:200,headers:{'content-type':'text/html'}}),
   }),/canonical/)
 })
+
+test('unsupported or multiple HTTP content encodings never excuse incomplete HTML source bytes', async () => {
+  const html = '<!doctype html><html><body>SYNTHETIC ENCODING EVIDENCE</body></html>'
+  for (const unsupported of ['unknown-transport', 'gzip, br', 'identity, gzip', 'x-gzip', 'gzip; level=1', ' ']) {
+    let cancelled = 0
+    const response = new Response(new ReadableStream({
+      start(controller) { controller.enqueue(new TextEncoder().encode(html)) },
+      cancel() { cancelled++ },
+    }), { status: 200, headers: {
+      'content-type': 'text/html; charset=utf-8',
+      'content-encoding': unsupported,
+      'content-length': '1',
+    } })
+    await assert.rejects(captureApprovedRetailerPage({
+      source, permissionGate: gate, grant, fetchFn: async () => response,
+    }), /Unsupported or ambiguous retailer Content-Encoding/)
+    assert.equal(cancelled, 1, 'a rejected response body must be cancelled: ' + unsupported)
+  }
+  for (const supported of ['identity', 'IDENTITY', 'gzip', 'br', 'deflate']) {
+    const compressed = !/^identity$/i.test(supported)
+    const row = await captureApprovedRetailerPage({
+      source, permissionGate: gate, grant,
+      fetchFn: async () => new Response(html, { status: 200, headers: {
+        'content-type': 'text/html',
+        'content-encoding': supported,
+        'content-length': String(compressed ? 3 : Buffer.byteLength(html)),
+      } }),
+    })
+    assert.equal(row.source.sha256, createHash('sha256').update(html).digest('hex'))
+    assert.equal(row.published, false)
+  }
+})
