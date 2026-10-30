@@ -242,7 +242,10 @@ export function proposeRetailerSelectors(source, html) {
     // source scanner rather than inventing selectors from encoded strings.
     const classText=staticAttributeValue(tag.attrs.get('class'))
     if (typeof classText !== 'string' || classText.length > 512) continue
-    const classes=classText.trim().split(/[ \t\n\f\r]+/).slice(0,24)
+    // CSS classList treats repeated tokens as one class on one DOM element.
+    // Deduplicate BEFORE applying the 24-distinct-token review budget, or
+    // noisy repeated classes can hide a real observed price/pack selector.
+    const classes=[...new Set(classText.trim().split(/[ \t\n\f\r]+/))].slice(0,24)
     for (const name of classes) {
       if (!CLASS_PATTERN.test(name) || !RELEVANCE_PATTERN.test(name)) continue
       const selector=tagName+'.'+name

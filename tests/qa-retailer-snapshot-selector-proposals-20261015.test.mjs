@@ -647,3 +647,17 @@ test('historical CSS selectors use browser-decoded observed class tokens exactly
     assert.equal(refused.proposedSelectors.some(x=>x.selector==='article.product-card'),false)
   }
 })
+
+test('duplicated HTML class tokens count one DOM element and never crowd out distinct field selectors',()=>{
+  for(const retailer of ['plus','dekamarkt']){
+    const html='<article class="'+Array(27).fill('product-card').join(' ')+' price-label">SYNTHETIC</article>'
+    const result=proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',html),html)
+    for(const selector of ['article.product-card','article.price-label']){
+      const found=result.proposedSelectors.find(x=>x.selector===selector)
+      assert.ok(found,retailer+' '+selector+' missing')
+      assert.equal(found.occurrences,1,retailer+' '+selector+' counted repeatedly')
+    }
+    assert.equal(result.currentPricesExtracted,false)
+    assert.equal(result.readyForScraping,false)
+  }
+})
