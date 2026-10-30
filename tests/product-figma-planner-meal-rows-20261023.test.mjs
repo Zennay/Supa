@@ -35,16 +35,28 @@ test('Figma Planner 3359:4896 meal rows and total card keep real state and make 
 
     // Mobile-focused row adds a state class without replacing Figma row styling.
     assert.equal((html.match(/class="meal-card meal-config hifi-meal-row active(?: quick-focused)?"/g) ?? []).length, activeDays.length)
-    assert.match(html, /class="meal-card meal-config hifi-meal-row active quick-focused"/)
+    assert.match(html, /class="hifi-meal-card quick-focused"/)
     assert.equal((html.match(/Voeg nu iets toe aan de planner/g) ?? []).length, 1)
     assert.match(html, new RegExp(`aria-label="${inactiveDay} aan planning toevoegen"`))
     assert.doesNotMatch(html, new RegExp(`id="recipe-${inactiveDay}"`))
-    for (const day of activeDays) assert.match(html, new RegExp(`id="recipe-${day}"`))
+    // Main now opens per-row editing on demand; mobile quick selection is immediate.
+    for (const day of activeDays) assert.doesNotMatch(html, new RegExp(`id="recipe-${day}"`))
     // Only the curated SUPA recipe receives original Figma food photography.
     assert.equal((html.match(/<span class="hifi-meal-thumb" aria-hidden="true"><img /g) ?? []).length, 1)
     assert.match(html, /<strong class="hifi-total-label">Totaal<\/strong>/)
-    assert.match(html, /Prijs onbekend/)
+    assert.match(html, /class="hifi-total-amount"/)
     // Mobile budget shortcuts use the persisted budget and no unverified totals.
+    // Mobile edits the real persisted weekday recipe without a second plan.
+    assert.match(html, /aria-label="Recept voor de gekozen dag"/)
+    assert.match(html, /id="planner-mobile-quick-recipe"/)
+    assert.match(html, /Wijzig dit recept direct in je bestaande weekplanning/)
+    const nothingActive = renderToStaticMarkup(createElement(PlannerView, {
+      budget: 35, activeDays: [], plannedMeals: meals, recipes,
+      basketTotalCents: null, basketUnresolvedLineCount: 0,
+      onBudgetChange() {}, onToggleDay() {}, onRecipeChange() {}, onReset() {},
+    }))
+    assert.doesNotMatch(nothingActive, /id="planner-mobile-quick-recipe"/)
+    assert.match(nothingActive, /alleen een dag kiezen verandert je planning niet/)
     assert.match(html, /aria-label="Snel weekbudget instellen"/)
     assert.match(html, /Weekbudget: /)
     assert.match(html, /Winkelkosten nog onbekend/)

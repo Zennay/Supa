@@ -59,7 +59,7 @@
   background: #c4fdeb;
   color: #006642;
 }
-.hifi-planner-day.selected::before {
+.hifi-planner-day.today::before {
   content: '';
   position: absolute;
   top: 0;
@@ -409,3 +409,50 @@
 }
 .hifi-planner-list-cta:disabled { opacity: .45; cursor: not-allowed; }
 .hifi-planner-list-cta:focus-visible { outline: 3px solid #005135; outline-offset: 3px; }
+
+/* Planner header with icon-only-style reset button. */
+.hifi-planner-heading { align-items: center; padding-top: 4px; }
+.hifi-planner-heading h2 { margin: 0; color: #262527; font: 600 18px/1.2 Poppins, -apple-system, BlinkMacSystemFont, 'SF Pro', Inter, sans-serif; }
+.hifi-reset-button {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px;
+  border: 0; border-radius: 999px; background: #fff; color: #262527; cursor: pointer;
+  font: 500 14px/1 -apple-system, BlinkMacSystemFont, 'SF Pro', Inter, sans-serif;
+}
+.hifi-reset-button svg { color: #36c693; }
+.hifi-reset-button:focus-visible { outline: 3px solid #005135; outline-offset: 2px; }
+
+/* Meal cards: compact rows exactly like the design (no price explanation). */
+.hifi-meal-card { background: #fff; border-radius: 20px; overflow: hidden; }
+.hifi-planner-screen .hifi-meal-card .hifi-meal-row,
+.hifi-planner-screen .hifi-meal-card .hifi-meal-row.active {
+  min-height: 0; height: 82px; padding: 16px 16px 16px 20px; background: transparent; margin: 0;
+  grid-template-columns: 40px minmax(0, 1fr) 24px; align-items: center;
+}
+.hifi-planner-screen .hifi-meal-card .hifi-meal-row:not(.active) { grid-template-columns: 40px minmax(0, 1fr) 44px; }
+.hifi-meal-title { display: block; color: #262527; font: 500 16px/1.25 -apple-system, BlinkMacSystemFont, 'SF Pro', Inter, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hifi-meal-price { color: #848484; font-size: 12px; }
+.hifi-meal-chevron {
+  width: 24px; height: 44px; padding: 0; border: 0; background: transparent; color: #262527;
+  display: grid; place-items: center; cursor: pointer; justify-self: end;
+}
+.hifi-meal-card.open .hifi-meal-chevron svg { transform: rotate(90deg); }
+.hifi-meal-chevron:focus-visible { outline: 3px solid #005135; outline-offset: 2px; border-radius: 8px; }
+.hifi-meal-edit { display: grid; gap: 10px; padding: 0 20px 18px; }
+.hifi-meal-edit label { color: #848484; font-size: 12px; }
+.hifi-meal-edit select { min-height: 44px; border: 1px solid #e5e5e5; border-radius: 12px; background: #fff; padding: 0 12px; font: 500 15px -apple-system, BlinkMacSystemFont, 'SF Pro', Inter, sans-serif; color: #262527; }
+.hifi-meal-remove { min-height: 44px; border: 0; border-radius: 12px; background: #f2f3f5; color: #262527; font-weight: 500; cursor: pointer; }
+.hifi-meal-thumb img { border-radius: 10px; }
+.hifi-planner-screen .hifi-meal-row .hifi-meal-add { width: 44px; height: 44px; padding: 2px; background: #1f6b4a content-box; border-radius: 50%; color: #fff; font-size: 26px; font-weight: 400; line-height: 1; }
+
+/* Ingredient pictures in the overlap strip. */
+.hifi-reuse-marks > span { overflow: hidden; }
+.hifi-reuse-marks > span img { width: 20px; height: 20px; display: block; }
+.hifi-reuse-more { color: #626569; }
+
+/* "Bekijk berekening": sum per meal. */
+.hifi-calc-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.hifi-calc-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 14px; color: #262527; }
+.hifi-calc-list li span { display: grid; gap: 2px; min-width: 0; }
+.hifi-calc-list small { color: #848484; font-size: 12px; }
+.hifi-calc-sum { padding-top: 10px; border-top: 1px solid #e5e5e5; }
+.hifi-calc-empty { margin: 0; color: #848484; font-size: 14px; }

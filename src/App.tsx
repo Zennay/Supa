@@ -11,6 +11,7 @@ const BasketView = lazy(async () => {
   const module = await import('./features/basket/BasketView')
   return { default: module.BasketView }
 })
+import { HiFiRecipes } from './features/recipes/HiFiRecipes'
 import { ShoppingListView } from './features/shopping-list/ShoppingListView'
 import { PrivateSourceShoppingList } from './features/shopping-list/PrivateSourceShoppingList.tsx'
 import './features/shopping-list/listSourceFilePicker.css'
@@ -36,7 +37,7 @@ import { parsePrivateExtraVisitCostCents } from './features/comparison/privateEx
 import { freshReviewedBaskets, type PrivateReviewedBaskets, type PrivateCaptureProgress, type PrivateReviewFocus, type OwnStore, type PrivateRouteChoice } from './features/comparison/privateReviewedBasketBridge.ts'
 import { ObservationView } from './features/observation/ObservationView'
 import { IdentityAvatar } from './components/IdentityAvatar.tsx'
-import { HiFiHome, HiFiDemoList } from './features/home/HiFiHome'
+import { HiFiHome, useDesignProducts } from './features/home/HiFiHome'
 import { readRecipeLibrary } from './features/recipes/recipeLibrary'
 import { toPlannerRecipe } from './features/recipes/plannerRecipes'
 import { curatedFigmaRecipes } from './features/recipes/curatedFigmaRecipes'
@@ -54,7 +55,6 @@ import { saveReplacedPlannerRecipes, missingStoredOwnRecipeSelections } from './
 import { restorePlannerPreferencesWithCustomBudget } from './features/planner/customWeekBudget.ts'
 import { canReplacePlannerRecord, persistPlannerRecord } from './features/planner/plannerStorageGuard.ts'
 import {
-  m2InitialPlan,
   m2Products,
   m2Recipes,
   m2Store,
@@ -66,23 +66,23 @@ import {
   m3CandidateStore,
 } from './data/m3ComparisonFixture'
 
+import { appInitialPlan, appDefaultActiveDays } from './data/appPlan'
+import navHomeActive from './assets/figma/nav/home-active.svg'
+import navPlannerActive from './assets/figma/nav/planner-active.svg'
+import navRecipesActive from './assets/figma/nav/recipes-active.svg'
+import navProductsActive from './assets/figma/nav/products-active.svg'
+import navListActive from './assets/figma/nav/list-active.svg'
+
 type Tab = 'home' | 'recipes' | 'products' | 'planner' | 'basket' | 'list' | 'observe'
 
-const tabs: { id: Tab; label: string; icon: string }[] = [
-  { id: 'home', label: 'Home', icon: figmaAssets.imgVector5 },
-  { id: 'planner', label: 'Planner', icon: figmaAssets.imgButton },
-  { id: 'recipes', label: 'Recepten', icon: figmaAssets.imgButton1 },
-  { id: 'products', label: 'Producten', icon: figmaAssets.imgButton2 },
-  { id: 'list', label: 'Lijst', icon: figmaAssets.imgButton3 },
+const tabs: { id: Tab; label: string; icon: string; activeIcon: string }[] = [
+  { id: 'home', label: 'Home', icon: figmaAssets.productsNavHome, activeIcon: navHomeActive },
+  { id: 'planner', label: 'Planner', icon: figmaAssets.imgButton, activeIcon: navPlannerActive },
+  { id: 'recipes', label: 'Recepten', icon: figmaAssets.imgButton1, activeIcon: navRecipesActive },
+  { id: 'products', label: 'Producten', icon: figmaAssets.imgButton2, activeIcon: navProductsActive },
+  { id: 'list', label: 'Lijst', icon: figmaAssets.imgButton3, activeIcon: navListActive },
 ]
 
-const originalProductNavIcons: Partial<Record<Tab, string>> = {
-  home: figmaAssets.productsNavHome,
-  planner: figmaAssets.productsNavPlanner,
-  recipes: figmaAssets.productsNavRecipes,
-  products: figmaAssets.productsNavProducts,
-  list: figmaAssets.productsNavList,
-}
 
 const plannerStorageKey = 'supa:planner-preferences:v2'
 const chosenProductsStorageKey = 'supa:chosen-products:v1'
@@ -119,19 +119,24 @@ function availableRecipes() {
 
 type PersistenceWarning = 'unavailable' | 'protected' | null
 
+function appDefaultPreferences(): PlannerPreferences {
+  return { ...defaultPlannerPreferences(appInitialPlan), activeDays: [...appDefaultActiveDays] }
+}
+
 function readPlannerPreferences(validRecipeIds = availableRecipes().map(recipe => recipe.id)): {
   preferences: PlannerPreferences
   warning: PersistenceWarning
   raw: string | null
 } {
-  const fallback = defaultPlannerPreferences(m2InitialPlan)
+  const fallback = appDefaultPreferences()
   if (typeof window === 'undefined') {
     return { preferences: fallback, warning: null, raw: null }
   }
   try {
     const raw = window.localStorage.getItem(plannerStorageKey)
-    const restored = restorePlannerPreferencesWithCustomBudget(raw, m2InitialPlan, validRecipeIds)
-    const missing = missingStoredOwnRecipeSelections(raw, m2InitialPlan, validRecipeIds)
+    const restored = raw === null ? appDefaultPreferences()
+      : restorePlannerPreferencesWithCustomBudget(raw, appInitialPlan, validRecipeIds)
+    const missing = missingStoredOwnRecipeSelections(raw, appInitialPlan, validRecipeIds)
     return {
       // Missing OWN recipe IDs remain a read-only, in-memory repair intent.
       // The actual week uses its existing safe temporary built-in fallback
@@ -139,7 +144,7 @@ function readPlannerPreferences(validRecipeIds = availableRecipes().map(recipe =
       preferences: Object.keys(missing).length
         ? { ...restored, recipeByDay: { ...restored.recipeByDay, ...missing } }
         : restored,
-      warning: canReplacePlannerRecord(raw, m2InitialPlan.map((meal) => meal.day), validRecipeIds)
+      warning: canReplacePlannerRecord(raw, appInitialPlan.map((meal) => meal.day), validRecipeIds)
         ? null : 'protected',
       raw,
     }
@@ -208,7 +213,10 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
     () => initialProductSelection.writable ? null : (typeof window === 'undefined' ? null : 'protected'),
   )
   const isHiFiView = tab === 'home' || tab === 'recipes' || tab === 'products'
+  const [pickerDay, setPickerDay] = useState<string | null>(null)
+  const catalogProducts = useDesignProducts()
   const navigate = (next: Tab) => {
+    setPickerDay(null)
     if (next === 'basket') setVisitedBasket(true)
     if (next === 'list') setVisitedList(true)
     setTab(next); window.scrollTo?.(0, 0)
@@ -287,7 +295,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
     const chosenDays = new Set(assignments.map(pair => pair.day))
     const next: PlannerPreferences = {
       ...current,
-      activeDays: m2InitialPlan.map(meal => meal.day).filter(day =>
+      activeDays: appInitialPlan.map(meal => meal.day).filter(day =>
         current.activeDays.includes(day) || chosenDays.has(day)),
       recipeByDay: { ...current.recipeByDay, ...replacements },
     }
@@ -296,7 +304,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       write: raw => window.localStorage.setItem(plannerStorageKey, raw),
       expectedRaw: storedPlannerRawRef.current,
       nextRaw: serializePlannerPreferences(next),
-      validDays: m2InitialPlan.map(meal => meal.day),
+      validDays: appInitialPlan.map(meal => meal.day),
       validRecipeIds,
     })
     if (result.status !== 'saved') {
@@ -330,7 +338,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         recipeId?: unknown; day?: unknown; destination?: unknown
       }
       if (typeof recipeId !== 'string' || typeof day !== 'string' ||
-          !m2InitialPlan.some(meal => meal.day === day)) {
+          !appInitialPlan.some(meal => meal.day === day)) {
         event.preventDefault()
         return
       }
@@ -365,9 +373,9 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         assignments?: unknown; destination?: unknown
       }
       if (!Array.isArray(assignments) || assignments.length < 1 ||
-          assignments.length > m2InitialPlan.length ||
+          assignments.length > appInitialPlan.length ||
           !['planner', 'list', 'basket'].includes(String(destination))) return deny()
-      const validDays = new Set(m2InitialPlan.map(meal => meal.day))
+      const validDays = new Set(appInitialPlan.map(meal => meal.day))
       const days = new Set<string>()
       const ids = new Set<string>()
       const pairs: { day: string; recipeId: string; recipeSnapshot: string }[] = []
@@ -411,15 +419,15 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   // immediately; never silently persist that fallback or carry forward the
   // old source-price comparison. A deliberate user action can repair it.
   const unavailableSelections = useMemo(
-    () => unavailablePlannerRecipes(preferences, m2InitialPlan, validRecipeIds),
+    () => unavailablePlannerRecipes(preferences, appInitialPlan, validRecipeIds),
     [preferences, recipes],
   )
   const plannedMeals = useMemo(
-    () => previewAvailablePlannerMeals(m2InitialPlan, unavailableSelections, recipeByDay),
+    () => previewAvailablePlannerMeals(appInitialPlan, unavailableSelections, recipeByDay),
     [recipeByDay, unavailableSelections],
   )
   function acceptMissingRecipeReplacements() {
-    const remaining = unavailablePlannerRecipes(preferences, m2InitialPlan, recipes.map(recipe => recipe.id))
+    const remaining = unavailablePlannerRecipes(preferences, appInitialPlan, recipes.map(recipe => recipe.id))
     if (!remaining.length) return
     // A corrupt/unreadable recipe library can masquerade as a deleted
     // private recipe. Never offer an irreversible replacement of its saved
@@ -450,7 +458,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       expectedRaw: lastStoredRaw,
       current: repaired,
       replacements: remaining,
-      validDays: m2InitialPlan.map(meal => meal.day),
+      validDays: appInitialPlan.map(meal => meal.day),
       validRecipeIds: recipes.map(recipe => recipe.id),
     })
     if (result.status !== 'saved') {
@@ -556,7 +564,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
       write: (raw) => window.localStorage.setItem(plannerStorageKey, raw),
       expectedRaw: lastStoredRaw,
       nextRaw: serializePlannerPreferences(preferences),
-      validDays: m2InitialPlan.map((meal) => meal.day),
+      validDays: appInitialPlan.map((meal) => meal.day),
       validRecipeIds,
     })
     if (result.status === 'saved') {
@@ -615,7 +623,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   }
 
   const resetPlan = () => {
-    setPreferences(defaultPlannerPreferences(m2InitialPlan))
+    setPreferences(appDefaultPreferences())
   }
 
   return (
@@ -654,44 +662,11 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             {planRepairMessage && <p role="alert">{planRepairMessage}</p>}
           </section>
         )}
-        {tab === 'products' && <Suspense fallback={<p role="status">Eigen bronproducten openen…</p>}>
-          <PrivateReviewedProductCatalog reviewed={livePrivateReviewed} budget={budget}
-            checked={privateShoppingTicks}
-            onToggleChecked={(shop, selected) => {
-              // No checkout progress can be created from expired or replaced
-              // source products. Existing local checkmarks remain untouched.
-              const current = freshReviewedBaskets(livePrivateReviewed, privatePlanKey, Date.now())
-              const capture = current?.stores[shop]
-              if (!capture || !capture.basket.lines.includes(selected)) return
-              const key = privatePhysicalShoppingTick(privatePlanKey, shop, capture.basket.store.id, selected)
-              setPrivateShoppingTicks(before => ({ ...before, [key]: !before[key] }))
-            }}
-            onOpenComparison={openOwnPriceImport}
-            onChooseRouteLine={intent => {
-              const serial = mixedRouteOpenSignal + 1
-              setMixedCostIntent(null)
-              setPrivateRouteChoice({ ...intent, serial })
-              setMixedRouteOpenSignal(serial)
-              navigate('list')
-            }}
-            onOpenMixedRoute={() => { setMixedCostIntent(null); setPrivateRouteChoice(null); setMixedRouteOpenSignal(value => value + 1); navigate('list') }}
-            onOpenList={(store) => {
-              if (store) setPreferredOwnStore(store)
-              navigate('list')
-            }} />
-        </Suspense>}
         {(tab === 'home' || tab === 'recipes') && <HiFiHome view={tab}
           onNavigate={navigate} activeDays={activeDays}
           addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />}
-        {tab === 'products' && <details className="supa-product-archive">
-          <summary>Oude ontwerpvoorbeelden en historische bronkaarten tonen (geen actuele prijzen)</summary>
-          <p>Alleen de persoonlijk bevestigde bronartikelen hierboven tellen mee in
-            de prijsvergelijking, budgetten en winkelroute. Deze voorbeelden zijn
-            geen supermarktvoorraad of actuele aanbiedingen.</p>
-          <HiFiHome view="products" onNavigate={navigate} activeDays={activeDays}
-            addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />
-        </details>}
-        {!isHiFiView && <nav className="hifi-utilities" aria-label="Vergelijken en meten"><button onClick={() => navigate('basket')}>Mand</button><button onClick={() => navigate('observe')}>Meten</button></nav>}
+        {tab === 'products' && <HiFiHome view="products" onNavigate={navigate} activeDays={activeDays}
+          addedProducts={designProductIds} onToggleProduct={toggleDesignProduct} />}
 
         {productSelectionWarning && (tab === 'list' || tab === 'products') && (
           <p role="status" className="disclaimer">
@@ -707,8 +682,20 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               : 'Je weekbudget en maaltijdkeuzes zijn tijdelijk en niet opgeslagen omdat browseropslag niet beschikbaar is.'}
           </p>
         )}
-        {tab === 'planner' && (
+        {tab === 'planner' && pickerDay !== null && (
+          <HiFiRecipes mode="pick"
+            plannedRecipeIds={plannedMeals.filter(meal => activeDays.includes(meal.day)).map(meal => meal.recipeId)}
+            onBack={() => setPickerDay(null)}
+            onPick={recipeId => {
+              changeRecipe(pickerDay, recipeId)
+              if (!activeDays.includes(pickerDay)) toggleDay(pickerDay)
+              setPickerDay(null)
+              window.scrollTo?.(0, 0)
+            }} />
+        )}
+        {tab === 'planner' && pickerDay === null && (
           <PlannerView
+            onPickRecipe={setPickerDay}
             budget={budget}
             activeDays={activeDays}
             plannedMeals={plannedMeals}
@@ -775,59 +762,6 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             onReset={resetPlan}
           />
         )}
-        {tab === 'planner' && <PlannerPortableWeek
-          preferences={preferences}
-          days={m2InitialPlan.map(meal => meal.day)}
-          recipeIds={recipes.map(recipe => recipe.id)}
-          recipeNames={Object.fromEntries(recipes.map(recipe => [recipe.id, recipe.title]))}
-          storageProtected={persistenceWarning !== null}
-          onRestore={next => {
-            setPreferences(next)
-            setManualWeekCopy(null)
-            setWeekCopyMessage('Weekplanning hersteld; controleer de nieuwe ingrediënten en prijsbronnen.')
-          }}
-        />}
-        {tab === 'planner' && (
-          <section className="week-share-panel" aria-label="Weekmenu delen">
-            <div className="week-share-actions">
-              <span>Deel je geplande maaltijden, zonder winkelprijzen.</span>
-              <button type="button" className="ghost-button" onClick={prepareWeekPlanCopy}>
-                Toon kopieertekst
-              </button>
-            </div>
-            <label className="week-share-privacy">
-              <input
-                type="checkbox"
-                checked={includeWeekBudget}
-                onChange={(event) => {
-                  setIncludeWeekBudget(event.target.checked)
-                  setManualWeekCopy(null)
-                  setWeekCopyMessage('')
-                }}
-              />
-              Mijn weekbudget ook opnemen (optioneel)
-            </label>
-            <label className="week-share-privacy">
-              <input
-                type="checkbox"
-                checked={includeWeekDetails}
-                onChange={(event) => {
-                  setIncludeWeekDetails(event.target.checked)
-                  setManualWeekCopy(null)
-                  setWeekCopyMessage('')
-                }}
-              />
-              Bereidingstijd en porties opnemen
-            </label>
-            <p role="status" aria-live="polite">{weekCopyMessage}</p>
-            {currentManualCopy !== null && (
-              <WeekShareManualCopy
-                text={currentManualCopy}
-                rows={Math.min(activeDays.length + 6, 14)}
-              />
-            )}
-          </section>
-        )}
         {visitedBasket && (
           <div hidden={tab !== 'basket'} aria-hidden={tab !== 'basket'}>
           <Suspense fallback={<section className="screen" role="status" aria-live="polite">
@@ -862,52 +796,12 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
           </Suspense>
           </div>
         )}
-        {tab === 'list' && (
-          <nav className="screen" aria-label="Snelle acties voor je boodschappenlijst">
-            <button type="button" className="ghost-button" onClick={() =>
-              document.getElementById('supa-own-extra-groceries')?.scrollIntoView({
-                behavior: 'smooth', block: 'start',
-              })}>
-              Voeg eigen boodschappen toe · zonder winkelprijs
-            </button>
-            <button type="button" className="ghost-button" onClick={openOwnPriceImport}>
-              Open mijn PLUS/Deka-winkelvergelijking
-            </button>
-            <label className="supa-list-source-upload">
-              <strong>Eigen winkelopname(s) direct openen</strong>
-              <small>1 of 2 originele PLUS/DekaMarkt CSV, TSV, TXT of Supa JSON-bestanden.
-                De import gaat via Vergelijk en vraagt daar altijd om eigen controle.</small>
-              <input type="file" multiple
-                accept=".csv,.tsv,.txt,.json,text/csv,text/plain,text/tab-separated-values,application/json"
-                onChange={event => {
-                  const files = Array.from(event.currentTarget.files ?? [])
-                  event.currentTarget.value = ''
-                  handoffOwnPriceFiles(files)
-                }} />
-            </label>
-            {listSourceFileWarning &&
-              <p role="alert" className="supa-list-source-upload__error">{listSourceFileWarning}</p>}
-          </nav>
-        )}
         {visitedList && !livePrivateReviewed && (
           <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
             <section className="screen" aria-label="Boodschappenlijst uit mijn eigen weekmenu">
-              <UnpricedPlannerChecklist plan={plannedMeals} recipes={recipes} activeDays={activeDays}
-                onOpenPriceImport={openOwnPriceImport} onOpenRecipes={() => navigate('recipes')} />
-              {tab === 'list' && (designProductIds.length > 0
-                ? <section aria-label="Mijn expliciet toegevoegde producten">
-                    <h3>Mijn toegevoegde producten · apart van receptboodschappen</h3>
-                    <p className="disclaimer">Deze selectie is door jou gemaakt in Producten.
-                      Historische gegevens en Figma-voorbeelden zijn geen geverifieerde prijzen
-                      en doen niet mee in een eigen winkelmandvergelijking.</p>
-                    <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
-                    <ShoppingListView basket={basket} />
-                  </section>
-                : <details className="demo-comparison-disclosure">
-                    <summary>Toon oude voorbeeldboodschappen (geen actuele winkelprijzen)</summary>
-                    <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
-                    <ShoppingListView basket={basket} />
-                  </details>)}
+              <ShoppingListView basket={basket} plan={plannedMeals} recipes={recipes} activeDays={activeDays}
+                chosenProducts={catalogProducts.filter(item => designProductIds.includes(item.id))}
+                onRemoveProduct={toggleDesignProduct} />
             </section>
           </div>
         )}
@@ -922,44 +816,6 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
               routeCostIntent={mixedCostIntent} />
           </div>
         )}
-        {visitedList && (
-          <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
-            <Suspense fallback={<p role="status">Eigen gedeeltelijke bronproducten laden…</p>}>
-              <PartialReviewedShoppingList
-                progress={privateCaptureProgress?.planKey === privatePlanKey
-                  ? privateCaptureProgress : null}
-                complete={livePrivateReviewed}
-                checked={privateShoppingTicks}
-                setChecked={setPrivateShoppingTicks}
-                onOpenComparison={openOwnPriceImport}
-                onReviewIngredient={(store, ingredientId) => {
-                  setPrivateReviewFocus(previous => ({
-                    planKey: privatePlanKey, store, ingredientId,
-                    serial: (previous?.serial ?? 0) + 1,
-                  }))
-                  navigate('basket')
-                }}
-              />
-            </Suspense>
-          </div>
-        )}
-        {tab === 'list' && livePrivateReviewed && designProductIds.length > 0 && (
-          <section className="screen" aria-label="Extra zelf gekozen producten buiten het prijsmandje">
-            <h3>Extra producten · niet meegerekend in jouw supermarktmand</h3>
-            <p className="disclaimer">Jouw losse Producten-selectie is apart bewaard.
-              Historische artikelen en Figma-voorbeelden zijn geen nieuwe bronprijzen,
-              volledige verpakkingsmatches of besparingsbewijs.</p>
-            <HiFiDemoList ids={designProductIds} onRemove={toggleDesignProduct} />
-          </section>
-        )}
-        {tab === 'list' && (
-          <section className="screen" aria-label="Persoonlijke extra boodschappen buiten het prijsmandje">
-            <Suspense fallback={<p>Eigen ongeprijsde boodschappen openen…</p>}>
-              <OwnExtraGroceries identity={privatePlanKey}
-                plan={plannedMeals} recipes={recipes} activeDays={activeDays} />
-            </Suspense>
-          </section>
-        )}
         {tab === 'observe' && <ObservationView />}
       </div>
 
@@ -970,11 +826,15 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             key={item.id}
             aria-label={item.label}
             className={tab === item.id ? 'active' : ''}
+            data-cart-target={item.id === 'list' ? '' : undefined}
             aria-current={tab === item.id ? 'page' : undefined}
             onClick={() => navigate(item.id)}
           >
-            <FigmaImage asset={tab === "products" ? (originalProductNavIcons[item.id] ?? item.icon) : item.icon} alt="" />
+            <FigmaImage asset={tab === item.id ? item.activeIcon : item.icon} alt="" />
             <span className="hifi-sr-only">{item.label}</span>
+            {item.id === 'list' && designProductIds.length > 0 && (
+              <span className="hifi-nav-badge" key={designProductIds.length} aria-label={`${designProductIds.length} producten toegevoegd`}>{designProductIds.length}</span>
+            )}
           </button>
         ))}
       </nav>

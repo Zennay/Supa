@@ -1,0 +1,87 @@
+/* Boodschappenlijst as in the Figma prototype. */
+.hifi-shopping-screen { gap: 16px; padding-bottom: 150px; }
+.hifi-list-heading { display: flex; align-items: center; justify-content: space-between; }
+.hifi-list-heading h2 { margin: 0; color: #262527; font: 600 18px/1.2 Poppins, -apple-system, BlinkMacSystemFont, 'SF Pro', Inter, sans-serif; }
+.hifi-list-more { width: 36px; height: 36px; border: 0; background: transparent; color: #262527; display: grid; place-items: center; cursor: pointer; }
+
+/* Store pills: mint with white text, small round logo. */
+.hifi-list-stores { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.hifi-list-store-chip {
+  display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px 0 4px; border: 0; border-radius: 999px;
+  background: #5fd8ae; color: #fff; font-size: 13px; font-weight: 500; cursor: pointer;
+}
+.hifi-list-store-chip img { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; background: #fff; }
+.hifi-list-store-button {
+  width: 32px; height: 32px; border: 0; border-radius: 50%; background: #fff; color: #262527; display: grid; place-items: center; cursor: pointer;
+}
+
+.hifi-list-group { display: grid; gap: 8px; }
+.hifi-list-group-heading { display: flex; align-items: center; gap: 8px; }
+.hifi-list-group-heading h3 { margin: 0; color: #262527; font-size: 15px; font-weight: 500; }
+.hifi-list-count { padding: 2px 8px; border-radius: 6px; background: #e5e7eb; color: #626569; font-size: 10px; }
+.hifi-list-sort { margin-left: auto; width: 32px; height: 28px; border: 0; background: transparent; color: #262527; display: grid; place-items: center; cursor: pointer; }
+.hifi-list-card { display: grid; gap: 10px; }
+
+.hifi-list-row {
+  display: flex; align-items: center; gap: 4px; min-height: 76px; padding: 12px 16px 12px 10px; border-radius: 18px; background: #fff; color: #262527;
+  transition: opacity .2s ease;
+}
+.hifi-list-row.checked { opacity: .5; }
+.hifi-list-row.checked .hifi-list-detail strong { text-decoration: line-through; }
+.hifi-list-row.unresolved .hifi-list-detail small { color: #b45309; }
+.hifi-list-radio {
+  flex: none; width: 28px; height: 44px; padding: 0; border: 0; background: transparent; display: grid; place-items: center; cursor: pointer;
+}
+.hifi-list-radio > span {
+  width: 14px; height: 14px; border: 1.5px solid #9a9a9a; border-radius: 50%; display: block; box-sizing: border-box;
+}
+.hifi-list-row.checked .hifi-list-radio > span { border-color: #848484; background: radial-gradient(circle, #848484 0 38%, transparent 42%); }
+.hifi-list-remove { color: #848484; font-size: 16px; line-height: 1; }
+.hifi-list-open {
+  flex: 1; min-width: 0; display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 10px;
+  padding: 0; border: 0; background: transparent; text-align: left; color: inherit; cursor: pointer; font: inherit;
+}
+.hifi-list-thumb { width: 44px; height: 44px; display: grid; place-items: center; overflow: hidden; }
+.hifi-list-thumb img { width: 28px; height: 28px; object-fit: contain; }
+.hifi-list-detail { display: grid; gap: 1px; min-width: 0; }
+.hifi-list-detail strong { font-size: 14px; font-weight: 500; overflow-wrap: anywhere; }
+.hifi-list-detail small { color: #848484; font-size: 12px; }
+/* Round store logo sits LEFT of the price. */
+.hifi-list-price { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; }
+.hifi-list-price b { font-weight: 500; }
+.hifi-list-price img { width: 20px; height: 20px; border-radius: 50%; object-fit: cover; flex: none; }
+
+/* Total card, fixed above the navigation. */
+.hifi-list-total {
+  position: sticky; bottom: 118px; z-index: 5; display: grid; gap: 2px; padding: 16px 20px; border-radius: 20px; background: #fff;
+  box-shadow: 0 6px 24px #152d2814;
+}
+.hifi-list-total > div { display: flex; justify-content: space-between; align-items: center; }
+.hifi-list-total span { font-size: 14px; }
+.hifi-list-total strong { font-size: 17px; font-weight: 600; color: #36c693; }
+.hifi-list-total small { color: #848484; font-size: 11px; }
+
+/* Modals. */
+.hifi-line-modal { padding: 14px; }
+.hifi-line-photo { position: relative; height: 210px; border-radius: 18px; display: grid; place-items: center; background: #f6f7f8; }
+.hifi-line-photo img:not(:first-child), .hifi-line-photo > img:only-child { width: 130px; height: 130px; object-fit: contain; }
+.hifi-line-photo > img:first-child:not(:only-child) { position: absolute; top: 12px; left: 12px; width: 30px; height: 30px; border-radius: 50%; object-fit: cover; }
+.hifi-line-info { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding: 14px 4px 10px; }
+.hifi-line-info strong { display: block; font-size: 17px; font-weight: 600; }
+.hifi-line-info small { color: #848484; font-size: 13px; }
+.hifi-line-info b { font-size: 17px; font-weight: 600; }
+.hifi-line-actions { display: flex; gap: 10px; align-items: center; }
+.hifi-stepper { display: inline-flex; align-items: center; gap: 10px; height: 40px; padding: 0 8px; border-radius: 999px; background: #6b6b6b; color: #fff; font-size: 12px; }
+.hifi-stepper button { width: 26px; height: 26px; border: 0; border-radius: 50%; background: #2b2b2b; color: #fff; font-size: 16px; line-height: 1; cursor: pointer; }
+.hifi-stepper button:disabled { opacity: .45; cursor: default; }
+.hifi-line-remove { flex: 1; height: 40px; border: 0; border-radius: 999px; background: #ff2d55; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
+
+.hifi-options-modal { width: min(100%, 250px); padding: 18px 20px; }
+.hifi-options-modal button, .hifi-stores-modal button {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 40px; padding: 0 12px; border: 0; border-radius: 12px;
+  background: transparent; color: #262527; font-size: 14px; text-align: left; cursor: pointer;
+}
+.hifi-options-modal .danger { color: #b3123f; }
+.hifi-stores-modal button { margin-bottom: 4px; min-height: 44px; }
+.hifi-stores-modal button.selected { background: #7ff5d1; }
+.hifi-stores-modal img { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; background: #fff; }

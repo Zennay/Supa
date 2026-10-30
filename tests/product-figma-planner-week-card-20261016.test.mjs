@@ -43,7 +43,7 @@ test('actual Planner renders the Figma week control with real plan and preferenc
       onBudgetChange() {}, onToggleDay() {}, onRecipeChange() {}, onReset() {},
     }))
     assert.match(page, /data-figma-node="3359:4900"/)
-    assert.match(page, /Plan eerst\. Vergelijk daarna\./)
+    assert.match(page, /aria-label="Recept voor de gekozen dag"/)
     assert.match(page, /aria-label="Kies je weekbudget"/)
     assert.match(page, /aria-label="Geplande maaltijden"/)
     assert.match(page, /Weekplanning/)
