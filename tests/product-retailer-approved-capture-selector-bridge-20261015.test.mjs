@@ -456,3 +456,34 @@ test('private PLUS/Deka capture refuses generic price hints shared by historical
     assert.doesNotMatch(JSON.stringify(review),/PRIVATE_PRIOR|PRIVATE_CURRENT/)
   }
 })
+
+test('one-shot PLUS/Deka private capture prioritizes six real semantic fields despite hundreds of noisy CSS selectors',async()=>{
+  const noise=Array.from({length:80},(_,i)=>
+    '<span class="price-noise-'+i+' stock-noise-'+i+'">PRIVATE_NOISE</span>').join('')
+  for(const [supermarket,kind,url] of [
+    ['plus','catalog','https://www.plus.nl/producten'],
+    ['dekamarkt','offers','https://www.dekamarkt.nl/aanbiedingen']]){
+    const html='<article class="product-card">'+noise+
+      '<h2 class="product-title">PRIVATE_NAME</h2>'+
+      '<span class="price-value">PRIVATE_PRICE</span>'+
+      '<span class="pack-size">PRIVATE_PACK</span>'+
+      '<span class="offer-label">PRIVATE_OFFER</span>'+
+      '<span class="stock-label">PRIVATE_STOCK</span></article>'
+    let requests=0
+    const receipt=await captureToPrivateSelectorReview({
+      source:{supermarket,kind,url},grant:consent(supermarket,kind,url),
+      permissionGate:syntheticGate(),capturedAt:at,
+      fetchFn:async()=>{requests++;return new Response(html,{status:200,headers:{'content-type':'text/html'}})},
+    })
+    assert.equal(requests,1)
+    for(const [field,selector] of [
+      ['product','article.product-card'],['name','h2.product-title'],
+      ['price','span.price-value'],['pack','span.pack-size'],
+      ['offer','span.offer-label'],['availability','span.stock-label']])
+      assert.ok(receipt.selectorProposals.some(row=>row.field===field&&row.selector===selector),supermarket+': '+field)
+    assert.ok(receipt.selectorProposals.length<=24)
+    assert.equal(receipt.readyForIngestion,false)
+    assert.equal(receipt.currentPricesExtracted,false)
+    assert.doesNotMatch(JSON.stringify(receipt),/PRIVATE_NOISE|PRIVATE_NAME|PRIVATE_PRICE|PRIVATE_PACK|PRIVATE_OFFER|PRIVATE_STOCK|price-noise-/)
+  }
+})

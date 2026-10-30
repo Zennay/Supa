@@ -733,3 +733,35 @@ test('SHA-private replay suppresses ambiguous shared price CSS from old and new 
     assert.equal((await verifyPrivateSyntheticHtmlFixture(filename,output)).verified,true)
   }
 })
+
+test('noisy 160-selector retailer listings still preserve source-observed product, price, pack, sale and stock reviews',async t=>{
+  const clutter=Array.from({length:80},(_,i)=>
+    '<span class="price-noise-'+i+' stock-noise-'+i+'">PRIVATE_NOISE</span>').join('')
+  for(const retailerId of ['plus','dekamarkt']){
+    const html='<article class="product-card">'+clutter+
+      '<h2 class="product-title">PRIVATE_NAME</h2>'+
+      '<span class="price-value">PRIVATE_PRICE</span>'+
+      '<span class="pack-size">PRIVATE_PACK</span>'+
+      '<span class="offer-label">PRIVATE_OFFER</span>'+
+      '<span class="stock-label">PRIVATE_AVAILABILITY</span></article>'
+    const {filename,dir,capture}=await archive(t,retailerId,retailerId==='plus'?'catalog':'offers',html)
+    const origin={retailerId,url:capture.source.url,capturedAt:capture.source.capturedAt}
+    const original=proposeOfflineRetailerSelectors({html,origin},true)
+    assert.equal(original.selectors.length,24)
+    assert.equal(original.candidateLimitReached,true)
+    const safe=summarizeOfflineSelectorProposals(original)
+    for(const [field,selector] of [
+      ['product','article.product-card'],['name','h2.product-title'],
+      ['price','span.price-value'],['pack','span.pack-size'],
+      ['offer','span.offer-label'],['availability','span.stock-label']])
+      assert.ok(safe.selectors.some(x=>x.selector===selector&&x.field===field),retailerId+' '+field)
+    const out=join(dir,'diverse-selector-replay')
+    await buildPrivateSyntheticHtmlFixture(filename,out)
+    const generated=await readFile(join(out,'synthetic-structure.html'),'utf8')
+    const replay=proposeOfflineRetailerSelectors({html:generated,origin})
+    for(const field of ['product','name','price','pack','offer','availability'])
+      assert.ok(replay.selectors.some(x=>x.field===field),retailerId+' replay '+field)
+    assert.doesNotMatch(generated,/PRIVATE_NOISE|PRIVATE_NAME|PRIVATE_PRICE|PRIVATE_PACK|PRIVATE_OFFER|PRIVATE_AVAILABILITY/)
+    assert.equal((await verifyPrivateSyntheticHtmlFixture(filename,out)).verified,true)
+  }
+})

@@ -388,7 +388,6 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
 
   // These are candidate CSS selectors for reviewed snapshots; counts are raw
   // tag occurrences, NOT a verified DOM selection and NEVER validated prices.
-  const selectorCandidatesOmitted = Math.max(0, candidates.size - MAX_SELECTORS)
   // Genuine observed Product roots and Schema.org microdata are the
   // highest-value structural anchors. Keep them inside the 24-candidate
   // review budget even when a large listing emits many noisy price classes.
@@ -403,18 +402,40 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
     if (Object.entries(SCHEMA_ITEMPROP_FIELDS).some(([prop,field]) =>
       row.field === field && row.selector.endsWith('[itemprop="'+prop+'"]')))
       return 1
+    // Existing, source-observed public class/test-id tokens are more useful
+    // to an operator than hundreds of unique hashed/retailer noise tokens.
+    // This prioritises review only; it NEVER creates an absent selector.
+    const match=/^[a-z][a-z0-9-]{0,32}(?:\.([a-z][a-z0-9_-]{1,59})|\[data-testid="([a-z][a-z0-9_-]{1,59})"\])$/.exec(row.selector)
+    const token=match?.[1] ?? match?.[2]
+    const known=token && Object.hasOwn(PUBLIC_OBSERVED_TOKEN_FIELDS,token)
+      ? PUBLIC_OBSERVED_TOKEN_FIELDS[token] : null
+    if (known && (known===row.field ||
+        (known==='price' && row.field==='offer' &&
+         isFormerPriceTag(row.tag)))) return 1
     return 0
   }
   for (const selector of ambiguousCurrentPriceSelectors)
     candidates.delete('price\u0000' + selector)
-  const selectors = [...candidates.values()]
-    .sort((a, b) => observedStructuralConfidence(b)-observedStructuralConfidence(a) ||
-      b.instances - a.instances || a.field.localeCompare(b.field) ||
-      a.selector.localeCompare(b.selector))
-    .slice(0, MAX_SELECTORS)
-    .map(({ field, selector, instances }) => ({
-      field, selector, instances, status: 'needs-human-review',
-    }))
+  // A noisy listing should never spend all 24 review slots on one category.
+  // Reserve one real observed candidate per available semantic field first.
+  const compare=(a,b)=>observedStructuralConfidence(b)-observedStructuralConfidence(a) ||
+    b.instances-a.instances || a.field.localeCompare(b.field) ||
+    a.selector.localeCompare(b.selector)
+  const ranked=[...candidates.values()].sort(compare)
+  const reserved=new Set()
+  for (const field of ['product','name','price','pack','offer','availability']) {
+    const best=ranked.find(row=>row.field===field)
+    if (best) reserved.add(best)
+  }
+  const selected=[...reserved]
+  for (const row of ranked) {
+    if (selected.length>=MAX_SELECTORS) break
+    if (!reserved.has(row)) selected.push(row)
+  }
+  const selectorCandidatesOmitted=Math.max(0,candidates.size-MAX_SELECTORS)
+  const selectors=selected.sort(compare).map(({field,selector,instances})=>({
+    field,selector,instances,status:'needs-human-review',
+  }))
   return {
     schemaVersion: 1,
     mode: 'offline-selector-proposals-only',
