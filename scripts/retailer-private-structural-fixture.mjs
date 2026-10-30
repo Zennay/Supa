@@ -12,8 +12,8 @@ import { assertNoSymlinkedM3OutputParents } from './m3-source-output-preservatio
 const FIELD = new Set(['product','name','price','pack','offer','availability'])
 const MICRODATA_PRODUCT = /^(article|section|div|li|a)\[itemtype="(https?:\/\/schema\.org\/Product)"\]$/
 
-const TAG = /^(article|section|div|span|p|li|h[1-6]|a|data|time)\.([a-z][a-z0-9_-]{0,58})$/i
-const ATTRIBUTE = /^(article|section|div|span|p|li|h[1-6]|meta|link|data|time)\[(data-testid|itemprop)="([a-z][a-z0-9_-]{1,59})"\]$/i
+const TAG = /^(article|section|div|span|p|li|h[1-6]|strong|a|data|time)\.([a-z][a-z0-9_-]{0,58})$/i
+const ATTRIBUTE = /^(article|section|div|span|p|li|h[1-6]|strong|a|meta|link|data|time)\[(data-testid|itemprop)="([a-z][a-z0-9_-]{1,59})"\]$/i
 const refuse = () => { throw Error('Private synthetic structural fixture refused') }
 function elementFor(row, retailerId) {
   if (!FIELD.has(row.field) || row.status !== 'needs-human-review' ||

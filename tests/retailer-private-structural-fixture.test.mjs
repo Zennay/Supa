@@ -510,3 +510,21 @@ test('private retailer Offer microdata creates structural link/data/time with no
     assert.equal(replay.readyForIngestion,false)
   }
 })
+
+test('SHA-bound two-store synthetic fixture preserves observed anchor and strong Schema.org itemprop tags',async t=>{
+  for(const [retailerId,root] of [['plus','/product/'],['dekamarkt','/producten/']]) {
+    const privateHtml='<article itemscope itemtype="https://schema.org/Product">'+
+      `<a itemprop="name" href="${root}private-sku-991">PRIVATE_ITEM_NAME</a>`+
+      '<strong itemprop="price">PRIVATE_7.99</strong></article>'
+    const {filename,dir}=await archive(t,retailerId,'product',privateHtml)
+    const out=join(dir,'safe-structural-review')
+    await buildPrivateSyntheticHtmlFixture(filename,out)
+    const replay=await readFile(join(out,'synthetic-structure.html'),'utf8')
+    assert.match(replay,/<a itemprop="name" data-synthetic="true">/)
+    assert.match(replay,/<strong itemprop="price" data-synthetic="true">/)
+    assert.doesNotMatch(replay,/PRIVATE_ITEM_NAME|PRIVATE_7.99|private-sku-991/)
+    const verified=await verifyPrivateSyntheticHtmlFixture(filename,out)
+    assert.equal(verified.verified,true)
+    assert.equal(verified.productionEnabled,false)
+  }
+})
