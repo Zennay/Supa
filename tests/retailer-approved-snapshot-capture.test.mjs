@@ -492,3 +492,33 @@ test('HTTP Age/Date cannot launder stale price HTML into a fresh snapshot', asyn
     createHash('sha256').update(recent).digest('hex'))
   assert.equal(admitted.readyForIngestion, false)
 })
+
+test('HTTP no-store and attachment HTML cannot enter a SHA-pinned snapshot archive', async () => {
+  const html='<html><article class="product-card">SYNTHETIC</article></html>'
+  for (const headers of [
+    { 'cache-control': 'max-age=30, no-store' },
+    { 'cache-control': 'NO-STORE' },
+    { 'content-disposition': 'attachment; filename="export.html"' },
+  ]) {
+    let cancelled = false
+    const stream = new ReadableStream({
+      start(controller) { controller.enqueue(new TextEncoder().encode(html)) },
+      cancel() { cancelled = true },
+    })
+    await assert.rejects(captureApprovedRetailerPage({
+      source, permissionGate: gate, grant,
+      fetchFn: async () => new Response(stream, { status:200,
+        headers: { 'content-type':'text/html', ...headers } }),
+    }), /disallows snapshot archival/)
+    assert.equal(cancelled, true)
+  }
+  const allowed = await captureApprovedRetailerPage({
+    source, permissionGate: gate, grant,
+    fetchFn: async () => new Response(html, {status:200,
+      headers: { 'content-type':'text/html',
+        'cache-control':'private, max-age=30',
+        'content-disposition':'inline' } }),
+  })
+  assert.equal(allowed.html, html)
+  assert.equal(allowed.published, false)
+})
