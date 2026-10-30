@@ -105,9 +105,14 @@ function checkedTarget(source) {
   }
   let target
   try { target = new URL(source.url) } catch { throw new Error('Malformed retailer source URL') }
+  // Product routes must identify an item, never an empty catalog root.
   const route = config[source.kind].some(prefix =>
-    target.pathname === prefix || (
-      prefix.endsWith('/') && target.pathname.startsWith(prefix)
+    (source.kind !== 'product' && target.pathname === prefix) || (
+      prefix.endsWith('/') && target.pathname.startsWith(prefix) &&
+      (source.kind !== 'product' || (
+        target.pathname.length > prefix.length &&
+        target.pathname[prefix.length] !== '/'
+      ))
     ))
   if (target.protocol !== 'https:' || target.hostname !== config.host ||
       target.port || target.username || target.password ||
@@ -183,9 +188,14 @@ export async function captureApprovedRetailerPage(options = {}) {
   const target = checkedTarget(source)
   permittedForCapture(permissionGate, source, grant, target)
   const timestamp = capturedAt ?? new Date().toISOString()
-  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(timestamp) ||
-      !Number.isFinite(Date.parse(timestamp)) ||
-      Date.parse(timestamp) > Date.now() + 60_000) {
+  // Date.parse normalizes impossible Gregorian dates: retain the exact
+  // civil UTC source event and refuse before invoking any transport.
+  const timestampMs = typeof timestamp === 'string' ? Date.parse(timestamp) : NaN
+  if (typeof timestamp !== 'string' ||
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(timestamp) ||
+      !Number.isFinite(timestampMs) ||
+      new Date(timestampMs).toISOString() !== timestamp ||
+      timestampMs > Date.now() + 60_000) {
     throw new Error('Invalid source capture clock')
   }
   const response = await fetchFn(target, {
