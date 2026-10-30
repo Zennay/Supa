@@ -144,7 +144,7 @@ export function proposeRetailerSelectors(source, html) {
   // A historical approved capture is still subject to the current source
   // archival contract. Never derive candidate selectors from a page that
   // explicitly forbids retention, redirects, or declares a non-UTF8 DOM.
-  const document = scanOfflineRetailerMarkup(html)
+  const document = scanOfflineRetailerMarkup(html,{includeScripts:true})
   if (document.hasMetaNoStore || document.hasMetaRefresh ||
       document.hasConflictingCharset) {
     reject('retailer HTML source directives prohibit selector review')
@@ -161,19 +161,21 @@ export function proposeRetailerSelectors(source, html) {
   const jsonLdTypes = new Set()
   const jsonLdKeys = new Set()
   let invalidJsonLdCount = 0
-  const activeHtml = html.replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<(?:template|noscript|textarea)\b[^>]*>[\s\S]*?<\/(?:template|noscript|textarea)\s*>/gi, '')
-    .replace(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi, (_, attrs, script) => {
-      const type = /\btype\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(attrs)
-      const scriptType = (type?.[1] ?? type?.[2] ?? type?.[3] ?? '').trim().toLowerCase()
-      if (scriptType === 'application/ld+json') {
-        if (!jsonLdShape(script, jsonLdTypes, jsonLdKeys)) invalidJsonLdCount++
-      }
-      if (/\bid\s*=\s*(?:"__NUXT_DATA__"|'__NUXT_DATA__')/i.test(attrs)) {
-        scripts.push('nuxt-data-script')
-      }
-      return ' '
-    })
+  // Inspect only script elements proved live by the same bounded HTML scanner.
+  // Matching raw HTML with a regex admitted fake JSON-LD scripts embedded
+  // inside <style>, inert SVG or quoted attribute values. Never execute JS.
+  for(const script of document.scripts){
+    if(script.attrs.has('src')) continue
+    const scriptType=script.attrs.get('type')?.trim().toLowerCase()
+    if(scriptType==='application/ld+json'){
+      if(!jsonLdShape(script.content,jsonLdTypes,jsonLdKeys)) invalidJsonLdCount++
+    }
+    if(script.attrs.get('id')==='__NUXT_DATA__')
+      scripts.push('nuxt-data-script')
+  }
+  // Every class candidate must correspond to an actual visible opening tag,
+  // not markup-shaped text inside a script/style/template/attribute.
+  const activeHtml=document.visible
   const counts = new Map()
   let htmlTagCount = 0
   for (const tag of activeHtml.matchAll(/<([a-z][a-z0-9-]{0,30})\b([^<>]{0,2048})>/gi)) {

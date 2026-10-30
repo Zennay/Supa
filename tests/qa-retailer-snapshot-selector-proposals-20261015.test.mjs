@@ -429,3 +429,40 @@ test('legacy large archival capture cannot evade canonical checks by skipping mo
   assert.throws(()=>proposeRetailerSelectors(source('plus','catalog',html),html),
     /Offline selector review refused: untrusted retailer HTML base or canonical source identity/)
 })
+
+test('legacy source review derives class and JSON-LD proposals only from live HTML tags',()=>{
+  const hostile=[
+    '<style>.x:after{content:"<article class=\"product-card\">"}'+
+      '/* <script type="application/ld+json">{ "@type":"Product" }</script> */</style>',
+    '<template><article class="product-fake-template"></article>'+
+      '<script type="application/ld+json">{"@context":"https://schema.org","@type":"Product"}</script></template>',
+    '<svg><foreignObject><article class="product-fake-svg"></article></foreignObject></svg>',
+    '<article class="product-fake-attribute" data-fake="<div class=&#39;price-fake-quoted&#39;>"></article>',
+    '<script type="application/ld+json" src="https://outside.invalid/json">{"@context":"https://schema.org","@type":"Product"}</script>',
+  ]
+  const html='<html><head><meta charset="UTF-8"></head><body>'+
+    hostile.join('')+
+    '<section class="product-card"><span class="price-value">PRIVATE_PRICE</span></section>'+
+    '<script type="application/ld+json">'+
+    JSON.stringify({'@context':'https://schema.org','@type':'Offer'})+
+    '</script></body></html>'
+  const result=proposeRetailerSelectors(source('plus','catalog',html),html)
+  const joined=JSON.stringify(result)
+  assert.ok(result.proposedSelectors.some(x=>x.selector==='section.product-card'))
+  assert.ok(result.proposedSelectors.some(x=>x.selector==='span.price-value'))
+  assert.deepEqual(result.embeddedSignals.jsonLdTypes,['Offer'])
+  assert.doesNotMatch(joined,/product-fake-template|product-fake-svg|price-fake-quoted/)
+  assert.equal(result.readyForScraping,false)
+  assert.equal(result.currentPricesExtracted,false)
+})
+test('trusted live Nuxt/JSON-LD scripts survive inert-aware legacy M1 parsing',()=>{
+  const html='<html><head><script type="application/ld+json">'+
+    JSON.stringify({'@context':'https://schema.org','@type':'Product'})+
+    '</script></head><body><script id="__NUXT_DATA__" type="application/json">[]</script>'+
+    '<article class="product-card"></article></body></html>'
+  const report=proposeRetailerSelectors(source('dekamarkt','offers',html),html)
+  assert.equal(report.embeddedSignals.nuxtDataScriptPresent,true)
+  assert.deepEqual(report.embeddedSignals.jsonLdTypes,['Product'])
+  assert.ok(report.proposedSelectors.some(x=>x.selector==='article.product-card'))
+  assert.equal(report.publicationAllowed,false)
+})
