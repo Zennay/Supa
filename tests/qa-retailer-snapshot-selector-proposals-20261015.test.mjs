@@ -327,3 +327,32 @@ test('duplicate JSON-LD keys cannot create a source signal in the legacy M1 snap
   assert.deepEqual(result.embeddedSignals.jsonLdTypes,[])
   assert.equal(result.readyForScraping,false)
 })
+
+test('M1 legacy capture review reuses observed microdata selectors from the strict offline engine',()=>{
+  for(const [retailer,kind,url] of [
+    ['plus','catalog','https://www.plus.nl/producten'],
+    ['dekamarkt','offers','https://www.dekamarkt.nl/aanbiedingen']]) {
+    const html='<html><head><meta charset="UTF-8"></head><body>'+
+      '<article itemscope itemtype="https://schema.org/Product">'+
+      '<span itemprop="name">PRIVATE_LEGACY_PRODUCT</span>'+
+      '<meta itemprop="price" content="99.99">'+
+      '<a href="'+(retailer==='plus'?'/product/':'/producten/')+
+      'PRIVATE_SKU_321">DO NOT PUBLISH</a></article></body></html>'
+    const identity=source(retailer,kind,html)
+    identity.requestedUrl=url
+    const report=proposeRetailerSelectors(identity,html)
+    for(const selector of [
+      'article[itemtype="https://schema.org/Product"]',
+      'span[itemprop="name"]','meta[itemprop="price"]']) {
+      assert.ok(report.proposedSelectors.some(row=>row.selector===selector),
+        'missing source-observed review hint '+selector)
+    }
+    assert.ok(report.possibleFieldSelectors.price.some(x=>
+      x.selector==='meta[itemprop="price"]'))
+    assert.equal(report.readyForScraping,false)
+    assert.equal(report.currentPricesExtracted,false)
+    assert.equal(report.sourcePermissionVerified,false)
+    assert.doesNotMatch(JSON.stringify(report),
+      /PRIVATE_LEGACY_PRODUCT|PRIVATE_SKU_321|99.99|DO NOT PUBLISH/)
+  }
+})

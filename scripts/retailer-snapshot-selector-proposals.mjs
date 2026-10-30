@@ -1,5 +1,6 @@
 import { ambiguousRetailerRoute } from './retailer-source-route-safety.mjs'
 import { scanOfflineRetailerMarkup } from './retailer-offline-structural-scan.mjs'
+import { proposeOfflineRetailerSelectors, summarizeOfflineSelectorProposals } from './retailer-offline-selector-discovery.mjs'
 import { parseUniqueKeyRetailerJson } from './retailer-private-unique-key-json.mjs'
 import { decodeExactRetailerHtmlBytes } from './retailer-private-html-byte-identity.mjs'
 /**
@@ -188,6 +189,24 @@ export function proposeRetailerSelectors(source, html) {
       selector, occurrences, status: 'UNVERIFIED_PROPOSAL',
       requiresReviewedSnapshotAndHumanApproval: true,
     }))
+  // Reuse the stricter source-observed selector engine for genuine product
+  // microdata and public product-link roots. Historical source readers may
+  // have older clock formats: if the modern analyzer declines, do not invent
+  // candidates and preserve the original class-only review.
+  let semantic = []
+  try {
+    const discovered = proposeOfflineRetailerSelectors({html,origin:{
+      retailerId:identity.supermarket,url:identity.url,capturedAt:identity.capturedAt}})
+    semantic = summarizeOfflineSelectorProposals(discovered).selectors
+      .filter(row => row.field === 'product' ||
+        /\[itemprop="(?:name|price|availability|size)"\]$/.test(row.selector))
+      .map(row => ({selector:row.selector,occurrences:row.instances,
+        status:'UNVERIFIED_PROPOSAL',requiresReviewedSnapshotAndHumanApproval:true}))
+  } catch { /* No new review proposals when the strict modern scanner refuses. */ }
+  const observed = new Map()
+  for(const row of [...semantic,...suggestions])
+    if(!observed.has(row.selector)) observed.set(row.selector,row)
+  const completeSuggestions=[...observed.values()].slice(0,40)
   return {
     schemaVersion: 1,
     artifactType: 'supa-offline-selector-proposals',
@@ -200,8 +219,8 @@ export function proposeRetailerSelectors(source, html) {
       jsonLdKeys: [...jsonLdKeys].sort(),
       invalidJsonLdCount,
     },
-    proposedSelectors: suggestions,
-    possibleFieldSelectors: mapCandidateFields(suggestions),
+    proposedSelectors: completeSuggestions,
+    possibleFieldSelectors: mapCandidateFields(completeSuggestions),
     readyForScraping: false, sourcePermissionVerified: false,
     currentPricesExtracted: false, publicationAllowed: false,
   }
