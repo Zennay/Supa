@@ -33,11 +33,15 @@ export function HiFiPlannerWeekCard({
   plannedMeals,
   activeDays,
   onToggleDay,
+  focusedDay,
+  onFocusDay,
   dayImages = {},
 }: {
   plannedMeals: PlannedMeal[]
   activeDays: string[]
   onToggleDay: (day: string) => void
+  focusedDay?: string
+  onFocusDay?: (day: string) => void
   /** Original Figma photo of the recipe planned on a day, when one exists. */
   dayImages?: Record<string, string>
 }) {
@@ -60,9 +64,13 @@ export function HiFiPlannerWeekCard({
               key={day}
               type="button"
               className={`hifi-planner-day${active ? ' selected' : ''}${date.toDateString() === today.toDateString() ? ' today' : ''}`}
+              data-focused={focusedDay === day ? 'true' : undefined}
               aria-label={`${weekdayNames[day] ?? day} ${date.getDate()} ${active ? 'uit planning halen' : 'aan planning toevoegen'}`}
               aria-pressed={active}
-              onClick={() => onToggleDay(day)}
+              onClick={() => {
+                onFocusDay?.(day)
+                onToggleDay(day)
+              }}
             >
               <span className="hifi-planner-day-label">{day === 'Zo' ? 'Z' : day.slice(0, 1)}</span>
               <span className={active && dayImages[day]

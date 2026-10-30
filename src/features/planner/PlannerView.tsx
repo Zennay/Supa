@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import type { PlannedMeal, Recipe } from '../../domain/types'
 import { type RecipeWithIngredients } from '../../domain/basket.ts'
 import { buildIngredientReuseInsight } from '../../domain/ingredientReuse.ts'
@@ -18,6 +18,8 @@ import './planner.css'
 const budgetOptions = [30, 35, 40]
 
 type PlannerViewProps = {
+  /** The day selected before an unmount into the recipe picker. */
+  preferredFocusedDay?: string
   /** Open the recipe picker for an open day ('Toevoegen aan planner'). */
   onPickRecipe: (day: string) => void
   budget: number
@@ -46,6 +48,7 @@ type PlannerViewProps = {
 }
 
 export function PlannerView({
+  preferredFocusedDay,
   onPickRecipe,
   budget,
   activeDays,
@@ -71,11 +74,53 @@ export function PlannerView({
   onRecipeChange,
   onReset,
 }: PlannerViewProps) {
+  // The mobile selector is ephemeral; only the canonical App callbacks
+  // change the actual planned day and recipe. Respect main's recipe picker.
+  const [focusedDay, setFocusedDay] = useState(() => preferredFocusedDay ?? '')
+  const quickDay = plannedMeals.some(({ day }) => day === focusedDay)
+    ? focusedDay
+    : (plannedMeals.find(({ day }) => activeDays.includes(day))?.day ?? plannedMeals[0]?.day ?? '')
+  const quickDayActive = activeDays.includes(quickDay)
+  const quickMeal = plannedMeals.find(({ day }) => day === quickDay)
+  const quickRecipeAvailable = recipes.some(({ id }) => id === quickMeal?.recipeId)
   const [openDay, setOpenDay] = useState<string | null>(null)
+
+  const jumpToRecipe = () => {
+    if (!quickDayActive) {
+      onPickRecipe(quickDay)
+      return
+    }
+    const select = document.getElementById('planner-mobile-quick-recipe')
+    select?.scrollIntoView({ block: 'center' })
+    select?.focus({ preventScroll: true })
+  }
+
+  const jumpToBudget = () => {
+    document.getElementById('weekbudget-title')?.scrollIntoView({ block: 'center' })
+  }
+
   const [customOpen, setCustomOpen] = useState(false)
   const [customDraft, setCustomDraft] = useState('')
   const [customError, setCustomError] = useState('')
   const customActive = validCustomWeekBudgetEuros(budget) !== null && !budgetOptions.includes(budget)
+  const [focusCustomBudget, setFocusCustomBudget] = useState(false)
+  useEffect(() => {
+    if (!focusCustomBudget || !customOpen) return
+    const input = document.getElementById('custom-weekbudget-value')
+    if (!input) return
+    input.scrollIntoView({ block: 'center' })
+    input.focus({ preventScroll: true })
+    setFocusCustomBudget(false)
+  }, [customOpen, focusCustomBudget])
+
+  const jumpToCustomBudget = () => {
+    const calc = document.querySelector<HTMLDetailsElement>('.hifi-planner-calc')
+    if (calc) calc.open = true
+    setCustomDraft(budget.toFixed(2).replace('.', ','))
+    setCustomError('')
+    setCustomOpen(true)
+    setFocusCustomBudget(true)
+  }
 
   const commitCustomBudget = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -168,9 +213,85 @@ export function PlannerView({
         plannedMeals={plannedMeals}
         activeDays={activeDays}
         onToggleDay={day => activeDays.includes(day) ? onToggleDay(day) : onPickRecipe(day)}
+        focusedDay={quickDay}
+        onFocusDay={setFocusedDay}
         dayImages={dayImages}
       />
 
+      {quickDay && (
+        <nav className="planner-mobile-jump" aria-label="Snelle acties voor je weekplanning">
+          <div className="planner-mobile-jump-heading">
+            <label htmlFor="planner-mobile-edit-day">Bewerk een dag zonder de planning te wijzigen</label>
+            <select
+              id="planner-mobile-edit-day"
+              value={quickDay}
+              onChange={(event) => setFocusedDay(event.currentTarget.value)}
+            >
+              {plannedMeals.map(({ day }) => (
+                <option key={day} value={day}>
+                  {day} · {activeDays.includes(day) ? 'gepland' : 'nog niet ingepland'}
+                </option>
+              ))}
+            </select>
+            <p aria-live="polite">
+              <strong>{quickDay}</strong> · {quickDayActive ? 'In je planning' : 'Nog niet ingepland'}
+              <span> · {activeDays.length} van {plannedMeals.length} dagen</span>
+            </p>
+          </div>
+          <div className="planner-mobile-recipe" role="group" aria-label="Recept voor de gekozen dag">
+            {quickDayActive && quickMeal && quickRecipeAvailable
+              ? <>
+                  <label htmlFor="planner-mobile-quick-recipe">Recept voor {weekdayNames[quickDay] ?? quickDay}</label>
+                  <select id="planner-mobile-quick-recipe" value={quickMeal.recipeId}
+                    onChange={(event) => onRecipeChange(quickDay, event.currentTarget.value)}>
+                    {recipes.map(recipe => (
+                      <option key={recipe.id} value={recipe.id}>{recipe.title}</option>
+                    ))}
+                  </select>
+                  <small>Wijzig dit recept direct in je bestaande weekplanning.</small>
+                </>
+              : <p>{quickDayActive
+                  ? 'Dit recept is niet meer beschikbaar. Open Recepten om het te controleren.'
+                  : `Plan ${quickDay} eerst; alleen een dag kiezen verandert je planning niet.`}</p>}
+          </div>
+          <div className="planner-mobile-budget" role="group" aria-label="Snel weekbudget instellen">
+            <strong>Weekbudget: {euro.format(budget)}</strong>
+            <small aria-live="polite">
+              {trustedCents === null ? 'Winkelkosten nog onbekend'
+                : budgetKnown && exactRemainingCents !== null
+                  ? exactRemainingCents < 0
+                    ? `${euro.formatCents(-exactRemainingCents)} boven budget`
+                    : `${euro.formatCents(exactRemainingCents)} over`
+                  : knownMinimumOverrunCents !== null
+                    ? `Minimaal ${euro.formatCents(knownMinimumOverrunCents)} boven budget; overige prijzen onbekend`
+                    : 'Niet alle mandprijzen bekend'}
+            </small>
+            <div className="planner-mobile-budget-options">
+              {budgetOptions.map(option => (
+                <button key={option} type="button" aria-pressed={budget === option}
+                  onClick={() => onBudgetChange(option)}>
+                  {euro.format(option)}
+                </button>
+              ))}
+              <button type="button" className="planner-mobile-custom-budget"
+                aria-controls="custom-weekbudget-form" onClick={jumpToCustomBudget}>
+                Eigen bedrag instellen
+              </button>
+            </div>
+          </div>
+          <div className="planner-mobile-jump-buttons">
+            <button type="button" onClick={jumpToRecipe} aria-controls={`recipe-${quickDay}`}>
+              {quickDayActive ? 'Kies recept voor' : 'Plan en kies recept voor'} {quickDay}
+            </button>
+            <button type="button" onClick={jumpToBudget}>
+              Naar weekbudget
+            </button>
+            <button type="button" onClick={onOpenShoppingList}>
+              Naar boodschappenlijst
+            </button>
+          </div>
+        </nav>
+      )}
       {hasIngredientData && <HiFiReuseStrip insight={reuseInsight} />}
 
       <div className="day-grid" aria-label="Geplande maaltijden">
@@ -189,7 +310,7 @@ export function PlannerView({
           // per person and a chevron; open days show an add-to-planner prompt.
           return (
             <article
-              className={`hifi-meal-card${open ? ' open' : ''}`}
+              className={`hifi-meal-card${open ? ' open' : ''}${item.day === quickDay ? ' quick-focused' : ''}`}
               key={item.day}
             >
               <div className={active ? 'meal-card meal-config hifi-meal-row active' : 'meal-card meal-config hifi-meal-row'}>
