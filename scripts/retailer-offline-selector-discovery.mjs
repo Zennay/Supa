@@ -182,8 +182,11 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
     const actualCustomElement = /^[a-z][a-z0-9]*-[a-z0-9-]{1,31}$/.test(tag)
     if (!standardCandidate && !actualCustomElement) continue
     const attrs = match.attrs
-    const classes = (attrs.get('class') ?? '').split(/\s+/)
-    const values = classes.filter(x => STATIC_NAME.test(x)).slice(0, 20)
+    // HTML class tokens split on ASCII whitespace, not JavaScript's wider \s
+    // (NBSP is a class-name character). Repeated tokens match one element,
+    // not multiple CSS elements; counting duplicates creates false drift.
+    const classes = (attrs.get('class') ?? '').split(/[ \t\n\f\r]+/)
+    const values = [...new Set(classes.filter(x => STATIC_NAME.test(x)))].slice(0, 20)
     for (const name of values) {
       for (const [field, rule] of Object.entries(FIELD_RULES)) {
         if (rule.test(name)) recordSelector(candidates, field, tag + '.' + name, tag)
