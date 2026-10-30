@@ -1207,3 +1207,20 @@ test('multiple live JSON-LD scripts cannot present trusted Product evidence when
     }
   }
 })
+
+test('source-observed HTML named lowbar references make real price CSS discoverable exactly once',()=>{
+  const valid='<article class="product-card"><span class="price&lowbar;value" data-testid="price&lowbar;value">SYNTHETIC_CURRENT</span></article>'
+  const former='<div class="old-price"><span class="price&lowbar;value">SYNTHETIC_OLD</span></div>'
+  const nested='<span class="price&amp;lowbar;value">SYNTHETIC_DOUBLE_ENCODED</span>'
+  for(const [retailerId,url] of [['plus','https://www.plus.nl/producten'],['dekamarkt','https://www.dekamarkt.nl/aanbiedingen']]){
+    const source={...origin,retailerId,url}
+    const seen=proposeOfflineRetailerSelectors({html:valid,origin:source})
+    assert.ok(seen.selectors.some(x=>x.field==='price'&&x.selector==='span.price_value'),retailerId)
+    assert.ok(seen.selectors.some(x=>x.field==='price'&&x.selector==='span[data-testid="price_value"]'),retailerId)
+    const old=proposeOfflineRetailerSelectors({html:former,origin:source})
+    assert.equal(old.selectors.some(x=>x.field==='price'),false,retailerId)
+    const twice=proposeOfflineRetailerSelectors({html:nested,origin:source})
+    assert.equal(twice.selectors.some(x=>x.field==='price'),false,retailerId)
+    assert.equal(seen.productionEnabled,false)
+  }
+})

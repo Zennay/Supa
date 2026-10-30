@@ -6,11 +6,11 @@
  */
 const NAMED = Object.freeze({
   sol: '/', colon: ':', amp: '&', Tab: '\t', NewLine: '\n',
-  comma: ',', semi: ';',
+  comma: ',', semi: ';', lowbar: '_',
 })
 export function decodeObservedHtmlAttribute(value) {
   if (typeof value !== 'string') return value
-  return value.replace(/&(sol|colon|amp|Tab|NewLine|comma|semi);|&#(?:[xX]([0-9a-fA-F]{1,6})(?![0-9a-fA-F])|([0-9]{1,7})(?![0-9]));?/g,
+  return value.replace(/&(sol|colon|amp|Tab|NewLine|comma|semi|lowbar);|&#(?:[xX]([0-9a-fA-F]{1,6})(?![0-9a-fA-F])|([0-9]{1,7})(?![0-9]));?/g,
     (raw, named, hex, decimal) => {
       if (named !== undefined) return NAMED[named]
       const point = Number.parseInt(hex ?? decimal, hex === undefined ? 10 : 16)
