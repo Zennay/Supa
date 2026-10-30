@@ -264,3 +264,29 @@ test('unbounded tiny HTTP chunks fail closed and cancel the stream', async () =>
   assert.equal(cancellations, 1)
   assert.ok(chunks >= 8192 && chunks <= 8200)
 })
+
+test('denied status and non-HTML source responses cancel unread network streams', async () => {
+  for (const [status, contentType, expected] of [
+    [403, 'text/html', /refused or rate-limited/],
+    [429, 'text/html', /refused or rate-limited/],
+    [302, 'text/html', /failed or redirected/],
+    [200, 'application/json', /did not return HTML/],
+    [200, 'text/html', /Declared snapshot exceeds size budget/],
+  ]) {
+    let cancelled = 0
+    const stream = new ReadableStream({
+      pull(controller) { controller.enqueue(new Uint8Array([60,62,60,62])) },
+      cancel() { cancelled++ },
+    })
+    const response = new Response(stream, {status, headers: {
+      'content-type': contentType,
+      ...(status === 200 && contentType === 'text/html'
+        ? {'content-length': '4000000'} : {}),
+    }})
+    await assert.rejects(captureApprovedRetailerPage({
+      source, permissionGate: gate, grant,
+      fetchFn: async () => response,
+    }), expected)
+    assert.equal(cancelled, 1)
+  }
+})
