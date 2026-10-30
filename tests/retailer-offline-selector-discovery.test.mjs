@@ -503,3 +503,21 @@ test('live canonical source URL cannot attribute foreign product pages to PLUS',
   assert.throws(()=>proposeOfflineRetailerSelectors({html:empty,origin}),
     /Ambiguous canonical retailer source URL/)
 })
+
+test('live HTML meta refresh cannot masquerade as a stable catalog product source', () => {
+  const item='<body><a href="/product/synthetic-42">Synthetic</a></body>'
+  for (const attr of [
+    'http-equiv="refresh" content="0;url=https://foreign.example/product"',
+    'HTTP-EQUIV="  REFRESH  " CONTENT="3;URL=/other-page"',
+  ]) {
+    const page='<html><head><meta '+attr+'></head>'+item+'</html>'
+    assert.throws(()=>proposeOfflineRetailerSelectors({html:page,origin}),
+      /Untrusted HTML redirect evidence/)
+  }
+  const hidden='<html><head><template><meta http-equiv="refresh" content="0;url=evil"></template></head>'+item+'</html>'
+  const normal='<html><head><meta data-http-equiv="refresh" content="0;url=evil"></head>'+item+'</html>'
+  for (const html of [hidden,normal]) {
+    assert.equal(proposeOfflineRetailerSelectors({html,origin}).selectors.find(x=>
+      x.selector==='a[href^="/product/"]')?.instances,1)
+  }
+})
