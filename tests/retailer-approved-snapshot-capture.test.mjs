@@ -649,3 +649,33 @@ test('unsupported or multiple HTTP content encodings never excuse incomplete HTM
     assert.equal(row.published, false)
   }
 })
+
+test('only a canonical RFC HTTP Date can give source HTML a fresh capture clock', async () => {
+  const html = '<html><body>FICTIONAL DATE HEADER</body></html>'
+  const fresh = new Date(Date.now() - 45_000).toUTCString()
+  const wrongWeekday = fresh.replace(/^[A-Za-z]{3}/,
+    fresh.startsWith('Mon') ? 'Tue' : 'Mon')
+  const untrusted = [
+    new Date(Date.now() - 45_000).toISOString(),
+    wrongWeekday,
+    fresh.replace(' GMT', ' PST'),
+    new Date(Date.now() - 45_000).toUTCString().replace(', ', ' '),
+  ]
+  for (const date of untrusted) {
+    await assert.rejects(captureApprovedRetailerPage({
+      source, permissionGate: gate, grant,
+      fetchFn: async () => new Response(html, {
+        status: 200, headers: { 'content-type': 'text/html', date },
+      }),
+    }), /Stale or malformed retailer HTTP representation refused/)
+  }
+  const accepted = await captureApprovedRetailerPage({
+    source, permissionGate: gate, grant,
+    fetchFn: async () => new Response(html, {
+      status: 200, headers: { 'content-type': 'text/html', date: fresh },
+    }),
+  })
+  assert.equal(accepted.source.sha256,
+    createHash('sha256').update(html).digest('hex'))
+  assert.equal(accepted.published, false)
+})

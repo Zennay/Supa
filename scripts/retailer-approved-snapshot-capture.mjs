@@ -226,7 +226,11 @@ function sourceHttpFreshness(headers) {
   }
   if (dated !== null && dated !== undefined) {
     const timestamp = Date.parse(dated)
+    // HTTP Date is an IMF-fixdate in GMT with an authentic weekday.
+    // Date.parse also accepts ISO aliases, arbitrary timezones and wrong
+    // weekday names, none of which prove a canonical HTTP source clock.
     if (!Number.isFinite(timestamp) ||
+        new Date(timestamp).toUTCString() !== dated ||
         timestamp > now + 5 * 60 * 1000 ||
         now - timestamp >= maxAgeSeconds * 1000) return false
   }
