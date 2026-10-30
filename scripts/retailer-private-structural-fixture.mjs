@@ -1,6 +1,8 @@
 /** Private synthetic HTML topology from one verified source, never real retailer HTML. */
 import { createHash } from 'node:crypto'
-import { mkdir, open } from 'node:fs/promises'
+import { mkdir, open, lstat } from 'node:fs/promises'
+import { constants as fsFlags } from 'node:fs'
+import { parseUniqueKeyRetailerJson } from './retailer-private-unique-key-json.mjs'
 import { resolve, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { replayPrivateProductHtmlSnapshot, replayPrivateSelectorHtmlSnapshot } from './retailer-replay-private-html-product.mjs'
@@ -33,9 +35,8 @@ async function writePrivate(path, bytes) {
     await handle.sync()
   } finally { await handle.close() }
 }
-export async function buildPrivateSyntheticHtmlFixture(htmlFile, newDirectory) {
-  if (typeof htmlFile !== 'string' || typeof newDirectory !== 'string' ||
-      !newDirectory.trim()) refuse()
+async function derivePrivateSyntheticFixture(htmlFile) {
+  if (typeof htmlFile !== 'string') refuse()
   let snapshot, source
   try {
     const catalog = await replayPrivateSelectorHtmlSnapshot(htmlFile)
@@ -56,9 +57,6 @@ export async function buildPrivateSyntheticHtmlFixture(htmlFile, newDirectory) {
   const synthetic = '<!doctype html>\n<html lang="nl"><head><meta charset="utf-8">'+
     '<title>SYNTHETIC STRUCTURE - NOT RETAILER HTML</title></head><body>\n'+
     htmlNodes.join('\n')+'\n</body></html>\n'
-  const out = resolve(newDirectory)
-  await assertNoSymlinkedM3OutputParents(out)
-  await mkdir(out,{mode:0o700})
   const manifest = {schemaVersion:1,kind:'synthetic-private-selector-fixture',
     source:{retailerId:source.retailerId,kind:source.kind,
       capturedAt:source.capturedAt,sha256:source.sha256,
@@ -67,14 +65,77 @@ export async function buildPrivateSyntheticHtmlFixture(htmlFile, newDirectory) {
     selectorsObserved:safe.length,syntheticNodes:htmlNodes.length,
     sourceTextRetained:false,sourcePricesRetained:false,originalHtmlRetained:false,
     humanReviewRequired:true,productionEnabled:false,published:false}
+  return {synthetic,manifest}
+}
+export async function buildPrivateSyntheticHtmlFixture(htmlFile, newDirectory) {
+  if (typeof newDirectory !== 'string' || !newDirectory.trim()) refuse()
+  const {synthetic,manifest} = await derivePrivateSyntheticFixture(htmlFile)
+  const out = resolve(newDirectory)
+  await assertNoSymlinkedM3OutputParents(out)
+  await mkdir(out,{mode:0o700})
   await writePrivate(join(out,'synthetic-structure.html'),synthetic)
   await writePrivate(join(out,'provenance.json'),JSON.stringify(manifest,null,2)+'\n')
   return {created:true,htmlSha256:manifest.syntheticHtmlSha256,
-    syntheticNodes:htmlNodes.length,productionEnabled:false,published:false}
+    syntheticNodes:manifest.syntheticNodes,productionEnabled:false,published:false}
+}
+// Read the original output as a bounded, same-inode private file. Do not
+// accept altered fixtures by recomputing only a self-declared manifest hash.
+async function readPinnedSyntheticFile(path, maxBytes) {
+  const before = await lstat(path)
+  if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1 ||
+      before.size < 1 || before.size > maxBytes ||
+      (before.mode & 0o077) !== 0) refuse()
+  const handle = await open(path, fsFlags.O_RDONLY | fsFlags.O_NOFOLLOW |
+    fsFlags.O_NONBLOCK)
+  try {
+    const opened = await handle.stat()
+    if (!opened.isFile() || opened.dev !== before.dev || opened.ino !== before.ino)
+      refuse()
+    const bytes = await handle.readFile()
+    const after = await handle.stat()
+    const named = await lstat(path)
+    if (!named.isFile() || named.isSymbolicLink() || named.nlink !== 1 ||
+        after.dev !== before.dev || after.ino !== before.ino ||
+        named.dev !== before.dev || named.ino !== before.ino ||
+        bytes.length !== before.size || after.size !== before.size ||
+        after.mtimeMs !== before.mtimeMs || after.ctimeMs !== before.ctimeMs)
+      refuse()
+    return bytes
+  } finally { await handle.close() }
+}
+
+export async function verifyPrivateSyntheticHtmlFixture(htmlFile, directory) {
+  if (typeof directory !== 'string' || !directory.trim()) refuse()
+  const out = resolve(directory)
+  await assertNoSymlinkedM3OutputParents(out)
+  const info = await lstat(out)
+  if (!info.isDirectory() || info.isSymbolicLink() ||
+      (info.mode & 0o077) !== 0) refuse()
+  const {synthetic,manifest} = await derivePrivateSyntheticFixture(htmlFile)
+  const htmlBytes = await readPinnedSyntheticFile(join(out,'synthetic-structure.html'),65536)
+  const manifestBytes = await readPinnedSyntheticFile(join(out,'provenance.json'),16384)
+  if (!htmlBytes.equals(Buffer.from(synthetic,'utf8'))) refuse()
+  let actual
+  try { actual = parseUniqueKeyRetailerJson(
+    new TextDecoder('utf-8',{fatal:true}).decode(manifestBytes),16384)
+  } catch { refuse() }
+  if (JSON.stringify(actual) !== JSON.stringify(manifest) ||
+      createHash('sha256').update(htmlBytes).digest('hex') !== manifest.syntheticHtmlSha256)
+    refuse()
+  return {verified:true,syntheticNodes:manifest.syntheticNodes,
+    htmlSha256:manifest.syntheticHtmlSha256,productionEnabled:false,published:false}
 }
 if(process.argv[1] && import.meta.url===pathToFileURL(resolve(process.argv[1])).href) {
-  if(process.argv.length!==4) {console.error('Usage: <private-source.html> <new-private-folder>');process.exitCode=2}
-  else buildPrivateSyntheticHtmlFixture(process.argv[2],process.argv[3])
-    .then(x=>process.stdout.write(JSON.stringify(x)+'\n'))
-    .catch(()=>{console.error('Private synthetic fixture creation refused');process.exitCode=2})
+  const args=process.argv.slice(2)
+  const verification=args.length===3 && args[0]==='--verify'
+  if(!verification && args.length!==2) {
+    console.error('Usage: <private-source.html> <new-private-folder> | --verify <private-source.html> <existing-private-folder>')
+    process.exitCode=2
+  } else {
+    const job=verification
+      ?verifyPrivateSyntheticHtmlFixture(args[1],args[2])
+      :buildPrivateSyntheticHtmlFixture(args[0],args[1])
+    job.then(x=>process.stdout.write(JSON.stringify(x)+'\n'))
+      .catch(()=>{console.error('Private synthetic fixture operation refused');process.exitCode=2})
+  }
 }
