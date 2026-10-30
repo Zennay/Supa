@@ -28,3 +28,6 @@ export async function captureAndArchiveApprovedRetailerProduct(captureOptions, p
     publicSavingsClaimEligible: false,
   }
 }
+
+// One fetch -> combined private selector/price archive (all M1 page kinds).
+export { captureAndArchiveApprovedSourceReview } from './retailer-approved-source-review-archive.mjs'
