@@ -163,6 +163,9 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
     const close = token[1] === '/';
     const attrText = html.slice(start + token[0].length, end);
     if (close) {
+      // Keep genuine visible end tags for conservative ancestor-aware selector
+      // review; never expose suppressed/template/raw-element closes.
+      if (!hidden.length && !HIDDEN.has(tag)) visible.push('</' + tag + '>');
       // Suppressed HTML is not a source of selector or structured evidence.
       if (hidden.at(-1) === tag) hidden.pop();
       pos = end + 1;

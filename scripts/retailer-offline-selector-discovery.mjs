@@ -99,11 +99,19 @@ function validSnapshotOrigin(origin) {
 
 // Only actual opening tags count. A quoted attribute may contain '<tag>'
 // text; that text must never be interpreted as an independent DOM element.
-export function* openingTags(markup) {
+export function* openingTags(markup, includeEndTags = false) {
   let cursor = 0
   while (cursor < markup.length) {
     const start = markup.indexOf('<', cursor)
     if (start < 0) return
+    if (includeEndTags && markup[start + 1] === '/') {
+      const end = /^<\/([a-z][a-z0-9-]{0,32})\s*>/i.exec(markup.slice(start))
+      if (end) {
+        yield { tag: end[1].toLowerCase(), closing: true }
+        cursor = start + end[0].length
+        continue
+      }
+    }
     const match = /^<([a-z][a-z0-9-]{0,32})\b/i.exec(markup.slice(start))
     if (!match) { cursor = start + 1; continue }
     const attributeStart = start + match[0].length
@@ -278,7 +286,16 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
   let productHrefInstances = 0
   const distinctProductPaths = new Set()
   let inspectedTags = 0
-  for (const match of openingTags(visible)) {
+  const ancestorStack = []
+  const voidTags = new Set(['area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr'])
+  for (const match of openingTags(visible, true)) {
+    if (match.closing) {
+      // Browsers ignore unmatched ordinary closing tags. Do not clear a
+      // known old-price ancestor merely because an attacker adds </unknown>.
+      const last = ancestorStack.findLastIndex(row => row.tag === match.tag)
+      if (last >= 0) ancestorStack.length = last
+      continue
+    }
     if (++inspectedTags > MAX_TAGS) {
       throw new Error('Offline selector scan exceeded bounded tag budget')
     }
@@ -289,16 +306,20 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
     // tag name. Only offer selectors whose exact tags/classes exist in the
     // approved local source; no made-up shadow DOM or descendant paths.
     const actualCustomElement = /^[a-z][a-z0-9]*-[a-z0-9-]{1,31}$/.test(tag)
-    if (!standardCandidate && !actualCustomElement) continue
     const attrs = match.attrs
     // HTML class tokens split on ASCII whitespace, not JavaScript's wider \s
     // (NBSP is a class-name character). Repeated tokens match one element,
     // not multiple CSS elements; counting duplicates creates false drift.
     const classes = (staticAttributeValue(attrs.get('class')) ?? '').split(/[ \t\n\f\r]+/)
     const values = [...new Set(classes.filter(x => STATIC_NAME.test(x)))].slice(0, 20)
-    const formerPriceContext = !isFormerPriceTag(tag) &&
-      (values.some(isFormerPriceToken) ||
-       isFormerPriceToken(staticAttributeValue(attrs.get('data-testid'))))
+    // A nested price-looking element within a former-price wrapper is NOT
+    // evidence of a current price, even when its own class is generic.
+    const localFormer = isFormerPriceTag(tag) || values.some(isFormerPriceToken) ||
+      isFormerPriceToken(staticAttributeValue(attrs.get('data-testid')))
+    const inheritedFormer = ancestorStack.some(row => row.former)
+    const formerPriceContext = inheritedFormer || (localFormer && !isFormerPriceTag(tag))
+    if (!voidTags.has(tag)) ancestorStack.push({ tag, former: inheritedFormer || localFormer })
+    if (!standardCandidate && !actualCustomElement) continue
     const addObserved = (field, selector) => {
       if (formerPriceContext && field === 'price') {
         ambiguousCurrentPriceSelectors.add(selector)

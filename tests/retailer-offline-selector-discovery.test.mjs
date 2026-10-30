@@ -1012,3 +1012,27 @@ test('same-scheme single-slash aliases never replace an explicit retailer base o
     }
   }
 })
+
+test('old-price ancestor may never count nested current-looking selectors as valid price', () => {
+  for (const [retailerId,url] of [['plus','https://www.plus.nl/producten'],['dekamarkt','https://www.dekamarkt.nl/aanbiedingen']]) {
+    const html='<article class="product-card"><div class="old-price"><span class="price-value" itemprop="price">PRIVATE_OLD</span></div>'+
+      '<div class="current-price"><span class="price-value" itemprop="price">PRIVATE_CURRENT</span></div></article>'
+    const report=proposeOfflineRetailerSelectors({html,origin:{...origin,retailerId,url}})
+    assert.equal(report.selectors.some(x=>x.field==='price'&&x.selector==='span.price-value'),false,retailerId)
+    assert.equal(report.selectors.some(x=>x.field==='price'&&x.selector==='span[itemprop="price"]'),false,retailerId)
+    assert.ok(report.selectors.some(x=>x.field==='price'&&x.selector==='div.current-price'),retailerId)
+    assert.equal(report.productionEnabled,false)
+    assert.doesNotMatch(JSON.stringify(report),/PRIVATE_OLD|PRIVATE_CURRENT/)
+  }
+})
+
+
+test('unmatched closing tags cannot escape an old-price wrapper and forge current price evidence', () => {
+  const html='<div class="old-price"></unknown><span class="price-value" itemprop="price">PRIVATE_OLD</span></div>'+
+    '<div class="current-price"><span class="price-value">PRIVATE_NEW</span></div>'
+  const report=proposeOfflineRetailerSelectors({html,origin})
+  assert.equal(report.selectors.some(x=>x.selector==='span.price-value'&&x.field==='price'),false)
+  assert.equal(report.selectors.some(x=>x.selector==='span[itemprop="price"]'&&x.field==='price'),false)
+  assert.ok(report.selectors.some(x=>x.selector==='div.current-price'&&x.field==='price'))
+  assert.equal(report.productionEnabled,false)
+})
