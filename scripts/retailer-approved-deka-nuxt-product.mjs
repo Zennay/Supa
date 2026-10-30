@@ -14,6 +14,7 @@ import { normalizeSchemaOrgAvailability } from '../src/data/schemaOrgProduct.ts'
 import { readAuthorizedHtmlScriptEvidence } from './retailer-approved-html-script-evidence.mjs'
 import { parseSchemaOrgProductForPage } from '../src/data/schemaOrgProductPageSelection.ts'
 import { structuredSchemaOrgPack } from '../src/data/schemaOrgQuantitativePack.ts'
+import { isAllowedM1RetailerSourcePath } from './retailer-source-route-safety.mjs'
 
 const fail = () => ({ type: 'abstain', reason: 'DekaMarkt Nuxt product cannot be independently corroborated' })
 const data = value => value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -112,8 +113,8 @@ export function parseDekaNuxtFromAuthorizedHtml({ html, provenance, jsonLdBlocks
     const expectedId = /\/([0-9]+)\/?$/.exec(parsedUrl.pathname)?.[1]
     if (parsedUrl.protocol !== 'https:' ||
         parsedUrl.hostname !== 'www.dekamarkt.nl' || parsedUrl.port ||
-        !parsedUrl.pathname.startsWith('/producten/') || !expectedId ||
-        parsedUrl.search || parsedUrl.hash ||
+        !isAllowedM1RetailerSourcePath('dekamarkt','product',parsedUrl.pathname) ||
+        !expectedId || parsedUrl.search || parsedUrl.hash ||
         parsedUrl.href !== provenance.url) return fail()
 
     // Direct offline fallback can be called without the checked HTTP bridge.

@@ -351,3 +351,20 @@ test('Deka source refuses extra independent Offer price claims beside the corrob
   assert.equal(result.status,'review_required')
   assert.equal(result.observation,null)
 })
+
+test('standalone Deka Nuxt replay refuses ambiguous SKU routes even with corroborating page IDs', async () => {
+  const { parseDekaNuxtFromAuthorizedHtml } = await import('../scripts/retailer-approved-deka-nuxt-product.mjs')
+  const { createHash } = await import('node:crypto')
+  for(const path of ['/producten//115873','/producten/%2fhidden/115873',
+      '/producten/%252fhidden/115873']) {
+    const sourceUrl='https://www.dekamarkt.nl'+path
+    const ld=structuredClone(fixture.jsonLdProduct)
+    if(ld['@id']!==undefined) ld['@id']=sourceUrl+'#product'
+    ld.offers.url=sourceUrl
+    const page=html(fixture.nuxtPayload,ld)
+    const provenance={supermarket:'dekamarkt',kind:'product',url:sourceUrl,
+      capturedAt:time,sha256:createHash('sha256').update(page).digest('hex')}
+    const output=parseDekaNuxtFromAuthorizedHtml({html:page,provenance,jsonLdBlocks:[ld]})
+    assert.equal(output.type,'abstain',sourceUrl)
+  }
+})
