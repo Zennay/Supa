@@ -221,3 +221,14 @@ test('direct selector entrypoint rejects getter, inherited and Proxy provenance 
   assert.equal(good.productionEnabled,false)
   assert.ok(good.selectors.some(s => s.field === 'product'))
 })
+
+test('revoked top-level and origin Proxies reject without leaking native TypeError', () => {
+  const html = '<article class="product-card">Synthetic</article>'
+  for (const target of [{html, origin}, origin]) {
+    const {proxy, revoke} = Proxy.revocable(target, {})
+    revoke()
+    assert.throws(() => proposeOfflineRetailerSelectors(
+      target === origin ? {html, origin: proxy} : proxy,
+    ), /Invalid or oversized offline retailer snapshot/)
+  }
+})

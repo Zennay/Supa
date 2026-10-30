@@ -20,7 +20,7 @@ const FIELD_RULES = Object.freeze({
 })
 
 function inertRecord(value, keys) {
-  if (!value || typeof value !== 'object' || Array.isArray(value) || nodeTypes.isProxy(value)) return null
+  if (!value || typeof value !== 'object' || nodeTypes.isProxy(value) || Array.isArray(value)) return null
   const proto = Object.getPrototypeOf(value)
   if (proto !== Object.prototype && proto !== null) return null
   const descriptors = Object.getOwnPropertyDescriptors(value)
@@ -142,8 +142,8 @@ function recordSelector(counters, field, selector, tag) {
 export function proposeOfflineRetailerSelectors(options = {}) {
   // Inspect own DATA descriptors before reading untrusted provenance/HTML.
   // Never run a caller getter, inherited identity or Proxy trap.
-  if (!options || typeof options !== 'object' || Array.isArray(options) ||
-      nodeTypes.isProxy(options) || ![Object.prototype, null].includes(Object.getPrototypeOf(options))) {
+  if (!options || typeof options !== 'object' || nodeTypes.isProxy(options) ||
+      Array.isArray(options) || ![Object.prototype, null].includes(Object.getPrototypeOf(options))) {
     throw new Error('Invalid or oversized offline retailer snapshot')
   }
   const descriptors = Object.getOwnPropertyDescriptors(options)
