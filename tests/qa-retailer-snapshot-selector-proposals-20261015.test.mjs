@@ -595,3 +595,25 @@ test('WebPage JSON-LD cannot forge product SKU, price or pack source fields in s
       assert.equal(positive.embeddedSignals.jsonLdKeys.includes(field),true,retailer+' '+field)
   }
 })
+
+test('official absolute Product IRI without context proves source fields, foreign context cannot',()=>{
+  for(const retailer of ['plus','dekamarkt']){
+    const run=object=>{
+      const html='<script type="application/ld+json">'+JSON.stringify(object)+'</script>'
+      return proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',html),html)
+    }
+    const raw={'@type':'https://schema.org/Product',name:'PRIVATE_ITEM',sku:'EXAMPLE',price:'1.00',weight:'500 g'}
+    const official=run(raw)
+    assert.deepEqual(official.embeddedSignals.jsonLdTypes,['Product'])
+    for(const field of ['name','sku','price','weight'])
+      assert.ok(official.embeddedSignals.jsonLdKeys.includes(field),retailer+' '+field)
+    const foreign=run({...raw,'@context':'https://foreign.invalid'})
+    assert.deepEqual(foreign.embeddedSignals.jsonLdTypes,[])
+    for(const field of ['name','sku','price','weight'])
+      assert.equal(foreign.embeddedSignals.jsonLdKeys.includes(field),false,retailer+' '+field)
+    const unqualified=run({...raw,'@type':'Product'})
+    assert.deepEqual(unqualified.embeddedSignals.jsonLdTypes,[])
+    assert.equal(unqualified.embeddedSignals.jsonLdKeys.includes('price'),false)
+    assert.equal(official.currentPricesExtracted,false)
+  }
+})

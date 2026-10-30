@@ -115,23 +115,26 @@ function jsonLdShape(text, types, keys) {
       node.slice(0,100).forEach(child => visit(child,depth+1,inheritedSchema))
       return
     }
-    const trusted = Object.hasOwn(node,'@context')
-      ? !!schemaVocabulary(node['@context']) : inheritedSchema
+    const declaresContext = Object.hasOwn(node,'@context')
+    const localContextOfficial = declaresContext && !!schemaVocabulary(node['@context'])
+    const trusted = declaresContext ? localContextOfficial : inheritedSchema
+    const foreignContext = declaresContext && !localContextOfficial
     const classes=Array.isArray(node['@type']) ? node['@type'] : [node['@type']]
     // A WebPage that happens to contain "price" or "sku" is not product
     // evidence. Only source-observed, official retail schema records may
     // contribute product/pack/offer field names to the private review.
-    const retailFields=classes.some(type => typeof type === 'string' &&
+    const retailFields=!foreignContext && classes.some(type => typeof type === 'string' &&
       /^(?:https?:\/\/schema\.org\/)?(Product|Offer|AggregateOffer|PriceSpecification|QuantitativeValue)$/.test(type) &&
-      (trusted || /^https?:\/\/schema\.org\//.test(type)))
+      (trusted || (!declaresContext && /^https?:\/\/schema\.org\//.test(type))))
     for (const [key,child] of Object.entries(node).slice(0,100)) {
-      if (trusted && ALLOWED_JSONLD_KEYS.has(key) &&
-          (key.startsWith('@') || retailFields)) keys.add(key)
+      if (ALLOWED_JSONLD_KEYS.has(key) &&
+          ((trusted && key.startsWith('@')) || retailFields)) keys.add(key)
       if (key === '@type') {
         for(const type of (Array.isArray(child)?child:[child])) {
           if(typeof type !== 'string') continue
           const match=/^(?:https?:\/\/schema\.org\/)?(Product|Offer|AggregateOffer|ItemList|WebPage)$/.exec(type)
-          if(match && (trusted || type !== match[1])) types.add(match[1])
+          if(match && (trusted || (!declaresContext && type !== match[1])))
+            types.add(match[1])
         }
       }
       // Walk only Schema.org graph/retail relationships. Arbitrary private
