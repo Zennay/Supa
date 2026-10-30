@@ -12,7 +12,7 @@ export const PUBLIC_OBSERVED_TOKEN_FIELDS = Object.freeze({
   'old-price':'offer', 'price-old':'offer', 'price-before':'offer',
   'previous-price':'offer', 'was-price':'offer', 'original-price':'offer',
   'offer-card':'offer', 'offer-label':'offer',
-  'stock-label':'availability',
+  'stock-label':'availability', 'stock-availability':'availability',
 })
 
 // These tags represent a struck-through FORMER price, never a current quote.

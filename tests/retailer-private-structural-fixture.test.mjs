@@ -916,3 +916,25 @@ test('nanosecond private pair admission rejects noncanonical, impossible and fut
     await assert.rejects(stat(out),{code:'ENOENT'})
   }
 })
+
+test('genuine observed generic stock-availability class survives private two-store selector roundtrip',async t=>{
+  const html='<html><body><article class="product-card"><span class="product-name">SYNTHETIC_NAME</span>'+
+    '<span class="price-value">SYNTHETIC_PRICE</span><span class="pack-size">SYNTHETIC_PACK</span>'+
+    '<span class="offer-label">SYNTHETIC_OFFER</span><span class="stock-availability">SYNTHETIC_STOCK</span>'+
+    '</article></body></html>'
+  const plus=await archive(t,'plus','catalog',html)
+  const deka=await archive(t,'dekamarkt','offers',html)
+  const out=join(plus.dir,'full-field-review')
+  const built=await buildPrivateSyntheticFixturePair(plus.filename,deka.filename,out)
+  const verified=await verifyPrivateSyntheticFixturePair(plus.filename,deka.filename,out)
+  assert.equal(built.allFieldsCoveredByBoth,true)
+  assert.equal(verified.verified,true)
+  assert.equal(verified.allFieldsCoveredByBoth,true)
+  for(const id of ['plus','dekamarkt']) {
+    assert.equal(verified.fieldCoverageByRetailer[id].availability,true,id)
+    const generated=await readFile(join(out,id,'synthetic-structure.html'),'utf8')
+    assert.match(generated,/class="stock-availability"/)
+    assert.doesNotMatch(generated,/SYNTHETIC_STOCK/)
+  }
+  assert.equal(verified.productionEnabled,false)
+})
