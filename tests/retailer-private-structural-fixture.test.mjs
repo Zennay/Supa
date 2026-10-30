@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createHash} from 'node:crypto'
-import {mkdtemp,writeFile,readFile,stat,rm,link,unlink,symlink} from 'node:fs/promises'
+import {mkdtemp,writeFile,readFile,stat,rm,link,unlink,symlink,readdir} from 'node:fs/promises'
 import {join} from 'node:path'
 import {tmpdir} from 'node:os'
 import {buildPrivateSyntheticHtmlFixture,verifyPrivateSyntheticHtmlFixture} from '../scripts/retailer-private-structural-fixture.mjs'
@@ -58,7 +58,9 @@ for(const [retailer,kind] of [
     assert.equal((await stat(output)).mode&0o777,0o700)
     assert.equal((await stat(join(output,'synthetic-structure.html'))).mode&0o777,0o600)
     assert.equal((await stat(join(output,'provenance.json'))).mode&0o777,0o600)
+    assert.deepEqual((await readdir(dir)).filter(n=>n.startsWith('.supa-synthetic-fixture-')),[])
     await assert.rejects(buildPrivateSyntheticHtmlFixture(filename,output),/EEXIST/)
+    assert.deepEqual((await readdir(dir)).filter(n=>n.startsWith('.supa-synthetic-fixture-')),[])
   })
 }
 
