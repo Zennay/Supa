@@ -504,6 +504,37 @@ test('live canonical source URL cannot attribute foreign product pages to PLUS',
     /Ambiguous canonical retailer source URL/)
 })
 
+test('offline archive cannot forge same-store SKU identity or entity-encoded base', () => {
+  const cases = [
+    { canonical: '/product/different-sku' },
+    { canonical: '/aanbiedingen' },
+    { canonical: '/producten?shop=other' },
+    { canonical: '/producten#foo' },
+    { canonical: '&#47;&#47;other.example/producten' },
+    { base: 'https&#58;//other.example/' },
+    { base: '&#47;&#47;other.example/' },
+  ]
+  for (const entry of cases) {
+    const name = entry.base ? 'base' : 'canonical'
+    const tag = entry.base ? 'base' : 'link rel="canonical"'
+    const href = entry.base ?? entry.canonical
+    const page = '<html><head><' + tag + ' href="' + href + '">' +
+      '</head><body><a href="/product/mock-123">MOCK</a></body></html>'
+    assert.throws(() => proposeOfflineRetailerSelectors({ html: page, origin }),
+      new RegExp('Untrusted HTML ' + (name === 'base' ? 'base' : 'canonical')))
+  }
+  const identity = { ...origin, url: 'https://www.plus.nl/product/mock-123' }
+  const mismatch = '<html><head><link rel="canonical" href="/product/mock-456">' +
+    '</head><body><a href="/product/mock-123">MOCK</a></body></html>'
+  assert.throws(() => proposeOfflineRetailerSelectors({ html: mismatch, origin: identity }),
+    /Untrusted HTML canonical source URL/)
+  const valid = '<html><head><link rel="canonical" href="/producten/">' +
+    '</head><body><a href="/product/mock-123">MOCK</a></body></html>'
+  const report = proposeOfflineRetailerSelectors({ html: valid, origin })
+  assert.equal(report.selectors.find(x => x.selector === 'a[href^="/product/"]')?.instances, 1)
+  assert.equal(report.readyForIngestion, false)
+})
+
 test('live HTML meta refresh cannot masquerade as a stable catalog product source', () => {
   const item='<body><a href="/product/synthetic-42">Synthetic</a></body>'
   for (const attr of [

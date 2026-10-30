@@ -217,8 +217,12 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
   // Live HTML base href changes the browser resolution of relative product
   // links. Foreign or malformed bases cannot become store product evidence.
   if (baseHrefs.length) {
+    // Offline archives must validate browser-facing href provenance too.
+    const href = baseHrefs[0]
+    if (typeof href !== 'string' || !href || href.length > 2048 ||
+        href.includes('&')) throw new Error('Untrusted HTML base URL')
     let base
-    try { base = new URL(staticAttributeValue(baseHrefs[0]), origin.url) }
+    try { base = new URL(href, origin.url) }
     catch { throw new Error('Untrusted HTML base URL') }
     const expected = new URL(origin.url)
     if (base.origin !== expected.origin || base.username || base.password ||
@@ -229,12 +233,19 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
   // even otherwise plausible CSS product hints unsafe to attribute to this
   // retailer. No canonical URL is emitted from the private review.
   if (canonicalHrefs.length) {
+    const href = canonicalHrefs[0]
+    if (typeof href !== 'string' || !href || href.length > 2048 ||
+        href.includes('&')) throw new Error('Untrusted HTML canonical source URL')
     let canonical
-    try { canonical = new URL(staticAttributeValue(canonicalHrefs[0]), origin.url) }
+    try { canonical = new URL(href, origin.url) }
     catch { throw new Error('Untrusted HTML canonical source URL') }
     const expected = new URL(origin.url)
+    const normalizedPath = path => path.replace(/\/$/, '') || '/'
+    // An older offline archive may claim another SKU on the same store.
     if (canonical.origin !== expected.origin || canonical.username ||
-        canonical.password || canonical.protocol !== 'https:')
+        canonical.password || canonical.protocol !== 'https:' ||
+        canonical.search || canonical.hash ||
+        normalizedPath(canonical.pathname) !== normalizedPath(expected.pathname))
       throw new Error('Untrusted HTML canonical source URL')
   }
 
