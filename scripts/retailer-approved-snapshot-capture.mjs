@@ -381,6 +381,17 @@ export async function captureApprovedRetailerPage(options = {}) {
     await closeRejectedBody()
     throw new Error('Stale or malformed retailer HTTP representation refused')
   }
+  // A 200 HTML body is not necessarily an archivable page. Honor an explicit
+  // no-store instruction and refuse download attachments before persisting
+  // source evidence. Private cache directives alone are compatible with the
+  // protected local 0600 operator archive; they are not source permissions.
+  const cacheControl = response.headers?.get?.('cache-control') || ''
+  const disposition = response.headers?.get?.('content-disposition') || ''
+  if (/(?:^|,)\s*no-store(?:\s*[;,]|\s*$)/i.test(cacheControl) ||
+      /^\s*attachment(?:\s*;|\s*$)/i.test(disposition)) {
+    await closeRejectedBody()
+    throw new Error('Retailer HTML response disallows snapshot archival')
+  }
   let body
   try { body = await collectBoundedBody(response) }
   catch (error) {
