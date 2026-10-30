@@ -3,7 +3,9 @@
  */
 export const PUBLIC_OBSERVED_TOKEN_FIELDS = Object.freeze({
   'product-card':'product', 'item-card':'product',
+  'product_card':'product', 'item_card':'product',
   'product-name':'name', 'item-name':'name',
+  'product_name':'name', 'item_name':'name',
   'product-title':'name', 'item-title':'name',
   'price-value':'price', 'price-label':'price', 'price-tag':'price',
   'product-price':'price', 'item-price':'price',
@@ -12,6 +14,7 @@ export const PUBLIC_OBSERVED_TOKEN_FIELDS = Object.freeze({
   // not become invented selectors, price quotes or publication permission.
   'price_value':'price', 'product_price':'price',
   'pack-size':'pack',
+  'pack_size':'pack',
   // Source-observed old/was/before price labels are NOT a live price quote.
   'old-price':'offer', 'price-old':'offer', 'price-before':'offer',
   'previous-price':'offer', 'was-price':'offer', 'original-price':'offer',
@@ -20,7 +23,9 @@ export const PUBLIC_OBSERVED_TOKEN_FIELDS = Object.freeze({
   'old_price':'offer', 'price_old':'offer', 'price_before':'offer',
   'previous_price':'offer', 'was_price':'offer', 'original_price':'offer',
   'offer-card':'offer', 'offer-label':'offer',
+  'offer_card':'offer', 'offer_label':'offer',
   'stock-label':'availability', 'stock-availability':'availability',
+  'stock_label':'availability', 'stock_availability':'availability',
 })
 
 // These tags represent a struck-through FORMER price, never a current quote.

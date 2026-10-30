@@ -90,3 +90,31 @@ for(const source of sources){
     assert.equal(safe.some(x=>x.selector==='div.old_price'&&x.field==='price'),false)
   })
 }
+
+// The private reviewer must see all six real source-observed generic fields
+// for both approved *synthetic* sample pages, never inferred retailer CSS.
+for(const source of sources){
+  test(`${source.retailerId}: six-field underscore source DOM preserves exact privacy-safe review coverage`,()=>{
+    const origin={...source,capturedAt:'2026-10-29T15:00:00Z'}
+    const html='<main><article class="product_card" data-testid="product_card">'+
+      '<h2 class="product_name" data-testid="product_name">SYNTHETIC_NAME</h2>'+
+      '<span class="price_value" data-testid="price_value">SYNTHETIC_PRICE</span>'+
+      '<span class="pack_size" data-testid="pack_size">SYNTHETIC_PACK</span>'+
+      '<strong class="offer_label" data-testid="offer_label">SYNTHETIC_OFFER</strong>'+
+      '<span class="stock_availability" data-testid="stock_availability">SYNTHETIC_STOCK</span>'+
+      '<span class="private_sku_991">SYNTHETIC_PRIVATE</span></article></main>'
+    const raw=proposeOfflineRetailerSelectors({html,origin})
+    const safe=safeSelectorProposals(raw.selectors,source.retailerId)
+    for(const [field,tag,token] of [
+      ['product','article','product_card'],['name','h2','product_name'],
+      ['price','span','price_value'],['pack','span','pack_size'],
+      ['offer','strong','offer_label'],['availability','span','stock_availability'],
+    ]){
+      assert.ok(raw.selectors.some(x=>x.field===field&&x.selector===`${tag}.${token}`),`${field} raw class`)
+      assert.ok(safe.some(x=>x.field===field&&x.selector===`${tag}.${token}`),`${field} exported class`)
+      assert.ok(safe.some(x=>x.field===field&&x.selector===`${tag}[data-testid="${token}"]`),`${field} exported test id`)
+    }
+    assert.equal(safe.some(x=>x.selector.includes('private_sku_991')),false)
+    assert.equal(safe.some(x=>x.selector==='strong.offer_label'&&x.field==='name'),false)
+  })
+}
