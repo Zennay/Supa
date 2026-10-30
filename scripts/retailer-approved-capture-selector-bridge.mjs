@@ -78,6 +78,9 @@ const GENERIC_SELECTOR = /^[a-z][a-z0-9-]{0,30}\.(?:product|item|card|tile|name|
 // These are actual standards-based selectors from the captured DOM, not
 // inferred retail fields. Allow exact public Schema.org tokens and a bounded
 // vocabulary of generic test IDs across the privacy/review boundary.
+// Only SOURCE-OBSERVED and EXACT public generic class tokens may leave
+// private review: never arbitrary SKU/price-bearing CSS identifiers.
+const OBSERVED_GENERIC_CLASS = /^[a-z][a-z0-9-]{0,30}\.([a-z][a-z0-9_-]{1,44})$/
 const SCHEMA_FIELDS = Object.freeze({
   name: 'name', price: 'price', lowPrice: 'price', highPrice: 'price',
   priceCurrency: 'price', priceSpecification: 'price',
@@ -86,12 +89,15 @@ const SCHEMA_FIELDS = Object.freeze({
   availability: 'availability', inventoryLevel: 'availability',
 })
 const SCHEMA_PROP_SELECTOR = /^(article|section|div|li|a|span|h[1-6]|p|strong|ins|del|s|strike|small|meta|link|data|time|[a-z][a-z0-9]*-[a-z0-9-]{1,31})\[itemprop="([a-zA-Z]+)"\]$/
-const GENERIC_TEST_ID_SELECTOR = /^(article|section|div|li|a|span|h[1-6]|p|strong|ins|del|s|strike|small|meta|link|data|time|[a-z][a-z0-9]*-[a-z0-9-]{1,31})\[data-testid="([a-z][a-z-]+)"\]$/
+const GENERIC_TEST_ID_SELECTOR = /^(article|section|div|li|a|span|h[1-6]|p|strong|ins|del|s|strike|small|meta|link|data|time|[a-z][a-z0-9]*-[a-z0-9-]{1,31})\[data-testid="([a-z][a-z_-]{1,44})"\]$/
 function publicReviewSelector(row, retailerId) {
   // Source tag names may themselves be user/product identifiers; the same
   // bounded structural vocabulary applies to both independent review paths.
   const tag = /^[a-z][a-z0-9-]*/.exec(row.selector)?.[0]
   if (!isSafeStructuralReviewTag(tag)) return false
+  const observedGeneric = OBSERVED_GENERIC_CLASS.exec(row.selector)
+  if (observedGeneric && Object.hasOwn(PUBLIC_OBSERVED_TOKEN_FIELDS, observedGeneric[1]) &&
+      PUBLIC_OBSERVED_TOKEN_FIELDS[observedGeneric[1]] === row.field) return true
   if (GENERIC_SELECTOR.test(row.selector)) return true
   const schemaProperty = SCHEMA_PROP_SELECTOR.exec(row.selector)
   if (schemaProperty) return Object.hasOwn(SCHEMA_FIELDS, schemaProperty[2]) &&

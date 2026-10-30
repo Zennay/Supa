@@ -46,7 +46,7 @@ for (const source of sources) {
     const product={'@context':'https://schema.org','@type':'Product',name:'Synthetic milk',sku,url:source.url,
       weight:{value:'500 g'},offers:{'@type':'Offer',price:'2.49',priceCurrency:'EUR',availability:'https://schema.org/InStock'}}
     const html='<!doctype html><html><head><meta charset="utf-8">'+
-      '<script type="application/ld+json">'+JSON.stringify(product)+'</script><main>'+observed.replace('price_value','price-value')
+      '<script type="application/ld+json">'+JSON.stringify(product)+'</script><main>'+observed.replace('price_value','price-value')+'<span class="price&lowbar;value" data-testid="price&lowbar;value">SYNTHETIC_SECOND</span>'
     let count=0
     const result=await captureApprovedProductReviewBundle({
       source:{supermarket:source.retailerId,kind:'product',url:source.url},
@@ -63,8 +63,30 @@ for (const source of sources) {
     assert.equal(result.priceReview.status,'candidate_needs_review')
     assert.equal(result.priceReview.observation.currentPriceCents,249)
     assert.ok(result.selectorReview.proposals.some(x=>x.field==='price'&&x.selector==='span.price-value'))
+    assert.ok(result.selectorReview.proposals.some(x=>x.field==='price'&&x.selector==='span.price_value'))
+    assert.ok(result.selectorReview.proposals.some(x=>x.field==='price'&&x.selector==='span[data-testid="price_value"]'))
     assert.equal(result.actualTransportInvocations,1)
     for(const field of ['published','readyForIngestion','productionEnabled','publicSavingsClaimEligible','sourceRightsForPublicationVerified'])
       assert.equal(result[field],false,field)
+  })
+}
+
+// A browser-decoded generic underscore CSS class/test ID is safe to show in
+// the *private* source review, but a SKU-bearing variant never is.
+const {safeSelectorProposals}=await import('../scripts/retailer-approved-capture-selector-bridge.mjs')
+for(const source of sources){
+  test(`${source.retailerId}: source-observed generic underscore selectors survive the private bridge`,()=>{
+    const origin={...source,capturedAt:'2026-10-29T15:00:00Z'}
+    const html='<main><article class="product-card"><span class="price&lowbar;value" data-testid="price&lowbar;value">SYNTHETIC_CURRENT</span>'+
+      '<span class="price_249_private" data-testid="price_249_secret">SYNTHETIC_PRIVATE</span>'+
+      '<div class="old_price"><span class="price-old">SYNTHETIC_FORMER</span></div></article></main>'
+    const raw=proposeOfflineRetailerSelectors({html,origin})
+    assert.ok(raw.selectors.some(x=>x.selector==='span.price_value'&&x.field==='price'))
+    assert.ok(raw.selectors.some(x=>x.selector==='span[data-testid="price_value"]'&&x.field==='price'))
+    const safe=safeSelectorProposals(raw.selectors,source.retailerId)
+    for(const selector of ['span.price_value','span[data-testid="price_value"]'])
+      assert.ok(safe.some(x=>x.selector===selector&&x.field==='price'),selector)
+    assert.equal(safe.some(x=>/249|private|secret/i.test(x.selector)),false)
+    assert.equal(safe.some(x=>x.selector==='div.old_price'&&x.field==='price'),false)
   })
 }
