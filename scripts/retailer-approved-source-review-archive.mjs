@@ -121,7 +121,10 @@ function safeArchive(bundle) {
       bundle.mode !== 'private-authorized-one-capture-structural-review') refuse()
 
   const archive = {
-    schemaVersion: 1,
+    // Version 2 binds exactly four structured source signals alongside safe
+    // selector/price proof. Legacy v1 without those fields cannot be upgraded
+    // by inventing signal values: it must be recaptured after a real grant.
+    schemaVersion: 2,
     mode: 'private-one-source-price-and-selector-review',
     source, capturedBytes: bundle.capturedBytes,
     priceReview: price === null ? null : {
@@ -242,6 +245,7 @@ async function readPrivateReview(file) {
       raw = await handle.readFile('utf8')
     } finally { await handle.close() }
     const data = JSON.parse(raw)
+    if (data?.schemaVersion !== 2) refuse()
     const source = data.source, price = data.priceReview, review = data.selectorReview
     const reconstructed = {
       schemaVersion: 1,

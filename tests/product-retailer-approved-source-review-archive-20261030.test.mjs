@@ -80,6 +80,7 @@ test('PLUS + Deka one-fetch private 0600 SHA-pinned price and selector archive',
     const info = await stat(file)
     assert.equal(info.mode & 0o777, 0o600)
     const saved = JSON.parse(await readFile(file, 'utf8'))
+    assert.equal(saved.schemaVersion, 2) // new version includes structured signal evidence
     assert.equal(saved.source.url, targets[store])
     assert.equal(saved.source.sha256, createHash('sha256').update(body).digest('hex'))
     assert.equal(saved.priceReview.observation.currentPriceCents, 249)
@@ -332,4 +333,16 @@ test('unavailable price source records a status change without presenting invent
   assert.equal(report.candidateReviewReasonChanged, true)
   assert.equal(report.unverifiedPriceAmountChanged, false)
   assert.equal(report.verifiedCurrentCheckoutPrice, false)
+})
+
+test('legacy v1 without structured source evidence is rejected, never auto-upgraded', async t => {
+  const dir = await folder(t)
+  const file = join(dir, 'legacy-v1.json')
+  await archive(options('plus'), file)
+  const legacy = JSON.parse(await readFile(file, 'utf8'))
+  legacy.schemaVersion = 1
+  delete legacy.selectorReview.structuredSignals
+  await writeFile(file, JSON.stringify(legacy, null, 2) + '\n')
+  await assert.rejects(compareArchivedSourceReviews(file, file),
+    /Private source review archive refused/)
 })
