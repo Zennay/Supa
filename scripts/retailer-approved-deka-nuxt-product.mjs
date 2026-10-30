@@ -25,8 +25,12 @@ function oneDekaProduct(jsonLdBlocks) {
   // Deka's historical product page supplied a single flat JSON-LD Product
   // document. Graphs or multiple products must be independently reviewed.
   const values = jsonLdBlocks.flatMap(value => Array.isArray(value) ? value : [value])
-  const products = values.filter(value => data(value) && value['@type'] === 'Product')
-  return products.length === 1 && values.length <= 8 ? products[0] : null
+  // Additional JSON-LD graphs may contain a contradictory Product even when
+  // one flat Product already corroborates Nuxt. Do not silently ignore them.
+  if (values.length > 8 || values.some(value =>
+      !data(value) || Object.hasOwn(value,'@graph'))) return null
+  const products = values.filter(value => value['@type'] === 'Product')
+  return products.length === 1 ? products[0] : null
 }
 
 // Deka's historical SSR uses capital Price. Additional price claims are

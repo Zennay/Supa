@@ -277,3 +277,16 @@ test('standalone Deka HTML fallback refuses impossible and future source capture
     assert.equal(parsed.type,'abstain',capturedAt)
   }
 })
+
+test('Deka Nuxt fallback refuses a second nested graph Product contradicting the source price', async () => {
+  const competing={ '@context':'https://schema.org', '@graph': [{
+    '@type':'Product',name:'Zuivelmeester Halfvolle melk',mpn:'115873',
+    offers:{'@type':'Offer',Price:0.01,priceCurrency:'EUR',
+      availability:'https://schema.org/InStock'},
+  }] }
+  const extra='<script type="application/ld+json">'+JSON.stringify(competing)+'</script>'
+  const sourcePage=html().replace('</head>',extra+'</head>')
+  const result=await captureApprovedProductPriceCandidate(options(sourcePage))
+  assert.equal(result.status,'review_required')
+  assert.equal(result.observation,null)
+})
