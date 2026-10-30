@@ -38,7 +38,9 @@ export function readAuthorizedHtmlScriptEvidence(html) {
   const invalid = () => ({ invalid: true, jsonLdBlocks: [], nuxtPayload: null })
   let elements
   try {
-    elements = scanOfflineRetailerMarkup(html, { includeScripts: true }).scripts
+    const scanned = scanOfflineRetailerMarkup(html, { includeScripts: true })
+    if (scanned.hasMetaRefresh) return invalid()
+    elements = scanned.scripts
   } catch { return invalid() }
   if (elements.length > MAX_SCRIPT_TAGS) return invalid()
   const jsonLdBlocks = []
