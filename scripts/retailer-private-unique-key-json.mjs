@@ -10,9 +10,9 @@ const MAX_BYTES = 256 * 1024
 const MAX_DEPTH = 64
 const denied = () => { throw new Error('Unsafe or ambiguous offline JSON-LD') }
 
-export function parseUniqueKeyRetailerJson(source) {
+export function parseUniqueKeyRetailerJson(source, maxBytes = MAX_BYTES) {
   if (typeof source !== 'string' ||
-      Buffer.byteLength(source, 'utf8') > MAX_BYTES ||
+      Buffer.byteLength(source, 'utf8') > maxBytes ||
       Buffer.from(source, 'utf8').toString('utf8') !== source) denied()
 
   // Native JSON grammar validation first, then duplicate-key verification.
