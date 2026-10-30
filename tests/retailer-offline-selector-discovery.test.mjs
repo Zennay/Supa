@@ -700,3 +700,18 @@ test('in-memory selector proposals refuse HTML BOM/NUL that browser parsing woul
   const valid=proposeOfflineRetailerSelectors({html:sample,origin})
   assert.equal(valid.selectors.find(x=>x.selector==='a[href^="/product/"]')?.instances,1)
 })
+
+test('private HTML selector review refuses conflicting declared encoding, not inert markup', () => {
+  const origin={retailerId:'plus',url:'https://www.plus.nl/producten',
+    capturedAt:'2026-10-14T12:00:00.000Z'}
+  const product='<a href="/product/synthetic-111">SYNTHETIC café</a>'
+  const meta='<meta charset="windows-1252">'
+  const page=markup=>'<html><head>'+markup+'</head><body>'+product+'</body></html>'
+  assert.throws(()=>proposeOfflineRetailerSelectors({html:page(meta),origin}),
+    /Untrusted HTML charset declaration/)
+  const allowed=proposeOfflineRetailerSelectors({
+    html:page('<template>'+meta+'</template><meta charset="utf-8">'),origin,
+  })
+  assert.equal(allowed.selectors.find(x=>x.selector==='a[href^="/product/"]')?.instances,1)
+  assert.equal(allowed.readyForIngestion,false)
+})
