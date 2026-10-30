@@ -534,3 +534,24 @@ test('legacy Nuxt script ID alone never proves JSON SSR when MIME is JavaScript 
   assert.equal(proposeRetailerSelectors(source('dekamarkt','offers',hidden),hidden)
     .embeddedSignals.nuxtDataScriptPresent,false)
 })
+
+test('M1 archived JSON-LD review ignores arbitrary nested metadata forged as Product/Offer nodes',()=>{
+  for(const retailer of ['plus','dekamarkt']) {
+    const make=body=>'<script type="application/ld+json">'+JSON.stringify(body)+'</script>'
+    const forged=make({'@context':'https://schema.org','@type':'WebPage',
+      debug:{'@type':'Product',sku:'NEVER_A_PRODUCT',offers:{'@type':'Offer',price:'0.01'}},
+      metadata:[{'@type':'https://schema.org/Product',name:'PRIVATE_DECOY'}],
+    })
+    const result=proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',forged),forged)
+    assert.deepEqual(result.embeddedSignals.jsonLdTypes,['WebPage'],retailer)
+    assert.equal(result.embeddedSignals.jsonLdKeys.includes('price'),false)
+    assert.equal(result.readyForScraping,false)
+    assert.equal(result.publicationAllowed,false)
+    const genuine=make({'@context':'https://schema.org','@type':'ItemList',
+      itemListElement:[{'@type':'ListItem',item:{'@type':'Product',offers:{'@type':'Offer',price:'1.00'}}}],
+    })
+    const nested=proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',genuine),genuine)
+    assert.deepEqual(nested.embeddedSignals.jsonLdTypes,['ItemList','Offer','Product'],retailer)
+    assert.equal(nested.readyForScraping,false)
+  }
+})

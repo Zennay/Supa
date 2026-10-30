@@ -126,7 +126,13 @@ function jsonLdShape(text, types, keys) {
           if(match && (trusted || type !== match[1])) types.add(match[1])
         }
       }
-      if (child && typeof child === 'object') visit(child,depth+1,trusted)
+      // Walk only Schema.org graph/retail relationships. Arbitrary private
+      // metadata, debug objects and annotations are not nested products,
+      // even when they happen to carry an @type key or official-looking IRI.
+      // This is an offline structural review hint, not a product price parser.
+      if (['@graph','mainEntity','itemListElement','item','offers',
+           'priceSpecification'].includes(key) && child && typeof child === 'object')
+        visit(child,depth+1,trusted)
     }
   }
   visit(value)
