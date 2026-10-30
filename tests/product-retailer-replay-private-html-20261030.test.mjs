@@ -719,3 +719,20 @@ test('selector stability rejects incomplete top-24 proposal coverage instead of 
   assert.equal(full.proposals.candidateLimitReached,false)
   assert.equal(full.proposals.selectorCandidatesOmitted,0)
 })
+
+test('private stable selector archive records actual per-snapshot match cardinality, never guesses singularity', async t => {
+  const url='https://www.plus.nl/producten'
+  const one=await archivedSelectorPage(t,'plus','catalog',url,
+    '<article class="product-card">Synthetic</article>')
+  const two=await archivedSelectorPage(t,'plus','catalog',url,
+    '<article class="product-card">Synthetic A</article><article class="product-card">Synthetic B</article>')
+  const filename=one.replace('captured.html','card-cardinality.json')
+  const receipt=await savePrivateSelectorStabilityArchive([one,two],filename)
+  assert.equal(receipt.stableCandidateCount,1)
+  const saved=JSON.parse(await readFile(filename,'utf8'))
+  assert.equal(saved.stableCandidates[0].selector,'article.product-card')
+  assert.equal(saved.stableCandidates[0].minMatchesPerSnapshot,1)
+  assert.equal(saved.stableCandidates[0].maxMatchesPerSnapshot,2)
+  assert.equal(saved.automatedSelectorPromotion,false)
+  assert.doesNotMatch(JSON.stringify(receipt),/product-card|Synthetic|www\.plus\.nl/)
+})

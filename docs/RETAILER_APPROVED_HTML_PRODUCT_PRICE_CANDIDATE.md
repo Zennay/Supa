@@ -428,3 +428,12 @@ quote-aware inhoud en weigert ambigue ongeldige interne subsets met een
 ongequote `<`. Een in een declaratie gestopte JSON-LD Product of klasse mag
 geen selector- of prijssignaal opleveren. Een afzonderlijk echt script ná
 een correcte declaratie wordt nog wel herkend.
+
+### Selector-matchaantallen per opgenomen bron
+
+Stabiele selectors zijn niet per definitie unieke productselectors: op een
+cataloguspagina mag `article.product-card` meerdere items aanwijzen. De private
+review bewaart daarom nu ook het werkelijk waargenomen minimum en maximum
+aantal matches per bronopname. De menselijke reviewer kan zo onderbouwd
+onderscheid maken tussen een uniek item en meerdere productkaarten, zonder
+prijzen, tekstwaarden of ruwe URL's in de CLI weer te geven.

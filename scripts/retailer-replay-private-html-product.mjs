@@ -243,9 +243,13 @@ export async function savePrivateSelectorStabilityArchive(htmlFiles, reviewFile)
       if (seen.has(key)) continue
       seen.add(key)
       const found = counts.get(key)
-      if (found) found.observedInSnapshots++
-      else counts.set(key, {field:row.field, selector:row.selector,
-        observedInSnapshots:1, status:'needs-human-review'})
+      if (found) {
+        found.observedInSnapshots++
+        found.minMatchesPerSnapshot = Math.min(found.minMatchesPerSnapshot, row.instances)
+        found.maxMatchesPerSnapshot = Math.max(found.maxMatchesPerSnapshot, row.instances)
+      } else counts.set(key, {field:row.field, selector:row.selector,
+        observedInSnapshots:1, minMatchesPerSnapshot:row.instances,
+        maxMatchesPerSnapshot:row.instances, status:'needs-human-review'})
       // Stable class/data-testid/itemprop tokens can survive DOM tag changes.
       // Normalize only tokens OBSERVED in each actual snapshot; these hints
       // remain private, human-reviewed and never auto-applied.
