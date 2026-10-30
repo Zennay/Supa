@@ -45,3 +45,22 @@ test('mutation of each capture evidence PR restriction is refused',()=>{
   assert.throws(()=>validate(mutated),undefined,step)
  }
 })
+
+test('manual M1 artifact upload contains ONLY versioned review metadata, never raw retained retailer HTML',()=>{
+ const start=source.indexOf('      - name: Upload capture evidence\n')
+ const end=source.indexOf('      - name: Fail visibly when capture evidence fails\n',start)
+ assert.ok(start>0 && end>start)
+ const block=source.slice(start,end)
+ assert.match(block,/path: \|/)
+ const artifacts=[...block.matchAll(/^            (artifacts\/m1-captures\/[^\n]+)$/gm)].map(x=>x[1])
+ assert.deepEqual(artifacts,[
+  'artifacts/m1-captures/**/manifest.json',
+  'artifacts/m1-captures/**/inspection.json',
+  'artifacts/m1-captures/**/freshness.json',
+  'artifacts/m1-captures/**/evidence-summary.json',
+  'artifacts/m1-captures/**/sanitized-candidates/index.json',
+ ])
+ assert.doesNotMatch(block,/path: artifacts\/m1-captures\/(?:\s|$)/)
+ assert.equal(artifacts.some(path=>path.endsWith('.html')),false)
+ assert.match(block,/if-no-files-found: error/)
+})
