@@ -513,3 +513,38 @@ test('unrelated inert scripts with encoded type cannot veto actual source-bound 
   assert.equal(refusal.status, 'review_required')
   assert.equal(refusal.observation, null)
 })
+
+test('browser-decoded Nuxt id preserves the real private Deka product and price source', async () => {
+  for (const id of ['__NUXT_D&#65;TA__', '__NUXT_D&#x41;TA__',
+    '__NUXT_DATA&#95;', '__NUXT_DATA__']) {
+    // The final underscore variant has an extra character and must not
+    // impersonate the actual Nuxt id; DOM character references are decoded
+    // exactly once, without guessed fuzzy identity.
+    const exact = id !== '__NUXT_DATA&#95;'
+    const html = dekaMarkup('id="' + id + '" type="application/json"')
+    const evidence = readAuthorizedHtmlScriptEvidence(html, dekaFixture.source.url)
+    assert.equal(evidence.invalid, false, id)
+    assert.equal(evidence.nuxtPayload !== null, exact, id)
+    if (exact) {
+      const candidate = await run('dekamarkt', html)
+      assert.equal(candidate.status, 'candidate_needs_review', id)
+      assert.equal(candidate.observation.currentPriceCents, 85, id)
+      assert.equal(candidate.published, false)
+    }
+  }
+})
+
+test('encoded Nuxt script id aliases cannot bypass duplicate, bad JSON or external-src checks', async () => {
+  const valid = script('id="__NUXT_DATA__" type="application/json"', dekaFixture.nuxtPayload)
+  const encoded = script('id="__NUXT_D&#65;TA__" type="application/json"', dekaFixture.nuxtPayload)
+  assert.equal(readAuthorizedHtmlScriptEvidence(valid + encoded).invalid, true)
+  assert.equal((await run('dekamarkt', valid + encoded)).status, 'review_required')
+  assert.equal(readAuthorizedHtmlScriptEvidence(
+    '<script id="__NUXT_D&#65;TA__" type="application/json">not JSON</script>').invalid, true)
+  assert.equal(readAuthorizedHtmlScriptEvidence(
+    '<script id="__NUXT_D&#65;TA__" type="application/json" src="/source"></script>').invalid, true)
+  const doubleEncoded = '<script id="__NUXT_D&amp;#65;TA__" type="application/json">' +
+    JSON.stringify(dekaFixture.nuxtPayload) + '</script>'
+  assert.equal(readAuthorizedHtmlScriptEvidence(doubleEncoded + valid).invalid, true)
+  assert.equal((await run('dekamarkt', doubleEncoded + valid)).status, 'review_required')
+})

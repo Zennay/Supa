@@ -790,3 +790,18 @@ test('encoded script MIME types produce the same offline source signals as priva
   assert.equal(refused.structuredSignals.jsonLd, false)
   assert.equal(refused.structuredSignals.schemaOrgProduct, false)
 })
+
+test('offline Nuxt and Next signals decode genuine script id HTML entities exactly once', () => {
+  const nuxt = '<script id="__NUXT_D&#x41;TA__" type="application/json">[]</script>'
+  const next = '<script id="__NEXT_D&#65;TA__" type="application/json">{}</script>'
+  const report = proposeOfflineRetailerSelectors({ html: nuxt + next, origin })
+  assert.equal(report.structuredSignals.nuxtData, true)
+  assert.equal(report.structuredSignals.nextData, true)
+  assert.equal(report.readyForIngestion, false)
+  const nested = '<script id="__NUXT_D&amp;#65;TA__" type="application/json">[]</script>'
+  const rejected = proposeOfflineRetailerSelectors({ html: nested, origin })
+  assert.equal(rejected.structuredSignals.nuxtData, false)
+  const unrelated = '<script id="other&#65;" type="text/plain">x</script>'
+  const accepted = proposeOfflineRetailerSelectors({ html: unrelated + nuxt, origin })
+  assert.equal(accepted.structuredSignals.nuxtData, true)
+})

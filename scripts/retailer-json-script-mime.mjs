@@ -23,6 +23,16 @@ function browserScriptMime(raw) {
   return invalid || decoded.includes('&') ? null : decoded
 }
 
+// HTML also decodes character references in the id attribute. A disguised
+// Nuxt/Next id must be counted as the same physical script; never silently
+// miss a duplicate payload or lose its independent source evidence.
+export function admittedRetailerScriptId(raw) {
+  if (raw === undefined) return undefined
+  if (typeof raw !== 'string' || raw.length > 256) return null
+  const decoded = browserScriptMime(raw)
+  return decoded !== null && decoded.length <= 256 ? decoded : null
+}
+
 export function admittedJsonScriptType(raw) {
   if (raw === undefined) return undefined
   if (typeof raw !== 'string') return null

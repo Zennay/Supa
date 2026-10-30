@@ -1,4 +1,4 @@
-import { admittedJsonScriptType } from './retailer-json-script-mime.mjs'
+import { admittedJsonScriptType, admittedRetailerScriptId } from './retailer-json-script-mime.mjs'
 import { scanOfflineRetailerMarkup } from './retailer-offline-structural-scan.mjs'
 import { assertObservedRetailerHtmlIdentity } from './retailer-offline-selector-discovery.mjs'
 import { parseUniqueKeyRetailerJson } from './retailer-private-unique-key-json.mjs'
@@ -82,7 +82,8 @@ export function readAuthorizedHtmlScriptEvidence(html, sourceUrl = undefined) {
     if ([...attr.values()].some(value => typeof value === 'string' && value.length > 256)) return invalid()
     const type = admittedJsonScriptType(attr.get('type'))
     if (type === null) return invalid()
-    const id = attr.get('id')
+    const id = admittedRetailerScriptId(attr.get('id'))
+    if (id === null) return invalid()
     const content = element.content.trim()
     // Never use remote script-src content as embedded structured evidence.
     if (attr.has('src')) {
