@@ -679,3 +679,52 @@ test('only a canonical RFC HTTP Date can give source HTML a fresh capture clock'
     createHash('sha256').update(html).digest('hex'))
   assert.equal(accepted.published, false)
 })
+
+test('RFC 9530 Content-Digest is checked against exact UTF-8 source bytes before archiving', async () => {
+  // Real non-ASCII UTF-8 ensures hash is over transport bytes, not JS code units.
+  const html = '<!doctype html><html lang="nl"><body>SYNTHETIC melk € 2,49</body></html>'
+  const digest = createHash('sha256').update(Buffer.from(html)).digest('base64')
+  const good = await captureApprovedRetailerPage({
+    source, permissionGate: gate, grant,
+    fetchFn: async () => new Response(html, {status: 200, headers: {
+      'content-type': 'text/html; charset=utf-8',
+      'content-digest': 'sha-256=:' + digest + ':',
+      'content-length': String(Buffer.byteLength(html)),
+    }}),
+  })
+  assert.equal(good.source.sha256, createHash('sha256').update(html).digest('hex'))
+  assert.equal(good.published, false)
+  const falseDigest = createHash('sha256').update('different bytes').digest('base64')
+  await assert.rejects(captureApprovedRetailerPage({
+    source, permissionGate: gate, grant,
+    fetchFn: async () => new Response(html, {status: 200, headers: {
+      'content-type': 'text/html',
+      'content-digest': 'sha-256=:' + falseDigest + ':',
+    }}),
+  }), /Content-Digest mismatch/)
+})
+
+test('ambiguous or uncheckable Content-Digest is refused before downloading upstream HTML', async () => {
+  const valid = createHash('sha256').update('synthetic').digest('base64')
+  for (const [digest, encoding] of [
+    ['sha-256=:invalid:', null],
+    ['sha-512=:abc:', null],
+    ['sha-256=:' + valid + ':, sha-512=:abc:', null],
+    ['sha-256=:' + valid + ':', 'gzip'],
+  ]) {
+    let cancelled = 0
+    const stream = new ReadableStream({
+      pull(controller) { controller.enqueue(new TextEncoder().encode('private upstream bytes')) },
+      cancel() { cancelled++ },
+    })
+    await assert.rejects(captureApprovedRetailerPage({
+      source, permissionGate: gate, grant,
+      fetchFn: async () => new Response(stream, {status: 200, headers: {
+        'content-type': 'text/html',
+        'content-digest': digest,
+        ...(encoding ? {'content-encoding': encoding} : {}),
+      }}),
+    }), /Unsupported or ambiguous retailer Content-Digest/)
+    assert.equal(cancelled, 1)
+  }
+})

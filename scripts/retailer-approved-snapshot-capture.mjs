@@ -249,7 +249,23 @@ function trustedHttpContentEncoding(headers) {
   return ['identity', 'gzip', 'br', 'deflate'].includes(type) ? type : null
 }
 
-async function collectBoundedBody(response) {
+// RFC 9530 byte integrity is representation-specific. A decoded fetch body
+// cannot prove a digest of compressed wire bytes: refuse that combination
+// rather than blessing an uncheckable merchant source. This is optional only
+// when the server sends no Content-Digest at all.
+function checkedHttpContentDigest(headers) {
+  const raw = headers?.get?.('content-digest')
+  if (raw === null || raw === undefined) return null
+  const match = typeof raw === 'string'
+    ? /^sha-256=:([A-Za-z0-9+/]{43}=):$/.exec(raw.trim()) : null
+  if (!match || Buffer.from(match[1], 'base64').toString('base64') !== match[1] ||
+      trustedHttpContentEncoding(headers) !== 'identity') {
+    throw new Error('Unsupported or ambiguous retailer Content-Digest')
+  }
+  return match[1]
+}
+
+async function collectBoundedBody(response, expectedDigest) {
   if (!response?.body || typeof response.body.getReader !== 'function') {
     throw new Error('Missing streaming HTML body')
   }
@@ -307,8 +323,12 @@ async function collectBoundedBody(response) {
     throw new Error('Incomplete HTML capture: declared length mismatch')
   }
   const all = Buffer.concat(chunks)
+  const digest = createHash('sha256').update(all).digest()
+  if (expectedDigest !== null && digest.toString('base64') !== expectedDigest) {
+    throw new Error('Retailer Content-Digest mismatch')
+  }
   const html = decodeExactRetailerHtmlBytes(all)
-  return { html, bytes, sha256: createHash('sha256').update(all).digest('hex') }
+  return { html, bytes, sha256: digest.toString('hex') }
 }
 
 export async function captureApprovedRetailerPage(options = {}) {
@@ -399,8 +419,11 @@ export async function captureApprovedRetailerPage(options = {}) {
     await closeRejectedBody()
     throw new Error('Unsupported or ambiguous retailer Content-Encoding')
   }
+  let expectedDigest
+  try { expectedDigest = checkedHttpContentDigest(response.headers) }
+  catch (error) { await closeRejectedBody(); throw error }
   let body
-  try { body = await collectBoundedBody(response) }
+  try { body = await collectBoundedBody(response, expectedDigest) }
   catch (error) {
     await closeRejectedBody()
     throw error
