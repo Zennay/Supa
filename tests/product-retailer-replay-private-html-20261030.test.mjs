@@ -313,3 +313,18 @@ test('historical HTML remains inspectable but is not a fresh price candidate', a
   assert.equal(historical.permissionVerifiedForThisReplay, false)
   assert.equal(historical.published, false)
 })
+
+
+test('private archive refuses world-visible staging directory without writing a review', async t => {
+  const { mkdir } = await import('node:fs/promises')
+  const source = await capture(t)
+  const publicDir = source.replace('captured.html', 'public-staging')
+  await mkdir(publicDir, { mode: 0o755 })
+  await chmod(publicDir, 0o755) // VPS umask may be 077
+  const out = join(publicDir, 'review.json')
+  await assert.rejects(savePrivateOfflineProductReview(source, out), /refused/)
+  await assert.rejects(stat(out), /ENOENT/)
+  const batchOut = join(publicDir, 'batch-review.json')
+  await assert.rejects(savePrivateOfflineReviewBatch([source], batchOut), /refused/)
+  await assert.rejects(stat(batchOut), /ENOENT/)
+})

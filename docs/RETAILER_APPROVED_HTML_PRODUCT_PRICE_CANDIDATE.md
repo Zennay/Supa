@@ -174,3 +174,11 @@ voor de originele SHA-gebonden selectorinspectie, maar labelt de prijs als
 Ook de batch telt zulke historische bronnen niet als nieuwe actuele
 prijskandidaten. Dat is bewust strenger dan alleen een aanwezig eurobedrag
 controleren; de data worden niet opnieuw opgehaald of ververst.
+
+De directe privé-review en de batch vereisen nu bovendien een **afgeschermde
+stagingmap** zonder groeps- of wereldrechten (bijvoorbeeld `0700`).
+Een directory waarvan derden de reviewbestandsnamen kunnen bekijken wordt
+geweigerd, ook al zou het bestand zelf `0600` hebben. Mocht een write
+mislukken, dan verwijdert de cleanup uitsluitend het fysieke bestand dat
+deze uitvoering zelf exclusief heeft geopend; een intussen onder dezelfde
+naam vervangen bestand van een andere schrijver wordt nooit gewist.

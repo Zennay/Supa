@@ -170,11 +170,13 @@ async function writePrivateReviewRecord(record, reviewFile) {
   await assertNoSymlinkedM3OutputParents(target)
   const { open, lstat, rm } = await import('node:fs/promises')
   const dir = await lstat(dirname(target))
-  if (!dir.isDirectory() || dir.isSymbolicLink()) fail()
-  let file, created = false
+  if (!dir.isDirectory() || dir.isSymbolicLink() ||
+      (dir.mode & 0o077) !== 0) fail()
+  let file, created = false, originalInode = null
   try {
     file = await open(target, 'wx', 0o600)
     created = true
+    originalInode = await file.stat()
     await file.writeFile(JSON.stringify(record, null, 2) + '\n', 'utf8')
     await file.chmod(0o600)
     await file.sync()
@@ -186,7 +188,11 @@ async function writePrivateReviewRecord(record, reviewFile) {
       try {
         await assertNoSymlinkedM3OutputParents(target)
         const current = await lstat(target)
-        if (current.isFile() && !current.isSymbolicLink()) await rm(target)
+        // An alternate writer may replace the name after our exclusive open:
+        // never delete that writer's file on a failed write/close.
+        if (originalInode && current.isFile() && !current.isSymbolicLink() &&
+            current.dev === originalInode.dev && current.ino === originalInode.ino)
+          await rm(target)
       } catch { /* refuse unsafe cleanup */ }
     }
     fail()
