@@ -1,3 +1,4 @@
+import { scanOfflineRetailerMarkup } from './retailer-offline-structural-scan.mjs'
 import { parseUniqueKeyRetailerJson } from './retailer-private-unique-key-json.mjs'
 import { decodeExactRetailerHtmlBytes } from './retailer-private-html-byte-identity.mjs'
 /**
@@ -114,6 +115,14 @@ export function proposeRetailerSelectors(source, html) {
       Buffer.from(html, 'utf8').toString('utf8') !== html ||
       sha256(html) !== identity.sha256) reject('HTML must be bounded, UTF-8 and match source SHA-256')
   assertClosedInertMarkup(html)
+  // A historical approved capture is still subject to the current source
+  // archival contract. Never derive candidate selectors from a page that
+  // explicitly forbids retention, redirects, or declares a non-UTF8 DOM.
+  const document = scanOfflineRetailerMarkup(html)
+  if (document.hasMetaNoStore || document.hasMetaRefresh ||
+      document.hasConflictingCharset) {
+    reject('retailer HTML source directives prohibit selector review')
+  }
   const scripts = []
   const jsonLdTypes = new Set()
   const jsonLdKeys = new Set()
