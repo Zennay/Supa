@@ -4,7 +4,7 @@ import {createHash} from 'node:crypto'
 import {mkdtemp,writeFile,readFile,stat,rm,link,unlink,symlink,readdir} from 'node:fs/promises'
 import {join} from 'node:path'
 import {tmpdir} from 'node:os'
-import {buildPrivateSyntheticHtmlFixture,verifyPrivateSyntheticHtmlFixture} from '../scripts/retailer-private-structural-fixture.mjs'
+import {buildPrivateSyntheticHtmlFixture,verifyPrivateSyntheticHtmlFixture,buildPrivateSyntheticFixturePair,verifyPrivateSyntheticFixturePair} from '../scripts/retailer-private-structural-fixture.mjs'
 import {replayPrivateProductHtmlSnapshot,replayPrivateSelectorHtmlSnapshot} from '../scripts/retailer-replay-private-html-product.mjs'
 import {proposeOfflineRetailerSelectors,summarizeOfflineSelectorProposals} from '../scripts/retailer-offline-selector-discovery.mjs'
 
@@ -189,4 +189,89 @@ test('operator verification CLI reports reproducible digest without raw retailer
   assert.equal(denied.status,2)
   assert.doesNotMatch(denied.stdout+denied.stderr,
     /PRIVATE_SECRET_123|€999|private-sku-secret|PRIVATE PRODUCT NAME|www\.plus\.nl/)
+})
+
+test('one private two-retailer package is complete only when both SHA-pinned sources verify',async t=>{
+  const plus=await archive(t,'plus','catalog')
+  const deka=await archive(t,'dekamarkt','offers')
+  const out=join(plus.dir,'two-stores')
+  const saved=await buildPrivateSyntheticFixturePair(plus.filename,deka.filename,out)
+  assert.deepEqual([saved.created,saved.retailers,saved.published],[true,2,false])
+  const checked=await verifyPrivateSyntheticFixturePair(plus.filename,deka.filename,out)
+  assert.equal(checked.verified,true)
+  const index=JSON.parse(await readFile(join(out,'pair-provenance.json'),'utf8'))
+  assert.deepEqual(index.retailers,['plus','dekamarkt'])
+  assert.equal(index.sources[0].sha256,plus.capture.source.sha256)
+  assert.equal(index.sources[1].sha256,deka.capture.source.sha256)
+  assert.equal(index.productionEnabled,false)
+  assert.equal(index.pricePublicationEnabled,false)
+  assert.equal((await stat(out)).mode&0o777,0o700)
+  assert.equal((await stat(join(out,'pair-provenance.json'))).mode&0o777,0o600)
+  for(const retailer of ['plus','dekamarkt']) {
+    const html=await readFile(join(out,retailer,'synthetic-structure.html'),'utf8')
+    assert.match(html,/SYNTHETIC STRUCTURE/)
+    assert.doesNotMatch(html,/PRIVATE_SECRET_123|PRIVATE PRODUCT NAME|private-sku-secret|€999/)
+    assert.equal((await stat(join(out,retailer,'provenance.json'))).mode&0o777,0o600)
+  }
+  assert.deepEqual((await readdir(plus.dir)).filter(x=>x.startsWith('.supa-two-store-')),[])
+  await assert.rejects(buildPrivateSyntheticFixturePair(plus.filename,deka.filename,out),/EEXIST/)
+  assert.equal((await verifyPrivateSyntheticFixturePair(plus.filename,deka.filename,out)).verified,true)
+})
+
+test('two-store generator refuses missing or misidentified retailer and leaves no partial package',async t=>{
+  const plus=await archive(t,'plus','catalog')
+  const otherPlus=await archive(t,'plus','product')
+  const deka=await archive(t,'dekamarkt','offers')
+  const destination=join(plus.dir,'not-produced')
+  await assert.rejects(buildPrivateSyntheticFixturePair(
+    deka.filename,plus.filename,destination))
+  await assert.rejects(buildPrivateSyntheticFixturePair(
+    plus.filename,otherPlus.filename,destination))
+  await assert.rejects(stat(destination),{code:'ENOENT'})
+  await writeFile(deka.filename,'<p>TAMPERED</p>',{mode:0o600})
+  await assert.rejects(buildPrivateSyntheticFixturePair(
+    plus.filename,deka.filename,destination))
+  await assert.rejects(stat(destination),{code:'ENOENT'})
+  assert.deepEqual((await readdir(plus.dir)).filter(x=>x.startsWith('.supa-two-store-')),[])
+})
+
+test('two-store verifier detects tampering in either child or shared manifest',async t=>{
+  const plus=await archive(t,'plus','product')
+  const deka=await archive(t,'dekamarkt','offers')
+  const out=join(plus.dir,'pair-verify')
+  await buildPrivateSyntheticFixturePair(plus.filename,deka.filename,out)
+  const globalManifest=join(out,'pair-provenance.json')
+  const original=await readFile(globalManifest)
+  await writeFile(globalManifest,original.toString('utf8').replace('"published": false',
+    '"published": true'))
+  await assert.rejects(verifyPrivateSyntheticFixturePair(plus.filename,deka.filename,out))
+  await writeFile(globalManifest,original)
+  const child=join(out,'dekamarkt','synthetic-structure.html')
+  const good=await readFile(child)
+  await writeFile(child,good.toString('utf8')+'UNREVIEWED')
+  await assert.rejects(verifyPrivateSyntheticFixturePair(plus.filename,deka.filename,out))
+  await writeFile(child,good)
+  assert.equal((await verifyPrivateSyntheticFixturePair(plus.filename,deka.filename,out)).verified,true)
+})
+
+test('real operator two-store CLI publishes only private verified synthetic receipts',async t=>{
+  const {spawnSync}=await import('node:child_process')
+  const plus=await archive(t,'plus','catalog')
+  const deka=await archive(t,'dekamarkt','offers')
+  const out=join(plus.dir,'pair-cli')
+  const executable=new URL('../scripts/retailer-private-structural-fixture.mjs',import.meta.url).pathname
+  const invoke=mode=>spawnSync(process.execPath,['--experimental-strip-types',
+    executable,mode,plus.filename,deka.filename,out],
+    {encoding:'utf8',timeout:20000})
+  const created=invoke('--pair')
+  assert.equal(created.status,0,created.stderr)
+  assert.equal(JSON.parse(created.stdout).retailers,2)
+  const verified=invoke('--verify-pair')
+  assert.equal(verified.status,0,verified.stderr)
+  assert.equal(JSON.parse(verified.stdout).verified,true)
+  assert.doesNotMatch(created.stdout+created.stderr+verified.stdout+verified.stderr,
+    /PRIVATE_SECRET_123|private-sku-secret|PRIVATE PRODUCT NAME|€999|www\.plus\.nl|www\.dekamarkt\.nl/)
+  const duplicate=invoke('--pair')
+  assert.equal(duplicate.status,2)
+  assert.doesNotMatch(duplicate.stdout+duplicate.stderr,/private-sku-secret|PRIVATE_SECRET_123/)
 })
