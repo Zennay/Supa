@@ -174,7 +174,13 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
       throw new Error('Offline selector scan exceeded bounded tag budget')
     }
     const tag = match.tag
-    if (!['article', 'a', 'div', 'li', 'section', 'span', 'h2', 'h3', 'p', 'strong', 'meta'].includes(tag)) continue
+    const standardCandidate = ['article', 'a', 'div', 'li', 'section', 'span',
+      'h2', 'h3', 'p', 'strong', 'meta'].includes(tag)
+    // Real SPA/retailer custom elements are valid HTML with a hyphenated
+    // tag name. Only offer selectors whose exact tags/classes exist in the
+    // approved local source; no made-up shadow DOM or descendant paths.
+    const actualCustomElement = /^[a-z][a-z0-9]*-[a-z0-9-]{1,31}$/.test(tag)
+    if (!standardCandidate && !actualCustomElement) continue
     const attrs = match.attrs
     const classes = (attrs.get('class') ?? '').split(/\s+/)
     const values = classes.filter(x => STATIC_NAME.test(x)).slice(0, 20)

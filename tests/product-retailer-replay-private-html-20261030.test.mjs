@@ -736,3 +736,20 @@ test('private stable selector archive records actual per-snapshot match cardinal
   assert.equal(saved.automatedSelectorPromotion,false)
   assert.doesNotMatch(JSON.stringify(receipt),/product-card|Synthetic|www\.plus\.nl/)
 })
+
+test('captured SPA custom elements retain evidence-backed selectors across private product catalogs', async t => {
+  const url='https://www.plus.nl/producten'
+  const a=await archivedSelectorPage(t,'plus','catalog',url,
+    '<plus-product-tile class="product-card"><plus-price-label class="price-value">SYNTHETIC</plus-price-label></plus-product-tile>')
+  const b=await archivedSelectorPage(t,'plus','catalog',url,
+    '<plus-product-tile class="product-card"><plus-price-label class="price-value">FICTIONAL</plus-price-label></plus-product-tile>')
+  const filename=a.replace('captured.html','web-component-selector-stability.json')
+  const summary=await savePrivateSelectorStabilityArchive([a,b],filename)
+  assert.ok(summary.stableCandidateCount>=2)
+  const data=JSON.parse(await readFile(filename,'utf8'))
+  assert.ok(data.stableCandidates.some(row=>row.selector==='plus-product-tile.product-card'))
+  assert.ok(data.stableCandidates.some(row=>row.selector==='plus-price-label.price-value'))
+  assert.equal(data.priceExtractionEnabled,false)
+  assert.equal(data.automatedSelectorPromotion,false)
+  assert.doesNotMatch(JSON.stringify(summary),/plus-product-tile|price-value|SYNTHETIC|FICTIONAL/)
+})

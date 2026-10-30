@@ -297,3 +297,14 @@ test('HTML declarations and quoted processing instructions are never real Produc
     html:`<!DOCTYPE html [ ${fake} ]>`,origin,
   }),/Malformed offline tag/)
 })
+
+test('real HTML custom-element retail tags generate only observed selectors, never invented shadow DOM', () => {
+  const html='<plus-product-tile class="product-card"><plus-price-label class="price-value">SYNTHETIC</plus-price-label></plus-product-tile>'
+  const report=proposeOfflineRetailerSelectors({html,origin})
+  assert.ok(report.selectors.some(x=>x.selector==='plus-product-tile.product-card'))
+  assert.ok(report.selectors.some(x=>x.selector==='plus-price-label.price-value'))
+  assert.equal(report.selectors.some(x=>x.selector.includes('shadow-root')),false)
+  assert.equal(report.readyForIngestion,false)
+  const fake='<template>'+html+'</template>'
+  assert.equal(proposeOfflineRetailerSelectors({html:fake,origin}).selectors.length,0)
+})

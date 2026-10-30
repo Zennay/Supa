@@ -437,3 +437,13 @@ review bewaart daarom nu ook het werkelijk waargenomen minimum en maximum
 aantal matches per bronopname. De menselijke reviewer kan zo onderbouwd
 onderscheid maken tussen een uniek item en meerdere productkaarten, zonder
 prijzen, tekstwaarden of ruwe URL's in de CLI weer te geven.
+
+### SPA-webcomponenten uitsluitend uit werkelijk HTML
+
+Webcomponenten met een geldige koppelstreep in hun tagnaam, zoals
+`plus-product-tile` of `plus-price-label`, komen voor in moderne webshops.
+De offline selectorontdekking neemt nu ook die werkelijk aanwezige starttags
+mee. Alleen daadwerkelijk waargenomen klassen en attributen leiden tot een
+voorstel; de engine verzint geen shadow-root-inhoud of niet-waargenomen
+CSS-paden. Dezelfde SHA-gebonden private stabiliteitsanalyse werkt voor deze
+webcomponenten, zonder publicatie of live scrape.
