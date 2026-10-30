@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { types as nodeTypes } from 'node:util'
 import { evaluateSourcePermissionGate } from './m1-check-source-permission-gate.mjs'
 import { scanOfflineRetailerMarkup } from './retailer-offline-structural-scan.mjs'
-import { ambiguousRetailerRoute, isAllowedM1RetailerSourcePath } from './retailer-source-route-safety.mjs'
+import { ambiguousRetailerRoute, isAllowedM1RetailerSourcePath, validateObservedRetailerDocumentIdentity, exactRawRetailerAuthority } from './retailer-source-route-safety.mjs'
 
 /**
  * A direct approved capture must not rely on getter/proxy fields that can
@@ -111,69 +111,12 @@ function checkedTarget(source) {
   return target.href
 }
 
-// WHATWG URL normalization decodes percent-escaped host bytes and IDNA
-// dot variants before comparing origins. A reviewed source must name the
-// literal retailer authority, not an equivalent-looking alias.
-function exactRawRetailerAuthority(raw, target) {
-  // The WHATWG parser strips CR/LF/TAB and edge C0 bytes from URLs.
-  // Such raw aliases are never direct evidence of the reviewed source.
-  if (/[\x00-\x1f\x7f]/.test(raw)) return false
-  const match = /^(?:[a-z][a-z0-9+.-]*:)?\/\/([^/?#]*)/i.exec(raw)
-  return !match || match[1].toLowerCase() === new URL(target).host.toLowerCase()
-}
-
 function assertDocumentSourceIdentity(html, target) {
-  // The HTTP 200 destination is not sufficient source provenance: HTML may
-  // navigate the browser or rebase relative links to a different storefront.
-  // Use the same inert offline HTML tokenizer as selector and price replay.
-  const document = scanOfflineRetailerMarkup(html)
-  if (document.hasMetaRefresh) throw new Error('Retailer HTML navigation refused')
-  if (document.hasMetaNoStore || document.hasMetaNoArchive) throw new Error('Retailer HTML disallows snapshot archival')
-  if (document.hasConflictingCharset) throw new Error('Untrusted retailer HTML charset')
-  const expected = new URL(target)
-  for (const href of document.baseHrefs) {
-    // The browser resolves HTML character references before interpreting
-    // href. Never validate their undecoded source text as a safe URL.
-    if (typeof href !== 'string' || !href || href.length > 2048 || (href.includes('&') || ambiguousRetailerRoute(href) ||
-        !exactRawRetailerAuthority(href, target))) {
-      throw new Error('Untrusted HTML base URL')
-    }
-    let destination
-    try { destination = new URL(href, target) }
-    catch { throw new Error('Untrusted HTML base URL') }
-    // A same-origin <base> can still silently redirect relative product-card
-    // links to another SKU, storefront or filtered listing. Accept only the
-    // current document, its containing directory or the retailer root.
-    // Browsers also use query/fragment from <base>, neither is a reviewed
-    // source identity for this one-URL capture grant.
-    const parentPath = expected.pathname.slice(0, expected.pathname.lastIndexOf('/') + 1)
-    const canonicalPath = path => path.replace(/\/$/, '') || '/'
-    const basePath = canonicalPath(destination.pathname)
-    if (destination.origin !== expected.origin || destination.username ||
-        destination.password || destination.protocol !== 'https:' ||
-        destination.search || destination.hash ||
-        (basePath !== '/' && basePath !== canonicalPath(parentPath) &&
-         basePath !== canonicalPath(expected.pathname))) {
-      throw new Error('Untrusted HTML base URL')
-    }
-  }
-  for (const href of document.canonicalHrefs) {
-    if (typeof href !== 'string' || !href || href.length > 2048 || (href.includes('&') || ambiguousRetailerRoute(href) ||
-        !exactRawRetailerAuthority(href, target))) {
-      throw new Error('Untrusted HTML canonical source URL')
-    }
-    let destination
-    try { destination = new URL(href, target) }
-    catch { throw new Error('Untrusted HTML canonical source URL') }
-    // A canonical for another product cannot prove the requested SKU's
-    // provenance, even when both URLs share the retailer host.
-    const path = p => p.replace(/\/$/, '') || '/'
-    if (destination.origin !== expected.origin || destination.username ||
-        destination.password || destination.search || destination.hash ||
-        path(destination.pathname) !== path(expected.pathname)) {
-      throw new Error('Untrusted HTML canonical source URL')
-    }
-  }
+  const doc = scanOfflineRetailerMarkup(html)
+  if (doc.hasMetaRefresh) throw new Error('Retailer HTML navigation refused')
+  if (doc.hasMetaNoStore || doc.hasMetaNoArchive) throw new Error('Retailer HTML disallows snapshot archival')
+  if (doc.hasConflictingCharset) throw new Error('Untrusted retailer HTML charset')
+  validateObservedRetailerDocumentIdentity(target, doc.baseHrefs, doc.canonicalHrefs)
 }
 
 function permittedForCapture(gate, source, grant, target) {

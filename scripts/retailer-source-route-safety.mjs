@@ -20,3 +20,61 @@ export function isAllowedM1RetailerSourcePath(retailerId,kind,path) {
   return path.startsWith(prefix) && path.length>prefix.length &&
     path[prefix.length]!=='/'
 }
+
+// Shared raw source identity for live capture and offline replay.
+export function exactRawRetailerAuthority(raw, target) {
+  // The WHATWG parser strips CR/LF/TAB and edge C0 bytes from URLs.
+  // Such raw aliases are never direct evidence of the reviewed source.
+  if (/[\x00-\x1f\x7f]/.test(raw)) return false
+  const match = /^(?:[a-z][a-z0-9+.-]*:)?\/\/([^/?#]*)/i.exec(raw)
+  return !match || match[1].toLowerCase() === new URL(target).host.toLowerCase()
+}
+
+export function validateObservedRetailerDocumentIdentity(target, baseHrefs, canonicalHrefs) {
+  const expected = new URL(target)
+  let documentBaseUrl = target
+  for (const href of baseHrefs) {
+    // The browser resolves HTML character references before interpreting
+    // href. Never validate their undecoded source text as a safe URL.
+    if (typeof href !== 'string' || !href || href.length > 2048 || (href.includes('&') || ambiguousRetailerRoute(href) ||
+        !exactRawRetailerAuthority(href, target))) {
+      throw new Error('Untrusted HTML base URL')
+    }
+    let destination
+    try { destination = new URL(href, target) }
+    catch { throw new Error('Untrusted HTML base URL') }
+    // A same-origin <base> can still silently redirect relative product-card
+    // links to another SKU, storefront or filtered listing. Accept only the
+    // current document, its containing directory or the retailer root.
+    // Browsers also use query/fragment from <base>, neither is a reviewed
+    // source identity for this one-URL capture grant.
+    const parentPath = expected.pathname.slice(0, expected.pathname.lastIndexOf('/') + 1)
+    const basePath = destination.pathname
+    if (destination.origin !== expected.origin || destination.username ||
+        destination.password || destination.protocol !== 'https:' ||
+        destination.search || destination.hash ||
+        (basePath !== '/' && basePath !== parentPath &&
+         basePath !== expected.pathname)) {
+      throw new Error('Untrusted HTML base URL')
+    }
+    documentBaseUrl = destination.href
+  }
+  for (const href of canonicalHrefs) {
+    if (typeof href !== 'string' || !href || href.length > 2048 || (href.includes('&') || ambiguousRetailerRoute(href) ||
+        !exactRawRetailerAuthority(href, target))) {
+      throw new Error('Untrusted HTML canonical source URL')
+    }
+    let destination
+    try { destination = new URL(href, target) }
+    catch { throw new Error('Untrusted HTML canonical source URL') }
+    // A canonical for another product cannot prove the requested SKU's
+    // provenance, even when both URLs share the retailer host.
+    const path = p => p.replace(/\/$/, '') || '/'
+    if (destination.origin !== expected.origin || destination.username ||
+        destination.password || destination.search || destination.hash ||
+        path(destination.pathname) !== path(expected.pathname)) {
+      throw new Error('Untrusted HTML canonical source URL')
+    }
+  }
+  return documentBaseUrl
+}

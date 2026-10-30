@@ -6,7 +6,7 @@ import { isPublicMerchantProductHrefSelector } from './retailer-public-product-h
 import { matchObservedSchemaProductSelector } from './retailer-observed-schema-product-selector.mjs'
 import { isSafeStructuralReviewTag } from './retailer-public-structural-tag.mjs'
 import { isFormerPriceTag, isFormerPriceToken, PUBLIC_OBSERVED_TOKEN_FIELDS } from './retailer-public-observed-token-fields.mjs'
-import { ambiguousRetailerRoute, isAllowedM1RetailerSourcePath } from './retailer-source-route-safety.mjs'
+import { ambiguousRetailerRoute, isAllowedM1RetailerSourcePath, validateObservedRetailerDocumentIdentity } from './retailer-source-route-safety.mjs'
 
 // Offline-first DOM selector proposal. NEVER downloads a page, executes scripts,
 // exports product/price text, or labels proposed selectors as confirmed.
@@ -230,44 +230,7 @@ function recordSelector(counters, field, selector, tag) {
 }
 
 export function assertObservedRetailerHtmlIdentity(originUrl, baseHrefs, canonicalHrefs) {
-  // Live HTML base href changes the browser resolution of relative product
-  // links. Foreign or malformed bases cannot become store product evidence.
-  let documentBaseUrl = originUrl
-  if (baseHrefs.length) {
-    // Offline archives must validate browser-facing href provenance too.
-    const href = baseHrefs[0]
-    if (typeof href !== 'string' || !href || href.length > 2048 ||
-        href.includes('&')) throw new Error('Untrusted HTML base URL')
-    let base
-    try { base = new URL(href, originUrl) }
-    catch { throw new Error('Untrusted HTML base URL') }
-    const expected = new URL(originUrl)
-    if (base.origin !== expected.origin || base.username || base.password ||
-        base.protocol !== 'https:') throw new Error('Untrusted HTML base URL')
-    documentBaseUrl = base.href
-  }
-
-  // An explicit canonical page identity belonging to another domain makes
-  // even otherwise plausible CSS product hints unsafe to attribute to this
-  // retailer. No canonical URL is emitted from the private review.
-  if (canonicalHrefs.length) {
-    const href = canonicalHrefs[0]
-    if (typeof href !== 'string' || !href || href.length > 2048 ||
-        href.includes('&')) throw new Error('Untrusted HTML canonical source URL')
-    let canonical
-    try { canonical = new URL(href, originUrl) }
-    catch { throw new Error('Untrusted HTML canonical source URL') }
-    const expected = new URL(originUrl)
-    const normalizedPath = path => path.replace(/\/$/, '') || '/'
-    // An older offline archive may claim another SKU on the same store.
-    if (canonical.origin !== expected.origin || canonical.username ||
-        canonical.password || canonical.protocol !== 'https:' ||
-        canonical.search || canonical.hash ||
-        normalizedPath(canonical.pathname) !== normalizedPath(expected.pathname))
-      throw new Error('Untrusted HTML canonical source URL')
-  }
-
-  return documentBaseUrl
+  return validateObservedRetailerDocumentIdentity(originUrl, baseHrefs, canonicalHrefs)
 }
 
 export function proposeOfflineRetailerSelectors(options = {}, includePrivateCoverage = false) {

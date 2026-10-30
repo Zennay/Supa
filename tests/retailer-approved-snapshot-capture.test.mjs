@@ -313,7 +313,7 @@ test('source-identity capture refuses mismatched canonical/base and live refresh
     }), pattern)
   }
   // Quotes inside inert comment/script data cannot forge page-level identity.
-  const legitimate = '<html><head><base href="/producten/"><link rel="canonical" href="/producten"></head><body><!-- <base href="https://evil.test"> --><script>const s = "<meta http-equiv=refresh>";</script><a class="product-card" href="/product/mock">Mock</a></body></html>'
+  const legitimate = '<html><head><base href="/producten"><link rel="canonical" href="/producten"></head><body><!-- <base href="https://evil.test"> --><script>const s = "<meta http-equiv=refresh>";</script><a class="product-card" href="/product/mock">Mock</a></body></html>'
   const valid = await captureApprovedRetailerPage({
     source, permissionGate: gate, grant,
     fetchFn: async () => new Response(legitimate, {
@@ -852,7 +852,7 @@ test('a same-host HTML base cannot silently rebase reviewed product links to a d
     '/product/unrelated-sku',
     '/producten?shop=unreviewed',
     '/producten/#unreviewed',
-    '/unreviewed-assets/',
+    '/unreviewed-assets/', '/producten/',
   ]
   for (const href of cases) {
     await assert.rejects(captureApprovedRetailerPage({
@@ -863,7 +863,7 @@ test('a same-host HTML base cannot silently rebase reviewed product links to a d
       ),
     }), /Untrusted HTML base URL/, 'must reject base ' + href)
   }
-  for (const href of ['/', '/producten/', '/producten']) {
+  for (const href of ['/', '/producten']) {
     const proof = await captureApprovedRetailerPage({
       source, permissionGate: gate, grant,
       fetchFn: async () => new Response('<html><head><base href="' + href + '"></head><body>SYNTHETIC</body></html>',

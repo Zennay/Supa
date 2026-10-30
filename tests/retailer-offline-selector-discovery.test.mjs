@@ -480,7 +480,7 @@ test('live HTML base href cannot redirect source product anchors to another orig
     const html = '<html><head><base href="' + base + '"></head>' + item + '</html>'
     assert.throws(() => proposeOfflineRetailerSelectors({html, origin}), /Untrusted HTML base URL/)
   }
-  for (const base of ['https://www.plus.nl/', '/', '//www.plus.nl/catalog/']) {
+  for (const base of ['https://www.plus.nl/', '/', '//www.plus.nl/producten']) {
     const html = '<html><head><base href="' + base + '"></head>' + item + '</html>'
     const report = proposeOfflineRetailerSelectors({html, origin})
     assert.equal(report.selectors.find(x=>x.selector==='a[href^="/product/"]')?.instances,1)
@@ -575,8 +575,8 @@ test('parent-relative product anchors are accepted only when the real page base 
     assert.equal(accepted.readyForIngestion,false)
     const changedBase='<html><head><base href="/aanbiedingen/week/"></head>' +
       '<body><a href="../' + productRoot + 'synthetic-item-111">SYNTHETIC</a></body></html>'
-    const rejected=proposeOfflineRetailerSelectors({html:changedBase,origin:source})
-    assert.equal(rejected.selectors.filter(x=>x.field==='product').length,0)
+    assert.throws(() => proposeOfflineRetailerSelectors({html:changedBase,origin:source}),
+      /Untrusted HTML base URL/)
   }
 })
 
@@ -968,4 +968,25 @@ test('nested HTML character references cannot invent source-observed Schema.org 
       assert.equal(result.productionEnabled,false)
     }
   }
+})
+
+test('offline selector and price provenance reject same-store HTML base rebasing and raw host aliases', () => {
+  const html = href => '<html><head><base href="' + href + '"></head><body><a href="/product/synthetic-item">SYNTHETIC</a></body></html>'
+  for (const href of [
+    '/product/unreviewed-sku', '/producten?alternate=store', '/aanbiedingen/week/',
+    '/producten/%2e%2e/producten', 'https://%77ww.plus.nl/producten',
+    'https://www．plus.nl/producten', 'https:\t//www.plus.nl/producten',
+  ]) {
+    assert.throws(() => proposeOfflineRetailerSelectors({ html: html(href), origin }),
+      /Untrusted HTML base URL/, JSON.stringify(href))
+  }
+  for (const href of ['https://%77ww.plus.nl/producten', '/producten/%2e%2e/producten',
+                       'https:\t//www.plus.nl/producten']) {
+    const markup = '<html><head><link rel="canonical" href="' + href + '"></head><body>SYNTHETIC</body></html>'
+    assert.throws(() => proposeOfflineRetailerSelectors({ html: markup, origin }),
+      /Untrusted HTML canonical source URL/, JSON.stringify(href))
+  }
+  const allowed = proposeOfflineRetailerSelectors({html:html('/'),origin})
+  assert.equal(allowed.productionEnabled,false)
+  assert.equal(allowed.permissionVerified,false)
 })
