@@ -1,3 +1,4 @@
+import { admittedJsonScriptType } from './retailer-json-script-mime.mjs'
 import { scanOfflineRetailerMarkup } from './retailer-offline-structural-scan.mjs'
 import { assertObservedRetailerHtmlIdentity } from './retailer-offline-selector-discovery.mjs'
 import { parseUniqueKeyRetailerJson } from './retailer-private-unique-key-json.mjs'
@@ -25,18 +26,6 @@ function normalizeKnownSchemaType(value) {
     return match ? match[1] : item
   }
   return Array.isArray(value) ? value.map(canonical) : canonical(value)
-}
-
-// Explicit UTF-8 MIME parameters are valid embedded JSON script metadata.
-// Reject malformed or contradictory charset parameters instead of quietly
-// ignoring one JSON-LD block while trusting a separate cheap Product.
-function admittedJsonScriptType(raw) {
-  if (raw === undefined) return undefined
-  const type = raw.trim().toLowerCase()
-  if (!type.startsWith('application/ld+json') &&
-      !type.startsWith('application/json')) return type
-  const match = /^(application\/(?:ld\+json|json))(?:\s*;\s*charset\s*=\s*(?:utf-8|"utf-8"|'utf-8'))?$/.exec(type)
-  return match ? match[1] : null
 }
 
 // Read the exact same quote-aware DOM-script boundaries as the offline

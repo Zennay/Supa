@@ -753,3 +753,27 @@ test('numeric canonical rel attribute identity cannot be hidden from offline sou
   const html='<html><head><link rel="canon&#105;cal" href="https://other.example/producten"></head><body><a href="/product/synthetic-42">synthetic</a></body></html>'
   assert.throws(()=>proposeOfflineRetailerSelectors({html,origin}),/canonical/)
 })
+
+test('offline selector signals agree with UTF-8 JSON-LD and Nuxt private price evidence', () => {
+  const product = '<script type="application/ld+json; charset=UTF-8">' +
+    '{"@context":"https://schema.org","@type":"Product","name":"Fictional"}' +
+    '</script>'
+  const plus = proposeOfflineRetailerSelectors({ html: product, origin })
+  assert.deepEqual(plus.structuredSignals, {
+    schemaOrgProduct: true, jsonLd: true, nuxtData: false, nextData: false,
+  })
+  assert.equal(plus.productionEnabled, false)
+  const dekaOrigin = { ...origin, retailerId:'dekamarkt',
+    url:'https://www.dekamarkt.nl/producten' }
+  const nuxt = '<script id="__NUXT_DATA__" type="application/json; charset=UTF-8">[]</script>'
+  const deka = proposeOfflineRetailerSelectors({ html: nuxt, origin: dekaOrigin })
+  assert.equal(deka.structuredSignals.nuxtData, true)
+  assert.equal(deka.readyForIngestion, false)
+  for (const type of ['application/ld+json; charset=latin1',
+    'application/ld+json; charset=UTF-8; charset=UTF-8']) {
+    const invalid = product.replace('application/ld+json; charset=UTF-8', type)
+    const report = proposeOfflineRetailerSelectors({ html: invalid, origin })
+    assert.equal(report.structuredSignals.jsonLd, false)
+    assert.equal(report.structuredSignals.schemaOrgProduct, false)
+  }
+})

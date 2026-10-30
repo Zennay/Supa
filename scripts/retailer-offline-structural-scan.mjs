@@ -1,3 +1,4 @@
+import { admittedJsonScriptType } from './retailer-json-script-mime.mjs'
 import { parseUniqueKeyRetailerJson } from './retailer-private-unique-key-json.mjs'
 
 /**
@@ -273,10 +274,10 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
       if (trustedScriptContext && !values.has('src')) {
         // MIME type matching ignores surrounding ASCII whitespace, matching
         // the already strict private JSON-LD/Nuxt source evidence reader.
-        const type = values.get('type')?.trim().toLowerCase();
+        const type = admittedJsonScriptType(values.get('type'));
         const id = values.get('id');
         const content = html.slice(end + 1, closing.index).trim();
-        if (Buffer.byteLength(content, 'utf8') <= 1024 * 1024) {
+        if (type !== null && Buffer.byteLength(content, 'utf8') <= 1024 * 1024) {
           let parsed = null;
           // A structural Product/SSR signal must meet the same unambiguous
           // JSON grammar as the private priced evidence reader. Duplicate
