@@ -1189,3 +1189,21 @@ test('a mixed JSON-LD graph does not promote official Product signal if another 
   assert.equal(privateEvidence.verifiedSchemaProductContexts,false)
   assert.equal(result.productionEnabled,false)
 })
+
+test('multiple live JSON-LD scripts cannot present trusted Product evidence when a separate script overrides Schema.org',async()=>{
+  const {readAuthorizedHtmlScriptEvidence}=await import('../scripts/retailer-approved-html-script-evidence.mjs')
+  const block=x=>'<script type="application/ld+json">'+JSON.stringify(x)+'</script>'
+  const official=block({'@context':'https://schema.org','@type':'Product',name:'SYNTHETIC',offers:{'@type':'Offer',price:'1.20'}})
+  const foreign=block({'@context':'https://other.example','@type':'Offer',price:'999'})
+  for(const [retailerId,url] of [['plus','https://www.plus.nl/producten'],['dekamarkt','https://www.dekamarkt.nl/aanbiedingen']]){
+    const valid=proposeOfflineRetailerSelectors({html:official,origin:{...origin,retailerId,url}})
+    assert.equal(valid.structuredSignals.schemaOrgProduct,true)
+    for(const html of [official+foreign,foreign+official]){
+      const result=proposeOfflineRetailerSelectors({html,origin:{...origin,retailerId,url}})
+      assert.equal(readAuthorizedHtmlScriptEvidence(html,url).verifiedSchemaProductContexts,false)
+      assert.equal(result.structuredSignals.jsonLd,true)
+      assert.equal(result.structuredSignals.schemaOrgProduct,false,retailerId)
+      assert.equal(result.productionEnabled,false)
+    }
+  }
+})

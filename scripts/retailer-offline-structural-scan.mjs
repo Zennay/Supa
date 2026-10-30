@@ -138,6 +138,9 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
   // Distinct source scripts may share a visible JSON schema, but duplicate
   // browser-equivalent SSR IDs do not establish unambiguous source evidence.
   let nuxtScriptCount = 0, nextScriptCount = 0;
+  // As with the SHA-bound private reader, Product context is a property of
+  // the complete captured JSON-LD source, not just the first positive block.
+  let foreignJsonLdContext = false;
   const hidden = [];
   // Keep live HTML base href facts separate from visible DOM selectors.
   const baseHrefs = [];
@@ -325,8 +328,8 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
           try { parsed = parseUniqueKeyRetailerJson(content); } catch {}
           if (type === 'application/ld+json' && parsed !== null) {
             signals.jsonLd = true;
-            if (!hasUntrustedNestedSchemaContext(parsed) && hasProduct(parsed))
-              signals.schemaOrgProduct = true;
+            if (hasUntrustedNestedSchemaContext(parsed)) foreignJsonLdContext = true;
+            else if (hasProduct(parsed)) signals.schemaOrgProduct = true;
           }
           if (id === '__NUXT_DATA__' && (type === undefined || type === 'application/json') &&
               Array.isArray(parsed)) signals.nuxtData = true;
@@ -341,6 +344,9 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
     pos = end + 1;
   }
   if (hidden.length) throw new Error('Unbalanced inert HTML element');
+  // One foreign node invalidates the combined official Product source claim,
+  // regardless of script ordering. JSON presence itself remains observable.
+  if (foreignJsonLdContext) signals.schemaOrgProduct = false;
   if (nuxtScriptCount !== 1) signals.nuxtData = false;
   if (nextScriptCount !== 1) signals.nextData = false;
   return { visible: visible.join(''), structuredSignals: signals,
