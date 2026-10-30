@@ -1,3 +1,4 @@
+import { decodeExactRetailerHtmlBytes } from './retailer-private-html-byte-identity.mjs'
 import { open, lstat } from 'node:fs/promises'
 import { constants as fsFlags } from 'node:fs'
 import { createHash } from 'node:crypto'
@@ -56,7 +57,7 @@ export async function main(argv = process.argv.slice(2), writeOutput = text => p
       createHash('sha256').update(raw).digest('hex') !== expectedSha256) {
     throw new Error('Offline snapshot SHA does not match capture manifest')
   }
-  const html = new TextDecoder('utf-8', { fatal: true }).decode(raw)
+  const html = decodeExactRetailerHtmlBytes(raw)
   const report = proposeOfflineRetailerSelectors({
     html, origin: { retailerId, url, capturedAt },
   })
