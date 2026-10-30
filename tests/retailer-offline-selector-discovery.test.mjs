@@ -43,6 +43,7 @@ test('historical retailer snapshots require observed allowed storefront routes',
   for (const retailerId of ['plus','dekamarkt']) {
     const host = retailerId === 'plus' ? 'www.plus.nl' : 'www.dekamarkt.nl'
     for (const path of ['/admin', '/checkout', '/mijn-account',
+                        '/producten//admin', '/aanbiedingen//checkout',
                         '/producten/%2fadmin', '/producten/%252fadmin']) {
       const originRecord = { ...origin, retailerId,
         url: 'https://' + host + path }

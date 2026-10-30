@@ -3,7 +3,7 @@ import { isIP } from 'node:net'
 import { types as nodeTypes } from 'node:util'
 import { scanOfflineRetailerMarkup } from './retailer-offline-structural-scan.mjs'
 import { isPublicMerchantProductHrefSelector } from './retailer-public-product-href-selectors.mjs'
-import { ambiguousRetailerRoute } from './retailer-source-route-safety.mjs'
+import { ambiguousRetailerRoute, isAllowedM1RetailerSourcePath } from './retailer-source-route-safety.mjs'
 
 // Offline-first DOM selector proposal. NEVER downloads a page, executes scripts,
 // exports product/price text, or labels proposed selectors as confirmed.
@@ -77,11 +77,12 @@ function validSnapshotOrigin(origin) {
     // encoded path separators rather than proposing false merchant products.
     if (requiredHost) {
       const path = url.pathname
-      const knownRoute = origin.retailerId === 'plus'
-        ? /^\/(?:product\/[^/]+|producten(?:\/.*)?|aanbiedingen(?:\/.*)?)$/.test(path)
-        : /^\/(?:producten(?:\/.*)?|aanbiedingen(?:\/.*)?)$/.test(path)
-      if (!knownRoute || ambiguousRetailerRoute(path))
-        return false
+      // Historical direct selector replay and first-party captures must
+      // share exactly one approved merchant route interpretation. A regex
+      // accepting '/producten//checkout' cannot bypass the capture contract.
+      const knownRoute = ['product','catalog','offers'].some(kind =>
+        isAllowedM1RetailerSourcePath(origin.retailerId,kind,path))
+      if (!knownRoute) return false
     }
     return exact && url.protocol === 'https:' &&
       /^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/.test(url.hostname) &&
