@@ -354,3 +354,20 @@ test('structural selector evidence never advertises duplicate-key JSON-LD or Nux
   assert.equal(report.selectors.some(x => x.field === 'name'), true)
   assert.equal(report.permissionVerified, false)
 })
+
+
+test('CSS hints reflect actual decoded numeric HTML attribute references, never invented labels', () => {
+  const html = [
+    '<article class="product&#45;card product&#45;card">',
+    '<span data-testid="price&#x2d;value">Synthetic</span>',
+    '<a href="&#47;producten&#47;synthetic-555">Source link</a>',
+    '<span class="price&#xD800;value">Invalid surrogate stays inert</span>',
+    '</article>',
+  ].join('')
+  const report = proposeOfflineRetailerSelectors({ html, origin })
+  assert.equal(report.selectors.find(x => x.selector === 'article.product-card')?.instances, 1)
+  assert.equal(report.selectors.find(x => x.selector === 'span[data-testid="price-value"]')?.instances, 1)
+  assert.equal(report.selectors.find(x => x.selector === 'a[href^="/producten/"]')?.instances, 1)
+  assert.equal(report.selectors.some(x => x.selector === 'span.price-value'), false)
+  assert.equal(report.readyForIngestion, false)
+})
