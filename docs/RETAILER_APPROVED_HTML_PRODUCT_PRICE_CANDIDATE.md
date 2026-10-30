@@ -182,3 +182,22 @@ geweigerd, ook al zou het bestand zelf `0600` hebben. Mocht een write
 mislukken, dan verwijdert de cleanup uitsluitend het fysieke bestand dat
 deze uitvoering zelf exclusief heeft geopend; een intussen onder dezelfde
 naam vervangen bestand van een andere schrijver wordt nooit gewist.
+
+### Controleerbare privé-driftwaarschuwing bewaren
+
+Met `--drift-save` wordt een eerder uitsluitend op stdout weergegeven
+driftmelding als nieuw, exclusief `0600` rapport op de lokale operator-
+stagingmap opgeslagen. Twee originele HTML+manifestbestanden moeten van
+**dezelfde retailer én dezelfde exacte product-URL** komen en een geldige
+tijdvolgorde hebben:
+
+```bash
+node --experimental-strip-types scripts/retailer-replay-private-html-product.mjs \
+  --drift-save /private/voor.html /private/na.html /private/nieuwe-drift.json
+```
+
+Het privérapport bevat enkel de originele HTML-SHA's, opnametijden, een
+SHA-fingerprint van de URL en geaggregeerde selector-, prijs- en
+verpakkingswijzigingen. Ook de privérapporten presenteren geen checkoutprijs
+of automatisch goedgekeurde selector. De normale CLI-uitvoer bevat uitsluitend
+een neutrale status; geen winkel-URL, HTML of prijs wordt gelogd.

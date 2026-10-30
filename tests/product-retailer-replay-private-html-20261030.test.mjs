@@ -5,7 +5,7 @@ import { mkdtemp, writeFile, readFile, rm, chmod, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { main as download } from '../scripts/retailer-download-reviewed-source.mjs'
-import { replayPrivateProductHtmlSnapshot, savePrivateOfflineProductReview, compareArchivedPrivateProductSnapshots, savePrivateOfflineReviewBatch } from '../scripts/retailer-replay-private-html-product.mjs'
+import { replayPrivateProductHtmlSnapshot, savePrivateOfflineProductReview, compareArchivedPrivateProductSnapshots, savePrivateOfflineReviewBatch, savePrivateOfflineDriftReview } from '../scripts/retailer-replay-private-html-product.mjs'
 
 const url = 'https://www.plus.nl/product/fictional-flour-123'
 const grant = { supermarket: 'plus', kind: 'product', sourceUrl: url,
@@ -327,4 +327,39 @@ test('private archive refuses world-visible staging directory without writing a 
   const batchOut = join(publicDir, 'batch-review.json')
   await assert.rejects(savePrivateOfflineReviewBatch([source], batchOut), /refused/)
   await assert.rejects(stat(batchOut), /ENOENT/)
+})
+
+
+test('independent SHA-pinned offline selector drift is saved mode 0600 without product price or URL', async t => {
+  const first = await capture(t)
+  const later = await capture(t, page.replace('class="product-card"', 'class="item-card"')
+    .replace('"price":"3.25"', '"price":"3.99"'))
+  const output = first.replace('captured.html', 'drift-review.json')
+  const summary = await savePrivateOfflineDriftReview(first, later, output)
+  assert.equal(summary.created, true)
+  assert.equal(summary.humanReviewRequired, true)
+  assert.equal(summary.published, false)
+  const saved = JSON.parse(await readFile(output, 'utf8'))
+  assert.equal(saved.alert.privateProductEvidence.priceChangeCount, 1)
+  assert.ok(saved.alert.missingSelectorCandidates > 0)
+  assert.ok(saved.alert.newSelectorCandidates > 0)
+  assert.equal(saved.before.sha256, createHash('sha256').update(page).digest('hex'))
+  assert.equal((await stat(output)).mode & 0o777, 0o600)
+  assert.doesNotMatch(JSON.stringify(saved), /www\.plus\.nl|Synthetic flour|3\.99|3\.25/)
+  await assert.rejects(savePrivateOfflineDriftReview(first, later, output), /refused/)
+})
+
+test('CLI --drift-save emits only a private review completion status', async t => {
+  const { execFile } = await import('node:child_process')
+  const { promisify } = await import('node:util')
+  const run = promisify(execFile)
+  const first = await capture(t)
+  const next = await capture(t, page.replace('class="product-card"', 'class="item-card"'))
+  const out = first.replace('captured.html', 'drift-cli.json')
+  const script = new URL('../scripts/retailer-replay-private-html-product.mjs', import.meta.url).pathname
+  const { stdout } = await run(process.execPath,
+    ['--experimental-strip-types', script, '--drift-save', first, next, out])
+  assert.equal(JSON.parse(stdout).created, true)
+  assert.doesNotMatch(stdout, /fictional|www\.plus|product-card|item-card|captured\.html/i)
+  assert.equal((await stat(out)).mode & 0o777, 0o600)
 })

@@ -120,7 +120,7 @@ export async function replayPrivateProductHtmlSnapshot(filename) {
  * Compare two independently SHA-verified original private HTML snapshots;
  * returns count-only selector drift, never proposed names, HTML or prices.
  */
-export async function compareArchivedPrivateProductSnapshots(beforeHtml, afterHtml) {
+async function inspectPrivateSnapshotDrift(beforeHtml, afterHtml) {
   const before = await replayPrivateProductHtmlSnapshot(beforeHtml)
   const after = await replayPrivateProductHtmlSnapshot(afterHtml)
   if (before.source.productUrlSha256 !== after.source.productUrlSha256) fail()
@@ -137,7 +137,7 @@ export async function compareArchivedPrivateProductSnapshots(beforeHtml, afterHt
     left.pack.unit !== 'unknown' && right.pack.unit !== 'unknown'
   // Count-only changes; never expose private prices or silently turn
   // missing evidence into a fake zero-price change.
-  return {
+  const report = {
     ...selectors,
     privateProductEvidence: {
       identityChangedCount: left && right && (
@@ -155,6 +155,11 @@ export async function compareArchivedPrivateProductSnapshots(beforeHtml, afterHt
       currentCheckoutVerified: false,
     },
   }
+  return { before, after, report }
+}
+
+export async function compareArchivedPrivateProductSnapshots(beforeHtml, afterHtml) {
+  return (await inspectPrivateSnapshotDrift(beforeHtml, afterHtml)).report
 }
 
 /**
@@ -207,6 +212,29 @@ export async function savePrivateOfflineProductReview(htmlFile, reviewFile) {
 }
 
 /**
+ * Save a traceable but still non-authoritative selector/price-change alert.
+ * Only source fingerprints, clock, HTML digests and aggregate change counts
+ * go into the private 0600 record. No product prices or source URLs.
+ */
+export async function savePrivateOfflineDriftReview(beforeHtml, afterHtml, reviewFile) {
+  const { before, after, report } =
+    await inspectPrivateSnapshotDrift(beforeHtml, afterHtml)
+  return writePrivateReviewRecord({
+    schemaVersion: 1, mode: 'private-offline-selector-drift-review',
+    status: 'human-review-required',
+    retailerId: before.source.retailerId,
+    productUrlSha256: before.source.productUrlSha256,
+    before: { sha256: before.source.sha256, capturedAt: before.source.capturedAt },
+    after: { sha256: after.source.sha256, capturedAt: after.source.capturedAt },
+    alert: report,
+    humanReviewRequired: true,
+    readyForIngestion: false, permissionVerifiedForThisReplay: false,
+    sourceRightsForPublicationVerified: false, verifiedCurrentCheckoutPrice: false,
+    publicSavingsClaimEligible: false, productionEnabled: false, published: false,
+  }, reviewFile)
+}
+
+/**
  * Offline operator batch: up to 22 independently pinned archived pages.
  * Prevent a duplicate SKU counting twice; no automatic price selection.
  */
@@ -256,7 +284,14 @@ export async function savePrivateOfflineReviewBatch(htmlFiles, reviewFile) {
 const { pathToFileURL } = await import('node:url')
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const args = process.argv.slice(2)
-  if (args[0] === '--batch' && args.length >= 3 && args.length <= 24) {
+  if (args.length === 4 && args[0] === '--drift-save') {
+    savePrivateOfflineDriftReview(args[1], args[2], args[3])
+      .then(result => process.stdout.write(JSON.stringify(result) + '\n'))
+      .catch(() => {
+        console.error('Private offline drift archive refused; no data published')
+        process.exitCode = 2
+      })
+  } else if (args[0] === '--batch' && args.length >= 3 && args.length <= 24) {
     savePrivateOfflineReviewBatch(args.slice(2), args[1])
       .then(result => process.stdout.write(JSON.stringify(result) + '\n'))
       .catch(() => {
@@ -278,7 +313,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
         process.exitCode = 2
       })
   } else {
-    console.error('Usage: retailer-replay-private-html-product.mjs <captured.html> <new-review.json> OR --drift <before.html> <after.html> OR --batch <new-review.json> <source1.html> [source2.html ...]')
+    console.error('Usage: retailer-replay-private-html-product.mjs <captured.html> <new-review.json> OR --drift <before.html> <after.html> OR --batch <new-review.json> <source1.html> [source2.html ...] OR --drift-save <before.html> <after.html> <new-drift.json>')
     process.exitCode = 2
   }
 }
