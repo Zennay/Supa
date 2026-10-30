@@ -207,3 +207,41 @@ test('bounded capture cancels oversized network stream and refuses empty success
       headers: {'content-type': 'text/html'}}),
   }), /Empty HTML capture refused/)
 })
+
+test('truncated/overlong identity HTML responses never become approved captures', async () => {
+  const html = '<html><body>SYNTHETIC SOURCE ONLY</body></html>'
+  let calls = 0
+  for (const declared of [html.length - 1, html.length + 1, 0]) {
+    await assert.rejects(captureApprovedRetailerPage({
+      source, permissionGate: gate, grant,
+      fetchFn: async () => {
+        calls++
+        return new Response(html, {status: 200, headers: {
+          'content-type': 'text/html',
+          'content-length': String(declared),
+        }})
+      },
+    }), /declared length mismatch/)
+  }
+  assert.equal(calls, 3)
+  const admitted = await captureApprovedRetailerPage({
+    source, permissionGate: gate, grant,
+    fetchFn: async () => new Response(html, {status: 200, headers: {
+      'content-type': 'text/html',
+      'content-length': String(Buffer.byteLength(html)),
+    }}),
+  })
+  assert.equal(admitted.html, html)
+  assert.equal(admitted.source.sha256, createHash('sha256').update(html).digest('hex'))
+  // Decoded HTTP streams can retain compressed *wire* Content-Length.
+  const compressed = await captureApprovedRetailerPage({
+    source, permissionGate: gate, grant,
+    fetchFn: async () => new Response(html, {status: 200, headers: {
+      'content-type': 'text/html',
+      'content-encoding': 'gzip',
+      'content-length': String(html.length - 4),
+    }}),
+  })
+  assert.equal(compressed.source.sha256, admitted.source.sha256)
+  assert.equal(compressed.published, false)
+})
