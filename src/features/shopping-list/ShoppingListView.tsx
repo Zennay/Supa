@@ -1,11 +1,12 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { FigmaImage } from '../../components/FigmaImage'
+import { supermarkets, readSelectedStores } from '../home/selectedStores'
+import { ingredientImage } from '../planner/ingredientImages'
+import './hifiShoppingList.css'
+import { useEffect, useMemo, useState } from 'react'
 import type { OneStoreBasket, RecipeWithIngredients } from '../../domain/basket'
 import type { PlannedMeal } from '../../domain/types'
 import { quantityUnitLabelNl } from '../../lib/quantityPresentation'
 import { euro } from '../../lib/money'
-import { ShoppingListCompletionBanner } from './ShoppingListCompletionBanner'
-import { ShoppingListCopyButton } from './ShoppingListCopyButton'
-import { PrintableShoppingChecklist } from './PrintableShoppingChecklist.tsx'
 import {
   restoreShoppingListProgress,
   restorePhysicalShoppingProgress,
@@ -14,7 +15,6 @@ import {
   shoppingListPhysicalProgressStorageKey,
   shoppingListProgressStorageKey,
 } from './shoppingListProgress'
-import { groupShoppingByRecipe } from './shoppingRecipeGroups'
 
 // An empty checklist is trustworthy only when its store identity is readable.
 // This guards the empty-state message, not ordinary populated product rows.
@@ -102,7 +102,39 @@ function canOverwriteStoredProgress(raw: string | null): boolean {
   }
 }
 
-export function ShoppingListView({ basket, plan, recipes, activeDays }: {
+const categoryRules: [RegExp, string][] = [
+  [/kokos|currypasta|saus|bao/i, 'Droogwaren & sauzen'],
+  [/broccoli|avocado|komkommer|spinazie|paprika|knoflook|mais|tomaat|courgette|\bui\b|\bsla\b|groente|gember|edamame/i, 'Groente'],
+  [/\bkip|gehakt|worst|zalm|\bvis\b|tonijn|\bham\b|spek/i, 'Vlees & vis'],
+  [/melk|kaas|yoghurt|yogurt|\broom\b|kwark|boter|\beieren\b|\bei\b/i, 'Zuivel & eieren'],
+  [/rijst|pasta|spaghetti|noodle|bonen|linzen|meel|brood|tortilla|wrap|panko/i, 'Droogwaren & sauzen'],
+]
+
+function shoppingCategory(label: string): string {
+  for (const [pattern, title] of categoryRules) if (pattern.test(label)) return title
+  return 'Overig'
+}
+
+/** Groups the visible lines by product category, in the design's order. */
+function shoppingCategoryGroups<T extends { status: string; productName?: string; ingredientLabel: string }>(
+  lines: readonly T[],
+): { title: string; lines: T[] }[] {
+  const order = ['Groente', 'Vlees & vis', 'Zuivel & eieren', 'Droogwaren & sauzen', 'Overig']
+  const byTitle = new Map<string, T[]>()
+  for (const line of lines) {
+    const label = line.status === 'matched' && line.productName ? line.productName : line.ingredientLabel
+    const title = shoppingCategory(label)
+    byTitle.set(title, [...(byTitle.get(title) ?? []), line])
+  }
+  return order.filter(title => byTitle.has(title)).map(title => ({ title, lines: byTitle.get(title)! }))
+}
+
+export type ChosenProduct = { id: string; name: string; image: string; logo: string; unit: string; price: string }
+
+export function ShoppingListView({ basket, plan, recipes, activeDays, chosenProducts = [], onRemoveProduct }: {
+  /** Products added with + in Producten. */
+  chosenProducts?: ChosenProduct[]
+  onRemoveProduct?: (id: string) => void
   basket: OneStoreBasket
   plan?: PlannedMeal[]
   recipes?: RecipeWithIngredients[]
@@ -133,9 +165,6 @@ export function ShoppingListView({ basket, plan, recipes, activeDays }: {
     ? []
     : shoppingVisibleLines(basket.lines, done, openOnly)
 
-  const recipeGroups = groupShoppingByRecipe(visibleLines, plan, recipes, activeDays)
-  const groupedLines = recipeGroups.flatMap(group => group.lines)
-  const firstLineGroups = new Map(recipeGroups.filter(group => group.lines.length > 0).map(group => [group.lines[0].id, group] as const))
 
   // A genuinely empty plan has no shopping tasks. An empty row array with
   // inconsistent counters is not proof that the customer needs nothing.
@@ -229,29 +258,24 @@ export function ShoppingListView({ basket, plan, recipes, activeDays }: {
     )
   }
 
+  const groups = shoppingCategoryGroups(visibleLines)
+  const chosenStores = supermarkets.filter(store => readSelectedStores().includes(store.id))
+  const logo = chosenStores[0]?.logo ?? null
+
   return (
     <section className="screen hifi-shopping-screen" data-figma-node="3342:4815">
-      <div className="section-heading">
-        <div>
-          <h2>Boodschappenlijst</h2>
-        </div>
-      </div>
+      <header className="hifi-list-heading">
+        <h2>Boodschappenlijst</h2>
+      </header>
 
-      <div className="hifi-shoplist-store" aria-label="Winkel van de berekende voorbeeldmand" data-figma-node="4168:17199">
-        <div className="hifi-shoplist-store-mark" aria-hidden="true">S</div>
-        <div>
-          <span>Winkel voor deze planning</span>
-          <strong>{basket.store.name}</strong>
-          <small>Voorbeeldmand · geen actuele winkelprijzen</small>
-        </div>
+      <div className="hifi-list-stores" aria-label="Winkel van deze lijst">
+        {chosenStores.map(store => (
+          <span className="hifi-list-store-chip selected" key={store.id}>
+            <FigmaImage asset={store.logo} alt="" />
+            {store.name}
+          </span>
+        ))}
       </div>
-
-      {basket.unresolvedLineCount > 0 && (
-        <div className="attention-card">
-          <strong>{basket.unresolvedLineCount} productkeuze vraagt controle</strong>
-          <span>SUPA vult een onzekere match niet automatisch in.</span>
-        </div>
-      )}
 
       {storageWarning && (
         <p role="alert" className="disclaimer">
@@ -261,106 +285,92 @@ export function ShoppingListView({ basket, plan, recipes, activeDays }: {
         </p>
       )}
 
-      <details className="hifi-shoplist-tools">
-        <summary>Deel of print je lijst</summary>
-        <div className="hifi-shoplist-tool-actions">
-          <ShoppingListCopyButton basket={basket} doneLineIds={done} />
-          <PrintableShoppingChecklist basket={basket} doneLineIds={done} />
-        </div>
-      </details>
-
-      {basket.lines.length > 0 && (
-        <div className="section-heading" data-shopping-filter={openOnly ? 'open' : 'all'}>
-          <button
-            type="button"
-            className="ghost-button"
-            aria-pressed={openOnly}
-            onClick={() => setOpenOnly((current) => !current)}
-          >
-            {openOnly ? 'Toon alles' : 'Alleen open'}
-          </button>
-          <span className="disclaimer">
-            {basket.lines.length - done.length} van {basket.lines.length} open
-          </span>
-        </div>
+      {basket.lines.length === 0 && (
+        <p className="disclaimer" role="status">
+          {genuinelyEmpty
+            ? 'Geen boodschappen voor deze planning. Voeg een maaltijd toe in Planner.'
+            : 'Boodschappenlijst niet beschikbaar. Controleer je planning.'}
+        </p>
       )}
 
-      <div className="list-card">
-        {basket.lines.length === 0 ? (
-          <p className="disclaimer" role="status">
-            {genuinelyEmpty
-              ? 'Geen boodschappen voor deze planning. Voeg een maaltijd toe in Planner.'
-              : 'Boodschappenlijst niet beschikbaar. Controleer je planning.'}
-          </p>
-        ) : visibleLines.length === 0 ? (
-          <p className="disclaimer" role="status">
-            Alle regels zijn afgevinkt. Onzekere productkeuzes blijven een handmatige controle.
-          </p>
-        ) : groupedLines.map((line) => {
-          const checked = done.includes(line.id)
-          const label =
-            line.status === 'matched' ? line.productName : line.ingredientLabel
-
-          return (
-            <Fragment key={line.id}>
-              {firstLineGroups.get(line.id) && (
-                <div className="hifi-shoplist-category" data-figma-node="3342:4838">
-                  <h3>{firstLineGroups.get(line.id)!.title}</h3>
-                  <span>{firstLineGroups.get(line.id)!.lines.length} items</span>
-                </div>
-              )}
-            <button
-              type="button"
-              aria-pressed={checked}
-              className={
-                line.status === 'unresolved'
-                  ? checked
-                    ? 'shopping-row checked unresolved-shopping'
-                    : 'shopping-row unresolved-shopping'
-                  : checked
-                    ? 'shopping-row checked'
-                    : 'shopping-row'
-              }
-              onClick={() =>
-                setProgress((current) => {
-                  const currentDone =
-                    current.basketKey === basketKey ? current.done : []
-                  return {
-                    ...current,
-                    basketKey,
-                    dirty: true,
-                    done: currentDone.includes(line.id)
-                      ? currentDone.filter((id) => id !== line.id)
-                      : [...currentDone, line.id],
+      {groups.map(group => (
+        <section className="hifi-list-group" key={group.title} aria-label={group.title}>
+          <div className="hifi-list-group-heading">
+            <h3>{group.title}</h3>
+            <span className="hifi-list-count">{group.lines.length} {group.lines.length === 1 ? "item" : "items"}</span>
+          </div>
+          <div className="hifi-list-card">
+            {group.lines.map(line => {
+              const checked = done.includes(line.id)
+              const label = line.status === 'matched' ? line.productName : line.ingredientLabel
+              return (
+                <button
+                  key={line.id}
+                  type="button"
+                  aria-pressed={checked}
+                  className={`hifi-list-row${checked ? ' checked' : ''}${line.status === 'unresolved' ? ' unresolved' : ''}`}
+                  onClick={() =>
+                    setProgress((current) => {
+                      const currentDone = current.basketKey === basketKey ? current.done : []
+                      return {
+                        ...current,
+                        basketKey,
+                        dirty: true,
+                        done: currentDone.includes(line.id)
+                          ? currentDone.filter((id) => id !== line.id)
+                          : [...currentDone, line.id],
+                      }
+                    })
                   }
-                })
-              }
-            >
-              <span className="check" aria-hidden="true">{checked ? '✓' : ''}</span>
-              <span className="hifi-shopping-thumb" aria-hidden="true">{label.trim().slice(0, 1).toLocaleUpperCase('nl-NL')}</span>
-              <span className="hifi-shopping-detail">
-                <strong>{label}</strong>
-                <small>{shoppingQuantity(line)}</small>
-              </span>
-              <span className="hifi-shopping-price" aria-label={line.status === 'matched' ? `Voorbeeldprijs ${euro.formatCents(line.lineTotalCents)}` : 'Prijs nog onbekend'}>
-                {line.status === 'matched' ? euro.formatCents(line.lineTotalCents) : '—'}
-              </span>
-            </button>
-            </Fragment>
-          )
-        })}
-      </div>
+                >
+                  <span className="hifi-list-radio" aria-hidden="true">{checked ? '✓' : ''}</span>
+                  <span className="hifi-list-thumb"><FigmaImage asset={ingredientImage(label)} alt="" /></span>
+                  <span className="hifi-list-detail">
+                    <strong>{label}</strong>
+                    <small>{shoppingQuantity(line)}</small>
+                  </span>
+                  <span className="hifi-list-price" aria-label={line.status === 'matched' ? `Voorbeeldprijs ${euro.formatCents(line.lineTotalCents)}` : 'Prijs nog onbekend'}>
+                    {logo && line.status === 'matched' && <FigmaImage asset={logo} alt="" />}
+                    {line.status === 'matched' ? euro.formatCents(line.lineTotalCents) : '—'}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </section>
+      ))}
+
+      {chosenProducts.length > 0 && (
+        <section className="hifi-list-group" aria-label="Producten">
+          <div className="hifi-list-group-heading">
+            <h3>Producten</h3>
+            <span className="hifi-list-count">{chosenProducts.length} {chosenProducts.length === 1 ? 'item' : 'items'}</span>
+          </div>
+          <div className="hifi-list-card">
+            {chosenProducts.map(product => (
+              <div className="hifi-list-row" key={product.id}>
+                <button type="button" className="hifi-list-radio hifi-list-remove" aria-label={`Verwijder ${product.name}`} onClick={() => onRemoveProduct?.(product.id)}>×</button>
+                <span className="hifi-list-thumb"><FigmaImage asset={product.image} alt="" /></span>
+                <span className="hifi-list-detail"><strong>{product.name}</strong><small>{product.unit}</small></span>
+                <span className="hifi-list-price">
+                  {product.logo && <FigmaImage asset={product.logo} alt="" />}
+                  {product.price}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {basket.lines.length > 0 && (
-        <section className="hifi-shoplist-total" aria-label="Overzicht boodschappen">
-          <div className="hifi-shoplist-total__line">
+        <section className="hifi-list-total" aria-label="Overzicht boodschappen">
+          <div>
             <span>{basket.unresolvedLineCount > 0 ? 'Bekend minimum' : 'Totaal'}</span>
             <strong>{euro.formatCents(basket.totalCents)}</strong>
           </div>
           {basket.unresolvedLineCount > 0 && (
-            <p>{basket.unresolvedLineCount} productkeuzes zijn nog niet meegeteld.</p>
+            <small>{basket.unresolvedLineCount} productkeuzes zijn nog niet meegeteld.</small>
           )}
-          <p>Voorbeeldprijzen uit de lokale planning; geen actuele kassaprijzen.</p>
-          <ShoppingListCompletionBanner basket={basket} doneLineIds={done} />
         </section>
       )}
     </section>
