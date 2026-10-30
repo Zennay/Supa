@@ -5,6 +5,8 @@ import {mkdtemp,writeFile,readFile,stat,rm,link,unlink,symlink,readdir} from 'no
 import {join} from 'node:path'
 import {tmpdir} from 'node:os'
 import {buildPrivateSyntheticHtmlFixture,verifyPrivateSyntheticHtmlFixture} from '../scripts/retailer-private-structural-fixture.mjs'
+import {replayPrivateProductHtmlSnapshot,replayPrivateSelectorHtmlSnapshot} from '../scripts/retailer-replay-private-html-product.mjs'
+import {proposeOfflineRetailerSelectors,summarizeOfflineSelectorProposals} from '../scripts/retailer-offline-selector-discovery.mjs'
 
 const digest=x=>createHash('sha256').update(x).digest('hex')
 async function archive(t,retailerId,kind) {
@@ -49,6 +51,22 @@ for(const [retailer,kind] of [
     assert.doesNotMatch(transformed,/PRIVATE_SECRET_123|€999|private-sku-secret|PRIVATE PRODUCT NAME/)
     assert.doesNotMatch(transformed,/www\.plus\.nl|www\.dekamarkt\.nl/)
     assert.notEqual(transformed,html)
+    const inputReview=kind==='product'
+      ?(await replayPrivateProductHtmlSnapshot(filename)).selectorSnapshot
+      :(await replayPrivateSelectorHtmlSnapshot(filename)).proposals
+    const expected=summarizeOfflineSelectorProposals(inputReview).selectors.filter(row=>
+      /^(?:article|section|div|span|p|li|h[1-6]|a)\.[a-z][a-z0-9_-]+$/i.test(row.selector) ||
+      /^a\[href\^="\/(?:product|producten)\/"\]$/.test(row.selector))
+    const roundtrip=proposeOfflineRetailerSelectors({html:transformed,
+      origin:{retailerId:retailer,url:capture.source.url,capturedAt:capture.source.capturedAt}})
+    const recreated=new Set(roundtrip.selectors.map(row=>row.field+'|'+row.selector))
+    assert.ok(expected.length>0)
+    for(const row of expected) {
+      assert.ok(recreated.has(row.field+'|'+row.selector),
+        'synthetic HTML must remain parseable for observed source selector: '+row.selector)
+    }
+    assert.equal(roundtrip.readyForIngestion,false)
+    assert.equal(manifest.syntheticSelectorRoundtripVerified,true)
     assert.equal(manifest.source.sha256,capture.source.sha256)
     assert.equal(manifest.source.kind,kind)
     assert.equal(manifest.syntheticHtmlSha256,digest(transformed))
