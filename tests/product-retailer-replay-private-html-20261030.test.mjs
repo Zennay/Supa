@@ -700,3 +700,22 @@ test('portable data-testid remains grounded across different element tags, never
   assert.doesNotMatch(JSON.stringify(receipt),/product-card|SYNTHETIC|data-testid|itemprop/)
   assert.equal(review.automatedSelectorPromotion,false)
 })
+
+test('selector stability rejects incomplete top-24 proposal coverage instead of claiming a false missing selector', async t => {
+  const url='https://www.plus.nl/producten'
+  const plentiful='<main>'+Array.from({length:29},(_,i)=>
+    `<article class="product-card-${String(i).padStart(2,'0')}">Synthetic</article>`).join('')+'</main>'
+  const safe='<article class="product-card">Synthetic review only</article>'
+  const incomplete=await archivedSelectorPage(t,'plus','catalog',url,plentiful)
+  const complete=await archivedSelectorPage(t,'plus','catalog',url,safe)
+  const report=await replayPrivateSelectorHtmlSnapshot(incomplete,true)
+  assert.equal(report.proposals.selectors.length,24)
+  assert.equal(report.proposals.candidateLimitReached,true)
+  assert.ok(report.proposals.selectorCandidatesOmitted>0)
+  const target=incomplete.replace('captured.html','incomplete-stability.json')
+  await assert.rejects(savePrivateSelectorStabilityArchive([incomplete,complete],target),/refused/)
+  await assert.rejects(stat(target),/ENOENT/)
+  const full=await replayPrivateSelectorHtmlSnapshot(complete,true)
+  assert.equal(full.proposals.candidateLimitReached,false)
+  assert.equal(full.proposals.selectorCandidatesOmitted,0)
+})

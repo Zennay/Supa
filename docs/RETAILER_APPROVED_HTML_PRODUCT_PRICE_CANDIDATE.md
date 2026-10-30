@@ -399,3 +399,14 @@ met identieke multipackaantallen, zonder een verschil in naam, SKU,
 beschikbaarheid of onafhankelijke prijscorroboratie te negeren. `750 ml` tegen
 `1 liter` en gewicht tegen volume blijven review-weigeringen. Het originele
 onafhankelijke QA-scenario uit PR #3572 is 3/3 groen nagebootst op deze code.
+
+### Onvolledige selectorwaarnemingen zijn geen stabiliteitsbewijs
+
+De offline extractor begrenst elk bronrapport op 24 selectorvoorstellen. Bij
+meer dan 24 verschillende werkelijk afgeleide kandidaten kan de aanwezigheid
+van de overige voorstellen niet uit de beperkte lijst worden vastgesteld.
+Daarom weigert het meer-snapshot-stabiliteitsarchief zo'n bron expliciet in
+plaats van ontbrekende voorstellen als instabiel of afwezig te classificeren.
+De private stabiliteitsroute vraagt hiervoor een afzonderlijk telgegeven op;
+de bestaande SHA-pinned v1 drift-json en zijn afgeschermde publicatiecontract
+blijven byte-/schema-compatibel.

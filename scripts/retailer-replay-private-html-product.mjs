@@ -147,14 +147,14 @@ export async function replayPrivateProductHtmlSnapshot(filename) {
  * Product-independent selector discovery for already archived catalog/search
  * and offer pages. This NEVER parses a displayed price into a product quote.
  */
-export async function replayPrivateSelectorHtmlSnapshot(filename) {
+export async function replayPrivateSelectorHtmlSnapshot(filename, includePrivateCoverage = false) {
   const { html, src } = await readPrivateCapture(filename)
   if (!['catalog', 'offers'].includes(src.kind)) fail()
   const proposals = proposeOfflineRetailerSelectors({
     html, origin: {
       retailerId: src.retailerId, url: src.url, capturedAt: src.capturedAt,
     },
-  })
+  }, includePrivateCoverage)
   if (proposals.source.sha256 !== src.sha256) fail()
   return {
     schemaVersion: 1, mode: 'offline-private-catalog-offer-selector-review',
@@ -221,7 +221,12 @@ export async function savePrivateSelectorStabilityArchive(htmlFiles, reviewFile)
   for (let i = 0; i < htmlFiles.length; i++) {
     const d = descriptors[i]
     if (!d || !Object.hasOwn(d, 'value') || typeof d.value !== 'string') fail()
-    const report = await replayPrivateSelectorHtmlSnapshot(d.value)
+    const report = await replayPrivateSelectorHtmlSnapshot(d.value, true)
+    // A top-24 report cannot prove absence or frequency of candidates that
+    // were pruned. Refuse a misleading cross-page stability assessment.
+    if (report.proposals.candidateLimitReached ||
+        !Number.isSafeInteger(report.proposals.selectorCandidatesOmitted) ||
+        report.proposals.selectorCandidatesOmitted !== 0) fail()
     if (retailerId === null) { retailerId = report.source.retailerId; kind = report.source.kind }
     if (report.source.retailerId !== retailerId || report.source.kind !== kind ||
         unique.has(report.source.sha256)) fail()

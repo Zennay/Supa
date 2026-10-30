@@ -139,7 +139,7 @@ function recordSelector(counters, field, selector, tag) {
   else counters.set(key, { field, selector, tag, instances: 1 })
 }
 
-export function proposeOfflineRetailerSelectors(options = {}) {
+export function proposeOfflineRetailerSelectors(options = {}, includePrivateCoverage = false) {
   // Inspect own DATA descriptors before reading untrusted provenance/HTML.
   // Never run a caller getter, inherited identity or Proxy trap.
   if (!options || typeof options !== 'object' || nodeTypes.isProxy(options) ||
@@ -204,6 +204,7 @@ export function proposeOfflineRetailerSelectors(options = {}) {
 
   // These are candidate CSS selectors for reviewed snapshots; counts are raw
   // tag occurrences, NOT a verified DOM selection and NEVER validated prices.
+  const selectorCandidatesOmitted = Math.max(0, candidates.size - MAX_SELECTORS)
   const selectors = [...candidates.values()]
     .sort((a, b) => b.instances - a.instances || a.field.localeCompare(b.field) ||
       a.selector.localeCompare(b.selector))
@@ -221,6 +222,13 @@ export function proposeOfflineRetailerSelectors(options = {}) {
     },
     bytes: Buffer.byteLength(html, 'utf8'),
     scannedTags: inspectedTags,
+    // Existing immutable drift schema has exact owned keys. Include this
+    // private-only diagnostic in the explicit stability inspection route;
+    // normal selector reports retain their existing v1 serialized contract.
+    ...(includePrivateCoverage === true ? {
+      selectorCandidatesOmitted,
+      candidateLimitReached: selectorCandidatesOmitted > 0,
+    } : {}),
     structuredSignals,
     selectors,
     humanReviewRequired: true,
