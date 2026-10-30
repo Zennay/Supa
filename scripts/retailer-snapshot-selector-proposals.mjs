@@ -5,7 +5,8 @@ import { decodeExactRetailerHtmlBytes } from './retailer-private-html-byte-ident
  * or source permission. No HTTP, browser automation or remote DOM access.
  */
 import { createHash } from 'node:crypto'
-import { lstat, mkdir, readFile, writeFile } from 'node:fs/promises'
+import { lstat, open, mkdir, writeFile } from 'node:fs/promises'
+import { constants as fsFlags } from 'node:fs'
 import { dirname, resolve, join, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
@@ -183,16 +184,48 @@ async function checkNonSymlinkParents(path) {
     current = parent
   }
 }
+// Read exactly one pinned regular inode; never follow an alias after
+// checking its name. Old path-based lstat/readFile was open to swap races.
+async function readPinnedCaptureFile(path, limit) {
+  await checkNonSymlinkParents(path)
+  const parent = await lstat(dirname(path))
+  const before = await lstat(path)
+  if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1 ||
+      before.size < 1 || before.size > limit) reject('unsafe snapshot inode')
+  const handle = await open(path, fsFlags.O_RDONLY | fsFlags.O_NOFOLLOW |
+    fsFlags.O_NONBLOCK)
+  try {
+    const fdBefore = await handle.stat()
+    if (!fdBefore.isFile() || fdBefore.nlink !== 1 ||
+        fdBefore.size !== before.size || fdBefore.dev !== before.dev ||
+        fdBefore.ino !== before.ino) reject('snapshot swapped before open')
+    const bytes = await handle.readFile()
+    const fdAfter = await handle.stat()
+    await checkNonSymlinkParents(path)
+    const named = await lstat(path)
+    const parentAfter = await lstat(dirname(path))
+    if (!named.isFile() || named.isSymbolicLink() || named.nlink !== 1 ||
+        named.dev !== fdAfter.dev || named.ino !== fdAfter.ino ||
+        parent.dev !== parentAfter.dev || parent.ino !== parentAfter.ino ||
+        before.size !== bytes.length || fdAfter.size !== bytes.length ||
+        fdBefore.mtimeMs !== fdAfter.mtimeMs ||
+        fdBefore.ctimeMs !== fdAfter.ctimeMs) {
+      reject('snapshot identity changed during inspection')
+    }
+    return bytes
+  } finally { await handle.close() }
+}
+
 export async function proposeFromM1CaptureDirectory(dir) {
   if (typeof dir !== 'string' || dir.trim() === '') reject('capture path required')
   await checkNonSymlinkParents(dir)
   const manifestPath = join(resolve(dir), 'manifest.json')
   await checkNonSymlinkParents(manifestPath)
-  const stat = await lstat(manifestPath)
-  if (!stat.isFile() || stat.size > 512 * 1024) reject('invalid manifest file')
   let manifest
-  try { manifest = JSON.parse(await readFile(manifestPath, 'utf8')) }
-  catch { reject('invalid manifest JSON') }
+  try {
+    manifest = JSON.parse(new TextDecoder('utf-8', { fatal:true })
+      .decode(await readPinnedCaptureFile(manifestPath, 512 * 1024)))
+  } catch { reject('invalid manifest JSON or file') }
   if (!manifest || !Array.isArray(manifest.results) ||
       manifest.results.length < 1 || manifest.results.length > MAX_CAPTURE_SOURCES ||
       manifest.sourceCount !== manifest.results.length) reject('invalid bounded capture manifest')
@@ -209,9 +242,8 @@ export async function proposeFromM1CaptureDirectory(dir) {
     }
     const filename = join(resolve(dir), source.supermarket, source.id + '.html')
     await checkNonSymlinkParents(filename)
-    const info = await lstat(filename)
-    if (!info.isFile() || info.size > MAX_HTML_BYTES) reject('capture HTML not a bounded regular file')
-    const html = decodeExactRetailerHtmlBytes(await readFile(filename), MAX_HTML_BYTES)
+    const html = decodeExactRetailerHtmlBytes(
+      await readPinnedCaptureFile(filename, MAX_HTML_BYTES), MAX_HTML_BYTES)
     proposals.push(proposeRetailerSelectors(source, html))
   }
   return {
