@@ -488,3 +488,17 @@ test('valid source-observed unquoted HTML class tokens remain reviewable in lega
   assert.equal(report.readyForScraping,false)
   assert.doesNotMatch(JSON.stringify(report),/PRIVATE_PRICE/)
 })
+
+test('legacy M1 source identity never executes Proxy descriptor traps or accepts custom prototypes',()=>{
+  const html='<html><body><article class="product-card"></article></body></html>'
+  const good=source('plus','catalog',html)
+  let traps=0
+  const proxy=new Proxy(good,{getOwnPropertyDescriptor(target,key){
+    traps++;return Reflect.getOwnPropertyDescriptor(target,key)
+  }})
+  assert.throws(()=>proposeRetailerSelectors(proxy,html),/Offline selector review refused:/)
+  assert.equal(traps,0,'untrusted Proxy source must be refused before descriptor inspection')
+  const inherited=Object.assign(Object.create({sourceGrant:'untrusted'}),good)
+  assert.throws(()=>proposeRetailerSelectors(inherited,html),/Offline selector review refused:/)
+  assert.equal(proposeRetailerSelectors(good,html).publicationAllowed,false)
+})

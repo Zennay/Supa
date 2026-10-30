@@ -9,6 +9,7 @@ import { decodeExactRetailerHtmlBytes } from './retailer-private-html-byte-ident
  * or source permission. No HTTP, browser automation or remote DOM access.
  */
 import { createHash } from 'node:crypto'
+import { types as nodeTypes } from 'node:util'
 import { lstat, open, mkdir, writeFile } from 'node:fs/promises'
 import { constants as fsFlags } from 'node:fs'
 import { dirname, resolve, join, sep } from 'node:path'
@@ -52,7 +53,13 @@ function mapCandidateFields(suggestions) {
   ]))
 }
 function validCapture(source, requireHash = true) {
-  if (!source || typeof source !== 'object' || Array.isArray(source)) reject('malformed source')
+  // Archived manifests are untrusted input, not objects allowed to execute
+  // caller-supplied Proxy descriptor traps during provenance validation.
+  // Accessor-backed fields remain rejected by owned() below.
+  if (!source || typeof source !== 'object' || Array.isArray(source) ||
+      nodeTypes.isProxy(source) ||
+      ![Object.prototype,null].includes(Object.getPrototypeOf(source)))
+    reject('malformed source')
   const supermarket = owned(source, 'supermarket')
   const kind = owned(source, 'kind')
   const urlValue = owned(source, 'finalUrl') ?? owned(source, 'requestedUrl') ?? owned(source, 'url')
