@@ -581,3 +581,25 @@ test('Deka canonical catalog root accepted by shared source capture route replay
   assert.equal(manifest.productionEnabled,false)
   assert.equal((await verifyPrivateSyntheticHtmlFixture(filename,out)).verified,true)
 })
+
+test('PLUS/Deka source-observed h1 to h6 fields survive SHA-private fixture generation',async t=>{
+  for(const retailerId of ['plus','dekamarkt']){
+    const html='<section itemscope itemtype="https://schema.org/Product">' +
+      '<h1 itemprop="name">PRIVATE_NAME_DO_NOT_COPY</h1>' +
+      '<h4 class="price-value">PRIVATE_2.49</h4>' +
+      '<h5 data-testid="pack-size">PRIVATE_500ml</h5>' +
+      '<h6 itemprop="availability">PRIVATE_IN_STOCK</h6></section>'
+    const {filename,dir,capture}=await archive(t,retailerId,retailerId==='plus'?'catalog':'offers',html)
+    const out=join(dir,'heading-synthetic')
+    await buildPrivateSyntheticHtmlFixture(filename,out)
+    const generated=await readFile(join(out,'synthetic-structure.html'),'utf8')
+    const replay=proposeOfflineRetailerSelectors({html:generated,origin:{
+      retailerId,url:capture.source.url,capturedAt:capture.source.capturedAt}})
+    for(const selector of ['h1[itemprop="name"]','h4.price-value',
+      'h5[data-testid="pack-size"]','h6[itemprop="availability"]']){
+      assert.ok(replay.selectors.some(x=>x.selector===selector),retailerId+' '+selector)
+    }
+    assert.doesNotMatch(generated,/PRIVATE_NAME|PRIVATE_2\.49|PRIVATE_500ml|PRIVATE_IN_STOCK/)
+    assert.equal((await verifyPrivateSyntheticHtmlFixture(filename,out)).verified,true)
+  }
+})

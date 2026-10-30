@@ -312,7 +312,7 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
     }
     const tag = match.tag
     const standardCandidate = ['article', 'a', 'div', 'li', 'section', 'span',
-      'h2', 'h3', 'p', 'strong', 'meta', 'link', 'data', 'time'].includes(tag)
+      'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'strong', 'meta', 'link', 'data', 'time'].includes(tag)
     // Real SPA/retailer custom elements are valid HTML with a hyphenated
     // tag name. Only offer selectors whose exact tags/classes exist in the
     // approved local source; no made-up shadow DOM or descendant paths.
@@ -444,7 +444,7 @@ export function summarizeOfflineSelectorProposals(report) {
     if (row.field === 'product' && MICRODATA_PRODUCT.test(row.selector)) return true
     if (Object.entries(SCHEMA_ITEMPROP_FIELDS).some(([prop,field]) =>
       row.field === field && row.selector.endsWith('[itemprop="'+prop+'"]') &&
-      /^(?:article|a|div|li|section|span|h[23]|p|strong|meta|link|data|time)\[itemprop="/.test(row.selector)))
+      /^(?:article|a|div|li|section|span|h[1-6]|p|strong|meta|link|data|time)\[itemprop="/.test(row.selector)))
       return true
     if (row.field === 'product' &&
         (isPublicMerchantProductHrefSelector(report.source.retailerId, row.selector) ||
