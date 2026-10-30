@@ -73,7 +73,7 @@ function inertCaptureOptions(options) {
 // source tokens: class names or data-testid attributes can encode a product
 // identifier or price. Only a bounded vocabulary of generic selectors leaves
 // the private captured HTML scope; unknown selectors stay in private review.
-const GENERIC_SELECTOR = /^[a-z][a-z0-9-]{0,30}\.(?:product|item|card|tile|name|title|label|price|pack|size|unit|offer|deal|sale|discount|stock|availability|product-card|price-label|price-value|offer-card|product-name|item-card|item-name|product-title|item-title|product-price|item-price|price-tag|stock-label|pack-size|offer-label)$/
+const GENERIC_SELECTOR = /^[a-z][a-z0-9-]{0,30}\.(?:product|item|card|tile|name|title|label|price|pack|size|unit|offer|deal|sale|discount|stock|availability|product-card|price-label|price-value|offer-card|product-name|item-card|item-name|product-title|item-title|product-price|item-price|price-tag|stock-label|pack-size|offer-label|old-price|price-old|price-before|previous-price|was-price|original-price)$/
 // These are actual standards-based selectors from the captured DOM, not
 // inferred retail fields. Allow exact public Schema.org tokens and a bounded
 // vocabulary of generic test IDs across the privacy/review boundary.

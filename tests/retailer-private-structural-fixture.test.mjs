@@ -689,3 +689,27 @@ test('two-retailer older sale-price <s>/<strike> tags survive SHA-private replay
     assert.equal((await verifyPrivateSyntheticHtmlFixture(filename,output)).verified,true)
   }
 })
+
+test('retailer price-before/old-price DOM hints are never counted as the current shelf price',async t=>{
+  for(const retailerId of ['plus','dekamarkt']){
+    const html='<article class="product-card">'+
+      '<span class="old-price" data-testid="price-before">PRIVATE_OLD_3.99</span>'+
+      '<span class="price-old">PRIVATE_OLD_4.99</span>'+
+      '<ins class="product-price">PRIVATE_CURRENT_2.49</ins></article>'
+    const {filename,dir,capture}=await archive(t,retailerId,retailerId==='plus'?'catalog':'offers',html)
+    const origin={retailerId,url:capture.source.url,capturedAt:capture.source.capturedAt}
+    const report=proposeOfflineRetailerSelectors({html,origin})
+    for(const selector of ['span.old-price','span[data-testid="price-before"]','span.price-old'])
+      assert.deepEqual(report.selectors.filter(row=>row.selector===selector).map(row=>row.field),['offer'],retailerId+': '+selector)
+    assert.equal(report.selectors.find(row=>row.selector==='ins.product-price')?.field,'price')
+    const out=join(dir,'private-prior-price-classes')
+    await buildPrivateSyntheticHtmlFixture(filename,out)
+    const sanitized=await readFile(join(out,'synthetic-structure.html'),'utf8')
+    const replay=proposeOfflineRetailerSelectors({html:sanitized,origin})
+    for(const selector of ['span.old-price','span[data-testid="price-before"]','span.price-old'])
+      assert.deepEqual(replay.selectors.filter(row=>row.selector===selector).map(row=>row.field),['offer'],retailerId+' replay '+selector)
+    assert.equal(replay.selectors.find(row=>row.selector==='ins.product-price')?.field,'price')
+    assert.doesNotMatch(sanitized,/PRIVATE_OLD|PRIVATE_CURRENT/)
+    assert.equal((await verifyPrivateSyntheticHtmlFixture(filename,out)).verified,true)
+  }
+})

@@ -8,6 +8,9 @@ export const PUBLIC_OBSERVED_TOKEN_FIELDS = Object.freeze({
   'price-value':'price', 'price-label':'price', 'price-tag':'price',
   'product-price':'price', 'item-price':'price',
   'pack-size':'pack',
+  // Source-observed old/was/before price labels are NOT a live price quote.
+  'old-price':'offer', 'price-old':'offer', 'price-before':'offer',
+  'previous-price':'offer', 'was-price':'offer', 'original-price':'offer',
   'offer-card':'offer', 'offer-label':'offer',
   'stock-label':'availability',
 })

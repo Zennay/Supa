@@ -438,7 +438,8 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
 const PUBLIC_GENERIC_TOKENS = new Set([
   'product','product-card','product-name','item','item-card','item-name',
   'name','title','label','price','price-value','price-label','price-tag',
-  'pack','pack-size','size','unit','offer','offer-card','offer-label',
+  'pack','pack-size','size','unit','old-price','price-old','price-before',
+  'previous-price','was-price','original-price','offer','offer-card','offer-label',
   'deal','sale','discount','stock','stock-label','availability',
 ])
 // Offline CLI reports may reveal only the known exact merchant product roots,
