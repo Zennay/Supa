@@ -643,3 +643,25 @@ test('private synthetic Deka/PLUS offer fixture retains old-price hint separatel
     assert.equal((await verifyPrivateSyntheticHtmlFixture(filename,output)).verified,true)
   }
 })
+
+test('SHA-private fixture replay distinguishes product cards from child title/price tokens',async t=>{
+  for(const retailerId of ['plus','dekamarkt']){
+    const html='<section class="product-card">'+
+      '<span class="product-name" data-testid="product-title">PRIVATE_NAME</span>'+
+      '<span class="product-price" data-testid="product-price">PRIVATE_PRICE</span></section>'
+    const {filename,dir,capture}=await archive(t,retailerId,retailerId==='plus'?'catalog':'offers',html)
+    const out=join(dir,'field-correct-private')
+    await buildPrivateSyntheticHtmlFixture(filename,out)
+    const synthetic=await readFile(join(out,'synthetic-structure.html'),'utf8')
+    const report=proposeOfflineRetailerSelectors({html:synthetic,origin:{
+      retailerId,url:capture.source.url,capturedAt:capture.source.capturedAt}})
+    for(const [selector,field] of [
+      ['section.product-card','product'],['span.product-name','name'],
+      ['span[data-testid="product-title"]','name'],
+      ['span.product-price','price'],['span[data-testid="product-price"]','price']])
+      assert.deepEqual(report.selectors.filter(x=>x.selector===selector).map(x=>x.field),[field],retailerId+' '+selector)
+    assert.equal(report.selectors.filter(x=>x.field==='product').length,1)
+    assert.doesNotMatch(synthetic,/PRIVATE_NAME|PRIVATE_PRICE/)
+    assert.equal((await verifyPrivateSyntheticHtmlFixture(filename,out)).verified,true)
+  }
+})

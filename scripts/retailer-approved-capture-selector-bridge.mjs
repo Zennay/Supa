@@ -11,6 +11,7 @@ import { captureApprovedRetailerPage } from './retailer-approved-snapshot-captur
 import { proposeOfflineRetailerSelectors } from './retailer-offline-selector-discovery.mjs'
 import { isPublicMerchantProductHrefSelector } from './retailer-public-product-href-selectors.mjs'
 import { isSafeStructuralReviewTag } from './retailer-public-structural-tag.mjs'
+import { PUBLIC_OBSERVED_TOKEN_FIELDS } from './retailer-public-observed-token-fields.mjs'
 
 const refuse = () => { throw new Error('Authorized retailer capture-to-selector review refused') }
 
@@ -72,7 +73,7 @@ function inertCaptureOptions(options) {
 // source tokens: class names or data-testid attributes can encode a product
 // identifier or price. Only a bounded vocabulary of generic selectors leaves
 // the private captured HTML scope; unknown selectors stay in private review.
-const GENERIC_SELECTOR = /^[a-z][a-z0-9-]{0,30}\.(?:product|item|card|tile|name|title|label|price|pack|size|unit|offer|deal|sale|discount|stock|availability|product-card|price-label|price-value|offer-card|product-name|item-card|item-name|price-tag|stock-label|pack-size|offer-label)$/
+const GENERIC_SELECTOR = /^[a-z][a-z0-9-]{0,30}\.(?:product|item|card|tile|name|title|label|price|pack|size|unit|offer|deal|sale|discount|stock|availability|product-card|price-label|price-value|offer-card|product-name|item-card|item-name|product-title|item-title|product-price|item-price|price-tag|stock-label|pack-size|offer-label)$/
 // These are actual standards-based selectors from the captured DOM, not
 // inferred retail fields. Allow exact public Schema.org tokens and a bounded
 // vocabulary of generic test IDs across the privacy/review boundary.
@@ -82,13 +83,6 @@ const SCHEMA_FIELDS = Object.freeze({
   priceValidUntil: 'offer', offers: 'offer', weight: 'pack',
   size: 'pack', unitCode: 'pack', unitText: 'pack',
   availability: 'availability', inventoryLevel: 'availability',
-})
-const GENERIC_TEST_ID_FIELDS = Object.freeze({
-  'product-card':'product', 'item-card':'product',
-  'product-name':'name', 'item-name':'name',
-  'price-value':'price', 'price-label':'price', 'price-tag':'price',
-  'pack-size':'pack', 'offer-card':'offer', 'offer-label':'offer',
-  'stock-label':'availability',
 })
 const SCHEMA_PROP_SELECTOR = /^(article|section|div|li|a|span|h[1-6]|p|strong|ins|del|small|meta|link|data|time|[a-z][a-z0-9]*-[a-z0-9-]{1,31})\[itemprop="([a-zA-Z]+)"\]$/
 const GENERIC_TEST_ID_SELECTOR = /^(article|section|div|li|a|span|h[1-6]|p|strong|ins|del|small|meta|link|data|time|[a-z][a-z0-9]*-[a-z0-9-]{1,31})\[data-testid="([a-z][a-z-]+)"\]$/
@@ -105,8 +99,8 @@ function publicReviewSelector(row, retailerId) {
       (schemaProperty[1] === 'del' && row.field === 'offer' &&
         SCHEMA_FIELDS[schemaProperty[2]] === 'price'))
   const testId = GENERIC_TEST_ID_SELECTOR.exec(row.selector)
-  if (testId) return Object.hasOwn(GENERIC_TEST_ID_FIELDS, testId[2]) &&
-    GENERIC_TEST_ID_FIELDS[testId[2]] === row.field
+  if (testId) return Object.hasOwn(PUBLIC_OBSERVED_TOKEN_FIELDS, testId[2]) &&
+    PUBLIC_OBSERVED_TOKEN_FIELDS[testId[2]] === row.field
   return row.field === 'product' &&
     (SCHEMA_PRODUCT_SELECTOR.test(row.selector) ||
       isPublicMerchantProductHrefSelector(retailerId, row.selector))

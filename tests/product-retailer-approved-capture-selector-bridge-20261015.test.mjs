@@ -364,3 +364,25 @@ test('observed struck-through price is only an offer review hint in both-store i
     assert.doesNotMatch(JSON.stringify(review),/PRIVATE_9\.99|PRIVATE_7\.99/)
   }
 })
+
+test('product title and price child tokens cannot inflate retailer product-card count',async()=>{
+  for(const [supermarket,kind,url] of [
+    ['plus','catalog','https://www.plus.nl/producten'],
+    ['dekamarkt','offers','https://www.dekamarkt.nl/aanbiedingen']]){
+    const html='<section class="product-card">'+
+      '<span class="product-name" data-testid="product-title">PRIVATE_NAME</span>'+
+      '<span class="product-price" data-testid="product-price">PRIVATE_PRICE</span></section>'
+    const result=await captureToPrivateSelectorReview({source:{supermarket,kind,url},
+      permissionGate:syntheticGate(),grant:consent(supermarket,kind,url),
+      capturedAt:at,fetchFn:async()=>new Response(html,{status:200,headers:{'content-type':'text/html'}})})
+    for(const [selector,field] of [
+      ['section.product-card','product'],['span.product-name','name'],
+      ['span[data-testid="product-title"]','name'],
+      ['span.product-price','price'],
+      ['span[data-testid="product-price"]','price']])
+      assert.deepEqual(result.selectorProposals.filter(x=>x.selector===selector).map(x=>x.field),[field],supermarket+' '+selector)
+    assert.equal(result.selectorProposals.filter(x=>x.field==='product').length,1)
+    assert.doesNotMatch(JSON.stringify(result),/PRIVATE_NAME|PRIVATE_PRICE/)
+    assert.equal(result.productionEnabled,false)
+  }
+})

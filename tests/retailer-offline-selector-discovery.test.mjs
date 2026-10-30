@@ -849,3 +849,23 @@ test('struck-through old shelf price is observed only as an offer hint, never a 
     assert.equal(report.readyForIngestion,false)
   }
 })
+
+test('actual title/price tokens never create phantom product-container selectors',()=>{
+  const html='<section class="product-card">'+
+    '<span class="product-name" data-testid="product-title">PRIVATE_ITEM</span>'+
+    '<span class="product-price" data-testid="product-price">PRIVATE_PRICE</span>'+
+    '<span class="pack-size">PRIVATE_UNIT</span></section>'
+  for(const [retailerId,url] of [
+    ['plus','https://www.plus.nl/producten'],
+    ['dekamarkt','https://www.dekamarkt.nl/aanbiedingen']]){
+    const report=proposeOfflineRetailerSelectors({html,origin:{...origin,retailerId,url}})
+    for(const [selector,field] of [
+      ['span.product-name','name'],['span[data-testid="product-title"]','name'],
+      ['span.product-price','price'],['span[data-testid="product-price"]','price'],
+      ['section.product-card','product']]){
+      assert.deepEqual(report.selectors.filter(row=>row.selector===selector).map(row=>row.field),[field],retailerId+' '+selector)
+    }
+    assert.equal(report.selectors.filter(row=>row.field==='product').length,1)
+    assert.equal(report.readyForIngestion,false)
+  }
+})
