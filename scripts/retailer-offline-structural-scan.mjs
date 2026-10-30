@@ -66,11 +66,24 @@ function isType(record, type) {
   return typeof t === 'string' ? expected.has(t) :
     (Array.isArray(t) && t.some(x => typeof x === 'string' && expected.has(x)));
 }
+// Explicit foreign JSON-LD contexts must not masquerade as Schema.org.
+function schemaContext(value) {
+  const official = new Set(['https://schema.org','https://schema.org/',
+    'http://schema.org','http://schema.org/']);
+  if (typeof value === 'string') return official.has(value);
+  if (Array.isArray(value)) return value.length > 0 && value.every(schemaContext);
+  return value !== null && typeof value === 'object' &&
+    Object.keys(value).length === 1 && Object.hasOwn(value,'@vocab') &&
+    official.has(value['@vocab']);
+}
 function hasProduct(value, depth = 0) {
   if (depth > 5 || !value || typeof value !== 'object') return false;
-  if (Array.isArray(value)) return value.some(x => hasProduct(x, depth + 1));
-  if (isType(value, 'Product')) return true;
-  return ['@graph','mainEntity','itemListElement'].some(key => hasProduct(value[key], depth + 1));
+  if (Array.isArray(value)) return value.some(x => hasProduct(x,depth+1));
+  if (Object.hasOwn(value,'@context') && !schemaContext(value['@context']))
+    return false;
+  if (isType(value,'Product')) return true;
+  return ['@graph','mainEntity','itemListElement'].some(key =>
+    hasProduct(value[key],depth+1));
 }
 
 // includeScripts is for the trusted private PRICE parser only. The public
