@@ -37,7 +37,7 @@ function mock(store) {
     '<div class="product-card"><span class="price-value">SYNTHETIC ONLY</span></div>' +
     '</body></html>'
 }
-function configured(store, body, reportedDigest, fetchTap) {
+function configured(store, body, reportedDigest, fetchTap, representationDigest = null) {
   return {
     source: {supermarket:store,kind:'product',url:urls[store]},
     capturedAt: new Date(Date.now() - 30_000).toISOString(),
@@ -50,6 +50,7 @@ function configured(store, body, reportedDigest, fetchTap) {
         'content-type':'text/html; charset=utf-8',
         'content-length':String(Buffer.byteLength(body)),
         'content-digest':reportedDigest,
+        ...(representationDigest ? {'repr-digest':representationDigest} : {}),
       }})
     },
   }
@@ -74,7 +75,8 @@ test('M1 PLUS and Deka SHA-256/SHA-512 source attestations bind one fetch to a p
         assert.equal(opts.credentials,'omit')
         assert.equal(opts.headers['accept-encoding'],'identity')
         assert.equal(opts.headers['want-content-digest'],'sha-256=10, sha-512=9')
-      }),file)
+        assert.equal(opts.headers['want-repr-digest'],'sha-256=10, sha-512=9')
+      },'sha-512=:'+sha512+':'),file)
     assert.equal(invocations,1)
     assert.equal(result.actualTransportInvocations,1)
     assert.equal(result.candidateCount,1)
@@ -106,6 +108,20 @@ test('corrupt independent SHA-512 source evidence is refused without partial pri
         ()=>{calls++}),file),
       /Retailer Content-Digest mismatch/)
     assert.equal(calls,1)
+    assert.deepEqual(await readdir(dir),[])
+  }
+})
+
+test('correct Content-Digest cannot hide forged Repr-Digest in a combined source review', async t => {
+  for (const store of ['plus','dekamarkt']) {
+    const dir=await temporary(t), html=mock(store), file=join(dir,'must-not-exist.json')
+    const ok='sha-256=:'+digest('sha256',html)+':'
+    const bad='sha-512=:'+digest('sha512','NOT THE CAPTURED REPRESENTATION')+':'
+    let requests=0
+    await assert.rejects(captureAndArchiveApprovedSourceReview(
+      configured(store,html,ok,()=>requests++,bad),file),
+      /Retailer Content-Digest mismatch/)
+    assert.equal(requests,1)
     assert.deepEqual(await readdir(dir),[])
   }
 })

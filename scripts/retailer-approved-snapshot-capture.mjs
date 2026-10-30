@@ -253,30 +253,44 @@ function trustedHttpContentEncoding(headers) {
 // cannot prove a digest of compressed wire bytes: refuse that combination
 // rather than blessing an uncheckable merchant source. This is optional only
 // when the server sends no Content-Digest at all.
-function checkedHttpContentDigest(headers) {
-  const raw = headers?.get?.('content-digest')
+function parseHttpDigestDictionary(raw, fieldName) {
   if (raw === null || raw === undefined) return null
-  if (typeof raw !== 'string' || raw.length > 240 ||
-      trustedHttpContentEncoding(headers) !== 'identity') {
-    throw new Error('Unsupported or ambiguous retailer Content-Digest')
+  if (typeof raw !== 'string' || raw.length > 240) {
+    throw new Error('Unsupported or ambiguous retailer ' + fieldName)
   }
-  // RFC 9530 permits SHA-256 and SHA-512 in one structured dictionary.
-  // Verify every provided supported algorithm; never pick a convenient valid
-  // member while silently discarding a contradictory digest or duplicate.
+  // RFC 9530 SHA-256/SHA-512 structured dictionary, strict on duplicates
+  // and on any mismatched dictionary member. No silent algorithm downgrade.
   const expected = Object.create(null)
   for (const item of raw.split(',')) {
     const match = /^(sha-256|sha-512)=:([A-Za-z0-9+/]+={0,2}):$/.exec(item.trim())
-    const algorithm = match?.[1]
-    const canonical = match?.[2]
+    const algorithm = match?.[1], encoded = match?.[2]
     const size = algorithm === 'sha-256' ? 32 : 64
     if (!algorithm || Object.hasOwn(expected, algorithm) ||
-        Buffer.from(canonical, 'base64').length !== size ||
-        Buffer.from(canonical, 'base64').toString('base64') !== canonical) {
-      throw new Error('Unsupported or ambiguous retailer Content-Digest')
+        Buffer.from(encoded, 'base64').length !== size ||
+        Buffer.from(encoded, 'base64').toString('base64') !== encoded) {
+      throw new Error('Unsupported or ambiguous retailer ' + fieldName)
     }
-    expected[algorithm] = canonical
+    expected[algorithm] = encoded
   }
   return expected
+}
+
+function checkedHttpContentDigest(headers) {
+  const rawContent = headers?.get?.('content-digest')
+  const rawRepresentation = headers?.get?.('repr-digest')
+  if (rawContent == null && rawRepresentation == null) return null
+  // The 200 response is a complete representation (ranges, alternate
+  // Content-Location and redirections already rejected above). For identity
+  // encoding, both RFC 9530 fields attest the exact same received bytes.
+  // Fetch silently decompresses gzip/br: coded digests cannot be checked.
+  if (trustedHttpContentEncoding(headers) !== 'identity') {
+    throw new Error('Unsupported or ambiguous retailer ' +
+      (rawRepresentation != null ? 'Repr-Digest' : 'Content-Digest'))
+  }
+  return [
+    parseHttpDigestDictionary(rawContent, 'Content-Digest'),
+    parseHttpDigestDictionary(rawRepresentation, 'Repr-Digest'),
+  ].filter(value => value !== null)
 }
 
 async function collectBoundedBody(response, expectedDigest) {
@@ -338,12 +352,16 @@ async function collectBoundedBody(response, expectedDigest) {
   }
   const all = Buffer.concat(chunks)
   const digest = createHash('sha256').update(all).digest()
-  if (expectedDigest !== null &&
-      ((expectedDigest['sha-256'] &&
-        digest.toString('base64') !== expectedDigest['sha-256']) ||
-       (expectedDigest['sha-512'] &&
-        createHash('sha512').update(all).digest('base64') !== expectedDigest['sha-512']))) {
-    throw new Error('Retailer Content-Digest mismatch')
+  if (expectedDigest !== null) {
+    const sha256 = digest.toString('base64')
+    const sha512 = expectedDigest.some(row => row['sha-512'])
+      ? createHash('sha512').update(all).digest('base64') : null
+    for (const row of expectedDigest) {
+      if ((row['sha-256'] && row['sha-256'] !== sha256) ||
+          (row['sha-512'] && row['sha-512'] !== sha512)) {
+        throw new Error('Retailer Content-Digest mismatch')
+      }
+    }
   }
   const html = decodeExactRetailerHtmlBytes(all)
   return { html, bytes, sha256: digest.toString('hex') }
@@ -381,6 +399,7 @@ export async function captureApprovedRetailerPage(options = {}) {
       'accept-encoding': 'identity',
       // RFC 9530 is optional: a retailer may omit the digest entirely.
       'want-content-digest': 'sha-256=10, sha-512=9',
+      'want-repr-digest': 'sha-256=10, sha-512=9',
       'user-agent': 'SUPA-authorized-source-review/0.1',
     },
     signal: AbortSignal.timeout(TIMEOUT_MS),

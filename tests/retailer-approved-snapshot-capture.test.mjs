@@ -49,6 +49,7 @@ test('synthetic approved fetch produces bounded hash-pinned local HTML for selec
       assert.equal(options.headers.accept, 'text/html')
       assert.equal(options.headers['accept-encoding'], 'identity')
       assert.equal(options.headers['want-content-digest'], 'sha-256=10, sha-512=9')
+      assert.equal(options.headers['want-repr-digest'], 'sha-256=10, sha-512=9')
       return new Response(html, { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } })
     },
   })
@@ -763,5 +764,58 @@ test('RFC 9530 SHA-512 and dual-algorithm Content-Digest evidence are fully chec
         'content-type': 'text/html', 'content-digest': header,
       }}),
     }), /Content-Digest/)
+  }
+})
+
+test('RFC 9530 representation digests are validated for complete identity-encoded retailer HTML', async () => {
+  const html = '<html><body>SYNTHETIC representation integrity</body></html>'
+  const sha256 = createHash('sha256').update(html).digest('base64')
+  const sha512 = createHash('sha512').update(html).digest('base64')
+  const wrong = createHash('sha512').update('NOT THE REPRESENTATION').digest('base64')
+  for (const headers of [
+    { 'repr-digest': 'sha-256=:' + sha256 + ':' },
+    { 'repr-digest': 'sha-512=:' + sha512 + ':' },
+    { 'repr-digest': 'sha-256=:' + sha256 + ':, sha-512=:' + sha512 + ':',
+      'content-digest': 'sha-512=:' + sha512 + ':' },
+  ]) {
+    const record = await captureApprovedRetailerPage({
+      source, permissionGate: gate, grant,
+      fetchFn: async () => new Response(html, {
+        status: 200, headers: {'content-type':'text/html',...headers},
+      }),
+    })
+    assert.equal(record.source.sha256, createHash('sha256').update(html).digest('hex'))
+    assert.equal(record.published, false)
+  }
+  // Never ignore a bad representation checksum merely because Content-Digest passed.
+  await assert.rejects(captureApprovedRetailerPage({
+    source, permissionGate: gate, grant,
+    fetchFn: async () => new Response(html, {status: 200,headers:{
+      'content-type':'text/html',
+      'content-digest':'sha-256=:' + sha256 + ':',
+      'repr-digest':'sha-512=:' + wrong + ':',
+    }}),
+  }), /Digest mismatch/)
+})
+
+test('uncheckable compressed or malformed representation checksums fail before stream read', async () => {
+  const hash = createHash('sha256').update('fake representation').digest('base64')
+  for(const headers of [
+    {'repr-digest':'sha-256=:' + hash + ':','content-encoding':'br'},
+    {'repr-digest':'sha-256=:not-valid:'},
+    {'repr-digest':'sha-256=:' + hash + ':, sha-256=:' + hash + ':'},
+  ]) {
+    let cancelled=0
+    const stream=new ReadableStream({
+      pull(controller){controller.enqueue(new TextEncoder().encode('untrusted'))},
+      cancel(){cancelled++},
+    })
+    await assert.rejects(captureApprovedRetailerPage({
+      source,permissionGate:gate,grant,
+      fetchFn:async()=>new Response(stream,{status:200,headers:{
+        'content-type':'text/html',...headers,
+      }}),
+    }), /Unsupported or ambiguous retailer Repr-Digest/)
+    assert.equal(cancelled,1)
   }
 })
