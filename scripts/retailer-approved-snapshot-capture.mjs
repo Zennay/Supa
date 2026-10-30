@@ -169,9 +169,15 @@ async function collectBoundedBody(response) {
       if (bytes > MAX_BODY_BYTES) throw new Error('Snapshot exceeds size budget')
       chunks.push(value)
     }
+  } catch (error) {
+    // Cancel the underlying response stream on size or read failure. Merely
+    // releasing a reader lock can leave a remote download running unseen.
+    await reader.cancel().catch(() => {})
+    throw error
   } finally {
     reader.releaseLock()
   }
+  if (bytes === 0) throw new Error('Empty HTML capture refused')
   const all = Buffer.concat(chunks)
   const html = new TextDecoder('utf-8', { fatal: true }).decode(all)
   return { html, bytes, sha256: createHash('sha256').update(all).digest('hex') }
