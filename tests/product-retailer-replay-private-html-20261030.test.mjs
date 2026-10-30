@@ -925,3 +925,28 @@ test('SHA-bound private catalog stability archives unique product path coverage 
   assert.doesNotMatch(JSON.stringify(archived.productLinkCoverage),/mock-111|mock-222|tracking|www\.plus\.nl/)
   assert.doesNotMatch(JSON.stringify(summary),/mock-111|mock-222|tracking|www\.plus\.nl/)
 })
+
+test('SHA-pinned private replay refuses byte-normalizing HTML even with matching manifest', async t => {
+  const file=await capture(t)
+  const manifestFile=file+'.manifest.json'
+  const original=JSON.parse(await readFile(manifestFile,'utf8'))
+  const base=Buffer.from(page)
+  for(const bytes of [
+    Buffer.concat([Buffer.from([0xef,0xbb,0xbf]),base]),
+    Buffer.concat([base,Buffer.from([0])]),
+    Buffer.concat([base,Buffer.from([0xc3,0x28])]),
+  ]) {
+    const changed=structuredClone(original)
+    changed.source.sha256=createHash('sha256').update(bytes).digest('hex')
+    changed.bytes=bytes.length
+    await writeFile(file,bytes,{mode:0o600})
+    await writeFile(manifestFile,JSON.stringify(changed,null,2)+'\n')
+    await assert.rejects(replayPrivateProductHtmlSnapshot(file),
+      /BOM|encoding|UTF-8/i)
+  }
+  await writeFile(file,base,{mode:0o600})
+  await writeFile(manifestFile,JSON.stringify(original,null,2)+'\n')
+  const replay=await replayPrivateProductHtmlSnapshot(file)
+  assert.equal(replay.source.sha256,original.source.sha256)
+  assert.equal(replay.published,false)
+})
