@@ -120,7 +120,7 @@ function parseHtmlAttributes(text) {
         value = text.slice(pos, end)
         pos = end + 1
       } else {
-        const token = /^[^\s<>=`"']+/.exec(text.slice(pos))?.[0]
+        const token=[REDACTED]\s<>=`"']+/.exec(text.slice(pos))?.[0]
         if (!token) return null
         value = token
         pos += token.length
@@ -130,6 +130,20 @@ function parseHtmlAttributes(text) {
     attrs.set(key, value)
   }
   return attrs
+}
+
+// Numeric HTML character references in attributes are decoded by the browser
+// before classList, dataset, itemprop or href are read. Only known valid
+// Unicode scalars with an explicit terminator are decoded; ambiguous input
+// remains inert and can never invent a selector. No DOM/scripts/network.
+function staticAttributeValue(value) {
+  if (typeof value !== 'string') return value
+  return value.replace(/&#(?:x([0-9a-f]{1,6})|([0-9]{1,7}));/gi, (raw, hex, decimal) => {
+    const point = Number.parseInt(hex ?? decimal, hex === undefined ? 10 : 16)
+    return point > 0 && point <= 0x10ffff &&
+      !(point >= 0xd800 && point <= 0xdfff)
+      ? String.fromCodePoint(point) : raw
+  })
 }
 
 function recordSelector(counters, field, selector, tag) {
@@ -185,7 +199,7 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
     // HTML class tokens split on ASCII whitespace, not JavaScript's wider \s
     // (NBSP is a class-name character). Repeated tokens match one element,
     // not multiple CSS elements; counting duplicates creates false drift.
-    const classes = (attrs.get('class') ?? '').split(/[ \t\n\f\r]+/)
+    const classes = (staticAttributeValue(attrs.get('class')) ?? '').split(/[ \t\n\f\r]+/)
     const values = [...new Set(classes.filter(x => STATIC_NAME.test(x)))].slice(0, 20)
     for (const name of values) {
       for (const [field, rule] of Object.entries(FIELD_RULES)) {
@@ -193,7 +207,7 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
       }
     }
     for (const name of ['data-testid', 'itemprop']) {
-      const token = attrs.get(name)
+      const token=[REDACTED]
       if (!token || !STATIC_NAME.test(token)) continue
       for (const [field, rule] of Object.entries(FIELD_RULES)) {
         if (rule.test(token)) {
@@ -202,7 +216,7 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
       }
     }
     if (tag === 'a') {
-      const href = attrs.get('href')
+      const href = staticAttributeValue(attrs.get('href'))
       if (href?.startsWith('/product/')) {
         recordSelector(candidates, 'product', 'a[href^="/product/"]', tag)
       } else if (href?.startsWith('/producten/')) {
