@@ -371,3 +371,19 @@ test('CSS hints reflect actual decoded numeric HTML attribute references, never 
   assert.equal(report.selectors.some(x => x.selector === 'span.price-value'), false)
   assert.equal(report.readyForIngestion, false)
 })
+
+
+test('structural capture signals match valid script type whitespace and still refuse attribute aliases', () => {
+  const html = [
+    '<html><head>',
+    '<script type="  Application/LD+JSON  ">{"@type":"Product","name":"Synthetic"}</script>',
+    '<script id="__NUXT_DATA__" type="  APPLICATION/JSON  ">[42]</script>',
+    '<script data-type="application/ld+json">{"@type":"Product"}</script>',
+    '</head><body><span class="product-name">Observed</span></body></html>',
+  ].join('')
+  const result = proposeOfflineRetailerSelectors({ html, origin })
+  assert.equal(result.structuredSignals.schemaOrgProduct, true)
+  assert.equal(result.structuredSignals.jsonLd, true)
+  assert.equal(result.structuredSignals.nuxtData, true)
+  assert.equal(result.readyForIngestion, false)
+})
