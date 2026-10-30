@@ -306,3 +306,14 @@ commentaren, verborgen DOM-markup en externe scripts nooit meetellen als
 zichtbaar selector- of JSON-LD-signaal. Geldig JSON-LD binnen een echte HTML
 `<head>` blijft juist herkenbaar. Selectors blijven uitsluitend voorstellen
 voor menselijke review, zonder automatische publicatie of prijsclaim.
+
+### Inspectie-CLI: nooit unieke CSS-bronidentiteit op stdout
+
+Ook lokale CSS-klassen en `data-testid`-attributen kunnen een unieke SKU,
+leveranciersnaam of prijs encoderen. De operatoruitvoer van
+`retailer-inspect-snapshot-cli.mjs` filtert daarom op een beperkte set
+herkenbare generieke selectorhints. Onbekende of identifier-bevattende
+selectoren blijven uitsluitend in de oorspronkelijke privé-HTML voor
+menselijke review; alleen hun **aantal** verschijnt op stdout als
+`privateSelectorCount`. De invoer blijft SHA-/inode-pinned. Geen individuele
+productnaam, prijs of ruwe unieke CSS-token mag als publiek resultaat dienen.

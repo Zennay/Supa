@@ -3,7 +3,7 @@ import { constants as fsFlags } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { proposeOfflineRetailerSelectors } from './retailer-offline-selector-discovery.mjs'
+import { proposeOfflineRetailerSelectors, summarizeOfflineSelectorProposals } from './retailer-offline-selector-discovery.mjs'
 
 // A reviewer can run this ONLY on a locally saved HTML snapshot with a pinned
 // SHA from an approved capture manifest. No browser/network/scrape entrypoint.
@@ -47,8 +47,9 @@ export async function main(argv = process.argv.slice(2), writeOutput = text => p
   const report = proposeOfflineRetailerSelectors({
     html, origin: { retailerId, url, capturedAt },
   })
-  writeOutput(JSON.stringify(report, null, 2) + '\n')
-  return report
+  const safe = summarizeOfflineSelectorProposals(report)
+  writeOutput(JSON.stringify(safe, null, 2) + '\n')
+  return safe
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

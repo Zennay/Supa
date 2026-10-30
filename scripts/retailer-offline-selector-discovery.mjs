@@ -199,3 +199,27 @@ export function proposeOfflineRetailerSelectors({ html, origin } = {}) {
     publicSavingsClaimEligible: false,
   }
 }
+
+// Console output is not an authorized private HTML artifact. CSS classes and
+// testids can embed SKU, supplier or price data even when text values are
+// omitted. Preserve full proposals only in the caller's in-memory/private
+// review, and show the CLI only known generic selectors + an aggregate count.
+const PUBLIC_GENERIC_TOKENS = new Set([
+  'product','product-card','product-name','item','item-card','item-name',
+  'name','title','label','price','price-value','price-label','price-tag',
+  'pack','pack-size','size','unit','offer','offer-card','offer-label',
+  'deal','sale','discount','stock','stock-label','availability',
+])
+export function summarizeOfflineSelectorProposals(report) {
+  const safe = report.selectors.filter(row => {
+    if (row.selector === 'a[href^="/product/"]' ||
+        row.selector === 'a[href^="/producten/"]') return true
+    const match = /^[a-z][a-z0-9-]{0,30}(?:\.([a-z][a-z0-9_-]{1,59})|\[(?:data-testid|itemprop)="([a-z][a-z0-9_-]{1,59})"\])$/.exec(row.selector)
+    return match && PUBLIC_GENERIC_TOKENS.has(match[1] ?? match[2])
+  })
+  return {
+    ...report,
+    selectors: safe,
+    privateSelectorCount: report.selectors.length - safe.length,
+  }
+}

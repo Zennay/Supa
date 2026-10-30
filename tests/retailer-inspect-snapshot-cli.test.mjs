@@ -60,3 +60,27 @@ test('offline inspector rejects symlink and hardlink aliases before reading snap
     }), /single-link/)
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+test('CLI excludes identifier-bearing CSS selectors and testids from stdout, retaining generic hints', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'supa-privacy-selector-'))
+  try {
+    const html = [
+      '<article class="product-secret-sku-12345 product-card">',
+      '<span class="price-secret-cents-199 price-value" data-testid="price-private-199">€1,99</span>',
+      '<span data-testid="pack-size">200 ml</span></article>',
+    ].join('')
+    const path = join(root, 'snapshot.html')
+    await writeFile(path, html)
+    let stdout = ''
+    const report = await main([
+      'plus', 'https://www.plus.nl/producten', '2026-10-14T12:00:00.000Z',
+      createHash('sha256').update(html).digest('hex'), path,
+    ], chunk => { stdout += String(chunk) })
+    assert.equal(report.privateSelectorCount, 3)
+    assert.ok(report.selectors.some(row => row.selector === 'article.product-card'))
+    assert.ok(report.selectors.some(row => row.selector === 'span.price-value'))
+    assert.ok(report.selectors.some(row => row.selector === 'span[data-testid="pack-size"]'))
+    assert.doesNotMatch(stdout, /secret-sku-12345|secret-cents-199|private-199|€1,99|200 ml/)
+    assert.equal(report.productionEnabled, false)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
