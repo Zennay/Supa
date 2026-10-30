@@ -1,3 +1,4 @@
+import { decodeExactRetailerHtmlBytes } from './retailer-private-html-byte-identity.mjs'
 import { createHash } from 'node:crypto'
 import { types as nodeTypes } from 'node:util'
 import { evaluateSourcePermissionGate } from './m1-check-source-permission-gate.mjs'
@@ -307,18 +308,7 @@ async function collectBoundedBody(response) {
     throw new Error('Incomplete HTML capture: declared length mismatch')
   }
   const all = Buffer.concat(chunks)
-  // UTF-8's optional leading BOM is stripped by TextDecoder by default.
-  // That would hash bytes which no longer match the HTML string archived for
-  // private replay. Fail closed rather than creating an unreplayable snapshot.
-  if (all.length >= 3 && all[0] === 0xef && all[1] === 0xbb && all[2] === 0xbf) {
-    throw new Error('Ambiguous HTML UTF-8 BOM refused')
-  }
-  const html = new TextDecoder('utf-8', { fatal: true }).decode(all)
-  // Browser HTML parsing replaces NUL bytes with U+FFFD. Prevent a source
-  // string and its claimed SHA from representing different DOM identities.
-  if (html.includes('\u0000') || Buffer.byteLength(html, 'utf8') !== bytes) {
-    throw new Error('Ambiguous HTML source encoding refused')
-  }
+  const html = decodeExactRetailerHtmlBytes(all)
   return { html, bytes, sha256: createHash('sha256').update(all).digest('hex') }
 }
 
