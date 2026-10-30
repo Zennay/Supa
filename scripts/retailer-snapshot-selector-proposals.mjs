@@ -213,6 +213,7 @@ export function proposeRetailerSelectors(source, html) {
   const jsonLdTypes = new Set()
   const jsonLdKeys = new Set()
   let invalidJsonLdCount = 0
+  let jsonLdScriptCount = 0
   // Inspect only script elements proved live by the same bounded HTML scanner.
   // Matching raw HTML with a regex admitted fake JSON-LD scripts embedded
   // inside <style>, inert SVG or quoted attribute values. Never execute JS.
@@ -221,8 +222,14 @@ export function proposeRetailerSelectors(source, html) {
     // Browser-decoded script MIME/ID is shared with strict private evidence.
     // Only exact UTF-8 JSON types qualify as review signals; no prices.
     const scriptType=admittedJsonScriptType(script.attrs.get('type'))
-    if(scriptType==='application/ld+json'){
-      if(!jsonLdShape(script.content,jsonLdTypes,jsonLdKeys)) invalidJsonLdCount++
+    // A malformed JSON-bearing script must not be ignored while an earlier
+    // Product JSON-LD block gets falsely described as complete evidence.
+    if (scriptType === null) invalidJsonLdCount++
+    if (scriptType === 'application/ld+json') {
+      jsonLdScriptCount++
+      if (jsonLdScriptCount > 16 ||
+          !jsonLdShape(script.content,jsonLdTypes,jsonLdKeys))
+        invalidJsonLdCount++
     }
     if (admittedRetailerScriptId(script.attrs.get('id'))==='__NUXT_DATA__') {
       nuxtScriptCount++

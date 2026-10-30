@@ -709,3 +709,20 @@ test('one malformed JSON-LD script or malformed graph poisons all aggregate arch
     assert.deepEqual(valid.jsonLdTypes,['Offer','Product','WebPage'])
   }
 })
+
+test('M1 reviewed script evidence rejects oversized JSON-LD script collections and malformed JSON MIME siblings',()=>{
+  for(const retailer of ['plus','dekamarkt']){
+    const read=html=>proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',html),html).embeddedSignals
+    const block=(type,body)=>'<script type="'+type+'">'+body+'</script>'
+    const good=block('application/ld+json',JSON.stringify({'@context':'https://schema.org','@type':'Product',name:'PRIVATE'}))
+    const proper16=Array(16).fill(good).join('')
+    assert.deepEqual(read(proper16).jsonLdTypes,['Product'])
+    for(const markup of [Array(17).fill(good).join(''),good+block('application/ld+json; charset=latin1','{"@type":"Offer"}'),block('application/json; charset=latin1','{}')+good]){
+      const result=read(markup)
+      assert.ok(result.invalidJsonLdCount>=1,retailer)
+      assert.deepEqual(result.jsonLdTypes,[],retailer)
+      assert.deepEqual(result.jsonLdKeys,[],retailer)
+    }
+    assert.deepEqual(read(good+block('text/javascript','var debug = 1;')).jsonLdTypes,['Product'])
+  }
+})
