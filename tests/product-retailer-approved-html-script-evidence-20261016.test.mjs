@@ -413,3 +413,44 @@ test('standalone script evidence requires provenance to verify declared page ide
   const noDeclared=html.replace('<link rel="canonical" href="'+plusUrl+'">','')
   assert.equal(readAuthorizedHtmlScriptEvidence(noDeclared).invalid,false)
 })
+
+test('UTF-8 script MIME parameters retain approved PLUS JSON-LD and Deka Nuxt evidence', async () => {
+  for (const type of ['application/ld+json; charset=UTF-8',
+    'APPLICATION/LD+JSON ; charset="utf-8"',
+    "application/ld+json;charset='utf-8'"]) {
+    const attribute = type.includes('"') ? "'" + type + "'" : '"' + type + '"'
+    const markup = '<script type=' + attribute + '>' +
+      JSON.stringify(plusProduct) + '</script>'
+    const direct = readAuthorizedHtmlScriptEvidence(markup, plusUrl)
+    assert.equal(direct.invalid, false, type)
+    assert.equal(direct.jsonLdBlocks.length, 1, type)
+    const candidate = await run('plus', markup)
+    assert.equal(candidate.status, 'candidate_needs_review', type)
+    assert.equal(candidate.observation.currentPriceCents, 199, type)
+    assert.equal(candidate.published, false)
+  }
+  const nuxt = dekaMarkup('id="__NUXT_DATA__" type="application/json; charset=UTF-8"')
+  assert.deepEqual(readAuthorizedHtmlScriptEvidence(nuxt).nuxtPayload, dekaFixture.nuxtPayload)
+  const deka = await run('dekamarkt', nuxt)
+  assert.equal(deka.status, 'candidate_needs_review')
+  assert.equal(deka.observation.currentPriceCents, 85)
+})
+
+test('ambiguous or non-UTF8 JSON MIME metadata cannot be ignored beside valid cheap offers', async () => {
+  const valid = script('type="application/ld+json"', plusProduct)
+  for (const type of ['application/ld+json; charset=windows-1252',
+    'application/ld+json; charset=UTF-8; charset=UTF-8',
+    'application/ld+json; version=1',
+    'application/ld+json;', 'application/ld+json; charset=unknown']) {
+    const bad = '<script type="' + type + '">' + JSON.stringify(plusProduct) + '</script>'
+    const parsed = readAuthorizedHtmlScriptEvidence(bad + valid, plusUrl)
+    assert.equal(parsed.invalid, true, type)
+    assert.deepEqual(parsed.jsonLdBlocks, [], type)
+    const result = await run('plus', bad + valid)
+    assert.equal(result.status, 'review_required', type)
+    assert.equal(result.observation, null)
+  }
+  const nuxt = dekaMarkup('id="__NUXT_DATA__" type="application/json; charset=latin1"')
+  assert.equal(readAuthorizedHtmlScriptEvidence(nuxt).invalid, true)
+  assert.equal((await run('dekamarkt', nuxt)).status, 'review_required')
+})

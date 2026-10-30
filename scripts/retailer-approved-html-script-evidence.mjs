@@ -27,6 +27,18 @@ function normalizeKnownSchemaType(value) {
   return Array.isArray(value) ? value.map(canonical) : canonical(value)
 }
 
+// Explicit UTF-8 MIME parameters are valid embedded JSON script metadata.
+// Reject malformed or contradictory charset parameters instead of quietly
+// ignoring one JSON-LD block while trusting a separate cheap Product.
+function admittedJsonScriptType(raw) {
+  if (raw === undefined) return undefined
+  const type = raw.trim().toLowerCase()
+  if (!type.startsWith('application/ld+json') &&
+      !type.startsWith('application/json')) return type
+  const match = /^(application\/(?:ld\+json|json))(?:\s*;\s*charset\s*=\s*(?:utf-8|"utf-8"|'utf-8'))?$/.exec(type)
+  return match ? match[1] : null
+}
+
 // Read the exact same quote-aware DOM-script boundaries as the offline
 // selector review, not a separate regex that could treat inert HTML as prices.
 // No raw HTML or private product values are returned to public callers.
@@ -79,7 +91,8 @@ export function readAuthorizedHtmlScriptEvidence(html, sourceUrl = undefined) {
     if (++count > MAX_SCRIPT_TAGS || element.rawAttributeLength > 1500) return invalid()
     const attr = element.attrs
     if ([...attr.values()].some(value => typeof value === 'string' && value.length > 256)) return invalid()
-    const type = attr.get('type')?.trim().toLowerCase()
+    const type = admittedJsonScriptType(attr.get('type'))
+    if (type === null) return invalid()
     const id = attr.get('id')
     const content = element.content.trim()
     // Never use remote script-src content as embedded structured evidence.
