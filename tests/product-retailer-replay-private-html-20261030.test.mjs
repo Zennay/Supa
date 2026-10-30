@@ -495,6 +495,26 @@ test('PLUS/Deka real absolute link CSS selectors survive private SHA-pinned drif
   }
 })
 
+test('previous SHA-pinned catalog manifests cannot launder encoded controls as retailer sources', async t => {
+  const html='<html><article class="product-card">SYNTHETIC</article></html>'
+  const file=await archivedSelectorPage(t,'plus','catalog',
+    'https://www.plus.nl/producten',html)
+  const manifestFile=file+'.manifest.json'
+  const original=JSON.parse(await readFile(manifestFile,'utf8'))
+  for (const escape of ['%00','%1f','%7f','%25','%2f','%2e']) {
+    const corrupted=structuredClone(original)
+    corrupted.source.url='https://www.plus.nl/producten/synthetic-'+escape+'other'
+    await writeFile(manifestFile,JSON.stringify(corrupted,null,2)+'\n')
+    await assert.rejects(replayPrivateSelectorHtmlSnapshot(file),
+      /Private source replay refused/)
+  }
+  await writeFile(manifestFile,JSON.stringify(original,null,2)+'\n')
+  const valid=await replayPrivateSelectorHtmlSnapshot(file)
+  assert.equal(valid.status,'human-selector-review-required')
+  assert.equal(valid.priceExtractionEnabled,false)
+  assert.equal(valid.productionEnabled,false)
+})
+
 test('PLUS catalog HTML can be SHA-replayed into a private selector review without price claims', async t => {
   const html = '<html><article class="product-card"><h3 class="product-name">Synthetic product</h3>' +
     '<span class="offer-price">3,25</span></article></html>'

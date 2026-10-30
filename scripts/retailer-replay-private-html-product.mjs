@@ -8,6 +8,7 @@ import { readAuthorizedHtmlScriptEvidence } from './retailer-approved-html-scrip
 import { parseSchemaOrgProductForPage } from '../src/data/schemaOrgProductPageSelection.ts'
 import { corroborateDekaNuxtProduct } from './retailer-approved-deka-nuxt-product.mjs'
 import { proposeOfflineRetailerSelectors } from './retailer-offline-selector-discovery.mjs'
+import { ambiguousRetailerRoute } from './retailer-source-route-safety.mjs'
 import { compareOfflineSelectorProposals } from './retailer-private-selector-drift.mjs'
 
 const LIMIT = 2 * 1024 * 1024
@@ -65,7 +66,8 @@ function admitManifest(record) {
   if (url.href !== src.url || url.protocol !== 'https:' ||
       url.hostname !== HOST[src.retailerId] || url.port || url.search || url.hash ||
       url.username || url.password ||
-      !allowedCaptureRoute(src, url)) fail()
+      !allowedCaptureRoute(src, url) ||
+      ambiguousRetailerRoute(url.pathname)) fail()
   const ms = Date.parse(src.capturedAt)
   if (!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(src.capturedAt) ||
       !Number.isFinite(ms) || new Date(ms).toISOString() !== src.capturedAt ||
