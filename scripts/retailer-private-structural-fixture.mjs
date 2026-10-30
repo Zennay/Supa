@@ -185,11 +185,12 @@ export async function verifyPrivateSyntheticHtmlFixture(htmlFile, directory) {
   return {verified:true,syntheticNodes:manifest.syntheticNodes,
     htmlSha256:manifest.syntheticHtmlSha256,productionEnabled:false,published:false}
 }
-function pairManifest(plus, deka) {
-  return {schemaVersion:1,kind:'synthetic-two-retailer-private-fixtures',
+function pairManifest(plus, deka, schemaVersion=2) {
+  return {schemaVersion,kind:'synthetic-two-retailer-private-fixtures',
     sources:[plus,deka].map(m=>({
       retailerId:m.source.retailerId,kind:m.source.kind,
       capturedAt:m.source.capturedAt,sha256:m.source.sha256,
+      ...(schemaVersion===2?{sourceUrlSha256:m.source.sourceUrlSha256}:{}),
       syntheticHtmlSha256:m.syntheticHtmlSha256,
     })),retailers:['plus','dekamarkt'],originalHtmlRetained:false,
     pricePublicationEnabled:false,humanReviewRequired:true,
@@ -214,8 +215,10 @@ export async function verifyPrivateSyntheticFixturePair(plusFile,dekaFile,direct
   let parsed
   try {parsed=parseUniqueKeyRetailerJson(new TextDecoder('utf-8',{fatal:true})
     .decode(data),16384)} catch {refuse()}
-  if(JSON.stringify(parsed)!==JSON.stringify(pairManifest(p,d))) refuse()
-  return {verified:true,retailers:2,productionEnabled:false,published:false}
+  if((parsed.schemaVersion!==1&&parsed.schemaVersion!==2)||
+      JSON.stringify(parsed)!==JSON.stringify(pairManifest(p,d,parsed.schemaVersion))) refuse()
+  return {verified:true,retailers:2,sourceUrlHashBound:parsed.schemaVersion===2,
+    productionEnabled:false,published:false}
 }
 
 export async function buildPrivateSyntheticFixturePair(plusFile,dekaFile,newDirectory) {

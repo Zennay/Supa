@@ -200,9 +200,13 @@ test('one private two-retailer package is complete only when both SHA-pinned sou
   const checked=await verifyPrivateSyntheticFixturePair(plus.filename,deka.filename,out)
   assert.equal(checked.verified,true)
   const index=JSON.parse(await readFile(join(out,'pair-provenance.json'),'utf8'))
+  assert.equal(index.schemaVersion,2)
+  assert.equal(checked.sourceUrlHashBound,true)
   assert.deepEqual(index.retailers,['plus','dekamarkt'])
   assert.equal(index.sources[0].sha256,plus.capture.source.sha256)
   assert.equal(index.sources[1].sha256,deka.capture.source.sha256)
+  assert.equal(index.sources[0].sourceUrlSha256,digest(plus.capture.source.url))
+  assert.equal(index.sources[1].sourceUrlSha256,digest(deka.capture.source.url))
   assert.equal(index.productionEnabled,false)
   assert.equal(index.pricePublicationEnabled,false)
   assert.equal((await stat(out)).mode&0o777,0o700)
@@ -332,4 +336,25 @@ test('synthetic-only export refuses added original or unrelated files after crea
     /Private synthetic structural fixture refused/)
   await unlink(childExtra)
   assert.equal((await verifyPrivateSyntheticFixturePair(plus.filename,deka.filename,pair)).verified,true)
+})
+
+test('legacy v1 private pair keeps SHA-bound verification without falsely claiming URL hash in pair manifest',async t=>{
+  const plus=await archive(t,'plus','catalog')
+  const deka=await archive(t,'dekamarkt','offers')
+  const dir=join(plus.dir,'legacy-pair')
+  await buildPrivateSyntheticFixturePair(plus.filename,deka.filename,dir)
+  const path=join(dir,'pair-provenance.json')
+  const legacy=JSON.parse(await readFile(path,'utf8'))
+  legacy.schemaVersion=1
+  for(const source of legacy.sources) delete source.sourceUrlSha256
+  await writeFile(path,JSON.stringify(legacy,null,2)+'\n',{mode:0o600})
+  const checked=await verifyPrivateSyntheticFixturePair(plus.filename,deka.filename,dir)
+  assert.equal(checked.verified,true)
+  assert.equal(checked.sourceUrlHashBound,false)
+  legacy.schemaVersion=2
+  await writeFile(path,JSON.stringify(legacy,null,2)+'\n',{mode:0o600})
+  await assert.rejects(verifyPrivateSyntheticFixturePair(plus.filename,deka.filename,dir))
+  legacy.schemaVersion=3
+  await writeFile(path,JSON.stringify(legacy,null,2)+'\n',{mode:0o600})
+  await assert.rejects(verifyPrivateSyntheticFixturePair(plus.filename,deka.filename,dir))
 })
