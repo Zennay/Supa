@@ -382,7 +382,7 @@ export function ShoppingListView({ basket, plan, recipes, activeDays, chosenProd
               <div className="hifi-list-row" key={product.id}>
                 <button type="button" className="hifi-list-radio hifi-list-remove" aria-label={`Verwijder ${product.name}`} onClick={() => onRemoveProduct?.(product.id)}>×</button>
                 <div className="hifi-list-open">
-                  <span className="hifi-list-thumb"><FigmaImage asset={product.image} alt="" /></span>
+                  <span className="hifi-list-thumb">{product.image.startsWith('https://') ? <img src={product.image} alt="" loading="lazy" referrerPolicy="no-referrer" /> : <FigmaImage asset={product.image} alt="" />}</span>
                   <span className="hifi-list-detail"><strong>{product.name}</strong><small>{product.unit}</small></span>
                   <span className="hifi-list-price">
                     {product.logo && <FigmaImage asset={product.logo} alt="" />}

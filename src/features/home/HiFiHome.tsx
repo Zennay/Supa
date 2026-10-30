@@ -1,8 +1,10 @@
 import { FigmaImage } from '../../components/FigmaImage'
 import { useEffect, useRef, useState } from 'react'
-import { figmaAssets as a } from './figmaAssets'
+import { figmaAssets as a, storeLogos } from './figmaAssets'
 import { supermarkets, storesStorageKey, readSelectedStores } from './selectedStores'
 import { upcomingHomeWeek } from './homeWeekDates'
+import { useCatalog } from '../../services/productCatalog'
+import type { ApiProduct } from '../../services/productApi'
 import { HeartIcon, PlusIcon, CheckIcon } from '../../components/HiFiIcons'
 import { flyToCart } from './flyToCart'
 import { HiFiRecipes } from '../recipes/HiFiRecipes'
@@ -27,6 +29,27 @@ export const designProducts = [
   { id: 'figma-fruit', name: 'Fruitmix', image: a.productFruitSalad, logo: '', store: 'Figma voorbeeld', crop: '', unit: 'Per verpakking', unitPrice: '', old: '', price: '' },
   { id: 'figma-ginger', name: 'Verse gember', image: a.productGinger, logo: '', store: 'Figma voorbeeld', crop: '', unit: 'Per stuk', unitPrice: '', old: '', price: '' },
 ]
+const storeLogoById: Record<string, string> = {
+  jumbo: storeLogos.jumbo, dirk: storeLogos.dirk, ah: storeLogos.ah, lidl: storeLogos.lidl,
+  plus: storeLogos.plus, vomar: storeLogos.vomar, aldi: storeLogos.aldi, hoogvliet: storeLogos.hoogvliet,
+}
+const euroText = (cents: number) => `€${(cents / 100).toFixed(2)}`
+
+/** Product from the scraper API in the same shape as the built-in demo products. */
+function fromApi(product: ApiProduct): (typeof designProducts)[number] {
+  return {
+    id: product.id, name: product.name, image: product.imageUrl ?? '', logo: storeLogoById[product.store] ?? '',
+    store: product.store, crop: product.store, unit: product.unit, unitPrice: product.unitPrice ?? '',
+    old: product.oldPriceCents ? euroText(product.oldPriceCents) : '', price: euroText(product.priceCents),
+  }
+}
+
+/** Demo products, or the scraper API products when the API is configured and reachable. */
+export function useDesignProducts() {
+  const catalog = useCatalog()
+  return catalog.source === 'api' ? catalog.products.map(fromApi) : designProducts
+}
+
 const designRecipes = curatedFigmaRecipes.filter(recipe =>
   recipe.id === 'supa-fried-rice' || recipe.id === 'supa-bao' || recipe.id === 'supa-katsu',
 ).map(recipe => ({
@@ -55,6 +78,8 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
   const [favoritesOnly, setFavoritesOnly] = useState(false)
   const [selectedRecipe, setSelectedRecipe] = useState<typeof designRecipes[number] | null>(null)
   const [message, setMessage] = useState('')
+  const catalogProducts = useDesignProducts()
+  const fromCatalog = catalogProducts !== designProducts
   const [selectedStores, setSelectedStores] = useState<string[]>(readSelectedStores)
   const toggleStore = (id: string) => setSelectedStores(current => {
     const next = current.includes(id) ? current.filter(item => item !== id) : [...current, id]
@@ -71,7 +96,7 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
     item.name.toLocaleLowerCase('nl').includes(query.trim().toLocaleLowerCase('nl')) &&
     (!favoritesOnly || favorites.includes(item.id))
   const recipes = designRecipes.filter(recipe => recipe.title.toLocaleLowerCase('nl').includes(query.trim().toLocaleLowerCase('nl')) && (!favoritesOnly || favorites.includes(recipe.id)))
-  const matchingProducts = filterDemoProductsByUnit(designProducts.filter(product => (view === 'products' ? (!product.crop || selectedStores.includes(product.crop)) : !product.id.startsWith('figma-')) && matches(product)), unitFilter)
+  const matchingProducts = filterDemoProductsByUnit(catalogProducts.filter((product, index) => (view === 'products' ? (!product.crop || selectedStores.includes(product.crop)) : (fromCatalog ? index < 4 : !product.id.startsWith('figma-'))) && matches(product)), unitFilter)
   const products = sortByPrice ? orderDemoProductsByUnitPrice(matchingProducts) :
     view === 'products' ? [...matchingProducts].sort((left, right) =>
       ['cola-regular', 'cola-zero', 'figma-paprika', 'figma-watermelon', 'figma-cola-classic', 'figma-arla-milk', 'figma-heineken', 'figma-pastry', 'figma-muffins', 'figma-peanut-butter', 'figma-fruit', 'figma-ginger', 'cola-pack'].indexOf(left.id) -
@@ -124,7 +149,7 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
     {(view === 'home' || view === 'products') && <section className="hifi-section" aria-labelledby="hifi-products-title">
       <div className="hifi-section-heading" data-figma-node={view === 'products' ? '3064:3181' : undefined}><div><h2 id="hifi-products-title">{view === 'products' ? query.trim() || 'Beste aanbiedingen' : 'Producten'}</h2>{view === 'products' && <p className="recipe-count">{products.length} producten</p>}</div>{view === 'home' ? <button onClick={() => changeView('products')}>Bekijk meer <FigmaImage asset={a.imgFrame7159} alt="" /></button> : <button className="hifi-product-sort" aria-pressed={sortByPrice} aria-label="Sorteer voorbeeldproducten op laagste prijs per kg of liter" onClick={() => setSortByPrice(!sortByPrice)}><FigmaImage asset={a.productsSort} alt="" /></button>}</div>
       <div className="hifi-product-grid" data-figma-node={view === 'products' ? '3064:3342' : undefined}>{products.map(product => <article className="hifi-product-card" key={product.id}>
-        <div className="hifi-product-image"><FigmaImage className="hifi-product-photo" asset={product.image} alt={product.name} />{product.logo && <span className={`hifi-store-logo ${product.crop}`}><FigmaImage asset={product.logo} alt={product.store} /></span>}{product.unitPrice && <span className="hifi-unit-price">{product.unitPrice}</span>}</div>
+        <div className="hifi-product-image">{product.image.startsWith('https://') ? <img className="hifi-product-photo" src={product.image} alt={product.name} loading="lazy" referrerPolicy="no-referrer" /> : <FigmaImage className="hifi-product-photo" asset={product.image} alt={product.name} />}{product.logo && <span className={`hifi-store-logo ${product.crop}`}><FigmaImage asset={product.logo} alt={product.store} /></span>}{product.unitPrice && <span className="hifi-unit-price">{product.unitPrice}</span>}</div>
         <div className="hifi-product-copy"><h3>{product.name}</h3><div className="hifi-product-price"><span>{product.unit}</span>{product.old && <del>{product.old}</del>}{product.price ? <strong>{product.price}</strong> : null}</div></div>
         <div className="hifi-product-actions"><button className="hifi-product-favorite hifi-heart" aria-label={`Favoriet: ${product.name}`} aria-pressed={favorites.includes(product.id)} onClick={() => toggleFavorite(product.id)}><HeartIcon filled={favorites.includes(product.id)} /></button><button className={`hifi-add${addedProducts.includes(product.id) ? ' added' : ''}`} aria-label={`${addedProducts.includes(product.id) ? 'Verwijder uit boodschappenlijst' : 'Voeg toe aan boodschappenlijst'}: ${product.name}`} aria-pressed={addedProducts.includes(product.id)} onClick={event => { if (!addedProducts.includes(product.id)) flyToCart(event.currentTarget); onToggleProduct(product.id) }}>{addedProducts.includes(product.id) ? <CheckIcon /> : <PlusIcon />}</button></div>
       </article>)}</div>

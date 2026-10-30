@@ -37,7 +37,7 @@ import { parsePrivateExtraVisitCostCents } from './features/comparison/privateEx
 import { freshReviewedBaskets, type PrivateReviewedBaskets, type PrivateCaptureProgress, type PrivateReviewFocus, type OwnStore, type PrivateRouteChoice } from './features/comparison/privateReviewedBasketBridge.ts'
 import { ObservationView } from './features/observation/ObservationView'
 import { IdentityAvatar } from './components/IdentityAvatar.tsx'
-import { HiFiHome, designProducts } from './features/home/HiFiHome'
+import { HiFiHome, useDesignProducts } from './features/home/HiFiHome'
 import { readRecipeLibrary } from './features/recipes/recipeLibrary'
 import { toPlannerRecipe } from './features/recipes/plannerRecipes'
 import { curatedFigmaRecipes } from './features/recipes/curatedFigmaRecipes'
@@ -214,6 +214,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
   )
   const isHiFiView = tab === 'home' || tab === 'recipes' || tab === 'products'
   const [pickerDay, setPickerDay] = useState<string | null>(null)
+  const catalogProducts = useDesignProducts()
   const navigate = (next: Tab) => {
     setPickerDay(null)
     if (next === 'basket') setVisitedBasket(true)
@@ -799,7 +800,7 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
           <div hidden={tab !== 'list'} aria-hidden={tab !== 'list'}>
             <section className="screen" aria-label="Boodschappenlijst uit mijn eigen weekmenu">
               <ShoppingListView basket={basket} plan={plannedMeals} recipes={recipes} activeDays={activeDays}
-                chosenProducts={designProducts.filter(item => designProductIds.includes(item.id))}
+                chosenProducts={catalogProducts.filter(item => designProductIds.includes(item.id))}
                 onRemoveProduct={toggleDesignProduct} />
             </section>
           </div>
