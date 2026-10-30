@@ -164,6 +164,11 @@ function equivalentPhysicalPack(a, b) {
  */
 export function corroborateDekaNuxtProduct({ html, provenance, jsonLdBlocks,
   structured, nuxtPresent } = {}) {
+  // A caller-provided presence flag is not evidence of what the captured
+  // HTML actually contains. Never let a false flag skip price corroboration.
+  const evidence = readAuthorizedHtmlScriptEvidence(html, provenance?.url)
+  if (evidence.invalid || Boolean(evidence.nuxtPayload) !== Boolean(nuxtPresent))
+    return fail()
   if (!nuxtPresent) return structured
   const fallback = parseDekaNuxtFromAuthorizedHtml({
     html, provenance, jsonLdBlocks,

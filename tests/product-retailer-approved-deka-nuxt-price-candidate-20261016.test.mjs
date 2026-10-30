@@ -247,3 +247,17 @@ test('direct Deka fallback refuses caller JSON-LD substituted for different capt
   const wrongHash = parseDekaNuxtFromAuthorizedHtml({html:honest,provenance:{...source(honest),sha256:'0'.repeat(64)},jsonLdBlocks:[fixture.jsonLdProduct]})
   assert.equal(wrongHash.type,'abstain')
 })
+
+test('direct Deka corroboration does not trust a caller that hides present Nuxt evidence', async () => {
+  const { corroborateDekaNuxtProduct, parseDekaNuxtFromAuthorizedHtml } =
+    await import('../scripts/retailer-approved-deka-nuxt-product.mjs')
+  const { createHash } = await import('node:crypto')
+  const page = html()
+  const provenance = {supermarket:'dekamarkt',kind:'product',url,
+    capturedAt:time,sha256:createHash('sha256').update(page).digest('hex')}
+  const structured=parseDekaNuxtFromAuthorizedHtml({html:page,provenance,jsonLdBlocks:[fixture.jsonLdProduct]})
+  assert.equal(structured.type,'observation')
+  const result=corroborateDekaNuxtProduct({html:page,provenance,
+    jsonLdBlocks:[fixture.jsonLdProduct],structured,nuxtPresent:false})
+  assert.equal(result.type,'abstain')
+})
