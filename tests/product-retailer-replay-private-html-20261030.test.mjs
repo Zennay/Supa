@@ -5,7 +5,7 @@ import { mkdtemp, writeFile, readFile, rm, chmod, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { main as download } from '../scripts/retailer-download-reviewed-source.mjs'
-import { replayPrivateProductHtmlSnapshot } from '../scripts/retailer-replay-private-html-product.mjs'
+import { replayPrivateProductHtmlSnapshot, savePrivateOfflineProductReview } from '../scripts/retailer-replay-private-html-product.mjs'
 
 const url = 'https://www.plus.nl/product/fictional-flour-123'
 const grant = { supermarket: 'plus', kind: 'product', sourceUrl: url,
@@ -70,4 +70,21 @@ test('tampered source, source URL mismatch and exposed private files cannot beco
   await writeFile(manifestPath, original)
   await chmod(output, 0o644)
   await assert.rejects(replayPrivateProductHtmlSnapshot(output), /refused/)
+})
+
+
+test('offline review is durably written mode 0600, never overwrites or publishes', async t => {
+  const output = await capture(t)
+  const filename = output.replace('captured.html', 'operator-review.json')
+  const summary = await savePrivateOfflineProductReview(output, filename)
+  assert.deepEqual(summary, { created: true, status: 'candidate_for_human_review',
+    humanReviewRequired: true, published: false, productionEnabled: false })
+  const saved = JSON.parse(await readFile(filename, 'utf8'))
+  assert.equal((await stat(filename)).mode & 0o777, 0o600)
+  assert.equal(saved.observation.currentPriceCents, 325)
+  assert.equal(saved.permissionVerifiedForThisReplay, false)
+  assert.equal(saved.readyForIngestion, false)
+  await assert.rejects(savePrivateOfflineProductReview(output, filename), /refused/)
+  assert.equal(JSON.parse(await readFile(filename, 'utf8')).source.sha256,
+    createHash('sha256').update(page).digest('hex'))
 })

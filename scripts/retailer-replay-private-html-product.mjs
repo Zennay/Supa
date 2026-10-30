@@ -1,6 +1,7 @@
 /** Offline 0600 HTML+manifest replay. No HTTP, rights grant or publication. */
 import { createHash } from 'node:crypto'
-import { readFile, lstat } from 'node:fs/promises'
+import { open, lstat } from 'node:fs/promises'
+import { constants } from 'node:fs'
 import { resolve } from 'node:path'
 import { assertNoSymlinkedM3OutputParents } from './m3-source-output-preservation.mjs'
 import { readAuthorizedHtmlScriptEvidence } from './retailer-approved-html-script-evidence.mjs'
@@ -13,12 +14,20 @@ const HOST = Object.freeze({ plus: 'www.plus.nl', dekamarkt: 'www.dekamarkt.nl' 
 const fail = () => { throw Error('Private source replay refused: untrusted HTML or manifest') }
 async function privateBytes(path, size) {
   await assertNoSymlinkedM3OutputParents(path)
-  const meta = await lstat(path)
-  if (!meta.isFile() || meta.isSymbolicLink() || (meta.mode & 0o077) !== 0 ||
-      meta.size <= 0 || meta.size > size) fail()
-  const bytes = await readFile(path)
-  if (bytes.length !== meta.size || bytes.length > size) fail()
-  return bytes
+  // No path-based read after checking metadata: a replaced symlink must not
+  // redirect the read to an unrelated source. Validate the opened inode.
+  const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW |
+    constants.O_NONBLOCK)
+  try {
+    const meta = await handle.stat()
+    if (!meta.isFile() || (meta.mode & 0o077) !== 0 ||
+        meta.size <= 0 || meta.size > size) fail()
+    const bytes = await handle.readFile()
+    if (bytes.length !== meta.size || bytes.length > size) fail()
+    return bytes
+  } finally {
+    await handle.close()
+  }
 }
 function admitManifest(record) {
   if (!record || record.schemaVersion !== 1 ||
@@ -89,5 +98,60 @@ export async function replayPrivateProductHtmlSnapshot(filename) {
     permissionVerifiedForThisReplay: false, sourceRightsForPublicationVerified: false,
     verifiedCurrentCheckoutPrice: false, readyForIngestion: false,
     publicSavingsClaimEligible: false, productionEnabled: false, published: false,
+  }
+}
+
+/**
+ * Durable private operator review. Never changes the canonical price store,
+ * source-permission register, scheduler or any public output.
+ */
+export async function savePrivateOfflineProductReview(htmlFile, reviewFile) {
+  if (typeof reviewFile !== 'string' || reviewFile.length > 512 ||
+      reviewFile.trim() !== reviewFile) fail()
+  const target = resolve(reviewFile)
+  const { basename, dirname } = await import('node:path')
+  if (!/^[a-z0-9][a-z0-9_.-]{0,79}\.json$/i.test(basename(target))) fail()
+  const record = await replayPrivateProductHtmlSnapshot(htmlFile)
+  await assertNoSymlinkedM3OutputParents(target)
+  const { open, lstat, rm } = await import('node:fs/promises')
+  const dir = await lstat(dirname(target))
+  if (!dir.isDirectory() || dir.isSymbolicLink()) fail()
+  let file, created = false
+  try {
+    file = await open(target, 'wx', 0o600)
+    created = true
+    await file.writeFile(JSON.stringify(record, null, 2) + '\n', 'utf8')
+    await file.chmod(0o600)
+    await file.sync()
+    await file.close()
+    file = null
+  } catch {
+    if (file) await file.close().catch(() => {})
+    if (created) {
+      try {
+        await assertNoSymlinkedM3OutputParents(target)
+        const current = await lstat(target)
+        if (current.isFile() && !current.isSymbolicLink()) await rm(target)
+      } catch { /* refuse unsafe cleanup */ }
+    }
+    fail()
+  }
+  return { created: true, status: record.status, humanReviewRequired: true,
+    published: false, productionEnabled: false }
+}
+
+// Operator CLI: no network and no source URL, price, HTML or private path stdout.
+const { pathToFileURL } = await import('node:url')
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  if (process.argv.length !== 4) {
+    console.error('Usage: retailer-replay-private-html-product.mjs <captured.html> <new-private-review.json>')
+    process.exitCode = 2
+  } else {
+    savePrivateOfflineProductReview(process.argv[2], process.argv[3])
+      .then(result => process.stdout.write(JSON.stringify(result) + '\n'))
+      .catch(() => {
+        console.error('Private offline source review refused; no price was published')
+        process.exitCode = 2
+      })
   }
 }

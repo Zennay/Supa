@@ -84,3 +84,25 @@ npm run build
 De tests geven **uitsluitend fictieve in-memory HTML + fictieve toestemming**, dus nul echte externe requests. Ze testen beide retailers, centbedragen, g/ml-verpakkingen, hash, meervoudige Product-nodes, oude snapshots, onbekende voorraad, foutieve bron, misvormde JSON, echte check-in-rights-denial, 403/429, onjuiste content-type en het ontbreken van retries.
 
 Dit maakt de ontbrekende **capture → productgegevens → prijsvalidatie**-schakel concreet uitvoerbaar. Er volgt pas na afzonderlijke bronrechten en review een dagverversing, productie-database-write, PWA-integratie en M3 live kassabonvergelijking. De bestaande verkennende 22 regels uit [issue #78](https://github.com/Zennay/Supa/issues/78#issuecomment-6210818832) blijven bruikbaar als zoek-/reviewlijst maar zijn geen actuele observaties.
+
+
+## Offline herinspectie van reeds toegestane private HTML-snapshots
+
+De bestaande eenpagina-downloader bewaart uitsluitend na aparte bronrechtentoets
+`capture.html` en `capture.html.manifest.json` met echte capture-URL, UTC, bytes
+en SHA-256. De nieuwe replay **voert geen HTTP-verzoek uit** en kan de echte
+bronrechtentoets bij capture nooit achteraf vervangen:
+
+```bash
+node --experimental-strip-types scripts/retailer-replay-private-html-product.mjs   /private/capture.html /private/nieuwe-review.json
+```
+
+Het `0600`-reviewbestand bevat uitsluitend lokaal een niet-publiceerbare
+`RawProductObservation`-kandidaat (indien exact herleidbaar) en ongoedgekeurde
+DOM-selectorvoorstellen. De uitvoer weigert gewijzigde HTML, foutieve/te
+ruime toegang, symlinks, niet-canonieke source-URL en bestaande reviewbestanden.
+`permissionVerifiedForThisReplay`, `readyForIngestion`,
+`verifiedCurrentCheckoutPrice`, `productionEnabled` en `published` blijven
+**false**; zelfs een herkenbare productprijs blijft menselijke review vereisen.
+De tests gebruiken expliciet synthetische HTML en fictieve in-memory toestemming;
+de huidige PLUS/DekaMarkt-bronrechten staan live-ophalen nog niet toe.
