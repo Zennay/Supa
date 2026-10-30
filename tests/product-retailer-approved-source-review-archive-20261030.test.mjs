@@ -267,3 +267,69 @@ test('concurrent archive writers cannot replace complete source evidence or leav
   const comparison = await compareArchivedSourceReviews(file, file)
   assert.equal(comparison.htmlBytesDiffer, false)
 })
+
+test('unchanged selectors still flag unverified source price and physical pack changes', async t => {
+  const dir = await folder(t)
+  const first = join(dir, 'source-v1.json')
+  const price = join(dir, 'source-price-v2.json')
+  const pack = join(dir, 'source-pack-v3.json')
+  const body = markup('plus')
+  const priceChanged = body.replace('"price":"2.49"', '"price":"3.49"')
+  const packChanged = body.replace('"value":"500 g"', '"value":"750 g"')
+  assert.notEqual(body, priceChanged)
+  assert.notEqual(body, packChanged)
+  await archive(options('plus', body, {
+    capturedAt: new Date(Date.now() - 120000).toISOString(),
+  }), first)
+  await archive(options('plus', priceChanged, {
+    capturedAt: new Date(Date.now() - 90000).toISOString(),
+  }), price)
+  await archive(options('plus', packChanged, {
+    capturedAt: new Date(Date.now() - 60000).toISOString(),
+  }), pack)
+  const priced = await compareArchivedSourceReviews(first, price)
+  assert.equal(priced.newSelectorCandidates, 0)
+  assert.equal(priced.missingSelectorCandidates, 0)
+  assert.equal(priced.unverifiedPriceAmountChanged, true)
+  assert.equal(priced.unverifiedPhysicalPackChanged, false)
+  assert.equal(priced.verifiedCurrentCheckoutPrice, false)
+  assert.doesNotMatch(JSON.stringify(priced), /3\\.49|349|2\\.49|fictional-771/)
+  const packed = await compareArchivedSourceReviews(first, pack)
+  assert.equal(packed.unverifiedPriceAmountChanged, false)
+  assert.equal(packed.unverifiedPhysicalPackChanged, true)
+  assert.equal(packed.newSelectorCandidates, 0)
+  const same = await compareArchivedSourceReviews(first, first)
+  assert.equal(same.unverifiedPriceAmountChanged, false)
+  assert.equal(same.unverifiedPhysicalPackChanged, false)
+})
+
+test('equivalent 500 g versus 0.5 kg physical packs do not create false drift', async t => {
+  const dir = await folder(t)
+  const first = join(dir, 'gram-pair.json')
+  const second = join(dir, 'kilogram-pair.json')
+  await archive(options('plus', markup('plus'), {
+    capturedAt: new Date(Date.now() - 90000).toISOString(),
+  }), first)
+  await archive(options('plus', markup('plus').replace('500 g', '0.5 kg'), {
+    capturedAt: new Date(Date.now() - 30000).toISOString(),
+  }), second)
+  const report = await compareArchivedSourceReviews(first, second)
+  assert.equal(report.unverifiedPhysicalPackChanged, false)
+  assert.equal(report.unverifiedPriceAmountChanged, false)
+})
+
+test('unavailable price source records a status change without presenting invented amounts', async t => {
+  const dir = await folder(t)
+  const before = join(dir, 'in-stock.json'), after = join(dir, 'out-stock.json')
+  await archive(options('plus', markup('plus'), {
+    capturedAt: new Date(Date.now() - 90000).toISOString(),
+  }), before)
+  await archive(options('plus', markup('plus', 'OutOfStock'), {
+    capturedAt: new Date(Date.now() - 30000).toISOString(),
+  }), after)
+  const report = await compareArchivedSourceReviews(before, after)
+  assert.equal(report.candidateReviewStatusChanged, true)
+  assert.equal(report.candidateReviewReasonChanged, true)
+  assert.equal(report.unverifiedPriceAmountChanged, false)
+  assert.equal(report.verifiedCurrentCheckoutPrice, false)
+})

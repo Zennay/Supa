@@ -24,6 +24,20 @@ const rejectedReasons = new Set([
   'availability_unverified',
 ])
 
+// Equivalent physical quantities must not create phantom package drift.
+// Normalize SI mass/volume before comparing already-validated observations.
+function samePhysicalPack(a, b) {
+  const physical = pack => {
+    const factor = { g: ['mass', 1], kg: ['mass', 1000],
+      ml: ['volume', 1], l: ['volume', 1000] }[pack.unit]
+    return factor ? [factor[0], pack.amount * factor[1]]
+      : [pack.unit, pack.amount]
+  }
+  const x = physical(a), y = physical(b)
+  return x[0] === y[0] &&
+    Math.abs(x[1] - y[1]) <= 1e-8 * Math.max(1, Math.abs(x[1]), Math.abs(y[1]))
+}
+
 function sourceRecord(value) {
   if (!value || !Object.hasOwn(hosts, value.retailerId) ||
       !['product', 'catalog', 'offers'].includes(value.kind) ||
@@ -284,7 +298,27 @@ export async function compareArchivedSourceReviews(beforeFile, afterFile) {
   })
   try {
     const drift = compareOfflineSelectorProposals(report(before), report(after))
-    return { ...drift, mode: 'private-one-source-review-selector-drift',
+    const beforeCandidate = before.priceReview?.status === 'candidate_needs_review'
+      ? before.priceReview.observation : null
+    const afterCandidate = after.priceReview?.status === 'candidate_needs_review'
+      ? after.priceReview.observation : null
+    const comparable = beforeCandidate !== null && afterCandidate !== null
+    // Structural CSS can remain identical while an unverified retailer fact
+    // changes. Only boolean review alarms leave these owner-only archives.
+    const privateFactDrift = {
+      candidateReviewStatusChanged:
+        before.priceReview?.status !== after.priceReview?.status,
+      candidateReviewReasonChanged:
+        before.priceReview?.reason !== after.priceReview?.reason,
+      unverifiedPriceAmountChanged: comparable &&
+        beforeCandidate.currentPriceCents !== afterCandidate.currentPriceCents,
+      unverifiedPhysicalPackChanged: comparable &&
+        !samePhysicalPack(beforeCandidate.pack, afterCandidate.pack),
+      unverifiedOfferChanged: comparable &&
+        JSON.stringify(beforeCandidate.offer) !== JSON.stringify(afterCandidate.offer),
+    }
+    return { ...drift, ...privateFactDrift,
+      mode: 'private-one-source-review-selector-drift',
       humanReviewRequired: true, published: false, readyForIngestion: false,
       verifiedCurrentCheckoutPrice: false }
   } catch { refuse() }
