@@ -3,6 +3,7 @@ import { FigmaImage } from '../../components/FigmaImage'
 import { figmaAssets as a, figmaRecipeImages, figmaPlannerThumbs } from '../home/figmaAssets'
 import { curatedFigmaRecipes } from './curatedFigmaRecipes'
 import { pricePerPersonLabel } from './recipePricePerPerson'
+import { HeartIcon, PlusIcon } from '../../components/HiFiIcons'
 import './hifiRecipes.css'
 
 const favoritesKey = 'supa:recipe-favorites:v2'
@@ -117,11 +118,11 @@ export function HiFiRecipes({ mode, onPick, onBack, plannedRecipeIds = [] }: Pro
         return <article key={recipe.id} className={`hifi-recipe-card${image ? '' : ' no-photo'}`}>
           {image && <FigmaImage className="hifi-recipe-photo" asset={image} alt="" />}
           <div className="hifi-recipe-top"><span />
-            <button type="button" className="hifi-favorite" aria-label={`Favoriet: ${recipe.title}`} aria-pressed={favorite} onClick={() => toggleFavorite(recipe.id)}>
-              <FigmaImage asset={favorite ? a.recipeHeartActive : a.imgFilter} alt="" /></button></div>
+            <button type="button" className="hifi-favorite hifi-heart" aria-label={`Favoriet: ${recipe.title}`} aria-pressed={favorite} onClick={() => toggleFavorite(recipe.id)}>
+              <HeartIcon filled={favorite} /></button></div>
           <div className="hifi-recipe-caption"><h3>{recipe.title}</h3>
             <p><span><FigmaImage asset={a.imgVector4} alt="" />{recipe.minutes}</span>{price && <span>{price}</span>}</p></div>
-          {mode === 'pick' && <button type="button" className="hifi-recipe-add" aria-label={`Voeg ${recipe.title} toe aan de planner`} onClick={() => onPick?.(recipe.id)}>+</button>}
+          {mode === 'pick' && <button type="button" className="hifi-recipe-add" aria-label={`Voeg ${recipe.title} toe aan de planner`} onClick={() => onPick?.(recipe.id)}><PlusIcon /></button>}
         </article>
       })}</div>
       {recipes.length === 0 && <p className="hifi-empty">Geen recepten gevonden. Probeer een andere zoekterm of wis de filters.</p>}

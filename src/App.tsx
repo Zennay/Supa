@@ -11,6 +11,7 @@ const BasketView = lazy(async () => {
   const module = await import('./features/basket/BasketView')
   return { default: module.BasketView }
 })
+import { CartIcon } from './components/HiFiIcons'
 import { HiFiRecipes } from './features/recipes/HiFiRecipes'
 import { ShoppingListView } from './features/shopping-list/ShoppingListView'
 import { PrivateSourceShoppingList } from './features/shopping-list/PrivateSourceShoppingList.tsx'
@@ -817,6 +818,13 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         )}
         {tab === 'observe' && <ObservationView />}
       </div>
+
+      {(tab === 'home' || tab === 'products' || tab === 'recipes') && (
+        <button type="button" className="hifi-cart" aria-label={`Boodschappenlijst, ${designProductIds.length} producten toegevoegd`} onClick={() => navigate('list')}>
+          <CartIcon />
+          <span className={`hifi-cart-count${designProductIds.length === 0 ? ' empty' : ''}`} key={designProductIds.length}>{designProductIds.length}</span>
+        </button>
+      )}
 
       <nav className="bottom-nav hifi-nav" aria-label="Hoofdnavigatie">
         {tabs.map((item) => (

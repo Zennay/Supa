@@ -1,5 +1,6 @@
 import { FigmaImage } from '../../components/FigmaImage'
-import { supermarkets, readSelectedStores } from '../home/selectedStores'
+import { supermarkets, readSelectedStores, writeSelectedStores } from '../home/selectedStores'
+import { HiFiModal } from '../../components/HiFiModal'
 import { ingredientImage } from '../planner/ingredientImages'
 import './hifiShoppingList.css'
 import { useEffect, useMemo, useState } from 'react'
@@ -258,23 +259,62 @@ export function ShoppingListView({ basket, plan, recipes, activeDays, chosenProd
     )
   }
 
-  const groups = shoppingCategoryGroups(visibleLines)
-  const chosenStores = supermarkets.filter(store => readSelectedStores().includes(store.id))
+  const [removed, setRemoved] = useState<string[]>([])
+  const [quantities, setQuantities] = useState<Record<string, number>>({})
+  const [openLineId, setOpenLineId] = useState<string | null>(null)
+  const [optionsOpen, setOptionsOpen] = useState(false)
+  const [storesOpen, setStoresOpen] = useState(false)
+  const [sorted, setSorted] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<string[]>(readSelectedStores)
+  const toggleStore = (id: string) => setSelectedIds(current => {
+    const next = current.includes(id) ? current.filter(item => item !== id) : [...current, id]
+    writeSelectedStores(next)
+    return next
+  })
+
+  const shownLines = visibleLines.filter(line => !removed.includes(line.id))
+  const rawGroups = shoppingCategoryGroups(shownLines)
+  const groups = sorted ? [...rawGroups].reverse() : rawGroups
+  const chosenStores = supermarkets.filter(store => selectedIds.includes(store.id))
   const logo = chosenStores[0]?.logo ?? null
+  const qtyOf = (id: string) => quantities[id] ?? 1
+  const openLine = shownLines.find(line => line.id === openLineId) ?? null
+  const totalCents = shownLines.reduce((sum, line) =>
+    sum + (line.status === 'matched' ? line.lineTotalCents * qtyOf(line.id) : 0), 0)
+  const unresolvedShown = shownLines.filter(line => line.status !== 'matched').length
+
+  const toggleDone = (lineId: string) =>
+    setProgress((current) => {
+      const currentDone = current.basketKey === basketKey ? current.done : []
+      return {
+        ...current,
+        basketKey,
+        dirty: true,
+        done: currentDone.includes(lineId)
+          ? currentDone.filter((id) => id !== lineId)
+          : [...currentDone, lineId],
+      }
+    })
 
   return (
     <section className="screen hifi-shopping-screen" data-figma-node="3342:4815">
       <header className="hifi-list-heading">
         <h2>Boodschappenlijst</h2>
+        <button type="button" className="hifi-list-more" aria-label="Opties" onClick={() => setOptionsOpen(true)}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg>
+        </button>
       </header>
 
-      <div className="hifi-list-stores" aria-label="Winkel van deze lijst">
+      <div className="hifi-list-stores" aria-label="Supermarkten van deze lijst">
         {chosenStores.map(store => (
-          <span className="hifi-list-store-chip selected" key={store.id}>
+          <button type="button" className="hifi-list-store-chip" key={store.id} aria-label={`${store.name} uitzetten`} onClick={() => toggleStore(store.id)}>
             <FigmaImage asset={store.logo} alt="" />
             {store.name}
-          </span>
+          </button>
         ))}
+        <button type="button" className="hifi-list-store-button" aria-label="Supermarkten kiezen" onClick={() => setStoresOpen(true)}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 9.5 5.5 4h13L20 9.5M4 9.5V20h16V9.5M4 9.5c0 1.7 1.3 3 3 3s3-1.3 3-3c0 1.7 1.3 3 3 3s3-1.3 3-3c0 1.7 1.3 3 3 3M10 20v-4.5h4V20" /></svg>
+        </button>
       </div>
 
       {storageWarning && (
@@ -293,47 +333,38 @@ export function ShoppingListView({ basket, plan, recipes, activeDays, chosenProd
         </p>
       )}
 
-      {groups.map(group => (
+      {groups.map((group, index) => (
         <section className="hifi-list-group" key={group.title} aria-label={group.title}>
           <div className="hifi-list-group-heading">
             <h3>{group.title}</h3>
-            <span className="hifi-list-count">{group.lines.length} {group.lines.length === 1 ? "item" : "items"}</span>
+            <span className="hifi-list-count">{group.lines.length} {group.lines.length === 1 ? 'item' : 'items'}</span>
+            {index === 0 && (
+              <button type="button" className="hifi-list-sort" aria-label="Categorieën omdraaien" aria-pressed={sorted} onClick={() => setSorted(!sorted)}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M8 20V5m0 0L4 9m4-4 4 4M16 4v15m0 0-4-4m4 4 4-4" /></svg>
+              </button>
+            )}
           </div>
           <div className="hifi-list-card">
             {group.lines.map(line => {
               const checked = done.includes(line.id)
               const label = line.status === 'matched' ? line.productName : line.ingredientLabel
               return (
-                <button
-                  key={line.id}
-                  type="button"
-                  aria-pressed={checked}
-                  className={`hifi-list-row${checked ? ' checked' : ''}${line.status === 'unresolved' ? ' unresolved' : ''}`}
-                  onClick={() =>
-                    setProgress((current) => {
-                      const currentDone = current.basketKey === basketKey ? current.done : []
-                      return {
-                        ...current,
-                        basketKey,
-                        dirty: true,
-                        done: currentDone.includes(line.id)
-                          ? currentDone.filter((id) => id !== line.id)
-                          : [...currentDone, line.id],
-                      }
-                    })
-                  }
-                >
-                  <span className="hifi-list-radio" aria-hidden="true">{checked ? '✓' : ''}</span>
-                  <span className="hifi-list-thumb"><FigmaImage asset={ingredientImage(label)} alt="" /></span>
-                  <span className="hifi-list-detail">
-                    <strong>{label}</strong>
-                    <small>{shoppingQuantity(line)}</small>
-                  </span>
-                  <span className="hifi-list-price" aria-label={line.status === 'matched' ? `Voorbeeldprijs ${euro.formatCents(line.lineTotalCents)}` : 'Prijs nog onbekend'}>
-                    {logo && line.status === 'matched' && <FigmaImage asset={logo} alt="" />}
-                    {line.status === 'matched' ? euro.formatCents(line.lineTotalCents) : '—'}
-                  </span>
-                </button>
+                <div key={line.id} className={`hifi-list-row${checked ? ' checked' : ''}${line.status === 'unresolved' ? ' unresolved' : ''}`}>
+                  <button type="button" className="hifi-list-radio" aria-pressed={checked} aria-label={`${label} afvinken`} onClick={() => toggleDone(line.id)}>
+                    <span />
+                  </button>
+                  <button type="button" className="hifi-list-open" aria-label={`${label} bekijken`} onClick={() => setOpenLineId(line.id)}>
+                    <span className="hifi-list-thumb"><FigmaImage asset={ingredientImage(label)} alt="" /></span>
+                    <span className="hifi-list-detail">
+                      <strong>{label}</strong>
+                      <small>{shoppingQuantity(line)}</small>
+                    </span>
+                    <span className="hifi-list-price" aria-label={line.status === 'matched' ? `Voorbeeldprijs ${euro.formatCents(line.lineTotalCents * qtyOf(line.id))}` : 'Prijs nog onbekend'}>
+                      {logo && line.status === 'matched' && <FigmaImage asset={logo} alt="" />}
+                      <b>{line.status === 'matched' ? euro.formatCents(line.lineTotalCents * qtyOf(line.id)) : '—'}</b>
+                    </span>
+                  </button>
+                </div>
               )
             })}
           </div>
@@ -350,12 +381,14 @@ export function ShoppingListView({ basket, plan, recipes, activeDays, chosenProd
             {chosenProducts.map(product => (
               <div className="hifi-list-row" key={product.id}>
                 <button type="button" className="hifi-list-radio hifi-list-remove" aria-label={`Verwijder ${product.name}`} onClick={() => onRemoveProduct?.(product.id)}>×</button>
-                <span className="hifi-list-thumb"><FigmaImage asset={product.image} alt="" /></span>
-                <span className="hifi-list-detail"><strong>{product.name}</strong><small>{product.unit}</small></span>
-                <span className="hifi-list-price">
-                  {product.logo && <FigmaImage asset={product.logo} alt="" />}
-                  {product.price}
-                </span>
+                <div className="hifi-list-open">
+                  <span className="hifi-list-thumb"><FigmaImage asset={product.image} alt="" /></span>
+                  <span className="hifi-list-detail"><strong>{product.name}</strong><small>{product.unit}</small></span>
+                  <span className="hifi-list-price">
+                    {product.logo && <FigmaImage asset={product.logo} alt="" />}
+                    <b>{product.price}</b>
+                  </span>
+                </div>
               </div>
             ))}
           </div>
@@ -365,13 +398,66 @@ export function ShoppingListView({ basket, plan, recipes, activeDays, chosenProd
       {basket.lines.length > 0 && (
         <section className="hifi-list-total" aria-label="Overzicht boodschappen">
           <div>
-            <span>{basket.unresolvedLineCount > 0 ? 'Bekend minimum' : 'Totaal'}</span>
-            <strong>{euro.formatCents(basket.totalCents)}</strong>
+            <span>{unresolvedShown > 0 ? 'Bekend minimum' : 'Totaal'}</span>
+            <strong>{euro.formatCents(totalCents)}</strong>
           </div>
-          {basket.unresolvedLineCount > 0 && (
-            <small>{basket.unresolvedLineCount} productkeuzes zijn nog niet meegeteld.</small>
+          {unresolvedShown > 0 && (
+            <small>{unresolvedShown} productkeuzes zijn nog niet meegeteld.</small>
           )}
         </section>
+      )}
+
+      {openLine && (
+        <HiFiModal label={openLine.status === 'matched' ? openLine.productName : openLine.ingredientLabel} onClose={() => setOpenLineId(null)} className="hifi-line-modal">
+          <div className="hifi-line-photo">
+            {logo && openLine.status === 'matched' && <FigmaImage asset={logo} alt="" />}
+            <FigmaImage asset={ingredientImage(openLine.status === 'matched' ? openLine.productName : openLine.ingredientLabel)} alt="" />
+          </div>
+          <div className="hifi-line-info">
+            <div>
+              <strong>{openLine.status === 'matched' ? openLine.productName : openLine.ingredientLabel}</strong>
+              <small>{shoppingQuantity(openLine)}</small>
+            </div>
+            <b>{openLine.status === 'matched' ? euro.formatCents(openLine.lineTotalCents * qtyOf(openLine.id)) : '—'}</b>
+          </div>
+          <div className="hifi-line-actions">
+            <div className="hifi-stepper">
+              <button type="button" aria-label="Minder" disabled={qtyOf(openLine.id) <= 1}
+                onClick={() => setQuantities(current => ({ ...current, [openLine.id]: Math.max(1, qtyOf(openLine.id) - 1) }))}>−</button>
+              <span>{qtyOf(openLine.id)} stuk</span>
+              <button type="button" aria-label="Meer"
+                onClick={() => setQuantities(current => ({ ...current, [openLine.id]: Math.min(99, qtyOf(openLine.id) + 1) }))}>+</button>
+            </div>
+            <button type="button" className="hifi-line-remove"
+              onClick={() => { setRemoved(current => [...current, openLine.id]); setOpenLineId(null) }}>
+              Verwijder
+            </button>
+          </div>
+        </HiFiModal>
+      )}
+
+      {optionsOpen && (
+        <HiFiModal label="Opties" onClose={() => setOptionsOpen(false)} className="hifi-options-modal">
+          <h2>Opties</h2>
+          <button type="button" className="danger" onClick={() => { setRemoved(basket.lines.map(line => line.id)); chosenProducts.forEach(product => onRemoveProduct?.(product.id)); setOptionsOpen(false) }}>Verwijder lijst</button>
+          <button type="button" onClick={() => { setOptionsOpen(false); setStoresOpen(true) }}>Supermarkten</button>
+          <button type="button" onClick={() => { setSorted(!sorted); setOptionsOpen(false) }}>Sorteren</button>
+        </HiFiModal>
+      )}
+
+      {storesOpen && (
+        <HiFiModal label="Supermarkten" onClose={() => setStoresOpen(false)} className="hifi-stores-modal">
+          <h2>Supermarkten</h2>
+          {supermarkets.map(store => {
+            const selected = selectedIds.includes(store.id)
+            return (
+              <button type="button" key={store.id} className={selected ? 'selected' : ''} aria-pressed={selected} onClick={() => toggleStore(store.id)}>
+                <FigmaImage asset={store.logo} alt="" />
+                {store.name}
+              </button>
+            )
+          })}
+        </HiFiModal>
       )}
     </section>
   )

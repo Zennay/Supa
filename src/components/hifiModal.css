@@ -1,0 +1,14 @@
+.hifi-modal-backdrop {
+  position: fixed; top: 0; bottom: 0; left: 50%; width: min(100vw, 440px); transform: translateX(-50%); z-index: 50; display: grid; place-items: center; padding: 24px;
+  background: rgb(243 244 246 / .55); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  animation: hifi-fade .18s ease-out;
+}
+.hifi-modal {
+  width: min(100%, 340px); max-height: 86dvh; overflow: auto; border-radius: 28px; background: #fff;
+  box-shadow: 0 18px 50px rgb(21 45 40 / .18); padding: 20px; color: #262527;
+  animation: hifi-pop .22s cubic-bezier(.2, .9, .3, 1.2);
+}
+.hifi-modal h2 { margin: 0 0 12px; text-align: center; font-size: 15px; font-weight: 600; }
+@keyframes hifi-fade { from { opacity: 0 } to { opacity: 1 } }
+@keyframes hifi-pop { from { opacity: 0; transform: scale(.92) } to { opacity: 1; transform: scale(1) } }
+@media (prefers-reduced-motion: reduce) { .hifi-modal-backdrop, .hifi-modal { animation: none; } }

@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from 'react'
 import { figmaAssets as a } from './figmaAssets'
 import { supermarkets, storesStorageKey, readSelectedStores } from './selectedStores'
 import { upcomingHomeWeek } from './homeWeekDates'
+import { HeartIcon, PlusIcon, CheckIcon } from '../../components/HiFiIcons'
+import { flyToCart } from './flyToCart'
 import { HiFiRecipes } from '../recipes/HiFiRecipes'
 import { curatedFigmaRecipes } from '../recipes/curatedFigmaRecipes'
 import { historicalRetailerProducts, filterHistoricalProducts } from '../products/historicalRetailerProducts'
@@ -114,8 +116,7 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
       <div className="hifi-section-heading"><h2 id="hifi-recipes-title">Recepten</h2>{view === 'home' && <button onClick={() => changeView('recipes')}>Bekijk meer <FigmaImage asset={a.imgFrame7159} alt="" /></button>}</div>
       <div className={view === 'recipes' ? 'hifi-recipe-grid' : 'hifi-recipe-row'}>{recipes.map(recipe => <article key={recipe.id} className="hifi-recipe-card">
         {recipe.image && <FigmaImage className="hifi-recipe-photo" asset={recipe.image} alt="" />}
-        <button className="hifi-recipe-open" aria-label={`Bekijk ${recipe.title}`} onClick={() => { setSelectedRecipe(recipe); dialog.current?.showModal() }} />
-        <div className="hifi-recipe-top"><span className="hifi-saving">In je planner</span><button className="hifi-favorite" aria-label={`Favoriet: ${recipe.title}`} aria-pressed={favorites.includes(recipe.id)} onClick={() => toggleFavorite(recipe.id)}><FigmaImage asset={a.imgFilter} alt="" /></button></div>
+        <div className="hifi-recipe-top"><span className="hifi-saving">In je planner</span><button className="hifi-favorite hifi-heart" aria-label={`Favoriet: ${recipe.title}`} aria-pressed={favorites.includes(recipe.id)} onClick={() => toggleFavorite(recipe.id)}><HeartIcon filled={favorites.includes(recipe.id)} /></button></div>
         <div className="hifi-recipe-caption"><h3>{recipe.title}</h3><p><span><FigmaImage asset={a.imgVector4} alt="" />{recipe.minutes}</span><span>{recipe.servings} porties</span></p></div>
       </article>)}</div>
       {recipes.length === 0 && <p className="hifi-empty">Geen gerechten gevonden. Probeer een andere zoekterm of wis je filters.</p>}
@@ -125,14 +126,11 @@ function HiFiDiscovery({ view, onNavigate, addedProducts, onToggleProduct, activ
       <div className="hifi-product-grid" data-figma-node={view === 'products' ? '3064:3342' : undefined}>{products.map(product => <article className="hifi-product-card" key={product.id}>
         <div className="hifi-product-image"><FigmaImage className="hifi-product-photo" asset={product.image} alt={product.name} />{product.logo && <span className={`hifi-store-logo ${product.crop}`}><FigmaImage asset={product.logo} alt={product.store} /></span>}{product.unitPrice && <span className="hifi-unit-price">{product.unitPrice}</span>}</div>
         <div className="hifi-product-copy"><h3>{product.name}</h3><div className="hifi-product-price"><span>{product.unit}</span>{product.old && <del>{product.old}</del>}{product.price ? <strong>{product.price}</strong> : null}</div></div>
-        <div className="hifi-product-actions"><button className="hifi-product-favorite" aria-label={`Favoriet: ${product.name}`} aria-pressed={favorites.includes(product.id)} onClick={() => toggleFavorite(product.id)}><FigmaImage asset={a.imgHeartButton} alt="" /></button><button aria-label={`${addedProducts.includes(product.id) ? 'Verwijder' : 'Voeg toe'}: ${product.name}`} aria-pressed={addedProducts.includes(product.id)} onClick={() => { onToggleProduct(product.id); setMessage(addedProducts.includes(product.id) ? `${product.name} verwijderd uit je demolijst.` : `${product.name} toegevoegd aan je demolijst.`) }}>{addedProducts.includes(product.id) ? <span className="hifi-added">✓</span> : <FigmaImage asset={a.imgFrame7121} alt="" />}</button></div>
+        <div className="hifi-product-actions"><button className="hifi-product-favorite hifi-heart" aria-label={`Favoriet: ${product.name}`} aria-pressed={favorites.includes(product.id)} onClick={() => toggleFavorite(product.id)}><HeartIcon filled={favorites.includes(product.id)} /></button><button className={`hifi-add${addedProducts.includes(product.id) ? ' added' : ''}`} aria-label={`${addedProducts.includes(product.id) ? 'Verwijder uit boodschappenlijst' : 'Voeg toe aan boodschappenlijst'}: ${product.name}`} aria-pressed={addedProducts.includes(product.id)} onClick={event => { if (!addedProducts.includes(product.id)) flyToCart(event.currentTarget); onToggleProduct(product.id) }}>{addedProducts.includes(product.id) ? <CheckIcon /> : <PlusIcon />}</button></div>
       </article>)}</div>
       {products.length === 0 && <p className="hifi-empty">Geen producten gevonden. Probeer een andere zoekterm of wis je filters.</p>}
     </section>}
     <p className="hifi-feedback" role="status">{message}</p>
-    <dialog className="hifi-dialog" ref={dialog} onClose={() => setSelectedRecipe(null)} aria-labelledby="hifi-detail-title">
-      {selectedRecipe && <><form method="dialog"><button className="ghost-button">Sluiten</button></form>{selectedRecipe.image && <FigmaImage className="hifi-detail-photo" asset={selectedRecipe.image} alt="" />}<h2 id="hifi-detail-title">{selectedRecipe.title}</h2><p>{selectedRecipe.minutes} minuten · {selectedRecipe.servings} porties</p><h3>Ingrediënten</h3><ul>{selectedRecipe.ingredients.map(item => <li key={item.id}>{item.amount} {item.unit === 'piece' ? 'stuks' : item.unit} {item.label}</li>)}</ul><h3>Bereiding</h3><ol>{selectedRecipe.steps.map(step => <li key={step}>{step}</li>)}</ol><p>Geen geverifieerde supermarktprijs of besparingsclaim.</p><button className="hifi-plan-button" onClick={() => { dialog.current?.close(); onNavigate('planner') }}>Open de planner</button></>}
-    </dialog>
   </div>
 }
 
