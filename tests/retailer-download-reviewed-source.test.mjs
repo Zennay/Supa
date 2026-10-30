@@ -187,3 +187,43 @@ test('failed-capture cleanup cannot delete a competing replacement or unowned sy
     assert.equal(await readFile(alternate, 'utf8'), 'should-stay')
   } finally { await rm(dir, { recursive: true, force: true }) }
 })
+
+test('truncated 200 HTML never leaves a private snapshot; valid retry archives exact UTF-8 source', async () => {
+  const {dir, grantFile} = await temp()
+  try {
+    const filename = join(dir, 'secure', 'catalog.html')
+    const html = '<html><body><article class="product-card">SYNTHETIC café only</article></body></html>'
+    const bytes = Buffer.byteLength(html, 'utf8')
+    let calls = 0
+    const fetchFn = async (_url, options) => {
+      calls++
+      assert.equal(options.redirect, 'error')
+      return new Response(html, {status: 200, headers: {
+        'content-type': 'text/html; charset=utf-8',
+        'content-length': String(calls === 1 ? bytes + 3 : bytes),
+      }})
+    }
+    await assert.rejects(main([grantFile, filename], {
+      testGateDocument: gate, fetchFn, writeOutput() {},
+    }), /Incomplete HTML capture/)
+    await assert.rejects(stat(filename), /ENOENT/)
+    await assert.rejects(stat(filename + '.manifest.json'), /ENOENT/)
+    const saved = await main([grantFile, filename], {
+      testGateDocument: gate, fetchFn, writeOutput() {},
+    })
+    assert.equal(calls, 2)
+    assert.equal(saved.bytes, bytes)
+    assert.equal(saved.source.sha256,
+      createHash('sha256').update(html, 'utf8').digest('hex'))
+    assert.equal((await stat(filename)).mode & 0o777, 0o600)
+    assert.equal((await stat(filename + '.manifest.json')).mode & 0o777, 0o600)
+    assert.equal(await readFile(filename, 'utf8'), html)
+    const reviewed = await replayPrivateSelectorHtmlSnapshot(filename)
+    assert.ok(reviewed.proposals.selectors.some(row =>
+      row.selector === 'article.product-card'))
+    assert.equal(reviewed.published, false)
+    assert.equal(reviewed.priceExtractionEnabled, false)
+  } finally {
+    await rm(dir, {recursive: true, force: true})
+  }
+})
