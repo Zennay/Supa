@@ -575,3 +575,23 @@ test('Nuxt historical SSR signal requires one well-formed unique-key bounded JSO
     assert.equal(result.currentPricesExtracted,false)
   }
 })
+
+test('WebPage JSON-LD cannot forge product SKU, price or pack source fields in snapshot review',()=>{
+  for(const retailer of ['plus','dekamarkt']){
+    const page={'@context':'https://schema.org','@type':'WebPage',
+      name:'PRIVATE_SITE',sku:'FAKE_WEBPAGE_SKU',price:'0.01',priceCurrency:'EUR',
+      availability:'https://schema.org/InStock',weight:'99 kg',
+    }
+    const html='<script type="application/ld+json">'+JSON.stringify(page)+'</script>'
+    const result=proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',html),html)
+    assert.deepEqual(result.embeddedSignals.jsonLdTypes,['WebPage'])
+    for(const field of ['sku','price','priceCurrency','availability','weight'])
+      assert.equal(result.embeddedSignals.jsonLdKeys.includes(field),false,retailer+' '+field)
+    assert.equal(result.currentPricesExtracted,false)
+    page['@type']='Product'
+    const product='<script type="application/ld+json">'+JSON.stringify(page)+'</script>'
+    const positive=proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',product),product)
+    for(const field of ['sku','price','priceCurrency','availability','weight'])
+      assert.equal(positive.embeddedSignals.jsonLdKeys.includes(field),true,retailer+' '+field)
+  }
+})

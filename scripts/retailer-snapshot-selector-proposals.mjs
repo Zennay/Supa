@@ -117,8 +117,16 @@ function jsonLdShape(text, types, keys) {
     }
     const trusted = Object.hasOwn(node,'@context')
       ? !!schemaVocabulary(node['@context']) : inheritedSchema
+    const classes=Array.isArray(node['@type']) ? node['@type'] : [node['@type']]
+    // A WebPage that happens to contain "price" or "sku" is not product
+    // evidence. Only source-observed, official retail schema records may
+    // contribute product/pack/offer field names to the private review.
+    const retailFields=classes.some(type => typeof type === 'string' &&
+      /^(?:https?:\/\/schema\.org\/)?(Product|Offer|AggregateOffer|PriceSpecification|QuantitativeValue)$/.test(type) &&
+      (trusted || /^https?:\/\/schema\.org\//.test(type)))
     for (const [key,child] of Object.entries(node).slice(0,100)) {
-      if (trusted && ALLOWED_JSONLD_KEYS.has(key)) keys.add(key)
+      if (trusted && ALLOWED_JSONLD_KEYS.has(key) &&
+          (key.startsWith('@') || retailFields)) keys.add(key)
       if (key === '@type') {
         for(const type of (Array.isArray(child)?child:[child])) {
           if(typeof type !== 'string') continue
