@@ -102,6 +102,29 @@ function hasProduct(value, depth = 0, inheritedSchemaContext = false) {
     hasProduct(value[key],depth+1,officialContext));
 }
 
+// A public Product *signal* must agree with strict private source evidence:
+// an Offer or nested priceSpecification using a foreign @context is NOT
+// official Schema.org evidence even when the parent Product is official.
+// Bound traversal over the same recognized nested fields as the price reader.
+function hasUntrustedNestedSchemaContext(root) {
+  const stack=[{value:root,depth:0}]
+  let visited=0
+  while (stack.length) {
+    const {value,depth}=stack.pop()
+    if (++visited>256 || depth>8) return true
+    if (Array.isArray(value)) {
+      if (value.length>128) return true
+      for (const item of value) stack.push({value:item,depth:depth+1})
+    } else if (value && typeof value==='object') {
+      if (Object.hasOwn(value,'@context') && !schemaContext(value['@context'])) return true
+      for (const key of ['@graph','mainEntity','itemListElement','item',
+                         'offers','priceSpecification','weight','size']) {
+        if (Object.hasOwn(value,key)) stack.push({value:value[key],depth:depth+1})
+      }
+    }
+  }
+  return false
+}
 // Reuse the same official-context check for the historical M1 source
 // inspector, not a weaker bare @type="Product" admission.
 export { hasProduct as hasVerifiedSchemaProduct }
@@ -302,7 +325,8 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
           try { parsed = parseUniqueKeyRetailerJson(content); } catch {}
           if (type === 'application/ld+json' && parsed !== null) {
             signals.jsonLd = true;
-            if (hasProduct(parsed)) signals.schemaOrgProduct = true;
+            if (!hasUntrustedNestedSchemaContext(parsed) && hasProduct(parsed))
+              signals.schemaOrgProduct = true;
           }
           if (id === '__NUXT_DATA__' && (type === undefined || type === 'application/json') &&
               Array.isArray(parsed)) signals.nuxtData = true;

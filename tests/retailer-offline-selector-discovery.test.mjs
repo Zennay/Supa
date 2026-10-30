@@ -1155,3 +1155,37 @@ test('inert script duplicates are excluded but real external duplicate SSR IDs c
   assert.equal(readAuthorizedHtmlScriptEvidence(source+other,origin.url).invalid,true)
   assert.equal(readAuthorizedHtmlScriptEvidence(source+hidden,origin.url).invalid,false)
 })
+
+test('public Product JSON-LD signal never asserts official evidence when nested Offer or priceSpecification overrides the vocabulary',()=>{
+  const sample=offers=>'<script type="application/ld+json">'+JSON.stringify({
+    '@context':'https://schema.org','@type':'Product',name:'SYNTHETIC_PRODUCT',offers,
+  })+'</script>'
+  const bad=[
+    {'@type':'Offer','@context':'https://foreign.example','price':'123'},
+    {'@type':'Offer',priceSpecification:{'@context':'https://foreign.example','@type':'UnitPriceSpecification','price':'123'}},
+  ]
+  for(const [retailerId,url] of [['plus','https://www.plus.nl/producten'],['dekamarkt','https://www.dekamarkt.nl/aanbiedingen']]) {
+    for(const offers of bad) {
+      const report=proposeOfflineRetailerSelectors({html:sample(offers),origin:{...origin,retailerId,url}})
+      assert.equal(report.structuredSignals.jsonLd,true)
+      assert.equal(report.structuredSignals.schemaOrgProduct,false,retailerId)
+      assert.equal(report.publicSavingsClaimEligible,false)
+    }
+    const safe=proposeOfflineRetailerSelectors({html:sample({'@type':'Offer',price:'123'}),origin:{...origin,retailerId,url}})
+    assert.equal(safe.structuredSignals.schemaOrgProduct,true,retailerId)
+  }
+})
+
+test('a mixed JSON-LD graph does not promote official Product signal if another nested context is foreign',async()=>{
+  const html='<script type="application/ld+json">'+JSON.stringify({
+    '@context':'https://schema.org',
+    '@graph':[{'@type':'Product',name:'SYNTHETIC'},{'@context':'https://untrusted.example','@type':'Offer',price:'999'}],
+  })+'</script>'
+  const result=proposeOfflineRetailerSelectors({html,origin})
+  assert.equal(result.structuredSignals.jsonLd,true)
+  assert.equal(result.structuredSignals.schemaOrgProduct,false)
+  const {readAuthorizedHtmlScriptEvidence}=await import('../scripts/retailer-approved-html-script-evidence.mjs')
+  const privateEvidence=readAuthorizedHtmlScriptEvidence(html,origin.url)
+  assert.equal(privateEvidence.verifiedSchemaProductContexts,false)
+  assert.equal(result.productionEnabled,false)
+})
