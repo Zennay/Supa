@@ -23,9 +23,10 @@ export function isAllowedM1RetailerSourcePath(retailerId,kind,path) {
 
 // Shared raw source identity for live capture and offline replay.
 export function exactRawRetailerAuthority(raw, target) {
-  // The WHATWG parser strips CR/LF/TAB and edge C0 bytes from URLs.
-  // Such raw aliases are never direct evidence of the reviewed source.
-  if (/[\x00-\x1f\x7f]/.test(raw)) return false
+  // WHATWG trims leading ASCII spaces and strips tabs/CR/LF, then
+  // normalizes percent-encoded authority. Do not skip raw-host validation
+  // just because an alias has leading whitespace.
+  if (/[\x00-\x20\x7f]/.test(raw)) return false
   const match = /^(?:[a-z][a-z0-9+.-]*:)?\/\/([^/?#]*)/i.exec(raw)
   return !match || match[1].toLowerCase() === new URL(target).host.toLowerCase()
 }

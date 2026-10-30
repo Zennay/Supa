@@ -921,3 +921,17 @@ test('raw HTML source URLs cannot launder control-byte aliases through URL norma
     }
   }
 })
+
+test('raw leading-space host aliases cannot become HTTP or HTML source identity', async () => {
+  for(const raw of [' //%77ww.plus.nl/producten',' https://%77ww.plus.nl/producten']) {
+    for(const html of [
+      '<html><head><base href="'+raw+'"></head><body>SYNTHETIC</body></html>',
+      '<html><head><link rel="canonical" href="'+raw+'"></head><body>SYNTHETIC</body></html>',
+    ]) {
+      await assert.rejects(captureApprovedRetailerPage({
+        source, permissionGate:gate, grant,
+        fetchFn:async()=>new Response(html,{status:200,headers:{'content-type':'text/html'}}),
+      }),/Untrusted HTML/,JSON.stringify(raw))
+    }
+  }
+})

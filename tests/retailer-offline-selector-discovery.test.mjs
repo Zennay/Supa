@@ -990,3 +990,15 @@ test('offline selector and price provenance reject same-store HTML base rebasing
   assert.equal(allowed.productionEnabled,false)
   assert.equal(allowed.permissionVerified,false)
 })
+
+test('leading whitespace before encoded source host cannot hide raw authority from offline replay', () => {
+  const aliases=[' //%77ww.plus.nl/producten',' https://%77ww.plus.nl/producten',' //www.plus.nl/producten']
+  for(const raw of aliases) {
+    assert.equal(new URL(raw,origin.url).href,origin.url)
+    for(const tag of ['base','link rel="canonical"']) {
+      const html='<html><head><'+tag+' href="'+raw+'"></head><body><a href="/product/synthetic">SYNTHETIC</a></body></html>'
+      assert.throws(()=>proposeOfflineRetailerSelectors({html,origin}),
+        /Untrusted HTML (?:base|canonical)/,JSON.stringify(raw))
+    }
+  }
+})
