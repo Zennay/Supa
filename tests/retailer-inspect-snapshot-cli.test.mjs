@@ -180,3 +180,31 @@ test('private inspector rejects group/world-readable HTML bytes even inside a 07
     assert.equal(report.source.retailerId, 'plus')
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+test('offline CLI rejects BOM, NUL and malformed UTF-8 even with matching SHA', async () => {
+  const dir=await mkdtemp(join(tmpdir(),'supa-exact-html-'))
+  try {
+    const file=join(dir,'archive.html')
+    const sample=Buffer.from('<article class="product-card">SYNTHETIC café</article>')
+    const variants=[
+      Buffer.concat([Buffer.from([0xef,0xbb,0xbf]),sample]),
+      Buffer.concat([sample,Buffer.from([0])]),
+      Buffer.concat([sample,Buffer.from([0xc3,0x28])]),
+    ]
+    for(const bytes of variants) {
+      await writeFile(file,bytes,{mode:0o600})
+      const sha=createHash('sha256').update(bytes).digest('hex')
+      let disclosed=false
+      await assert.rejects(main(['plus','https://www.plus.nl/producten',
+        '2026-10-14T12:00:00.000Z',sha,file],()=>{disclosed=true}),
+        /BOM|encoding|UTF-8/i)
+      assert.equal(disclosed,false)
+    }
+    await writeFile(file,sample)
+    const report=await main(['plus','https://www.plus.nl/producten',
+      '2026-10-14T12:00:00.000Z',
+      createHash('sha256').update(sample).digest('hex'),file],()=>{})
+    assert.equal(report.bytes,sample.length)
+    assert.equal(report.readyForIngestion,false)
+  } finally { await rm(dir,{recursive:true,force:true}) }
+})
