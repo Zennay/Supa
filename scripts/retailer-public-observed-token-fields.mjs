@@ -7,6 +7,10 @@ export const PUBLIC_OBSERVED_TOKEN_FIELDS = Object.freeze({
   'product-title':'name', 'item-title':'name',
   'price-value':'price', 'price-label':'price', 'price-tag':'price',
   'product-price':'price', 'item-price':'price',
+  // The observed class/test-id must actually occur in source DOM. These
+  // generic underscore aliases may then safely survive private-only review,
+  // not become invented selectors, price quotes or publication permission.
+  'price_value':'price', 'product_price':'price',
   'pack-size':'pack',
   // Source-observed old/was/before price labels are NOT a live price quote.
   'old-price':'offer', 'price-old':'offer', 'price-before':'offer',

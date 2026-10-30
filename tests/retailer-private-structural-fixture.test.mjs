@@ -975,3 +975,27 @@ test('two-store private HTML table source pair retains only browser-visible curr
   }
   assert.equal(verified.productionEnabled,false)
 })
+
+test('two-retailer private fixture retains six source-observed fields with named-entity underscore price and old-price isolation',async t=>{
+  const html='<html><body><article class="product-card"><div class="old&lowbar;price">'+
+    '<span class="price&lowbar;value">SYNTHETIC_OLD</span></div>'+
+    '<span class="product-name">SYNTHETIC_NAME</span>'+
+    '<span class="product&lowbar;price">SYNTHETIC_CURRENT</span>'+
+    '<span class="pack-size">SYNTHETIC_PACK</span>'+
+    '<span class="offer-label">SYNTHETIC_OFFER</span>'+
+    '<span class="stock-label">SYNTHETIC_STOCK</span></article></body></html>'
+  const plus=await archive(t,'plus','catalog',html),deka=await archive(t,'dekamarkt','offers',html)
+  const dir=join(plus.dir,'entity-price-pair')
+  const built=await buildPrivateSyntheticFixturePair(plus.filename,deka.filename,dir)
+  const verified=await verifyPrivateSyntheticFixturePair(plus.filename,deka.filename,dir)
+  assert.equal(verified.verified,true)
+  assert.equal(verified.allFieldsCoveredByBoth,true)
+  for(const id of ['plus','dekamarkt']){
+    assert.equal(verified.fieldCoverageByRetailer[id].price,true,id)
+    const synthetic=await readFile(join(dir,id,'synthetic-structure.html'),'utf8')
+    assert.match(synthetic,/class="product_price"/)
+    assert.doesNotMatch(synthetic,/SYNTHETIC_CURRENT|SYNTHETIC_OLD|&lowbar;/)
+  }
+  assert.equal(built.productionEnabled,false)
+  assert.equal(verified.published,false)
+})
