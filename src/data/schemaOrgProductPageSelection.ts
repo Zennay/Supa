@@ -30,9 +30,10 @@ function readData(object: object, key: string): unknown {
 
 function isProductType(raw: unknown): boolean {
   const values = Array.isArray(raw) ? raw : [raw]
-  return values.some(
-    (value) => typeof value === 'string' && value.toLowerCase() === 'product',
-  )
+  // Schema.org class terms are case-sensitive. A lower-case "product"
+  // node cannot borrow an official Product elsewhere in the same graph to
+  // inject a conflicting price for the captured source URL.
+  return values.some((value) => value === 'Product')
 }
 
 function productNodes(jsonLd: unknown): DataObject[] {

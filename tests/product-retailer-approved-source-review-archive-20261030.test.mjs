@@ -455,3 +455,23 @@ test('a foreign JSON-LD Offer or PriceSpecification context cannot redefine the 
     assert.equal(saved.published,false)
   }
 })
+
+test('case-spoofed Schema.org product in a graph cannot borrow another Product context to set this SKU price',async t=>{
+  const make=(url,type,price)=>({'@type':type,url,
+    name:'SYNTHETIC',weight:{value:'500 g'},offers:{
+      '@type':'Offer',price,priceCurrency:'EUR',availability:'https://schema.org/InStock',
+    }})
+  const graph={'@context':'https://schema.org','@graph':[
+    make('https://www.plus.nl/product/fictional-recommendation','Product','99.99'),
+    make(targets.plus,'product','0.01'),
+  ]}
+  const html='<html><head><script type="application/ld+json">'+
+    JSON.stringify(graph)+'</script></head><body><article class="product-card"></article></body></html>'
+  const file=join(await folder(t),'unverified-case-product.json')
+  const status=await archive(options('plus',html),file)
+  const saved=JSON.parse(await readFile(file,'utf8'))
+  assert.equal(status.candidateCount,0)
+  assert.equal(saved.priceReview.reason,'product_identity_or_price_unverified')
+  assert.equal(saved.priceReview.observation,null)
+  assert.equal(saved.published,false)
+})
