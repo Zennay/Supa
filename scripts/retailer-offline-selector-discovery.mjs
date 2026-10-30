@@ -340,8 +340,17 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
   // These are candidate CSS selectors for reviewed snapshots; counts are raw
   // tag occurrences, NOT a verified DOM selection and NEVER validated prices.
   const selectorCandidatesOmitted = Math.max(0, candidates.size - MAX_SELECTORS)
+  // Genuine observed Product roots and Schema.org microdata are the
+  // highest-value structural anchors. Keep them inside the 24-candidate
+  // review budget even when a large listing emits many noisy price classes.
+  // Every proposal must still exist in the original HTML: this ranks, never
+  // invents, selectors or enables automatic promotion.
+  const observedProductAnchor = row => Number(row.field === 'product' &&
+    (MICRODATA_PRODUCT.test(row.selector) ||
+      isPublicMerchantProductHrefSelector(origin.retailerId,row.selector)))
   const selectors = [...candidates.values()]
-    .sort((a, b) => b.instances - a.instances || a.field.localeCompare(b.field) ||
+    .sort((a, b) => observedProductAnchor(b)-observedProductAnchor(a) ||
+      b.instances - a.instances || a.field.localeCompare(b.field) ||
       a.selector.localeCompare(b.selector))
     .slice(0, MAX_SELECTORS)
     .map(({ field, selector, instances }) => ({

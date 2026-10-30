@@ -149,3 +149,34 @@ test('source-observed product-card anchor microdata yields a real review selecto
   assert.equal(report.readyForIngestion,false)
   assert.equal(report.productionEnabled,false)
 })
+
+test('noisy real catalog preserves observed microdata product selector inside 24-slot review budget',()=>{
+  const clutter=Array.from({length:50},(_,i)=>
+    '<span class="price-noise-'+i+'">FAKE PRICE</span>').join('')
+  const html='<html><body>'+clutter+
+    '<article itemscope itemtype="https://schema.org/Product">'+
+    '<span itemprop="name">PRIVATE NAME</span></article></body></html>'
+  const origin={retailerId:'plus',url:'https://www.plus.nl/producten',
+    capturedAt:'2026-10-14T12:00:00.000Z'}
+  const report=proposeOfflineRetailerSelectors({html,origin},true)
+  assert.equal(report.selectors.length,24)
+  assert.equal(report.candidateLimitReached,true)
+  assert.ok(report.selectors.some(row=>row.field==='product'&&
+    row.selector==='article[itemtype="https://schema.org/Product"]'))
+  assert.equal(report.selectors[0].field,'product')
+  assert.equal(report.readyForIngestion,false)
+  assert.equal(report.productionEnabled,false)
+})
+test('real same-store product href survives noisy selector candidates without guessing a link',()=>{
+  const clutter=Array.from({length:50},(_,i)=>
+    '<span class="price-noise-'+i+'">SYNTHETIC</span>').join('')
+  const html='<html><body>'+clutter+
+    '<a href="/product/private-sku-321">SYNTHETIC LINK</a></body></html>'
+  const report=proposeOfflineRetailerSelectors({html,origin:{
+    retailerId:'plus',url:'https://www.plus.nl/producten',
+    capturedAt:'2026-10-14T12:00:00.000Z'}},true)
+  assert.equal(report.candidateLimitReached,true)
+  assert.ok(report.selectors.some(row=>row.field==='product'&&
+    row.selector==='a[href^="/product/"]'))
+  assert.equal(report.readyForIngestion,false)
+})
