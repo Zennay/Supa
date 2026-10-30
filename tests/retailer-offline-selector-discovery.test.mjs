@@ -1109,3 +1109,20 @@ test('real browser implied paragraph/list-item endings restore independent sourc
     assert.equal(excluded.selectors.some(x=>x.field==='price'),false,retailerId)
   }
 })
+
+test('browser implicit table row/cell ends expose genuine current price without escaping nested former-price tables',()=>{
+  const normal=[
+    '<table><tr class="old-price"><td>SYNTHETIC_OLD<tr><td><span class="price-value">SYNTHETIC_CURRENT</span></td></tr></table>',
+    '<table><tr><td class="old-price">SYNTHETIC_OLD<td><span class="price-value">SYNTHETIC_CURRENT</span></tr></table>',
+  ]
+  const nested='<table><tr><td class="old-price"><table><tr><td><span class="price-value">SYNTHETIC_OLD_NESTED</span></td></tr></table></td></tr></table>'
+  for(const [retailerId,url] of [['plus','https://www.plus.nl/producten'],['dekamarkt','https://www.dekamarkt.nl/aanbiedingen']]){
+    for(const html of normal){
+      const result=proposeOfflineRetailerSelectors({html,origin:{...origin,retailerId,url}})
+      assert.ok(result.selectors.some(x=>x.field==='price'&&x.selector==='span.price-value'),retailerId+' '+html)
+      assert.equal(result.productionEnabled,false)
+    }
+    const former=proposeOfflineRetailerSelectors({html:nested,origin:{...origin,retailerId,url}})
+    assert.equal(former.selectors.some(x=>x.field==='price'),false,retailerId)
+  }
+})

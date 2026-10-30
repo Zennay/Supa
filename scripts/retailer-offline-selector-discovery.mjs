@@ -310,6 +310,19 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
         .some(row=>row.tag==='ul'||row.tag==='ol'||row.tag==='menu'))
         ancestorStack.length=prior
     }
+    // Browsers also imply a </tr> or </td>/<th> at the next peer. Keep
+    // a nested <table> barrier so a former-price cell containing its own
+    // table never promotes a nested former price as a fresh sibling.
+    if (tag==='tr') {
+      const prior=ancestorStack.findLastIndex(row=>row.tag==='tr')
+      if (prior>=0 && !ancestorStack.slice(prior+1)
+        .some(row=>row.tag==='table')) ancestorStack.length=prior
+    }
+    if (tag==='td'||tag==='th') {
+      const prior=ancestorStack.findLastIndex(row=>row.tag==='td'||row.tag==='th')
+      if (prior>=0 && !ancestorStack.slice(prior+1)
+        .some(row=>row.tag==='tr'||row.tag==='table')) ancestorStack.length=prior
+    }
     const standardCandidate = ['article', 'a', 'div', 'li', 'section', 'span',
       'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'strong', 'ins', 'del', 's', 'strike', 'small', 'meta', 'link', 'data', 'time'].includes(tag)
     // Real SPA/retailer custom elements are valid HTML with a hyphenated

@@ -957,3 +957,21 @@ test('two-store private synthetic pair keeps genuine current price after HTML im
   assert.equal(built.publicSavingsClaimEligible,false)
   assert.equal(built.productionEnabled,false)
 })
+
+test('two-store private HTML table source pair retains only browser-visible current price after implied row end',async t=>{
+  const html='<html><body><table><tr class="old-price"><td>SYNTHETIC_OLD'+
+    '<tr><td><span class="price-value">SYNTHETIC_CURRENT</span></td></tr></table></body></html>'
+  const plus=await archive(t,'plus','catalog',html),deka=await archive(t,'dekamarkt','offers',html)
+  const dir=join(plus.dir,'implied-table-price-pair')
+  const built=await buildPrivateSyntheticFixturePair(plus.filename,deka.filename,dir)
+  const verified=await verifyPrivateSyntheticFixturePair(plus.filename,deka.filename,dir)
+  assert.equal(built.created,true)
+  assert.equal(verified.verified,true)
+  for(const store of ['plus','dekamarkt']) {
+    assert.equal(verified.fieldCoverageByRetailer[store].price,true,store)
+    const synthetic=await readFile(join(dir,store,'synthetic-structure.html'),'utf8')
+    assert.match(synthetic,/class="price-value"/)
+    assert.doesNotMatch(synthetic,/SYNTHETIC_CURRENT|SYNTHETIC_OLD/)
+  }
+  assert.equal(verified.productionEnabled,false)
+})
