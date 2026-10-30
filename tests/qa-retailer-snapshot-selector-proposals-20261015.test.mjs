@@ -172,3 +172,47 @@ test('legacy captured-source directory refuses invalid UTF-8 with a recomputed S
     assert.equal(allowed.productionEnabled,false)
   } finally { await rm(dir,{recursive:true,force:true}) }
 })
+
+test('historical M1 import refuses hardlinked HTML or manifest inode aliases', async () => {
+  const { link, unlink } = await import('node:fs/promises')
+  const root=await mkdtemp(join(tmpdir(),'supa-m1-hardlink-'))
+  try {
+    const dir=join(root,'capture')
+    await mkdir(join(dir,'plus'),{recursive:true})
+    const htmlFile=join(dir,'plus','fictional-plus-catalog.html')
+    const manifestFile=join(dir,'manifest.json')
+    const html=plusHtml
+    const record={...source('plus','catalog',html),success:true,
+      finalUrl:'https://www.plus.nl/producten'}
+    await writeFile(htmlFile,html)
+    await writeFile(manifestFile,JSON.stringify({sourceCount:1,results:[record]}))
+    const baseline=await proposeFromM1CaptureDirectory(dir)
+    assert.equal(baseline.selectorSets.length,1)
+    assert.equal(baseline.productionEnabled,false)
+    const htmlAlias=join(root,'html-alias')
+    await link(htmlFile,htmlAlias)
+    await assert.rejects(proposeFromM1CaptureDirectory(dir),/unsafe snapshot inode/)
+    await unlink(htmlAlias)
+    const manifestAlias=join(root,'manifest-alias')
+    await link(manifestFile,manifestAlias)
+    await assert.rejects(proposeFromM1CaptureDirectory(dir),/invalid manifest JSON or file/)
+    await unlink(manifestAlias)
+    assert.equal((await proposeFromM1CaptureDirectory(dir)).analyzedSources,1)
+  } finally {await rm(root,{recursive:true,force:true})}
+})
+
+test('M1 imported source refuses symbolic HTML file with a valid-looking hash', async () => {
+  const dir=await mkdtemp(join(tmpdir(),'supa-m1-symlink-'))
+  try {
+    await mkdir(join(dir,'plus'))
+    const real=join(dir,'actual.html')
+    const alias=join(dir,'plus','fictional-plus-catalog.html')
+    await writeFile(real,plusHtml)
+    await symlink(real,alias)
+    await writeFile(join(dir,'manifest.json'),JSON.stringify({
+      sourceCount:1,results:[{...source('plus','catalog',plusHtml),
+        success:true,finalUrl:'https://www.plus.nl/producten'}],
+    }))
+    await assert.rejects(proposeFromM1CaptureDirectory(dir),/symlink path components not allowed/)
+  } finally {await rm(dir,{recursive:true,force:true})}
+})
