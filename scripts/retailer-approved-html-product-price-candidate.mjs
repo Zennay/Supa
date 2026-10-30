@@ -10,6 +10,7 @@
  * for pages which do not expose an unambiguous structured Product price.
  */
 import { createHash } from 'node:crypto'
+import { types as nodeTypes } from 'node:util'
 import { captureApprovedRetailerPage } from './retailer-approved-snapshot-capture.mjs'
 import { readAuthorizedHtmlScriptEvidence } from './retailer-approved-html-script-evidence.mjs'
 import { proposeOfflineRetailerSelectors } from './retailer-offline-selector-discovery.mjs'
@@ -142,12 +143,11 @@ function priceReviewFromAuthorizedCapture(captured) {
 // authorization-scoped fetch now produces TWO private reviews pinned to the
 // exact same HTML digest and UTC clock. Never reuse a raw caller-supplied
 // capture or treat selector guesses as approved price extraction rules.
-export async function captureApprovedProductReviewBundle(options = {}) {
+async function captureSourceReviewBundle(options) {
   const captured = await captureApprovedRetailerPage(options)
-  const priceReview = priceReviewFromAuthorizedCapture(captured)
-  if (captured.source.kind !== 'product') {
-    throw new Error('Authorized product review bundle requires a product page')
-  }
+  const priceReview = captured.source.kind === 'product'
+    ? priceReviewFromAuthorizedCapture(captured) : null
+  const identity = priceReview?.source ?? captured.source
   const selectors = proposeOfflineRetailerSelectors({
     html: captured.html,
     origin: {
@@ -157,9 +157,9 @@ export async function captureApprovedProductReviewBundle(options = {}) {
     },
   })
   if (selectors.mode !== 'offline-selector-proposals-only' ||
-      selectors.source?.retailerId !== priceReview.source.retailerId ||
-      selectors.source?.sha256 !== priceReview.source.sha256 ||
-      selectors.source?.capturedAt !== priceReview.source.capturedAt ||
+      selectors.source?.retailerId !== identity.retailerId ||
+      selectors.source?.sha256 !== identity.sha256 ||
+      selectors.source?.capturedAt !== identity.capturedAt ||
       selectors.bytes !== captured.bytes ||
       selectors.humanReviewRequired !== true ||
       selectors.readyForIngestion !== false ||
@@ -175,8 +175,9 @@ export async function captureApprovedProductReviewBundle(options = {}) {
   const safeSelectors = safeSelectorProposals(selectors.selectors, captured.source.retailerId)
   return {
     schemaVersion: 1,
-    mode: 'private-authorized-one-capture-product-review',
-    source: priceReview.source,
+    mode: priceReview === null ? 'private-authorized-one-capture-structural-review'
+      : 'private-authorized-one-capture-product-review',
+    source: identity,
     capturedBytes: captured.bytes,
     actualTransportInvocations: 1,
     priceReview,
@@ -198,6 +199,26 @@ export async function captureApprovedProductReviewBundle(options = {}) {
     productionEnabled: false,
     published: false,
   }
+}
+
+// One sanctioned source per call: catalog/offer pages have useful structure,
+// but must NEVER be represented as priced Product observations.
+export async function captureApprovedRetailerReviewBundle(options = {}) {
+  return captureSourceReviewBundle(options)
+}
+
+// Refuse a non-product request before opening any transport. Use own data
+// descriptors to avoid invoking caller-provided getters while preflighting;
+// the normal capture validator remains the authoritative rights gate.
+export async function captureApprovedProductReviewBundle(options = {}) {
+  if (!options || typeof options !== 'object' || nodeTypes.isProxy(options))
+    throw new Error('Authorized product review bundle requires a product page')
+  const source = Object.getOwnPropertyDescriptor(options, 'source')
+  const value = source && Object.hasOwn(source, 'value') ? source.value : null
+  if (!value || typeof value !== 'object' || nodeTypes.isProxy(value) ||
+      Object.getOwnPropertyDescriptor(value, 'kind')?.value !== 'product')
+    throw new Error('Authorized product review bundle requires a product page')
+  return captureSourceReviewBundle(options)
 }
 
 export async function captureApprovedProductPriceCandidate(options = {}) {

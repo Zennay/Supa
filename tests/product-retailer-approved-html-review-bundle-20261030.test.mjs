@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import {createHash} from 'node:crypto'
 import {readFile} from 'node:fs/promises'
 import test from 'node:test'
-import {captureApprovedProductReviewBundle as review} from '../scripts/retailer-approved-html-product-price-candidate.mjs'
+import {captureApprovedProductReviewBundle as review, captureApprovedRetailerReviewBundle as reviewAny} from '../scripts/retailer-approved-html-product-price-candidate.mjs'
 // All pages, grants, prices and responses are SYNTHETIC in-memory inputs.
 const urls={plus:'https://www.plus.nl/product/mock-123',dekamarkt:'https://www.dekamarkt.nl/producten/mock-456'}
 const grantGate={version:1,milestone:'M1 Data Feasibility',reviewedAt:'2026-10-16',sources:['plus','dekamarkt'].map(supermarket=>({supermarket,technicalStatus:'proven',permissionStatus:'permitted',productionEnabled:true,evidence:[{kind:'written_permission',url:'https://example.test/synthetic',finding:'SYNTHETIC TEST ONLY; NOT A REAL GRANT'}]}))}
@@ -71,4 +71,48 @@ test('one-shot product bundle does not leak price/SKU-bearing captured selector 
   /249-private|249-secret|mock-sku-123|Sensitive source|Private label/)
  assert.equal(result.selectorReview.approvedSelectors,0)
  assert.equal(result.publicSavingsClaimEligible,false)
+})
+
+test('M1 PLUS catalog and Deka offers each yield one private SHA-bound selector review, never an invented price',async()=>{
+ for(const [store,kind,url] of [
+  ['plus','catalog','https://www.plus.nl/producten'],
+  ['dekamarkt','offers','https://www.dekamarkt.nl/aanbiedingen']]){
+  const html=markup(store)
+  let calls=0
+  const request=opts(store,html,{source:{supermarket:store,kind,url},grant:{supermarket:store,kind,sourceUrl:url,reviewed:true,termsReviewed:true,robotsReviewed:true,noAntiBotBypass:true},fetchFn:async()=>{calls++;return new Response(html,{status:200,headers:{'content-type':'text/html'}})}})
+  const result=await reviewAny(request)
+  assert.equal(calls,1)
+  assert.equal(result.mode,'private-authorized-one-capture-structural-review')
+  assert.equal(result.source.kind,kind)
+  assert.equal(result.source.sha256,createHash('sha256').update(html).digest('hex'))
+  assert.equal(result.priceReview,null)
+  assert.ok(result.selectorReview.proposals.some(x=>x.field==='product'))
+  assert.equal(result.selectorReview.approvedSelectors,0)
+  assert.equal(result.actualTransportInvocations,1)
+  assert.equal(result.verifiedCurrentCheckoutPrice,false)
+  assert.equal(result.publicSavingsClaimEligible,false)
+  assert.equal(result.rawHtmlReturned,false)
+ }
+})
+
+test('product-only API rejects catalog and offer requests before invoking transport',async()=>{
+ let calls=0
+ for(const kind of ['catalog','offers']){
+  const request=opts('plus',markup('plus'),{source:{supermarket:'plus',kind,url:'https://www.plus.nl/'+(kind==='catalog'?'producten':'aanbiedingen')},fetchFn:async()=>{calls++;throw Error('NO NETWORK')}})
+  await assert.rejects(review(request),/requires a product page/)
+ }
+ const accessor=opts('plus',markup('plus'))
+ Object.defineProperty(accessor.source,'kind',{get(){calls++;return 'product'}})
+ await assert.rejects(review(accessor),/requires a product page/)
+ assert.equal(calls,0)
+})
+
+test('canonical actual retailer rights deny catalog and offers before any HTTP request',async()=>{
+ const production=JSON.parse(await readFile(new URL('../evidence/m1/source-permission-gate.v1.json',import.meta.url),'utf8'))
+ let calls=0
+ for(const [store,kind,url] of [['plus','catalog','https://www.plus.nl/producten'],['dekamarkt','offers','https://www.dekamarkt.nl/aanbiedingen']]){
+  const request=opts(store,markup(store),{source:{supermarket:store,kind,url},grant:{supermarket:store,kind,sourceUrl:url,reviewed:true,termsReviewed:true,robotsReviewed:true,noAntiBotBypass:true},permissionGate:production,fetchFn:async()=>{calls++;throw Error('NO NETWORK')}})
+  await assert.rejects(reviewAny(request),/Explicit retailer source permission required/)
+ }
+ assert.equal(calls,0)
 })
