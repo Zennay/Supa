@@ -808,3 +808,19 @@ test('historical M1 structural JSON-LD review refuses official Product hints whe
     }
   }
 })
+
+test('legacy M1 source review does not advertise verified retail Product keys across separately foreign JSON-LD scripts',()=>{
+  const block=x=>'<script type="application/ld+json">'+JSON.stringify(x)+'</script>'
+  const official=block({'@context':'https://schema.org','@type':'Product',name:'SYNTHETIC',offers:{'@type':'Offer',price:'1.20'}})
+  const foreign=block({'@context':'https://other.example','@type':'Offer',price:'999'})
+  for(const [store,kind] of [['plus','catalog'],['dekamarkt','offers']]) {
+    for(const html of [official+foreign,foreign+official]) {
+      const report=proposeRetailerSelectors(source(store,kind,html),html)
+      assert.deepEqual(report.embeddedSignals.jsonLdTypes,[],store)
+      assert.deepEqual(report.embeddedSignals.jsonLdKeys,[],store)
+      assert.equal(report.embeddedSignals.invalidJsonLdCount,1,store)
+      assert.equal(report.readyForScraping,false)
+      assert.equal(report.publicationAllowed,false)
+    }
+  }
+})

@@ -110,7 +110,7 @@ function schemaVocabulary(value) {
   return value && typeof value === 'object' &&
     Object.keys(value).length === 1 && OFFICIAL_SCHEMA_CONTEXT.has(value['@vocab'])
 }
-function jsonLdShape(text, types, keys) {
+function jsonLdShape(text, types, keys, sourceContexts) {
   let value
   // Duplicate JSON-LD members cannot become apparently verified source
   // attributes through JSON.parse's last-key-wins behavior.
@@ -134,6 +134,7 @@ function jsonLdShape(text, types, keys) {
     const localContextOfficial = declaresContext && !!schemaVocabulary(node['@context'])
     const trusted = declaresContext ? localContextOfficial : inheritedSchema
     const foreignContext = declaresContext && !localContextOfficial
+    if (foreignContext) sourceContexts.foreign = true
     // A descendant that overrides an already verified Schema vocabulary
     // makes the whole offline Product/Offer structural review ambiguous.
     // The strict source scanner and private price reader refuse it too.
@@ -230,6 +231,7 @@ export function proposeRetailerSelectors(source, html) {
   const jsonLdKeys = new Set()
   let invalidJsonLdCount = 0
   let jsonLdScriptCount = 0
+  const sourceContexts = {foreign:false}
   // Inspect only script elements proved live by the same bounded HTML scanner.
   // Matching raw HTML with a regex admitted fake JSON-LD scripts embedded
   // inside <style>, inert SVG or quoted attribute values. Never execute JS.
@@ -244,7 +246,7 @@ export function proposeRetailerSelectors(source, html) {
     if (scriptType === 'application/ld+json') {
       jsonLdScriptCount++
       if (jsonLdScriptCount > 16 ||
-          !jsonLdShape(script.content,jsonLdTypes,jsonLdKeys))
+          !jsonLdShape(script.content,jsonLdTypes,jsonLdKeys,sourceContexts))
         invalidJsonLdCount++
     }
     if (admittedRetailerScriptId(script.attrs.get('id'))==='__NUXT_DATA__') {
@@ -263,6 +265,11 @@ export function proposeRetailerSelectors(source, html) {
       }
     }
   }
+  // A second, independently foreign JSON-LD document is also a direct
+  // contradiction of otherwise-official Product/Offer context evidence. The
+  // strict private inspector already denies that combined source claim.
+  if (sourceContexts.foreign && (jsonLdTypes.size || jsonLdKeys.size))
+    invalidJsonLdCount++
   // Source evidence is an indivisible snapshot: one malformed JSON-LD block
   // invalidates the aggregated review, even if another block was parseable.
   if (invalidJsonLdCount !== 0) {
