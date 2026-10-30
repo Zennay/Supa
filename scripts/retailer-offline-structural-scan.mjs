@@ -113,6 +113,10 @@ function hasProduct(value, depth = 0, inheritedSchemaContext = false) {
     hasProduct(value[key],depth+1,officialContext));
 }
 
+// Reuse the same official-context check for the historical M1 source
+// inspector, not a weaker bare @type="Product" admission.
+export { hasProduct as hasVerifiedSchemaProduct }
+
 // includeScripts is for the trusted private PRICE parser only. The public
 // selector report continues to expose only counts and booleans by default.
 export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {}) {

@@ -4,7 +4,7 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import { parseSchemaOrgProduct } from '../src/data/schemaOrgProduct.ts'
-import { scanOfflineRetailerMarkup } from './retailer-offline-structural-scan.mjs'
+import { scanOfflineRetailerMarkup, hasVerifiedSchemaProduct } from './retailer-offline-structural-scan.mjs'
 import { admittedJsonScriptType, admittedRetailerScriptId } from './retailer-json-script-mime.mjs'
 import { parseUniqueKeyRetailerJson } from './retailer-private-unique-key-json.mjs'
 import { decodeExactRetailerHtmlBytes } from './retailer-private-html-byte-identity.mjs'
@@ -172,7 +172,10 @@ export async function inspectCaptureDirectory(rootDir) {
         sha256: result.sha256,
       }
       const schemaResults = extractJsonLdValues(html)
-        .filter((value) => !value?.__supaParseError)
+        // The generic Product parser accepts legacy short names. At the M1
+        // source boundary, require explicit official Schema.org context or
+        // absolute Product IRI before even proposing a priced observation.
+        .filter((value) => !value?.__supaParseError && hasVerifiedSchemaProduct(value))
         .map((value) => parseSchemaOrgProduct(value, provenance))
 
       const observations = schemaResults.filter(

@@ -223,3 +223,21 @@ test('M1 captured manifest duplicate identities cannot be laundered by JSON last
     await assert.rejects(inspectCaptureDirectory(root),/ambiguous|duplicate|manifest|JSON/i)
   } finally {await rm(root,{recursive:true,force:true})}
 })
+
+test('M1 capture inspection refuses unscoped fake Product price while retaining official-context source evidence',async()=>{
+  const {rm}=await import('node:fs/promises')
+  const root=await mkdtemp(path.join(os.tmpdir(),'supa-m1-schema-origin-'))
+  try {
+    await mkdir(path.join(root,'plus'))
+    const product={'@type':'Product',name:'SYNTHETIC',sku:'TEST',offers:{'@type':'Offer',price:'1.99',priceCurrency:'EUR',availability:'https://schema.org/InStock'}}
+    for(const official of [false,true]) {
+      const body=official?{'@context':'https://schema.org',...product}:product
+      const html='<script type="application/ld+json">'+JSON.stringify(body)+'</script>'
+      await writeFile(path.join(root,'plus','plus-product.html'),html)
+      await writeFile(path.join(root,'manifest.json'),JSON.stringify({milestone:'M1 Data Feasibility',bounded:true,sourceCount:1,results:[{id:'plus-product',supermarket:'plus',kind:'product',requestedUrl:'https://www.plus.nl/product/test',finalUrl:'https://www.plus.nl/product/test',capturedAt:'2026-10-04T00:00:00.000Z',sha256:createHash('sha256').update(html).digest('hex'),success:true}]}))
+      const review=await inspectCaptureDirectory(root)
+      assert.equal(review.sources[0].schemaOrgProduct.type,official?'observation':'abstain')
+      if(official)assert.equal(review.sources[0].schemaOrgProduct.observation.currentPriceCents,199)
+    }
+  } finally {await rm(root,{recursive:true,force:true})}
+})
