@@ -35,3 +35,36 @@ for(const source of sources){
     assert.throws(()=>proposeOfflineRetailerSelectors({html:denied,origin}),/archive|retention/i)
   })
 }
+
+// Exercise the real capture -> signed SHA -> private product + selector bridge,
+// not just the offline parser. Fetch and authorization are synthetic in-memory.
+const {captureApprovedProductReviewBundle} = await import('../scripts/retailer-approved-html-product-price-candidate.mjs')
+const {createHash} = await import('node:crypto')
+for (const source of sources) {
+  test(`${source.retailerId}: one synthetic captured HTML response joins product-price and selector evidence without a body tag`,async()=>{
+    const sku = 'synthetic-browser-head'
+    const product={'@context':'https://schema.org','@type':'Product',name:'Synthetic milk',sku,url:source.url,
+      weight:{value:'500 g'},offers:{'@type':'Offer',price:'2.49',priceCurrency:'EUR',availability:'https://schema.org/InStock'}}
+    const html='<!doctype html><html><head><meta charset="utf-8">'+
+      '<script type="application/ld+json">'+JSON.stringify(product)+'</script><main>'+observed.replace('price_value','price-value')
+    let count=0
+    const result=await captureApprovedProductReviewBundle({
+      source:{supermarket:source.retailerId,kind:'product',url:source.url},
+      permissionGate:{version:1,milestone:'M1 Data Feasibility',reviewedAt:'2026-10-16',sources:sources.map(({retailerId})=>({
+        supermarket:retailerId,technicalStatus:'proven',permissionStatus:'permitted',productionEnabled:true,
+        evidence:[{kind:'written_permission',url:'https://example.test/synthetic-only',finding:'FICTIONAL TEST; NOT REAL PERMISSION'}]}))},
+      grant:{supermarket:source.retailerId,kind:'product',sourceUrl:source.url,reviewed:true,termsReviewed:true,robotsReviewed:true,noAntiBotBypass:true},
+      capturedAt:new Date(Date.now()-30_000).toISOString(),
+      fetchFn:async()=>{count++;return new Response(html,{status:200,headers:{'content-type':'text/html'}})},
+    })
+    assert.equal(count,1)
+    assert.equal(result.source.sha256,createHash('sha256').update(html).digest('hex'))
+    assert.equal(result.source.sha256,result.priceReview.source.sha256)
+    assert.equal(result.priceReview.status,'candidate_needs_review')
+    assert.equal(result.priceReview.observation.currentPriceCents,249)
+    assert.ok(result.selectorReview.proposals.some(x=>x.field==='price'&&x.selector==='span.price-value'))
+    assert.equal(result.actualTransportInvocations,1)
+    for(const field of ['published','readyForIngestion','productionEnabled','publicSavingsClaimEligible','sourceRightsForPublicationVerified'])
+      assert.equal(result[field],false,field)
+  })
+}
