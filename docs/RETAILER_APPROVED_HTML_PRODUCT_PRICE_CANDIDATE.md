@@ -419,3 +419,12 @@ geen script of template af. De gedeelde scanner herkent nu uitsluitend echte
 niet alsnog zichtbare Product-, prijs- of selectorinformatie kan opleveren.
 Evenzo wordt `< script>` nooit als JSON-LD-script aangemerkt. Ongeldig
 bronscript levert geen prijswaarneming; echt geldig HTML blijft ondersteund.
+
+### DOCTYPE en verwerkinginstructies zijn geen prijs- of DOM-bewijs
+
+HTML-doctypedeclaraties en XML-verwerkinginstructies zijn geen scripts of
+echte HTML-starttags. De gedeelde offline bronparser negeert daarom hun
+quote-aware inhoud en weigert ambigue ongeldige interne subsets met een
+ongequote `<`. Een in een declaratie gestopte JSON-LD Product of klasse mag
+geen selector- of prijssignaal opleveren. Een afzonderlijk echt script ná
+een correcte declaratie wordt nog wel herkend.

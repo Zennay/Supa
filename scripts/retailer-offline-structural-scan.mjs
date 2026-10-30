@@ -95,6 +95,13 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
       pos = end + 3;
       continue;
     }
+    // DOCTYPE, invalid HTML internal subsets, XML processing instructions and
+    // conditional declarations are never DOM elements. Their quoted contents
+    // must not be rescanned as live Product scripts or selector-bearing tags.
+    if (html.startsWith('<!', start) || html.startsWith('<?', start)) {
+      pos = tagEnd(html, start + 2) + 1;
+      continue;
+    }
     const token = /^<(\/?)([a-z][a-z0-9-]{0,32})\b/i.exec(html.slice(start));
     if (!token) { pos = start + 1; continue; }
     if (++inspected > 25000) throw new Error('Offline token budget exceeded');

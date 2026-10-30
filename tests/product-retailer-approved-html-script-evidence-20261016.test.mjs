@@ -243,3 +243,14 @@ test('invalid HTML start-tag whitespace or fake script closer cannot admit a Pro
   assert.equal((await run('plus',falseClosing)).status,'review_required')
   assert.equal((await run('plus',markup)).status,'candidate_needs_review')
 })
+
+test('quoted DOCTYPE/Product declaration cannot impersonate authorized JSON-LD evidence', async () => {
+  const genuine=script('type="application/ld+json"',plusProduct)
+  const header=`<!DOCTYPE html SYSTEM '${genuine}'>`
+  const denied=await run('plus',header)
+  assert.equal(denied.status,'review_required')
+  assert.equal(denied.observation,null)
+  const accepted=await run('plus',header+genuine)
+  assert.equal(accepted.status,'candidate_needs_review')
+  assert.equal(accepted.publicSavingsClaimEligible,false)
+})

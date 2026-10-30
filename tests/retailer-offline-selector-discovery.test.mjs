@@ -281,3 +281,19 @@ test('invalid HTML spacing in start/end tags cannot reveal inert Product markup'
   assert.equal(report.structuredSignals.jsonLd,false)
   assert.equal(report.selectors.length,0)
 })
+
+test('HTML declarations and quoted processing instructions are never real Product DOM sources', () => {
+  const fake='<script type="application/ld+json">{"@type":"Product"}</script>'
+  const html=`<!DOCTYPE html SYSTEM "${fake}"><article class="product-card">SYNTHETIC</article>`
+  const report=proposeOfflineRetailerSelectors({html,origin})
+  assert.equal(report.structuredSignals.jsonLd,false)
+  assert.equal(report.structuredSignals.schemaOrgProduct,false)
+  assert.ok(report.selectors.some(x=>x.selector==='article.product-card'))
+  const pi=`<?xml version="1.0" note="${fake}"><div class="price-value">SYNTHETIC</div>`
+  const second=proposeOfflineRetailerSelectors({html:pi,origin})
+  assert.equal(second.structuredSignals.jsonLd,false)
+  assert.ok(second.selectors.some(x=>x.selector==='div.price-value'))
+  assert.throws(()=>proposeOfflineRetailerSelectors({
+    html:`<!DOCTYPE html [ ${fake} ]>`,origin,
+  }),/Malformed offline tag/)
+})
