@@ -676,3 +676,15 @@ test('private HTML listing coverage counts distinct observed products, not repea
   assert.equal(privateReview.readyForIngestion,false)
   assert.doesNotMatch(JSON.stringify(privateReview),/synthetic-1|synthetic-2|utm_source/)
 })
+
+test('private offline proposals refuse live no-store meta while ignoring inert fake tags', () => {
+  const origin={retailerId:'plus',url:'https://www.plus.nl/producten',capturedAt:'2026-10-14T12:00:00.000Z'}
+  const anchor='<a href="/product/synthetic-1">SYNTHETIC</a>'
+  const meta='<meta http-equiv="Cache-Control" content="no-store">'
+  const page=tag=>'<html><head>'+tag+'</head><body>'+anchor+'</body></html>'
+  assert.throws(()=>proposeOfflineRetailerSelectors({html:page(meta),origin}),
+    /Untrusted HTML no-store archival directive/)
+  const allowed=proposeOfflineRetailerSelectors({html:page('<template>'+meta+'</template>'),origin})
+  assert.equal(allowed.selectors.find(x=>x.selector==='a[href^="/product/"]')?.instances,1)
+  assert.equal(allowed.readyForIngestion,false)
+})
