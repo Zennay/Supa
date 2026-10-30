@@ -35,7 +35,7 @@ function owned(record, key) {
   const descriptor = Object.getOwnPropertyDescriptor(record, key)
   return descriptor && Object.hasOwn(descriptor, 'value') ? descriptor.value : undefined
 }
-function mapCandidateFields(suggestions) {
+function mapCandidateFields(suggestions, observedCurrentPriceSelectors = null) {
   // Semantic hints for AI/human review; NOT parsed product values or vetted CSS.
   const patterns = {
     name: /name|naam|title/i,
@@ -46,7 +46,9 @@ function mapCandidateFields(suggestions) {
   }
   return Object.fromEntries(Object.entries(patterns).map(([field, expression]) => [
     field,
-    suggestions.filter(item => expression.test(item.selector))
+    suggestions.filter(item => expression.test(item.selector) &&
+      (field !== 'price' || observedCurrentPriceSelectors === null ||
+       observedCurrentPriceSelectors.has(item.selector)))
       .slice(0, 8).map(item => ({
         selector: item.selector, status: 'UNVERIFIED_FIELD_HINT',
         reviewerMustVerifySemantics: true,
@@ -301,9 +303,15 @@ export function proposeRetailerSelectors(source, html) {
   // have older clock formats: if the modern analyzer declines, do not invent
   // candidates and preserve the original class-only review.
   let semantic = []
+  let observedCurrentPriceSelectors = null
   try {
     const discovered = proposeOfflineRetailerSelectors({html,origin:{
       retailerId:identity.supermarket,url:identity.url,capturedAt:identity.capturedAt}})
+    // The historical generic class list may include old prices. Field hints
+    // must agree with the strict, ancestor-aware snapshot price proposal;
+    // preserve raw selectors for human inspection, never label them current.
+    observedCurrentPriceSelectors = new Set(discovered.selectors
+      .filter(row => row.field === 'price').map(row => row.selector))
     semantic = summarizeOfflineSelectorProposals(discovered).selectors
       // Only the modern scanner's pre-sanitized, public vocabulary hints.
       // No original price, ID, href or arbitrary CSS token is copied.
@@ -329,7 +337,7 @@ export function proposeRetailerSelectors(source, html) {
       invalidJsonLdCount,
     },
     proposedSelectors: completeSuggestions,
-    possibleFieldSelectors: mapCandidateFields(completeSuggestions),
+    possibleFieldSelectors: mapCandidateFields(completeSuggestions, observedCurrentPriceSelectors),
     readyForScraping: false, sourcePermissionVerified: false,
     currentPricesExtracted: false, publicationAllowed: false,
   }

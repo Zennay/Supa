@@ -743,3 +743,16 @@ test('standalone HTTPS references in Schema.org retail relations remain non-exec
     assert.equal(read({'@context':'https://schema.org','@type':'Product','@graph':'https://example.invalid/graph'}).invalidJsonLdCount,1)
   }
 })
+
+test('legacy M1 review may not label old-price child as current price field hint', () => {
+  const html='<article class="product-card"><div class="old-price"><span class="price-value">SYNTHETIC_OLD</span></div>'+
+    '<div class="current-price"><span class="price-value">SYNTHETIC_CURRENT</span></div></article>'
+  for (const [store,kind] of [['plus','catalog'],['dekamarkt','offers']]) {
+    const report=proposeRetailerSelectors(source(store,kind,html),html)
+    assert.ok(report.proposedSelectors.some(row=>row.selector==='span.price-value'))
+    assert.equal(report.possibleFieldSelectors.price.some(row=>row.selector==='span.price-value'),false,store)
+    assert.ok(report.possibleFieldSelectors.price.some(row=>row.selector==='div.current-price'),store)
+    assert.equal(report.currentPricesExtracted,false)
+    assert.doesNotMatch(JSON.stringify(report),/SYNTHETIC_OLD|SYNTHETIC_CURRENT/)
+  }
+})
