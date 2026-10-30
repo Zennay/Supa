@@ -24,3 +24,24 @@
 }
 .hifi-working-shell .hifi-recipes { padding: 24px 0 128px; min-height: 0; }
 .hifi-recipe-add { color: #fff; }
+
+/* The real 320px recipe picker must not widen the document: its category
+   carousel and chips scroll *inside* their own boxes, never beyond the
+   viewport. Keep desktop Figma spacing and give mobile add/filter actions
+   thumb-sized hit areas. */
+@media (max-width: 640px) {
+  .hifi-recipes .hifi-category-row {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    padding: 4px 12px 4px 4px;
+  }
+  .hifi-recipes .hifi-chip-row {
+    box-sizing: border-box;
+    margin-inline: 0;
+    padding-inline: 0 12px;
+    max-width: 100%;
+  }
+  .hifi-recipes .hifi-chip-row button { min-height: 44px; }
+  .hifi-recipes .hifi-recipe-add { width: 44px; height: 44px; right: 4px; bottom: 4px; }
+}
