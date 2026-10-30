@@ -24,3 +24,7 @@ export function readSelectedStores(): string[] {
     return Array.isArray(value) ? value.filter((id): id is string => typeof id === 'string' && known.has(id)) : fallback
   } catch { return fallback }
 }
+
+export function writeSelectedStores(ids: string[]) {
+  try { window.localStorage.setItem(storesStorageKey, JSON.stringify(ids)) } catch { /* selection stays in memory */ }
+}
