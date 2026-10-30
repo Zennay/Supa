@@ -228,14 +228,26 @@ export async function captureApprovedRetailerPage(options = {}) {
     },
     signal: AbortSignal.timeout(TIMEOUT_MS),
   })
+  // Rejected upstream bodies must not keep downloading after the source
+  // lane refuses their status, final URL or unsafe response metadata.
+  async function closeRejectedBody() {
+    try { await response?.body?.cancel?.() } catch { /* fail closed */ }
+  }
   if (response?.status === 403 || response?.status === 429) {
+    await closeRejectedBody()
     throw new Error('Retailer refused or rate-limited capture; no retry/rotation')
   }
   if (response?.status !== 200 || response?.ok !== true ||
       (response.url && response.url !== target)) {
+    await closeRejectedBody()
     throw new Error('Retailer capture failed or redirected')
   }
-  const body = await collectBoundedBody(response)
+  let body
+  try { body = await collectBoundedBody(response) }
+  catch (error) {
+    await closeRejectedBody()
+    throw error
+  }
   return {
     mode: 'authorized-one-page-capture-needs-review',
     source: {
