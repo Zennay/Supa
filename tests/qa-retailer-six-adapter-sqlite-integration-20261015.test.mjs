@@ -40,8 +40,11 @@ test('REAL six reviewed PLUS/Deka adapters -> one universal DB, original snapsho
     ])
     assert.deepEqual(query(output, "SELECT retailer_id,source_product_id,price_cents FROM price_observations WHERE source_product_id IN ('115873','579010') ORDER BY retailer_id,price_cents"), [
       ['dekamarkt', '115873', 85], ['dekamarkt', '115873', 85],
-      ['plus', '579010', 85], ['plus', '579010', 85],
+      // PLUS's historical product JSON-LD has only a unit price, not a
+      // payable pack Offer.price; SQL must retain that unknown as NULL.
+      ['plus', '579010', null], ['plus', '579010', 85],
     ])
+    assert.deepEqual(query(output, "SELECT COUNT(*) FROM price_observations WHERE retailer_id='plus' AND source_product_id='579010' AND price_cents IS NULL"), [[1]])
     assert.deepEqual(query(output, "SELECT value FROM metadata WHERE key='production_enabled'"), [['false']])
     const text = await readFile(output)
     assert.ok(text.byteLength > 10000)
