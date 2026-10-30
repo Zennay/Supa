@@ -245,3 +245,22 @@ test('truncated/overlong identity HTML responses never become approved captures'
   assert.equal(compressed.source.sha256, admitted.source.sha256)
   assert.equal(compressed.published, false)
 })
+
+test('unbounded tiny HTTP chunks fail closed and cancel the stream', async () => {
+  let chunks = 0
+  let cancellations = 0
+  const stream = new ReadableStream({
+    pull(controller) {
+      chunks++
+      controller.enqueue(new Uint8Array([60]))
+    },
+    cancel() { cancellations++ },
+  })
+  await assert.rejects(captureApprovedRetailerPage({
+    source, permissionGate: gate, grant,
+    fetchFn: async () => new Response(stream, {status: 200,
+      headers: {'content-type': 'text/html'}}),
+  }), /HTML stream segment budget exceeded/)
+  assert.equal(cancellations, 1)
+  assert.ok(chunks >= 8192 && chunks <= 8200)
+})
