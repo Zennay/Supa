@@ -298,3 +298,18 @@ test('mixed offline pilot batch processes independently attributed PLUS and Deka
   assert.equal(archive.published, false)
   assert.equal(archive.sourceRightsForPublicationVerified, false)
 })
+
+
+test('historical HTML remains inspectable but is not a fresh price candidate', async t => {
+  const output = await capture(t)
+  const manifestPath = output + '.manifest.json'
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+  manifest.source.capturedAt = new Date(Date.now() - 25 * 3600_000).toISOString()
+  await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n')
+  const historical = await replayPrivateProductHtmlSnapshot(output)
+  assert.equal(historical.status, 'unverified_product')
+  assert.equal(historical.observation, null)
+  assert.ok(historical.selectorProposals.length > 0)
+  assert.equal(historical.permissionVerifiedForThisReplay, false)
+  assert.equal(historical.published, false)
+})

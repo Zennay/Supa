@@ -167,3 +167,10 @@ alleen aantallen kandidaten en onbesliste records per keten, nooit individuele
 producten, bedragen of URLs. De synthetische end-to-endtests gebruiken
 speciaal fictieve toestemming; dit activeert geen live retailercapture of
 publicatie.
+
+De offline replay houdt een historische opname ouder dan 24 uur nog beschikbaar
+voor de originele SHA-gebonden selectorinspectie, maar labelt de prijs als
+`unverified_product` en verwijdert de prijsobservatie uit het reviewrecord.
+Ook de batch telt zulke historische bronnen niet als nieuwe actuele
+prijskandidaten. Dat is bewust strenger dan alleen een aanwezig eurobedrag
+controleren; de data worden niet opnieuw opgehaald of ververst.

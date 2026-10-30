@@ -92,7 +92,10 @@ export async function replayPrivateProductHtmlSnapshot(filename) {
   })
   if (selectors.source.sha256 !== src.sha256) fail()
   const price = parsed.type === 'observation' ? parsed.observation : null
-  const plausible = price && Number.isSafeInteger(price.currentPriceCents) &&
+  const maxCandidateAgeMs = 24 * 60 * 60 * 1000
+  const freshEnoughForPriceReview = Date.now() - Date.parse(src.capturedAt) <= maxCandidateAgeMs
+  const plausible = freshEnoughForPriceReview &&
+    price && Number.isSafeInteger(price.currentPriceCents) &&
     price.currentPriceCents > 0 && price.pack.amount !== null &&
     price.availability === 'available' &&
     !['unknown', 'pack'].includes(price.pack.unit)
