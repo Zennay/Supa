@@ -66,8 +66,15 @@ function admitManifest(record) {
       !allowedCaptureRoute(src, url) ||
       ambiguousRetailerRoute(url.pathname)) fail()
   const ms = Date.parse(src.capturedAt)
-  if (!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(src.capturedAt) ||
-      !Number.isFinite(ms) || new Date(ms).toISOString() !== src.capturedAt ||
+  // The same source timestamp may have 1–9 exact UTC fractional digits
+  // in a historical M1 archive. Date.parse truncates submilliseconds for
+  // calendar validation only; never alter the original SHA-linked evidence.
+  const validClock = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{1,9}Z$/.test(src.capturedAt)
+  const calendar = Number.isFinite(ms) ? new Date(ms).toISOString() : ''
+  const fractional = validClock ? src.capturedAt.split('.')[1].slice(0,-1) : ''
+  if (!validClock || !Number.isFinite(ms) ||
+      calendar.slice(0,19) !== src.capturedAt.slice(0,19) ||
+      calendar.slice(20,23) !== fractional.slice(0,3).padEnd(3,'0') ||
       ms > Date.now() + 60_000) fail()
   return src
 }

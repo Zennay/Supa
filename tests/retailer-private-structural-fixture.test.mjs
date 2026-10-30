@@ -875,3 +875,44 @@ test('two-retailer encoded Product microdata remains source-proven through priva
     assert.equal(replay.productionEnabled,false)
   }
 })
+
+test('two-retailer private HTML pair preserves nanosecond UTC capture provenance end to end',async t=>{
+  const plus=await archive(t,'plus','catalog')
+  const deka=await archive(t,'dekamarkt','offers')
+  const capturedAt='2026-10-14T12:00:00.123456789Z'
+  for(const record of [plus,deka]) {
+    const path=record.filename+'.manifest.json'
+    const manifest=JSON.parse(await readFile(path,'utf8'))
+    manifest.source.capturedAt=capturedAt
+    await writeFile(path,JSON.stringify(manifest,null,2)+'\n',{mode:0o600})
+  }
+  const out=join(plus.dir,'nanosecond-two-store')
+  const built=await buildPrivateSyntheticFixturePair(plus.filename,deka.filename,out)
+  const verified=await verifyPrivateSyntheticFixturePair(plus.filename,deka.filename,out)
+  const manifest=JSON.parse(await readFile(join(out,'pair-provenance.json'),'utf8'))
+  assert.equal(built.created,true)
+  assert.equal(verified.verified,true)
+  assert.deepEqual(manifest.sources.map(x=>x.capturedAt),[capturedAt,capturedAt])
+  assert.equal(verified.productionEnabled,false)
+  assert.equal(built.published,false)
+})
+
+test('nanosecond private pair admission rejects noncanonical, impossible and future capture UTC evidence',async t=>{
+  const p=await archive(t,'plus','catalog')
+  const d=await archive(t,'dekamarkt','offers')
+  const manifestFile=p.filename+'.manifest.json'
+  const initial=JSON.parse(await readFile(manifestFile,'utf8'))
+  for(const [index,clock] of [
+    '2026-02-30T12:00:00.123456789Z',
+    '2026-10-14T12:00:00.1234567890Z',
+    '2026-10-14T12:00:00.123456789+00:00',
+    '2999-10-14T12:00:00.123456789Z',
+  ].entries()) {
+    const invalid=structuredClone(initial)
+    invalid.source.capturedAt=clock
+    await writeFile(manifestFile,JSON.stringify(invalid,null,2)+'\n',{mode:0o600})
+    const out=join(p.dir,'invalid-pair-'+index)
+    await assert.rejects(buildPrivateSyntheticFixturePair(p.filename,d.filename,out),/refused/)
+    await assert.rejects(stat(out),{code:'ENOENT'})
+  }
+})
