@@ -5,6 +5,8 @@ import { pathToFileURL } from 'node:url'
 
 import { parseSchemaOrgProduct } from '../src/data/schemaOrgProduct.ts'
 import { scanOfflineRetailerMarkup, hasVerifiedSchemaProduct } from './retailer-offline-structural-scan.mjs'
+import { assertObservedRetailerHtmlIdentity } from './retailer-offline-selector-discovery.mjs'
+import { isAllowedM1RetailerSourcePath } from './retailer-source-route-safety.mjs'
 import { admittedJsonScriptType, admittedRetailerScriptId } from './retailer-json-script-mime.mjs'
 import { parseUniqueKeyRetailerJson } from './retailer-private-unique-key-json.mjs'
 import { decodeExactRetailerHtmlBytes } from './retailer-private-html-byte-identity.mjs'
@@ -19,6 +21,26 @@ function isSafePathSegment(value) {
     typeof value === 'string' &&
     /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)
   )
+}
+
+function admittedSourceUrl(record) {
+  const hosts={plus:'www.plus.nl',dekamarkt:'www.dekamarkt.nl',ah:'www.ah.nl'}
+  const raw=record.requestedUrl
+  if (!Object.hasOwn(hosts,record.supermarket) || typeof raw !== 'string' ||
+      (record.finalUrl != null && record.finalUrl !== raw))
+    throw new Error('Capture source URL identity or redirect mismatch')
+  let url
+  try { url=new URL(raw) } catch { throw new Error('Invalid capture source URL') }
+  const path=url.pathname
+  const route=record.supermarket==='ah'
+    ? record.kind==='product' && path.startsWith('/producten/product/') &&
+      path.length > '/producten/product/'.length
+    : ['product','catalog','offers'].includes(record.kind) &&
+      isAllowedM1RetailerSourcePath(record.supermarket,record.kind,path)
+  if (url.protocol!=='https:' || url.hostname!==hosts[record.supermarket] ||
+      url.port || url.username || url.password || url.search || url.hash ||
+      url.href!==raw || !route) throw new Error('Unapproved capture source URL identity')
+  return raw
 }
 
 function decodeHtmlEntities(value) {
@@ -148,6 +170,7 @@ export async function inspectCaptureDirectory(rootDir) {
     }
 
     if (result.success) {
+      const sourceUrl=admittedSourceUrl(result)
       const htmlPath = path.join(rootDir, result.supermarket, `${result.id}.html`)
       // Hash the immutable ORIGINAL bytes. Decoding with replacement chars
       // before hashing could make a forged manifest refer to different HTML.
@@ -161,13 +184,17 @@ export async function inspectCaptureDirectory(rootDir) {
       }
 
       const html = decodeExactRetailerHtmlBytes(rawHtml,5 * 1024 * 1024)
+      const observed=scanOfflineRetailerMarkup(html)
+      if (observed.baseHrefs.length>1 || observed.canonicalHrefs.length>1)
+        throw new Error('Ambiguous capture canonical or base identity')
+      assertObservedRetailerHtmlIdentity(sourceUrl,observed.baseHrefs,observed.canonicalHrefs)
       record.integrity = 'verified'
       record.html = inspectHtml(html)
 
       const provenance = {
         supermarket: result.supermarket,
         kind: result.kind,
-        url: result.finalUrl ?? result.requestedUrl,
+        url: sourceUrl,
         capturedAt: result.capturedAt,
         sha256: result.sha256,
       }

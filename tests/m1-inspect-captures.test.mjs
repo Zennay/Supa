@@ -241,3 +241,27 @@ test('M1 capture inspection refuses unscoped fake Product price while retaining 
     }
   } finally {await rm(root,{recursive:true,force:true})}
 })
+
+test('M1 inspection binds archived product bytes to one verified retailer URL and DOM canonical',async()=>{
+  const {rm}=await import('node:fs/promises')
+  const root=await mkdtemp(path.join(os.tmpdir(),'supa-m1-real-identity-'))
+  try {
+    await mkdir(path.join(root,'plus'))
+    const goodUrl='https://www.plus.nl/product/test'
+    const write=async(html,finalUrl=goodUrl)=>{
+      await writeFile(path.join(root,'plus','plus-product.html'),html)
+      await writeFile(path.join(root,'manifest.json'),JSON.stringify({milestone:'M1 Data Feasibility',bounded:true,sourceCount:1,results:[{id:'plus-product',supermarket:'plus',kind:'product',requestedUrl:goodUrl,finalUrl,capturedAt:'2026-10-04T00:00:00.000Z',sha256:createHash('sha256').update(html).digest('hex'),success:true}]}))
+    }
+    const product='<script type="application/ld+json">'+JSON.stringify({'@context':'https://schema.org','@type':'Product',name:'SYNTHETIC',sku:'TEST',offers:{'@type':'Offer',price:'1.99',priceCurrency:'EUR'}})+'</script>'
+    await write('<html><link rel="canonical" href="'+goodUrl+'">'+product+'</html>')
+    assert.equal((await inspectCaptureDirectory(root)).sources[0].integrity,'verified')
+    for(const wrong of ['https://www.plus.nl/product/other','https://www.dekamarkt.nl/producten/other']){
+      await write('<html>'+product+'</html>',wrong)
+      await assert.rejects(inspectCaptureDirectory(root),/origin|URL|redirect|source|identity/i)
+    }
+    for(const declaration of ['<link rel="canonical" href="https://www.plus.nl/product/other">','<base href="https://other.invalid/">']){
+      await write('<html>'+declaration+product+'</html>')
+      await assert.rejects(inspectCaptureDirectory(root),/canonical|base|origin|source|identity/i)
+    }
+  } finally {await rm(root,{recursive:true,force:true})}
+})
