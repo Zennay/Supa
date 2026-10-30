@@ -72,21 +72,52 @@ function inertCaptureOptions(options) {
 // identifier or price. Only a bounded vocabulary of generic selectors leaves
 // the private captured HTML scope; unknown selectors stay in private review.
 const GENERIC_SELECTOR = /^[a-z][a-z0-9-]{0,30}\.(?:product|item|card|tile|name|title|label|price|pack|size|unit|offer|deal|sale|discount|stock|availability|product-card|price-label|price-value|offer-card|product-name|item-card|item-name|price-tag|stock-label)$/
+// These are actual standards-based selectors from the captured DOM, not
+// inferred retail fields. Allow exact public Schema.org tokens and a bounded
+// vocabulary of generic test IDs across the privacy/review boundary.
+const SCHEMA_FIELDS = Object.freeze({
+  name: 'name', price: 'price', lowPrice: 'price', highPrice: 'price',
+  priceCurrency: 'price', priceSpecification: 'price',
+  priceValidUntil: 'offer', offers: 'offer', weight: 'pack',
+  size: 'pack', unitCode: 'pack', unitText: 'pack',
+  availability: 'availability', inventoryLevel: 'availability',
+})
+const GENERIC_TEST_ID_FIELDS = Object.freeze({
+  'product-card':'product', 'item-card':'product',
+  'product-name':'name', 'item-name':'name',
+  'price-value':'price', 'price-label':'price', 'price-tag':'price',
+  'pack-size':'pack', 'offer-card':'offer', 'offer-label':'offer',
+  'stock-label':'availability',
+})
+const SCHEMA_PROP_SELECTOR = /^(article|section|div|li|a|span|h2|h3|p|strong|meta|link|data|time)\[itemprop="([a-zA-Z]+)"\]$/
+const GENERIC_TEST_ID_SELECTOR = /^(article|section|div|li|a|span|h2|h3|p|strong|meta|link|data|time)\[data-testid="([a-z][a-z-]+)"\]$/
+const SCHEMA_PRODUCT_SELECTOR = /^(article|section|div|li|a)\[itemtype="https?:\/\/schema\.org\/Product"\]$/
+function publicReviewSelector(row, retailerId) {
+  if (GENERIC_SELECTOR.test(row.selector)) return true
+  const schemaProperty = SCHEMA_PROP_SELECTOR.exec(row.selector)
+  if (schemaProperty) return Object.hasOwn(SCHEMA_FIELDS, schemaProperty[2]) &&
+    SCHEMA_FIELDS[schemaProperty[2]] === row.field
+  const testId = GENERIC_TEST_ID_SELECTOR.exec(row.selector)
+  if (testId) return Object.hasOwn(GENERIC_TEST_ID_FIELDS, testId[2]) &&
+    GENERIC_TEST_ID_FIELDS[testId[2]] === row.field
+  return row.field === 'product' &&
+    (SCHEMA_PRODUCT_SELECTOR.test(row.selector) ||
+      isPublicMerchantProductHrefSelector(retailerId, row.selector))
+}
 // The only absolute href prefixes allowed out of private source review are
-// known official merchant product roots, never a SKU, query or arbitrary URL.
+// official merchant product roots, never a SKU, query or arbitrary URL.
 export function safeSelectorProposals(selectors, retailerId) {
   if (!Array.isArray(selectors) || selectors.length > 24) refuse()
   return selectors.filter(row =>
     row && row.status === 'needs-human-review' &&
     typeof row.selector === 'string' &&
-    (GENERIC_SELECTOR.test(row.selector) ||
-      (row.field === 'product' &&
-        isPublicMerchantProductHrefSelector(retailerId, row.selector))) &&
     typeof row.field === 'string' && /^[a-z]{2,20}$/.test(row.field) &&
+    publicReviewSelector(row, retailerId) &&
     typeof row.instances === 'number' && Number.isSafeInteger(row.instances) &&
     row.instances >= 1
   ).map(row => ({
-    field: row.field, selector: row.selector, tag: row.tag,
+    field: row.field, selector: row.selector,
+    tag: /^[a-z][a-z0-9-]*/.exec(row.selector)?.[0],
     instances: row.instances, status: 'needs-human-review',
   }))
 }

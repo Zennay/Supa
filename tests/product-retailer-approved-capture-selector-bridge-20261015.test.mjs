@@ -237,3 +237,30 @@ test('injected one-URL capture never returns cross-store canonical selector cand
   assert.equal(accepted.readyForIngestion,false)
   assert.doesNotMatch(JSON.stringify(accepted),/synthetic-123|www.dekamarkt.nl/)
 })
+
+test('approved one-capture bridge preserves only observed safe Schema.org and generic test-id selectors for PLUS/Deka', async () => {
+  for (const [supermarket, root, host] of [
+    ['plus', '/product/', 'www.plus.nl'],
+    ['dekamarkt', '/producten/', 'www.dekamarkt.nl'],
+  ]) {
+    const url = `https://${host}${root}synthetic-fixture-123`
+    const html = `<article itemscope itemtype="https://schema.org/Product" class="product-card">` +
+      `<a href="${root}synthetic-fixture-123"><span itemprop="name" data-testid="product-name">Private example</span></a>` +
+      `<meta itemprop="price" content="2.49"><span data-testid="pack-size">300 ml</span>` +
+      `<span data-testid="customer-987-price-2-49">Private token</span></article>`
+    const review = await captureToPrivateSelectorReview({
+      source: {supermarket,kind:'product',url},
+      grant: consent(supermarket,'product',url), permissionGate:syntheticGate(), capturedAt:at,
+      fetchFn:async()=>new Response(html,{status:200,headers:{'content-type':'text/html'}}),
+    })
+    for (const selector of [
+      'article[itemtype="https://schema.org/Product"]',
+      'span[itemprop="name"]', 'meta[itemprop="price"]',
+      'span[data-testid="product-name"]', 'span[data-testid="pack-size"]',
+    ]) assert.ok(review.selectorProposals.some(row=>row.selector===selector), `${supermarket}: ${selector}`)
+    assert.equal(review.selectorProposals.some(row=>row.selector.includes('customer-987')),false)
+    assert.doesNotMatch(JSON.stringify(review), /2\.49|Private example|synthetic-fixture-123|customer-987/)
+    assert.equal(review.productionEnabled,false)
+    assert.equal(review.currentPricesExtracted,false)
+  }
+})
