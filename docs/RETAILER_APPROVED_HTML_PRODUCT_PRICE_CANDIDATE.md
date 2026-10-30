@@ -201,3 +201,11 @@ SHA-fingerprint van de URL en geaggregeerde selector-, prijs- en
 verpakkingswijzigingen. Ook de privérapporten presenteren geen checkoutprijs
 of automatisch goedgekeurde selector. De normale CLI-uitvoer bevat uitsluitend
 een neutrale status; geen winkel-URL, HTML of prijs wordt gelogd.
+
+Bij een geslaagde `--batch`, single-item review of `--drift-save` geeft
+de CLI ook `archiveSha256` terug. Dat is uitsluitend de SHA-256 van de
+daadwerkelijk naar een nieuw privébestand geschreven UTF-8 bytes, geen
+individuele prijs of bron-URL. Een operator kan het bestand later onafhankelijk
+controleren met `sha256sum /private/nieuw-reviewpakket.json`. Deze receipt
+bevestigt lokale bestandsintegriteit, **niet** dat de bronrechten, kassaprijs
+of menselijke review zijn goedgekeurd.

@@ -177,12 +177,14 @@ async function writePrivateReviewRecord(record, reviewFile) {
   const dir = await lstat(dirname(target))
   if (!dir.isDirectory() || dir.isSymbolicLink() ||
       (dir.mode & 0o077) !== 0) fail()
+  const archiveBytes = JSON.stringify(record, null, 2) + '\n'
+  const archiveSha256 = createHash('sha256').update(archiveBytes, 'utf8').digest('hex')
   let file, created = false, originalInode = null
   try {
     file = await open(target, 'wx', 0o600)
     created = true
     originalInode = await file.stat()
-    await file.writeFile(JSON.stringify(record, null, 2) + '\n', 'utf8')
+    await file.writeFile(archiveBytes, 'utf8')
     await file.chmod(0o600)
     await file.sync()
     await file.close()
@@ -202,8 +204,10 @@ async function writePrivateReviewRecord(record, reviewFile) {
     }
     fail()
   }
+  // Operator can independently hash the private file to verify durability.
+  // Its content never enters stdout; only the SHA-256 receipt is returned.
   return { created: true, status: record.status, humanReviewRequired: true,
-    published: false, productionEnabled: false }
+    archiveSha256, published: false, productionEnabled: false }
 }
 
 export async function savePrivateOfflineProductReview(htmlFile, reviewFile) {

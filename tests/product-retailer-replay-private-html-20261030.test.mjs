@@ -80,8 +80,13 @@ test('offline review is durably written mode 0600, never overwrites or publishes
   const output = await capture(t)
   const filename = output.replace('captured.html', 'operator-review.json')
   const summary = await savePrivateOfflineProductReview(output, filename)
-  assert.deepEqual(summary, { created: true, status: 'candidate_for_human_review',
-    humanReviewRequired: true, published: false, productionEnabled: false })
+  assert.equal(summary.created, true)
+  assert.equal(summary.status, 'candidate_for_human_review')
+  assert.equal(summary.humanReviewRequired, true)
+  assert.equal(summary.published, false)
+  assert.equal(summary.productionEnabled, false)
+  assert.equal(summary.archiveSha256,
+    createHash('sha256').update(await readFile(filename)).digest('hex'))
   const saved = JSON.parse(await readFile(filename, 'utf8'))
   assert.equal((await stat(filename)).mode & 0o777, 0o600)
   assert.equal(saved.observation.currentPriceCents, 325)
@@ -212,6 +217,8 @@ test('offline two-product batch writes independent historical review without pub
   const output = first.replace('captured.html', 'batch-review.json')
   const summary = await savePrivateOfflineReviewBatch([first, second], output)
   assert.equal(summary.count, 2)
+  assert.equal(summary.archiveSha256,
+    createHash('sha256').update(await readFile(output)).digest('hex'))
   assert.equal(summary.candidateCount, 2)
   assert.equal(summary.unverifiedCount, 0)
   assert.equal(summary.published, false)
@@ -337,6 +344,8 @@ test('independent SHA-pinned offline selector drift is saved mode 0600 without p
   const output = first.replace('captured.html', 'drift-review.json')
   const summary = await savePrivateOfflineDriftReview(first, later, output)
   assert.equal(summary.created, true)
+  assert.equal(summary.archiveSha256,
+    createHash('sha256').update(await readFile(output)).digest('hex'))
   assert.equal(summary.humanReviewRequired, true)
   assert.equal(summary.published, false)
   const saved = JSON.parse(await readFile(output, 'utf8'))
