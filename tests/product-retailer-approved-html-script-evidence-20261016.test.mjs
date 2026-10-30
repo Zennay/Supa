@@ -334,3 +334,23 @@ test('private PLUS parser accepts real JSON-LD from valid omitted head end-tag H
   assert.equal(candidate.observation.currentPriceCents,199)
   assert.equal(candidate.published,false)
 })
+
+test('visible meta refresh prevents trusting JSON-LD prices even if markup contains a valid Product', () => {
+  const markup='<html><head><meta http-equiv="refresh" content="0;url=https://outside.example">' +
+    '<script type="application/ld+json">'+JSON.stringify({
+      '@type':'Product',name:'Synthetic item',offers:{'@type':'Offer',price:'1.99',
+        priceCurrency:'EUR'}
+    })+'</script></head><body></body></html>'
+  const rejected=readAuthorizedHtmlScriptEvidence(markup)
+  assert.equal(rejected.invalid,true)
+  assert.deepEqual(rejected.jsonLdBlocks,[])
+  assert.equal(rejected.nuxtPayload,null)
+  const safe=readAuthorizedHtmlScriptEvidence(markup.replace('http-equiv="refresh"',
+    'data-http-equiv="refresh"'))
+  assert.equal(safe.invalid,false)
+  assert.equal(safe.jsonLdBlocks.length,1)
+  const inert=readAuthorizedHtmlScriptEvidence(markup.replace('<meta http-equiv="refresh"',
+    '<template><meta http-equiv="refresh"').replace('</head>','</template></head>'))
+  assert.equal(inert.invalid,false)
+  assert.equal(inert.jsonLdBlocks.length,0) // JSON-LD inside inert template is not executable
+})
