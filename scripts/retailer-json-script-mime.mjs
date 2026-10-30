@@ -27,7 +27,14 @@ export function admittedJsonScriptType(raw) {
   if (raw === undefined) return undefined
   if (typeof raw !== 'string') return null
   const normalized = browserScriptMime(raw)
-  if (normalized === null) return null
+  // Browser-irrelevant text/*, module, and JavaScript script tags should
+  // not veto a legitimate Product JSON block elsewhere on the same page.
+  // Any malformed JSON-looking application/* type still fails closed.
+  if (normalized === null) {
+    const rawType = raw.trim().toLowerCase()
+    return rawType.startsWith('application') || rawType.includes('ld+json')
+      ? null : rawType
+  }
   const type = normalized.trim().toLowerCase()
   if (!type.startsWith('application/ld+json') &&
       !type.startsWith('application/json')) return type

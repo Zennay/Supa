@@ -493,3 +493,23 @@ test('encoded wrong charsets and nested entities cannot silently conceal contrad
     assert.equal(result.observation, null, type)
   }
 })
+
+
+test('unrelated inert scripts with encoded type cannot veto actual source-bound JSON-LD', async () => {
+  const metadata = '<script type="text/plain&amp;irrelevant">not a product</script>' +
+    '<script type="module&amp;unused">not JSON</script>'
+  const valid = script('type="application/ld+json"', plusProduct)
+  const result = await run('plus', metadata + valid)
+  assert.equal(result.status, 'candidate_needs_review')
+  assert.equal(result.observation.currentPriceCents, 199)
+  const read = readAuthorizedHtmlScriptEvidence(metadata + valid, plusUrl)
+  assert.equal(read.invalid, false)
+  assert.equal(read.jsonLdBlocks.length, 1)
+  assert.equal(read.nuxtPayload, null)
+  const ambiguousJson = '<script type="application/ld+json&amp;semi;charset=utf-8">' +
+    JSON.stringify({ ...plusProduct, offers: { ...plusProduct.offers, price:'0.01' } }) +
+    '</script>'
+  const refusal = await run('plus', metadata + ambiguousJson + valid)
+  assert.equal(refusal.status, 'review_required')
+  assert.equal(refusal.observation, null)
+})
