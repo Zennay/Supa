@@ -457,3 +457,15 @@ de bekende private parsertermen. De SHA-256 blijft berekend over het
 **ongewijzigde originele HTML**; willekeurige `/Product`-URL's op andere
 hosts, afwijkende hoofdletterspelling in de IRI-path en strijdige Deka Nuxt
 prijs blijven geweigerd. Dit verleent geen extra bronrechten of publicatie.
+
+### Geen dubbele JSON-LD- of Nuxt-objectvelden als bronbewijs
+
+`JSON.parse` kiest bij dubbele sleutels stilzwijgend de laatste waarde. Voor
+prijs, SKU, aanbod, voorraad en pakketinformatie is dat geen betrouwbaar
+bewijs. De privéprijsroute gebruikt daarom dezelfde bestaande offline strikte
+JSON-decoder als de M3-review. Iedere JSON-LD- en Nuxt-bron met dubbele
+objectveldnamen, ook varianten met JSON-Unicode-escapes, wordt geweigerd in
+plaats van een arbitraire prijs te kiezen. De strikte invoergrens per
+JSON-bron is 256 KiB; grotere payloads vragen apart operatoronderzoek en
+worden niet automatisch gepubliceerd. Zowel PLUS als DekaMarkt blijven
+onder de bestaande bronrechten- en reviewgates vallen.

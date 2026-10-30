@@ -293,3 +293,32 @@ test('private Deka source accepts exact Schema.org IRIs only when independent Nu
     JSON.stringify(dekaFixture.jsonLdProduct),JSON.stringify(ld)))
   assert.equal(denied.status,'review_required')
 })
+
+test('captured PLUS JSON-LD refuses duplicated offer prices and escaped equivalent key aliases', async () => {
+  const clean=JSON.stringify(plusProduct)
+  for (const poisoned of [
+    clean.replace('"price":"1.99"','"price":"0.01","price":"1.99"'),
+    clean.replace('"price":"1.99"','"pr\\u0069ce":"0.01","price":"1.99"'),
+    clean.replace('"@type":"Product"','"@type":"Thing","@type":"Product"'),
+  ]) {
+    const markup='<script type="application/ld+json">'+poisoned+'</script>'
+    assert.equal(readAuthorizedHtmlScriptEvidence(markup).invalid,true)
+    const result=await run('plus',markup)
+    assert.equal(result.status,'review_required')
+    assert.equal(result.observation,null)
+    assert.equal(result.publicSavingsClaimEligible,false)
+  }
+  assert.equal((await run('plus',script('type="application/ld+json"',plusProduct))).status,'candidate_needs_review')
+})
+
+test('Deka Nuxt refuses duplicate nested keys even when final value corroborates JSON-LD', async () => {
+  const original=JSON.stringify(dekaFixture.nuxtPayload)
+  const poisoned=original.replace('"productId":','"productId":0,"productId":')
+  assert.notEqual(original,poisoned)
+  const html='<script id="__NUXT_DATA__" type="application/json">'+poisoned+'</script>'+script('type="application/ld+json"',dekaFixture.jsonLdProduct)
+  assert.equal(readAuthorizedHtmlScriptEvidence(html).invalid,true)
+  const result=await run('dekamarkt',html)
+  assert.equal(result.status,'review_required')
+  assert.equal(result.observation,null)
+  assert.equal(result.published,false)
+})

@@ -1,4 +1,5 @@
 import { scanOfflineRetailerMarkup } from './retailer-offline-structural-scan.mjs'
+import { parseUniqueKeyRetailerJson } from './retailer-private-unique-key-json.mjs'
 
 /**
  * Strict, bounded script-tag evidence reader for permission-gated HTML.
@@ -60,7 +61,10 @@ export function readAuthorizedHtmlScriptEvidence(html) {
       if (Buffer.byteLength(content, 'utf8') > MAX_SCRIPT_BYTES ||
           jsonLdBlocks.length >= MAX_JSONLD) return invalid()
       try {
-        jsonLdBlocks.push(JSON.parse(content, (key, value) =>
+        // The shared bounded decoder rejects duplicates, including Unicode-
+        // escaped aliases, before any Product/Offer price is considered.
+        const owned = parseUniqueKeyRetailerJson(content)
+        jsonLdBlocks.push(JSON.parse(JSON.stringify(owned), (key, value) =>
           key === '@type' ? normalizeKnownSchemaType(value) : value))
       } catch { return invalid() }
     }
@@ -70,7 +74,7 @@ export function readAuthorizedHtmlScriptEvidence(html) {
           Buffer.byteLength(content, 'utf8') > MAX_SCRIPT_BYTES) return invalid()
       nuxtSeen = true
       try {
-        const parsed = JSON.parse(content)
+        const parsed = parseUniqueKeyRetailerJson(content)
         if (!Array.isArray(parsed) || parsed.length > 25000) return invalid()
         nuxtPayload = parsed
       } catch { return invalid() }
