@@ -11,7 +11,7 @@ import { captureApprovedRetailerPage } from './retailer-approved-snapshot-captur
 import { proposeOfflineRetailerSelectors } from './retailer-offline-selector-discovery.mjs'
 import { isPublicMerchantProductHrefSelector } from './retailer-public-product-href-selectors.mjs'
 import { isSafeStructuralReviewTag } from './retailer-public-structural-tag.mjs'
-import { PUBLIC_OBSERVED_TOKEN_FIELDS } from './retailer-public-observed-token-fields.mjs'
+import { isFormerPriceTag, PUBLIC_OBSERVED_TOKEN_FIELDS } from './retailer-public-observed-token-fields.mjs'
 
 const refuse = () => { throw new Error('Authorized retailer capture-to-selector review refused') }
 
@@ -84,8 +84,8 @@ const SCHEMA_FIELDS = Object.freeze({
   size: 'pack', unitCode: 'pack', unitText: 'pack',
   availability: 'availability', inventoryLevel: 'availability',
 })
-const SCHEMA_PROP_SELECTOR = /^(article|section|div|li|a|span|h[1-6]|p|strong|ins|del|small|meta|link|data|time|[a-z][a-z0-9]*-[a-z0-9-]{1,31})\[itemprop="([a-zA-Z]+)"\]$/
-const GENERIC_TEST_ID_SELECTOR = /^(article|section|div|li|a|span|h[1-6]|p|strong|ins|del|small|meta|link|data|time|[a-z][a-z0-9]*-[a-z0-9-]{1,31})\[data-testid="([a-z][a-z-]+)"\]$/
+const SCHEMA_PROP_SELECTOR = /^(article|section|div|li|a|span|h[1-6]|p|strong|ins|del|s|strike|small|meta|link|data|time|[a-z][a-z0-9]*-[a-z0-9-]{1,31})\[itemprop="([a-zA-Z]+)"\]$/
+const GENERIC_TEST_ID_SELECTOR = /^(article|section|div|li|a|span|h[1-6]|p|strong|ins|del|s|strike|small|meta|link|data|time|[a-z][a-z0-9]*-[a-z0-9-]{1,31})\[data-testid="([a-z][a-z-]+)"\]$/
 const SCHEMA_PRODUCT_SELECTOR = /^(article|section|div|li|a)\[itemtype="https?:\/\/schema\.org\/Product"\]$/
 function publicReviewSelector(row, retailerId) {
   // Source tag names may themselves be user/product identifiers; the same
@@ -96,11 +96,13 @@ function publicReviewSelector(row, retailerId) {
   const schemaProperty = SCHEMA_PROP_SELECTOR.exec(row.selector)
   if (schemaProperty) return Object.hasOwn(SCHEMA_FIELDS, schemaProperty[2]) &&
     (SCHEMA_FIELDS[schemaProperty[2]] === row.field ||
-      (schemaProperty[1] === 'del' && row.field === 'offer' &&
+      (isFormerPriceTag(schemaProperty[1]) && row.field === 'offer' &&
         SCHEMA_FIELDS[schemaProperty[2]] === 'price'))
   const testId = GENERIC_TEST_ID_SELECTOR.exec(row.selector)
   if (testId) return Object.hasOwn(PUBLIC_OBSERVED_TOKEN_FIELDS, testId[2]) &&
-    PUBLIC_OBSERVED_TOKEN_FIELDS[testId[2]] === row.field
+    (PUBLIC_OBSERVED_TOKEN_FIELDS[testId[2]] === row.field ||
+      (isFormerPriceTag(testId[1]) && row.field === 'offer' &&
+       PUBLIC_OBSERVED_TOKEN_FIELDS[testId[2]] === 'price'))
   return row.field === 'product' &&
     (SCHEMA_PRODUCT_SELECTOR.test(row.selector) ||
       isPublicMerchantProductHrefSelector(retailerId, row.selector))

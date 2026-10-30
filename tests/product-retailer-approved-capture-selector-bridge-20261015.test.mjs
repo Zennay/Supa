@@ -386,3 +386,28 @@ test('product title and price child tokens cannot inflate retailer product-card 
     assert.equal(result.productionEnabled,false)
   }
 })
+
+test('PLUS/Deka single captured HTML keeps <s>/<strike> old prices as offer hints, never current price',async()=>{
+  for(const [supermarket,kind,url] of [
+    ['plus','catalog','https://www.plus.nl/producten'],
+    ['dekamarkt','offers','https://www.dekamarkt.nl/aanbiedingen']]){
+    const html='<article class="product-card">'+
+      '<s class="price-value" itemprop="price">PRIVATE_OLD_4.99</s>'+
+      '<strike data-testid="price-value">PRIVATE_OLD_5.99</strike>'+
+      '<ins class="price-value">PRIVATE_NEW_3.49</ins></article>'
+    let calls=0
+    const review=await captureToPrivateSelectorReview({
+      source:{supermarket,kind,url},grant:consent(supermarket,kind,url),
+      permissionGate:syntheticGate(),capturedAt:at,
+      fetchFn:async()=>{calls++;return new Response(html,{status:200,headers:{'content-type':'text/html'}})},
+    })
+    assert.equal(calls,1)
+    for(const selector of ['s.price-value','s[itemprop="price"]','strike[data-testid="price-value"]'])
+      assert.equal(review.selectorProposals.find(x=>x.selector===selector)?.field,'offer',supermarket+': '+selector)
+    assert.equal(review.selectorProposals.find(x=>x.selector==='ins.price-value')?.field,'price')
+    assert.equal(review.currentPricesExtracted,false)
+    assert.equal(review.readyForIngestion,false)
+    assert.equal(review.sourceRightsForPublicationVerified,false)
+    assert.doesNotMatch(JSON.stringify(review),/PRIVATE_OLD|PRIVATE_NEW/)
+  }
+})

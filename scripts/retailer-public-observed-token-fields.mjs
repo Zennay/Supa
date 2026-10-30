@@ -11,3 +11,6 @@ export const PUBLIC_OBSERVED_TOKEN_FIELDS = Object.freeze({
   'offer-card':'offer', 'offer-label':'offer',
   'stock-label':'availability',
 })
+
+// These tags represent a struck-through FORMER price, never a current quote.
+export const isFormerPriceTag = tag => tag === 'del' || tag === 's' || tag === 'strike'

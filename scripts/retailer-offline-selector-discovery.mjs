@@ -4,7 +4,7 @@ import { types as nodeTypes } from 'node:util'
 import { scanOfflineRetailerMarkup } from './retailer-offline-structural-scan.mjs'
 import { isPublicMerchantProductHrefSelector } from './retailer-public-product-href-selectors.mjs'
 import { isSafeStructuralReviewTag } from './retailer-public-structural-tag.mjs'
-import { PUBLIC_OBSERVED_TOKEN_FIELDS } from './retailer-public-observed-token-fields.mjs'
+import { isFormerPriceTag, PUBLIC_OBSERVED_TOKEN_FIELDS } from './retailer-public-observed-token-fields.mjs'
 import { ambiguousRetailerRoute, isAllowedM1RetailerSourcePath } from './retailer-source-route-safety.mjs'
 
 // Offline-first DOM selector proposal. NEVER downloads a page, executes scripts,
@@ -221,7 +221,7 @@ function recordSelector(counters, field, selector, tag) {
   // HTML <del> is a struck-through *previous* price. Even when the captured
   // retailer uses price-value / itemprop=price, it must not produce a current
   // price candidate. Keep the observed structure as an unapproved offer hint.
-  if (tag === 'del' && field === 'price') field = 'offer'
+  if (isFormerPriceTag(tag) && field === 'price') field = 'offer'
   const key = field + '\u0000' + selector
   const prior = counters.get(key)
   if (prior) prior.instances += 1
@@ -317,7 +317,7 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
     }
     const tag = match.tag
     const standardCandidate = ['article', 'a', 'div', 'li', 'section', 'span',
-      'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'strong', 'ins', 'del', 'small', 'meta', 'link', 'data', 'time'].includes(tag)
+      'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'strong', 'ins', 'del', 's', 'strike', 'small', 'meta', 'link', 'data', 'time'].includes(tag)
     // Real SPA/retailer custom elements are valid HTML with a hyphenated
     // tag name. Only offer selectors whose exact tags/classes exist in the
     // approved local source; no made-up shadow DOM or descendant paths.
@@ -455,9 +455,9 @@ export function summarizeOfflineSelectorProposals(report) {
     if (row.field === 'product' && MICRODATA_PRODUCT.test(row.selector)) return true
     if (Object.entries(SCHEMA_ITEMPROP_FIELDS).some(([prop,field]) =>
       (row.field === field || row.field === 'offer' && field === 'price' &&
-        row.selector.startsWith('del[itemprop="')) &&
+        isFormerPriceTag(row.selector.split('[')[0])) &&
       row.selector.endsWith('[itemprop="'+prop+'"]') &&
-      /^(?:article|a|div|li|section|span|h[1-6]|p|strong|ins|del|small|meta|link|data|time)\[itemprop="/.test(row.selector)))
+      /^(?:article|a|div|li|section|span|h[1-6]|p|strong|ins|del|s|strike|small|meta|link|data|time)\[itemprop="/.test(row.selector)))
       return true
     if (row.field === 'product' &&
         (isPublicMerchantProductHrefSelector(report.source.retailerId, row.selector) ||
@@ -469,7 +469,7 @@ export function summarizeOfflineSelectorProposals(report) {
     const exact = Object.hasOwn(PUBLIC_OBSERVED_TOKEN_FIELDS,token)
       ? PUBLIC_OBSERVED_TOKEN_FIELDS[token] : null
     if (exact) return row.field === exact ||
-      (tag === 'del' && exact === 'price' && row.field === 'offer')
+      (isFormerPriceTag(tag) && exact === 'price' && row.field === 'offer')
     return PUBLIC_GENERIC_TOKENS.has(token)
   })
   return {

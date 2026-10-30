@@ -16,7 +16,7 @@ const MICRODATA_PRODUCT = /^(article|section|div|li|a)\[itemtype="(https?:\/\/sc
 // Match the same bounded retailer web components as the offline scanner.
 // Modern store listings often wrap cards, pack sizes and price labels in
 // custom HTML elements instead of the standard div/span DOM elements.
-const ELEMENT = '(?:article|section|div|span|p|li|h[1-6]|strong|ins|del|small|a|data|time|[a-z][a-z0-9]*-[a-z0-9-]{1,31})'
+const ELEMENT = '(?:article|section|div|span|p|li|h[1-6]|strong|ins|del|s|strike|small|a|data|time|[a-z][a-z0-9]*-[a-z0-9-]{1,31})'
 const TAG = new RegExp('^(' + ELEMENT + ')\\.([a-z][a-z0-9_-]{0,58})$', 'i')
 const ATTRIBUTE = new RegExp('^(' + ELEMENT + '|meta|link)\\[(data-testid|itemprop)="([a-z][a-z0-9_-]{1,59})"\\]$', 'i')
 const refuse = () => { throw Error('Private synthetic structural fixture refused') }
