@@ -661,3 +661,24 @@ test('offline Deka offers selector stability CLI publishes only counts and a 060
   assert.equal((await stat(archive)).mode & 0o777,0o600)
   assert.equal(receipt.archiveSha256,createHash('sha256').update(await readFile(archive)).digest('hex'))
 })
+
+test('portable class review detects a real reused class after HTML tag changes', async t => {
+  const url = 'https://www.plus.nl/producten'
+  const first = await archivedSelectorPage(t,'plus','catalog',url,
+    '<article class="product-card"><span class="price-value">SYNTHETIC</span></article>')
+  const second = await archivedSelectorPage(t,'plus','catalog',url,
+    '<div class="product-card"><p class="price-value">SYNTHETIC</p></div>')
+  const file = first.replace('captured.html','portable-selector-review.json')
+  const receipt = await savePrivateSelectorStabilityArchive([first,second],file)
+  assert.equal(receipt.stableCandidateCount,0)
+  assert.equal(receipt.stablePortableClassCandidateCount,2)
+  assert.doesNotMatch(JSON.stringify(receipt),/product-card|price-value|www\.plus\.nl|captured\.html/)
+  const archived = JSON.parse(await readFile(file,'utf8'))
+  assert.deepEqual(archived.stablePortableClassCandidates.map(row=>row.selector).sort(),
+    ['.price-value','.product-card'])
+  assert.ok(archived.stablePortableClassCandidates.every(row=>
+    row.status==='needs-human-review' && row.derivedFromActualClassTokens))
+  assert.equal(archived.automatedSelectorPromotion,false)
+  assert.equal(archived.readyForIngestion,false)
+  assert.equal((await stat(file)).mode & 0o777,0o600)
+})

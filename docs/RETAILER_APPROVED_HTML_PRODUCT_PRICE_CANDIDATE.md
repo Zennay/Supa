@@ -374,3 +374,11 @@ plus een per-field overzicht (`product`, `name`, `price`, `pack`, `offer`,
 `availability`). Een ontbrekend veld blijft een expliciete nul, nooit een
 verzonnen selector. De publiek leesbare CLI-samenvatting houdt alleen
 aggregaten bij.
+
+Wanneer HTML-elementtypen tussen opnamen veranderen, bewaart het privéarchief
+tevens een afzonderlijke groep **over alle captures aangetroffen klasse-tokens**.
+Bijvoorbeeld `article.product-card` en `div.product-card` bewijzen allebei
+uitsluitend het bestaan van de klas `product-card`; het nieuwe bredere voorstel
+`.product-card` blijft expliciet `needs-human-review`, omdat uniciteit en
+DOM-selectie nooit automatisch zijn bewezen. Ook dit voorstel verschijnt niet
+als CSS-waarde op stdout en telt nooit als productieadmissie.

@@ -229,8 +229,10 @@ export async function savePrivateSelectorStabilityArchive(htmlFiles, reviewFile)
     reports.push(report)
   }
   const counts = new Map()
+  const portable = new Map()
   for (const report of reports) {
     const seen = new Set()
+    const seenClasses = new Set()
     for (const row of report.proposals.selectors) {
       const key = row.field + '\u0000' + row.selector
       if (seen.has(key)) continue
@@ -239,8 +241,26 @@ export async function savePrivateSelectorStabilityArchive(htmlFiles, reviewFile)
       if (found) found.observedInSnapshots++
       else counts.set(key, {field:row.field, selector:row.selector,
         observedInSnapshots:1, status:'needs-human-review'})
+      // A CSS class found on different actual HTML tags may be a more
+      // resilient review hint than either tag-qualified selector. These are
+      // grounded class tokens, never a validated/automated DOM selector.
+      const klass = /^[a-z][a-z0-9-]*\.([a-z][a-z0-9_-]{1,59})$/i.exec(row.selector)?.[1]
+      if (klass) {
+        const key = row.field + '\u0000' + '.' + klass
+        if (!seenClasses.has(key)) {
+          seenClasses.add(key)
+          const existing = portable.get(key)
+          if (existing) existing.observedInSnapshots++
+          else portable.set(key,{field:row.field, selector:'.'+klass,
+            observedInSnapshots:1, status:'needs-human-review',
+            derivedFromActualClassTokens:true})
+        }
+      }
     }
   }
+  const stablePortable = [...portable.values()].filter(x =>
+    x.observedInSnapshots === reports.length).sort((a,b) =>
+    a.field.localeCompare(b.field) || a.selector.localeCompare(b.selector))
   const all = [...counts.values()].sort((a,b) =>
     a.field.localeCompare(b.field) || a.selector.localeCompare(b.selector))
   const stable = all.filter(row => row.observedInSnapshots === reports.length)
@@ -260,6 +280,8 @@ export async function savePrivateSelectorStabilityArchive(htmlFiles, reviewFile)
     sampleCount:reports.length, stableCandidateCount:stable.length,
     unstableCandidateCount:unstable.length, stableCandidates:stable,
     unstableCandidates:unstable, fieldCoverage,
+    stablePortableClassCandidates:stablePortable,
+    stablePortableClassCandidateCount:stablePortable.length,
     humanReviewRequired:true, automatedSelectorPromotion:false,
     readyForIngestion:false, sourceRightsForPublicationVerified:false,
     priceExtractionEnabled:false, publicSavingsClaimEligible:false,
@@ -267,7 +289,8 @@ export async function savePrivateSelectorStabilityArchive(htmlFiles, reviewFile)
   }, reviewFile)
   // No raw selectors or source URLs in CLI/stdout/API return.
   return {...saved, sampleCount:reports.length, stableCandidateCount:stable.length,
-    unstableCandidateCount:unstable.length}
+    unstableCandidateCount:unstable.length,
+    stablePortableClassCandidateCount:stablePortable.length}
 }
 
 /**
