@@ -555,3 +555,23 @@ test('M1 archived JSON-LD review ignores arbitrary nested metadata forged as Pro
     assert.equal(nested.readyForScraping,false)
   }
 })
+
+test('Nuxt historical SSR signal requires one well-formed unique-key bounded JSON array',()=>{
+  for(const retailer of ['plus','dekamarkt']){
+    const doc=payload=>'<script id="__NUXT_DATA__" type="application/json">'+payload+'</script>'
+    for(const payload of ['{bad','{}','{"price":1}','{"sku":1,"sku":2}','[1,','"array"']) {
+      const html=doc(payload)
+      const result=proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',html),html)
+      assert.equal(result.embeddedSignals.nuxtDataScriptPresent,false,retailer+' '+payload)
+      assert.equal(result.readyForScraping,false)
+    }
+    for(const html of [doc('[]')+doc('[]'),doc('not-json')+doc('[]'),doc('[]')+doc('not-json')]){
+      assert.equal(proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',html),html)
+        .embeddedSignals.nuxtDataScriptPresent,false,retailer+' duplicate')
+    }
+    const valid=doc('[{"id":"SYNTHETIC","title":"PRIVATE"}]')
+    const result=proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',valid),valid)
+    assert.equal(result.embeddedSignals.nuxtDataScriptPresent,true)
+    assert.equal(result.currentPricesExtracted,false)
+  }
+})

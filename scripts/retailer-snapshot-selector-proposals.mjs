@@ -178,7 +178,8 @@ export function proposeRetailerSelectors(source, html) {
     assertObservedRetailerHtmlIdentity(identity.url,
       document.baseHrefs,document.canonicalHrefs)
   } catch { reject('untrusted retailer HTML base or canonical source identity') }
-  const scripts = []
+  let nuxtScriptCount = 0
+  let eligibleNuxtPayload = false
   const jsonLdTypes = new Set()
   const jsonLdKeys = new Set()
   let invalidJsonLdCount = 0
@@ -193,9 +194,21 @@ export function proposeRetailerSelectors(source, html) {
     if(scriptType==='application/ld+json'){
       if(!jsonLdShape(script.content,jsonLdTypes,jsonLdKeys)) invalidJsonLdCount++
     }
-    if(admittedRetailerScriptId(script.attrs.get('id'))==='__NUXT_DATA__' &&
-        (scriptType === undefined || scriptType === 'application/json'))
-      scripts.push('nuxt-data-script')
+    if (admittedRetailerScriptId(script.attrs.get('id'))==='__NUXT_DATA__') {
+      nuxtScriptCount++
+      if (scriptType === undefined || scriptType === 'application/json') {
+        // An ID is not an SSR data source by itself. The private price parser
+        // requires an unambiguous bounded JSON array with unique object keys.
+        // Keep exactly the same conditions for historical review signals.
+        if (Buffer.byteLength(script.content,'utf8') <= 1024 * 1024) {
+          try {
+            const payload = parseUniqueKeyRetailerJson(script.content.trim())
+            if (Array.isArray(payload) && payload.length <= 25000)
+              eligibleNuxtPayload = true
+          } catch { /* no source evidence from invalid JSON */ }
+        }
+      }
+    }
   }
   // Every class candidate must correspond to an actual visible opening tag,
   // not markup-shaped text inside a script/style/template/attribute.
@@ -252,7 +265,7 @@ export function proposeRetailerSelectors(source, html) {
     byteLength: Buffer.byteLength(html, 'utf8'),
     inspectedTagCount: htmlTagCount,
     embeddedSignals: {
-      nuxtDataScriptPresent: scripts.includes('nuxt-data-script'),
+      nuxtDataScriptPresent: nuxtScriptCount === 1 && eligibleNuxtPayload,
       jsonLdTypes: [...jsonLdTypes].sort(),
       jsonLdKeys: [...jsonLdKeys].sort(),
       invalidJsonLdCount,
