@@ -79,6 +79,8 @@ jobs:
 
       - name: Verify bounded source contract
         run: npm test
+        env:
+          NODE_OPTIONS: --max-old-space-size=1024
 
       - name: Run matching benchmark
         run: npm run m1:matching-benchmark

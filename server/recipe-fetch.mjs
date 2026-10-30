@@ -21,15 +21,19 @@ const PRIVATE_QUERY_KEY = /^(?:code|auth(?:orization)?code|oauthcode|accesstoken
 function privateRecipeQueryKey(key) {
   let current = key
   for (let depth = 0; depth < 8; depth++) {
-    const folded = current.normalize('NFKC')
+    // Canonicalize before parsing identity: NFKC may turn fullwidth query
+    // delimiters into separators that a later URL consumer would re-parse.
+    const canonical = current.normalize('NFKC')
       .replace(/[\p{Default_Ignorable_Code_Point}\p{Mark}]/gu, '')
-      .toLocaleLowerCase('en').replace(/[^a-z0-9]/gu, '')
+    if (/[&=?#\u0000-\u001f\u007f]/u.test(canonical)) return true
+    const folded = canonical.toLocaleLowerCase('en').replace(/[^a-z0-9]/gu, '')
     if (PRIVATE_QUERY_KEY.test(folded) ||
         /(?:token|secret|password|credential|signature|apikey|codeverifier|codechallenge|samlresponse|csrf)/u.test(folded)) return true
-    if (!/%[0-9a-fA-F]{2}/u.test(current)) return false
+    if (!canonical.includes('%')) return false
+    if (!/%[0-9a-fA-F]{2}/u.test(canonical)) return true
     let decoded
-    try { decoded = decodeURIComponent(current) } catch { return true }
-    if (decoded === current) return false
+    try { decoded = decodeURIComponent(canonical) } catch { return true }
+    if (decoded === canonical) return true
     current = decoded
   }
   return true
@@ -38,16 +42,21 @@ function privateRecipeQueryKey(key) {
 function privateNestedRecipeQuery(value) {
   let current = value
   for (let depth = 0; depth < 8; depth++) {
-    const marker = current.indexOf('?')
+    // Normalize nested URL syntax before locating '?' or '#': a downstream
+    // URL consumer may canonicalize fullwidth delimiters before decoding.
+    const canonical = current.normalize('NFKC')
+      .replace(/[\p{Default_Ignorable_Code_Point}\p{Mark}]/gu, '')
+    const marker = canonical.indexOf('?')
     if (marker !== -1) {
-      const query = current.slice(marker + 1).split('#', 1)[0]
+      const query = canonical.slice(marker + 1).split('#', 1)[0]
       for (const key of new URLSearchParams(query).keys())
         if (privateRecipeQueryKey(key)) return true
     }
-    if (!/%[0-9a-fA-F]{2}/u.test(current)) return false
+    if (!canonical.includes('%')) return false
+    if (!/%[0-9a-fA-F]{2}/u.test(canonical)) return true
     let decoded
-    try { decoded = decodeURIComponent(current) } catch { return true }
-    if (decoded === current) return false
+    try { decoded = decodeURIComponent(canonical) } catch { return true }
+    if (decoded === canonical) return true
     current = decoded
   }
   return true
@@ -87,9 +96,15 @@ export async function fetchRecipeHtml(input, { resolve = lookup, request = https
         },
       }, res => {
         if ([301, 302, 303, 307, 308].includes(res.statusCode)) {
-          const location = res.headers.location; res.destroy()
+          const location = res.headers.location
+          res.destroy()
           if (!location || redirects >= 3) return reject(new Error('Te veel doorverwijzingen in de receptlink.'))
-          return resolve({ redirect: new URL(location, url).href })
+          // A malformed Location header must reject this fetch, never escape
+          // the async response callback as an uncaught exception.
+          let redirect
+          try { redirect = new URL(location, url).href }
+          catch { return reject(new Error('Ongeldige doorverwijzing in de receptlink.')) }
+          return resolve({ redirect })
         }
         if (res.statusCode !== 200 || !/^(text\/html|application\/xhtml\+xml)(;|$)/i.test(res.headers['content-type'] ?? '')) {
           res.destroy(); return reject(new Error('Deze website geeft geen leesbare receptpagina terug. Vul het recept handmatig in.'))
