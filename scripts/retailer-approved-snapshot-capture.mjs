@@ -372,6 +372,13 @@ export async function captureApprovedRetailerPage(options = {}) {
   const refresh = response.headers?.get?.('refresh')
   const contentLocation = response.headers?.get?.('content-location')
   const links = response.headers?.get?.('link')
+  // An upstream may return a partial representation with HTTP 200 by
+  // mistake. Never hash a ranged fragment as a complete HTML snapshot.
+  const contentRange = response.headers?.get?.('content-range')
+  if (contentRange != null) {
+    await closeRejectedBody()
+    throw new Error('Partial retailer HTML representation refused')
+  }
   if ((refresh != null && refresh.trim() !== '') ||
       (contentLocation != null && !sameRetailerContentLocation(contentLocation, target)) ||
       !sameRetailerCanonicalLink(links, target)) {
