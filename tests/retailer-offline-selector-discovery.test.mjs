@@ -449,3 +449,26 @@ test('same-merchant absolute and protocol-relative observed item links produce a
   assert.equal(deka.selectors.some(x =>
     x.selector === 'a[href^="//www.dekamarkt.nl/producten/"]'), true)
 })
+
+test('live HTML base href cannot redirect source product anchors to another origin', () => {
+  const item = '<body><a href="/product/synthetic-123">Synthetic</a></body>'
+  for (const base of [
+    'https://outside.example/', '//outside.example/catalog/',
+    'http://www.plus.nl/', 'https://www.plus.nl.evil.example/',
+    'javascript:alert(1)',
+  ]) {
+    const html = '<html><head><base href="' + base + '"></head>' + item + '</html>'
+    assert.throws(() => proposeOfflineRetailerSelectors({html, origin}), /Untrusted HTML base URL/)
+  }
+  for (const base of ['https://www.plus.nl/', '/', '//www.plus.nl/catalog/']) {
+    const html = '<html><head><base href="' + base + '"></head>' + item + '</html>'
+    const report = proposeOfflineRetailerSelectors({html, origin})
+    assert.equal(report.selectors.find(x=>x.selector==='a[href^="/product/"]')?.instances,1)
+  }
+  const hidden = '<html><head><template><base href="https://outside.example/"></template></head>' +
+    item + '</html>'
+  assert.equal(proposeOfflineRetailerSelectors({html:hidden, origin}).selectors.length, 1)
+  const duplicate = '<html><head><base href="/"><base href="/"></head>' + item + '</html>'
+  assert.throws(()=>proposeOfflineRetailerSelectors({html:duplicate, origin}),
+    /Multiple live HTML base URLs/)
+})
