@@ -521,3 +521,22 @@ test('live HTML meta refresh cannot masquerade as a stable catalog product sourc
       x.selector==='a[href^="/product/"]')?.instances,1)
   }
 })
+
+test('private HTML listing coverage counts distinct observed products, not repeated links or tracking URLs',()=>{
+  const html=[
+    '<a href="/product/synthetic-1">Item 1</a>',
+    '<a href="https://www.plus.nl/product/synthetic-1?utm_source=mock">Repeated link</a>',
+    '<a href="//www.plus.nl/product/synthetic-1#details">Repeated third link</a>',
+    '<a href="/product/synthetic-2">Item 2</a>',
+    '<a href="/producten/foreign-3">Unrelated store route</a>',
+    '<a href="/product/">Catalog root</a>',
+  ].join('')
+  const normal=proposeOfflineRetailerSelectors({html,origin})
+  assert.equal('observedProductLinkOccurrences' in normal,false)
+  assert.equal('distinctObservedProductPaths' in normal,false)
+  const privateReview=proposeOfflineRetailerSelectors({html,origin},true)
+  assert.equal(privateReview.observedProductLinkOccurrences,4)
+  assert.equal(privateReview.distinctObservedProductPaths,2)
+  assert.equal(privateReview.readyForIngestion,false)
+  assert.doesNotMatch(JSON.stringify(privateReview),/synthetic-1|synthetic-2|utm_source/)
+})

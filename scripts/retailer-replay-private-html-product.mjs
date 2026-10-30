@@ -233,6 +233,11 @@ export async function savePrivateSelectorStabilityArchive(htmlFiles, reviewFile)
     unique.add(report.source.sha256)
     reports.push(report)
   }
+  const productLinkCoverage = reports.map(report => ({
+    sourceSha256: report.source.sha256,
+    observedOccurrences: report.proposals.observedProductLinkOccurrences,
+    distinctPaths: report.proposals.distinctObservedProductPaths,
+  }))
   const counts = new Map()
   const portable = new Map()
   for (const report of reports) {
@@ -320,6 +325,8 @@ export async function savePrivateSelectorStabilityArchive(htmlFiles, reviewFile)
     stablePortableTokenCandidateCount:stablePortable.length,
     stableObservedProductRoutes,
     stableObservedProductRouteCount:stableObservedProductRoutes.length,
+    productLinkCoverage,
+    productLinksObservedInEverySnapshot:productLinkCoverage.every(x => x.distinctPaths > 0),
     humanReviewRequired:true, automatedSelectorPromotion:false,
     readyForIngestion:false, sourceRightsForPublicationVerified:false,
     priceExtractionEnabled:false, publicSavingsClaimEligible:false,
@@ -329,7 +336,12 @@ export async function savePrivateSelectorStabilityArchive(htmlFiles, reviewFile)
   return {...saved, sampleCount:reports.length, stableCandidateCount:stable.length,
     unstableCandidateCount:unstable.length,
     stablePortableTokenCandidateCount:stablePortable.length,
-    stableObservedProductRouteCount:stableObservedProductRoutes.length}
+    stableObservedProductRouteCount:stableObservedProductRoutes.length,
+    productLinksObservedInEverySnapshot:productLinkCoverage.every(x => x.distinctPaths > 0),
+    observedDistinctPathRange: [
+      Math.min(...productLinkCoverage.map(x => x.distinctPaths)),
+      Math.max(...productLinkCoverage.map(x => x.distinctPaths)),
+    ]}
 }
 
 /**

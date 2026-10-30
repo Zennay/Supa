@@ -239,6 +239,11 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
   }
 
   const candidates = new Map()
+  // Duplicate links to one SKU on a listing are not independent products.
+  // Keep URL identities only in this short-lived private scan; expose count
+  // aggregates, never product paths, search params or identifiers.
+  let productHrefInstances = 0
+  const distinctProductPaths = new Set()
   let inspectedTags = 0
   for (const match of openingTags(visible)) {
     if (++inspectedTags > MAX_TAGS) {
@@ -277,6 +282,9 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
       const observed = observedProductHrefPrefix(origin, href)
       if (observed) {
         recordSelector(candidates, 'product', 'a[href^="' + observed + '"]', tag)
+        productHrefInstances++
+        const product = new URL(href, origin.url)
+        distinctProductPaths.add(product.pathname.replace(/\/$/, ''))
       }
     }
   }
@@ -307,6 +315,8 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
     ...(includePrivateCoverage === true ? {
       selectorCandidatesOmitted,
       candidateLimitReached: selectorCandidatesOmitted > 0,
+      observedProductLinkOccurrences: productHrefInstances,
+      distinctObservedProductPaths: distinctProductPaths.size,
     } : {}),
     structuredSignals,
     selectors,

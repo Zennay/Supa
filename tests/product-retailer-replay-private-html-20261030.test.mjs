@@ -822,3 +822,24 @@ test('private source HTML with foreign live canonical URL cannot become a replay
     /Private source replay refused/)
   await assert.rejects(stat(review),/ENOENT/)
 })
+
+test('SHA-bound private catalog stability archives unique product path coverage without publishing identifiers',async t=>{
+  const url='https://www.plus.nl/producten'
+  const first=await archivedSelectorPage(t,'plus','catalog',url,
+    '<a href="/product/mock-111">One</a><a href="/product/mock-111?tracking=1">Repeat</a>')
+  const second=await archivedSelectorPage(t,'plus','catalog',url,
+    '<a href="https://www.plus.nl/product/mock-111">One</a>' +
+    '<a href="//www.plus.nl/product/mock-222">Two</a>')
+  const output=first.replace('captured.html','product-path-coverage.json')
+  const summary=await savePrivateSelectorStabilityArchive([first,second],output)
+  assert.deepEqual(summary.observedDistinctPathRange,[1,2])
+  assert.equal(summary.productLinksObservedInEverySnapshot,true)
+  const archived=JSON.parse(await readFile(output,'utf8'))
+  assert.equal((await stat(output)).mode & 0o777,0o600)
+  assert.deepEqual(archived.productLinkCoverage.map(x=>x.distinctPaths),[1,2])
+  assert.deepEqual(archived.productLinkCoverage.map(x=>x.observedOccurrences),[2,2])
+  assert.equal(archived.automatedSelectorPromotion,false)
+  assert.equal(archived.readyForIngestion,false)
+  assert.doesNotMatch(JSON.stringify(archived.productLinkCoverage),/mock-111|mock-222|tracking|www\.plus\.nl/)
+  assert.doesNotMatch(JSON.stringify(summary),/mock-111|mock-222|tracking|www\.plus\.nl/)
+})
