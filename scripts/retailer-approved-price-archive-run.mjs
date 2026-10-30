@@ -30,4 +30,4 @@ export async function captureAndArchiveApprovedRetailerProduct(captureOptions, p
 }
 
 // One fetch -> combined private selector/price archive (all M1 page kinds).
-export { captureAndArchiveApprovedSourceReview } from './retailer-approved-source-review-archive.mjs'
+export { captureAndArchiveApprovedSourceReview, compareArchivedSourceReviews } from './retailer-approved-source-review-archive.mjs'

@@ -4,11 +4,14 @@
  * permission grants, or public report of retailer data.
  */
 import { open, lstat, rm } from 'node:fs/promises'
+import { constants } from 'node:fs'
+import { pathToFileURL } from 'node:url'
 import { basename, dirname, isAbsolute } from 'node:path'
 import { captureApprovedRetailerReviewBundle } from './retailer-approved-html-product-price-candidate.mjs'
 import { safeSelectorProposals } from './retailer-approved-capture-selector-bridge.mjs'
 import { isAllowedM1RetailerSourcePath } from './retailer-source-route-safety.mjs'
 import { validateRawProductObservation } from '../src/data/ingestion.ts'
+import { compareOfflineSelectorProposals } from './retailer-private-selector-drift.mjs'
 import { assertNoSymlinkedM3OutputParents } from './m3-source-output-preservation.mjs'
 
 const hosts = Object.freeze({ plus: 'www.plus.nl', dekamarkt: 'www.dekamarkt.nl' })
@@ -62,6 +65,11 @@ function safeArchive(bundle) {
       review.privateProposalsOmitted < 0 ||
       !Number.isSafeInteger(review.inspectedTags) ||
       review.inspectedTags < 0) refuse()
+  const signalNames = ['schemaOrgProduct', 'nextData', 'nuxtData', 'jsonLd']
+  if (!review.structuredSignals || Object.keys(review.structuredSignals).length !== 4 ||
+      signalNames.some(key => typeof review.structuredSignals[key] !== 'boolean')) refuse()
+  const structuredSignals = Object.fromEntries(signalNames.map(key =>
+    [key, review.structuredSignals[key]]))
   const proposals = safeSelectorProposals(review.proposals, source.retailerId)
   if (proposals.length !== review.proposals.length ||
       proposals.some((p, i) =>
@@ -106,7 +114,7 @@ function safeArchive(bundle) {
       observation: price.status === 'candidate_needs_review' ? price.observation : null,
     },
     selectorReview: {
-      proposals,
+      proposals, structuredSignals,
       privateProposalsOmitted: review.privateProposalsOmitted,
       inspectedTags: review.inspectedTags,
       approvedSelectors: 0,
@@ -183,4 +191,105 @@ export async function captureAndArchiveApprovedSourceReview(options, file) {
     publicSavingsClaimEligible: false,
     readyForIngestion: false, productionEnabled: false, published: false,
   }
+}
+
+/** Verify a SHA-pinned private archive's strict canonical bytes before drift. */
+async function readPrivateReview(file) {
+  if (typeof file !== 'string' || !isAbsolute(file) ||
+      file.includes('/../') || file.length > 512 ||
+      !/^[a-z][a-z0-9_.-]{0,79}\.json$/i.test(basename(file))) refuse()
+  try {
+    await assertNoSymlinkedM3OutputParents(file)
+    const parent = await lstat(dirname(file))
+    if (!parent.isDirectory() || parent.isSymbolicLink() ||
+        (parent.mode & 0o077) !== 0) refuse()
+    const identity = await lstat(file)
+    if (!identity.isFile() || identity.isSymbolicLink() ||
+        identity.nlink !== 1 || (identity.mode & 0o777) !== 0o600 ||
+        identity.uid !== process.getuid() || identity.size < 2 ||
+        identity.size > 48 * 1024) refuse()
+    const handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW)
+    let raw
+    try {
+      const current = await handle.stat()
+      if (current.dev !== identity.dev || current.ino !== identity.ino ||
+          current.size !== identity.size) refuse()
+      raw = await handle.readFile('utf8')
+    } finally { await handle.close() }
+    const data = JSON.parse(raw)
+    const source = data.source, price = data.priceReview, review = data.selectorReview
+    const reconstructed = {
+      schemaVersion: 1,
+      mode: source?.kind === 'product'
+        ? 'private-authorized-one-capture-product-review'
+        : 'private-authorized-one-capture-structural-review',
+      source, capturedBytes: data.capturedBytes, actualTransportInvocations: 1,
+      priceReview: price === null ? null : {
+        mode: 'private-authorized-html-product-candidate',
+        source, status: price?.status, reason: price?.reason,
+        observation: price?.observation, humanReviewRequired: true,
+        permissionVerifiedForThisRequest: true,
+        verifiedCurrentCheckoutPrice: false, publicSavingsClaimEligible: false,
+        productionEnabled: false, published: false,
+      },
+      selectorReview: {
+        mode: 'private-unapproved-selector-proposals',
+        proposals: review?.proposals,
+        structuredSignals: review?.structuredSignals,
+        privateProposalsOmitted: review?.privateProposalsOmitted,
+        inspectedTags: review?.inspectedTags,
+        humanReviewRequired: true, approvedSelectors: 0,
+      },
+      rawHtmlReturned: false, humanReviewRequired: true,
+      verifiedCurrentCheckoutPrice: false,
+      sourceRightsForPublicationVerified: false, publicSavingsClaimEligible: false,
+      readyForIngestion: false, productionEnabled: false, published: false,
+    }
+    // Strict byte equality rejects duplicate keys and altered privacy flags.
+    if (safeArchive(reconstructed).bytes !== raw) refuse()
+    return data
+  } catch { refuse() }
+}
+
+/** Offline structural drift only. Never surface CSS, names, URLs, or prices. */
+export async function compareArchivedSourceReviews(beforeFile, afterFile) {
+  const [before, after] = await Promise.all([
+    readPrivateReview(beforeFile), readPrivateReview(afterFile),
+  ])
+  if (before.source.retailerId !== after.source.retailerId ||
+      before.source.kind !== after.source.kind ||
+      before.source.url !== after.source.url) refuse()
+  const report = entry => ({
+    schemaVersion: 1, mode: 'offline-selector-proposals-only',
+    source: { retailerId: entry.source.retailerId,
+      sha256: entry.source.sha256, capturedAt: entry.source.capturedAt },
+    bytes: entry.capturedBytes, scannedTags: entry.selectorReview.inspectedTags,
+    structuredSignals: entry.selectorReview.structuredSignals,
+    selectors: entry.selectorReview.proposals.map(
+      ({ field, selector, instances, status }) => ({ field, selector, instances, status })),
+    humanReviewRequired: true, readyForIngestion: false,
+    permissionVerified: false, productionEnabled: false,
+    publicSavingsClaimEligible: false,
+  })
+  try {
+    const drift = compareOfflineSelectorProposals(report(before), report(after))
+    return { ...drift, mode: 'private-one-source-review-selector-drift',
+      humanReviewRequired: true, published: false, readyForIngestion: false,
+      verifiedCurrentCheckoutPrice: false }
+  } catch { refuse() }
+}
+
+/** Read-only CLI: aggregate drift only. No embedded HTTP or source extraction. */
+export async function main(argv = process.argv.slice(2),
+  write = value => process.stdout.write(value)) {
+  if (argv.length !== 3 || argv[0] !== '--compare') refuse()
+  const result = await compareArchivedSourceReviews(argv[1], argv[2])
+  write(JSON.stringify(result) + '\n')
+  return 0
+}
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch(() => {
+    process.stderr.write('Private source review archive refused\n')
+    process.exitCode = 1
+  })
 }

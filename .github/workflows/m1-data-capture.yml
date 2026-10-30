@@ -19,6 +19,7 @@ on:
       - "scripts/retailer-approved-html-script-evidence.mjs"
       - "scripts/retailer-approved-price-archive-run.mjs"
       - "scripts/retailer-approved-source-review-archive.mjs"
+      - "scripts/retailer-private-selector-drift.mjs"
       - "tests/product-retailer-approved-source-review-archive-20261030.test.mjs"
       - "scripts/retailer-approved-private-price-snapshot-store.mjs"
       - "scripts/retailer-approved-snapshot-capture.mjs"

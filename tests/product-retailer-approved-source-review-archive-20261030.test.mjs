@@ -4,7 +4,9 @@ import { mkdtemp, readFile, rm, stat, symlink, writeFile, chmod } from 'node:fs/
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { captureAndArchiveApprovedSourceReview as archive } from
+import { spawnSync } from 'node:child_process'
+import { captureAndArchiveApprovedSourceReview as archive,
+  compareArchivedSourceReviews } from
   '../scripts/retailer-approved-source-review-archive.mjs'
 
 // All rights, URLs, pages and product facts below are explicitly SYNTHETIC.
@@ -165,4 +167,80 @@ test('unsafe or occupied private destination fails before the first network requ
   }
   assert.equal(calls, 0)
   assert.equal(await readFile(file, 'utf8'), 'KEEP THE EXISTING EVIDENCE')
+})
+
+test('two SHA-pinned private captures report true selector drift without leaking private identifiers', async t => {
+  const dir = await folder(t)
+  const original = join(dir, 'baseline.json')
+  const changed = join(dir, 'changed.json')
+  const first = markup('plus')
+  const second = first.replace('price-value', 'price-label')
+  await archive(options('plus', first, {
+    capturedAt: new Date(Date.now() - 90000).toISOString(),
+  }), original)
+  await archive(options('plus', second, {
+    capturedAt: new Date(Date.now() - 30000).toISOString(),
+  }), changed)
+  const change = await compareArchivedSourceReviews(original, changed)
+  assert.equal(change.mode, 'private-one-source-review-selector-drift')
+  assert.equal(change.htmlBytesDiffer, true)
+  assert.ok(change.newSelectorCandidates > 0)
+  assert.ok(change.missingSelectorCandidates > 0)
+  assert.equal(change.humanReviewRequired, true)
+  assert.equal(change.productionEnabled, false)
+  assert.equal(change.published, false)
+  assert.doesNotMatch(JSON.stringify(change),
+    /Synthetic test milk|PRIVATE-HTML|fictional-771|price-value|price-label|2\\.49/)
+  const same = await compareArchivedSourceReviews(original, original)
+  assert.equal(same.htmlBytesDiffer, false)
+  assert.equal(same.newSelectorCandidates, 0)
+  assert.equal(same.missingSelectorCandidates, 0)
+  await assert.rejects(compareArchivedSourceReviews(changed, original),
+    /Private source review archive refused/)
+})
+test('drift comparison refuses tampered, public, linked, or cross-store archive evidence', async t => {
+  const dir = await folder(t)
+  const one = join(dir, 'one.json'), two = join(dir, 'two.json')
+  await archive(options('plus'), one)
+  await archive(options('dekamarkt'), two)
+  await assert.rejects(compareArchivedSourceReviews(one, two))
+  const alias = join(dir, 'alias.json')
+  await symlink(one, alias)
+  await assert.rejects(compareArchivedSourceReviews(one, alias))
+  const changed = await readFile(one, 'utf8')
+  await writeFile(one, changed.replace('"published": false', '"published": true'))
+  await assert.rejects(compareArchivedSourceReviews(one, one))
+  await writeFile(one, changed)
+  await chmod(one, 0o644)
+  await assert.rejects(compareArchivedSourceReviews(one, one))
+})
+
+test('read-only CLI compares real private synthetic archives with aggregate-only stdout', async t => {
+  const dir = await folder(t)
+  const before = join(dir, 'before.json')
+  const after = join(dir, 'after.json')
+  const baseline = markup('plus')
+  const drifted = baseline.replace('price-value', 'price-label')
+  await archive(options('plus', baseline, {
+    capturedAt: new Date(Date.now() - 85000).toISOString(),
+  }), before)
+  await archive(options('plus', drifted, {
+    capturedAt: new Date(Date.now() - 25000).toISOString(),
+  }), after)
+  const script = new URL('../scripts/retailer-approved-source-review-archive.mjs', import.meta.url).pathname
+  const result = spawnSync(process.execPath, ['--experimental-strip-types',
+    script, '--compare', before, after], { encoding: 'utf8' })
+  assert.equal(result.status, 0, result.stderr)
+  const summary = JSON.parse(result.stdout)
+  assert.equal(summary.mode, 'private-one-source-review-selector-drift')
+  assert.equal(summary.htmlBytesDiffer, true)
+  assert.ok(summary.newSelectorCandidates > 0)
+  assert.equal(summary.published, false)
+  assert.doesNotMatch(result.stdout, /before\\.json|after\\.json|fictional-771|price-value|2\\.49/)
+  const invalid = spawnSync(process.execPath, ['--experimental-strip-types',
+    script, '--compare', before, '/tmp/not-a-source.json'], { encoding: 'utf8' })
+  assert.notEqual(invalid.status, 0)
+  assert.equal(invalid.stdout, '')
+  assert.match(invalid.stderr, /Private source review archive refused/)
+  assert.doesNotMatch(invalid.stderr, /fictional-771|2\\.49|before\\.json/)
 })
