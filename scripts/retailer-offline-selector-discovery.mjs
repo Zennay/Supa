@@ -146,6 +146,30 @@ function staticAttributeValue(value) {
   })
 }
 
+// A catalog navigation link to the catalog root is not evidence for a
+// product-card href selector. Restrict observed paths to the actual store:
+// PLUS uses /product/, whereas /producten/ is Deka's product item route.
+function observedProductHrefPrefix(origin, href) {
+  if (typeof href !== 'string') return null
+  const paths = origin.retailerId === 'plus' ? ['/product/']
+    : origin.retailerId === 'dekamarkt' ? ['/producten/']
+    : ['/product/', '/producten/'] // other offline research sources
+  for (const prefix of paths) {
+    if (!href.startsWith(prefix)) continue
+    try {
+      const target = new URL(href, origin.url)
+      const base = new URL(origin.url)
+      const slug = target.pathname.slice(prefix.length)
+      if (target.origin !== base.origin ||
+          !target.pathname.startsWith(prefix) ||
+          !slug || slug.startsWith('/') ||
+          /%(?:2f|5c)/i.test(slug)) return null
+      return prefix
+    } catch { return null }
+  }
+  return null
+}
+
 function recordSelector(counters, field, selector, tag) {
   const key = field + '\u0000' + selector
   const prior = counters.get(key)
@@ -217,10 +241,9 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
     }
     if (tag === 'a') {
       const href = staticAttributeValue(attrs.get('href'))
-      if (href?.startsWith('/product/')) {
-        recordSelector(candidates, 'product', 'a[href^="/product/"]', tag)
-      } else if (href?.startsWith('/producten/')) {
-        recordSelector(candidates, 'product', 'a[href^="/producten/"]', tag)
+      const observed = observedProductHrefPrefix(origin, href)
+      if (observed) {
+        recordSelector(candidates, 'product', 'a[href^="' + observed + '"]', tag)
       }
     }
   }
