@@ -248,3 +248,26 @@ test('pinned M1 manifest refuses duplicate or Unicode-aliased source identity ke
     }
   } finally {await rm(dir,{recursive:true,force:true})}
 })
+
+test('legacy M1 source review refuses live HTML no-store, charset drift and page redirects', () => {
+  const markup = [
+    '<article class="product-card">SYNTHETIC</article>',
+    '<a href="/product/synthetic-1">SYNTHETIC</a>',
+  ].join('')
+  const html=meta=>'<html><head>'+meta+'</head><body>'+markup+'</body></html>'
+  for (const meta of [
+    '<meta http-equiv="Cache-Control" content="no-store">',
+    '<meta charset="windows-1252">',
+    '<meta http-equiv="Content-Type" content="text/html; charset=latin1">',
+    '<meta http-equiv="refresh" content="0; URL=/redirect">',
+  ]) {
+    const sourceRecord=source('plus','catalog',html(meta))
+    assert.throws(()=>proposeRetailerSelectors(sourceRecord,html(meta)),
+      /source directives prohibit selector review/)
+  }
+  const inert='<template><meta charset="windows-1252"></template>'
+  const valid=html(inert+'<meta charset="UTF-8">')
+  const report=proposeRetailerSelectors(source('plus','catalog',valid),valid)
+  assert.equal(report.readyForScraping,false)
+  assert.ok(report.proposedSelectors.some(row=>row.selector==='article.product-card'))
+})
