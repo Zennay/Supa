@@ -98,3 +98,17 @@ test('CLI refuses world-readable files and aliased source without leaking path',
   assert.equal(result.stdout,'')
   assert.doesNotMatch(result.stderr,/\/tmp\/|before\.json|after\.json/)
 }))
+
+test('offline drift recognizes genuine Product/Thing multi-type changes without exposing raw itemtype or promoting sources',()=>{
+  for(const retailerId of ['plus','dekamarkt']){
+    const older=proposal('<section itemscope itemtype="https://schema.org/Product"></section>',whenA,retailerId)
+    const newer=proposal('<section itemscope itemtype="https://schema.org/Product https://schema.org/Thing"></section>',whenB,retailerId)
+    const alert=compareOfflineSelectorProposals(older,newer)
+    assert.equal(alert.perField.product.new,1,retailerId)
+    assert.equal(alert.perField.product.missing,1,retailerId)
+    assert.equal(alert.reviewRequired,true)
+    assert.equal(alert.automatedSelectorPromotion,false)
+    assert.equal(alert.productionEnabled,false)
+    assert.doesNotMatch(JSON.stringify(alert),/schema\.org|Product|Thing|https?:/)
+  }
+})

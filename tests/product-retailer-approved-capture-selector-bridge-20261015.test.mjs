@@ -487,3 +487,30 @@ test('one-shot PLUS/Deka private capture prioritizes six real semantic fields de
     assert.doesNotMatch(JSON.stringify(receipt),/PRIVATE_NOISE|PRIVATE_NAME|PRIVATE_PRICE|PRIVATE_PACK|PRIVATE_OFFER|PRIVATE_STOCK|price-noise-/)
   }
 })
+
+test('one authorized synthetic capture retains genuine Schema.org Product Thing pair, never foreign item types',async()=>{
+  for(const [supermarket,kind,url] of [
+    ['plus','catalog','https://www.plus.nl/producten'],
+    ['dekamarkt','offers','https://www.dekamarkt.nl/aanbiedingen']]){
+    const itemtype='https://schema.org/Product https://schema.org/Thing'
+    const html='<section itemscope itemtype="'+itemtype+'"><span itemprop="name">PRIVATE_NAME</span></section>'
+    const receipt=await captureToPrivateSelectorReview({source:{supermarket,kind,url},
+      grant:consent(supermarket,kind,url),permissionGate:syntheticGate(),capturedAt:at,
+      fetchFn:async()=>new Response(html,{status:200,headers:{'content-type':'text/html'}})})
+    assert.equal(receipt.selectorProposals.find(x=>x.selector==='section[itemtype="'+itemtype+'"]')?.field,'product')
+    assert.equal(receipt.readyForIngestion,false)
+    assert.equal(receipt.sourceRightsForPublicationVerified,false)
+    assert.doesNotMatch(JSON.stringify(receipt),/PRIVATE_NAME/)
+    for(const invalid of [
+      'https://schema.org/Product https://example.invalid/Secret',
+      'https://schema.org/Thing',
+      'https://schema.org/Product https://schema.org/Product',
+      'https://schema.org/Product  https://schema.org/Thing']){
+      const bad=html.replace(itemtype,invalid)
+      const checked=await captureToPrivateSelectorReview({source:{supermarket,kind,url},
+        grant:consent(supermarket,kind,url),permissionGate:syntheticGate(),capturedAt:at,
+        fetchFn:async()=>new Response(bad,{status:200,headers:{'content-type':'text/html'}})})
+      assert.equal(checked.selectorProposals.some(x=>x.selector.includes('itemtype=')),false,invalid)
+    }
+  }
+})

@@ -4,6 +4,7 @@ import { open, lstat, mkdtemp, rename, rm, readdir } from 'node:fs/promises'
 import { constants as fsFlags } from 'node:fs'
 import { parseUniqueKeyRetailerJson } from './retailer-private-unique-key-json.mjs'
 import { isPublicMerchantProductHrefSelector } from './retailer-public-product-href-selectors.mjs'
+import { matchObservedSchemaProductSelector } from './retailer-observed-schema-product-selector.mjs'
 import { isSafeStructuralReviewTag } from './retailer-public-structural-tag.mjs'
 import { resolve, join, dirname } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -11,7 +12,6 @@ import { replayPrivateProductHtmlSnapshot, replayPrivateSelectorHtmlSnapshot } f
 import { summarizeOfflineSelectorProposals, proposeOfflineRetailerSelectors } from './retailer-offline-selector-discovery.mjs'
 import { assertNoSymlinkedM3OutputParents } from './m3-source-output-preservation.mjs'
 const FIELD = new Set(['product','name','price','pack','offer','availability'])
-const MICRODATA_PRODUCT = /^(article|section|div|li|a)\[itemtype="(https?:\/\/schema\.org\/Product)"\]$/
 
 // Match the same bounded retailer web components as the offline scanner.
 // Modern store listings often wrap cards, pack sizes and price labels in
@@ -36,10 +36,10 @@ function elementFor(row, retailerId) {
     // an HTML void element and must not receive a fake closing element.
     return ['meta','link'].includes(tag) ? opening : opening+'SYNTHETIC STRUCTURE</'+tag+'>'
   }
-  match=MICRODATA_PRODUCT.exec(row.selector)
+  match=matchObservedSchemaProductSelector(row.selector)
   if (row.field === 'product' && match)
-    return '<'+match[1]+' itemscope itemtype="'+match[2]+
-      '" data-synthetic="true">SYNTHETIC STRUCTURE</'+match[1]+'>'
+    return '<'+match.tag+' itemscope itemtype="'+match.itemtype+
+      '" data-synthetic="true">SYNTHETIC STRUCTURE</'+match.tag+'>'
   if (row.field === 'product' &&
       isPublicMerchantProductHrefSelector(retailerId, row.selector)) {
     const root = /^a\[href\^="([^"<>]+)"\]$/.exec(row.selector)?.[1]

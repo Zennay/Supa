@@ -3,6 +3,7 @@ import { isIP } from 'node:net'
 import { types as nodeTypes } from 'node:util'
 import { scanOfflineRetailerMarkup } from './retailer-offline-structural-scan.mjs'
 import { isPublicMerchantProductHrefSelector } from './retailer-public-product-href-selectors.mjs'
+import { matchObservedSchemaProductSelector } from './retailer-observed-schema-product-selector.mjs'
 import { isSafeStructuralReviewTag } from './retailer-public-structural-tag.mjs'
 import { isFormerPriceTag, isFormerPriceToken, PUBLIC_OBSERVED_TOKEN_FIELDS } from './retailer-public-observed-token-fields.mjs'
 import { ambiguousRetailerRoute, isAllowedM1RetailerSourcePath } from './retailer-source-route-safety.mjs'
@@ -13,7 +14,6 @@ const MAX_HTML_BYTES = 2 * 1024 * 1024
 const MAX_TAGS = 25000
 const MAX_SELECTORS = 24
 const STATIC_NAME = /^[a-z][a-z0-9_-]{1,59}$/i
-const MICRODATA_PRODUCT = /^(?:article|section|div|li|a)\[itemtype="https?:\/\/schema\.org\/Product"\]$/
 // Exact public Schema.org Microdata attribute names: an observed name alone
 // is a *review hint*, never verified price, stock, permission or product data.
 // Canonical camelCase fields are common in actual nested Product/Offer markup
@@ -371,7 +371,7 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
     if (['article','section','div','li','a'].includes(tag) && attrs.has('itemscope')) {
       const itemtype = staticAttributeValue(attrs.get('itemtype'))
       const microdata = tag + '[itemtype="' + itemtype + '"]'
-      if (itemtype && MICRODATA_PRODUCT.test(microdata))
+      if (itemtype && matchObservedSchemaProductSelector(microdata))
         recordSelector(candidates,'product',microdata,tag)
     }
     if (tag === 'a') {
@@ -394,7 +394,7 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
   // Every proposal must still exist in the original HTML: this ranks, never
   // invents, selectors or enables automatic promotion.
   const observedStructuralConfidence = row => {
-    if (row.field === 'product' && (MICRODATA_PRODUCT.test(row.selector) ||
+    if (row.field === 'product' && (matchObservedSchemaProductSelector(row.selector) ||
         isPublicMerchantProductHrefSelector(origin.retailerId,row.selector))) return 2
     // Known public Schema.org property names are more stable than ephemeral
     // CSS classes on a large listing. This is only a selector review order;
@@ -487,7 +487,7 @@ export function summarizeOfflineSelectorProposals(report) {
     // Human-facing CLI output must obey the same vocabulary as private replay.
     const tag = /^[a-z][a-z0-9-]*/.exec(row.selector)?.[0]
     if (!isSafeStructuralReviewTag(tag)) return false
-    if (row.field === 'product' && MICRODATA_PRODUCT.test(row.selector)) return true
+    if (row.field === 'product' && matchObservedSchemaProductSelector(row.selector)) return true
     if (Object.entries(SCHEMA_ITEMPROP_FIELDS).some(([prop,field]) =>
       (row.field === field || row.field === 'offer' && field === 'price' &&
         isFormerPriceTag(row.selector.split('[')[0])) &&

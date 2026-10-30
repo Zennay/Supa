@@ -10,6 +10,7 @@ import { types as nodeTypes } from 'node:util'
 import { captureApprovedRetailerPage } from './retailer-approved-snapshot-capture.mjs'
 import { proposeOfflineRetailerSelectors } from './retailer-offline-selector-discovery.mjs'
 import { isPublicMerchantProductHrefSelector } from './retailer-public-product-href-selectors.mjs'
+import { matchObservedSchemaProductSelector } from './retailer-observed-schema-product-selector.mjs'
 import { isSafeStructuralReviewTag } from './retailer-public-structural-tag.mjs'
 import { isFormerPriceTag, PUBLIC_OBSERVED_TOKEN_FIELDS } from './retailer-public-observed-token-fields.mjs'
 
@@ -86,7 +87,6 @@ const SCHEMA_FIELDS = Object.freeze({
 })
 const SCHEMA_PROP_SELECTOR = /^(article|section|div|li|a|span|h[1-6]|p|strong|ins|del|s|strike|small|meta|link|data|time|[a-z][a-z0-9]*-[a-z0-9-]{1,31})\[itemprop="([a-zA-Z]+)"\]$/
 const GENERIC_TEST_ID_SELECTOR = /^(article|section|div|li|a|span|h[1-6]|p|strong|ins|del|s|strike|small|meta|link|data|time|[a-z][a-z0-9]*-[a-z0-9-]{1,31})\[data-testid="([a-z][a-z-]+)"\]$/
-const SCHEMA_PRODUCT_SELECTOR = /^(article|section|div|li|a)\[itemtype="https?:\/\/schema\.org\/Product"\]$/
 function publicReviewSelector(row, retailerId) {
   // Source tag names may themselves be user/product identifiers; the same
   // bounded structural vocabulary applies to both independent review paths.
@@ -104,7 +104,7 @@ function publicReviewSelector(row, retailerId) {
       (isFormerPriceTag(testId[1]) && row.field === 'offer' &&
        PUBLIC_OBSERVED_TOKEN_FIELDS[testId[2]] === 'price'))
   return row.field === 'product' &&
-    (SCHEMA_PRODUCT_SELECTOR.test(row.selector) ||
+    (matchObservedSchemaProductSelector(row.selector) ||
       isPublicMerchantProductHrefSelector(retailerId, row.selector))
 }
 // The only absolute href prefixes allowed out of private source review are

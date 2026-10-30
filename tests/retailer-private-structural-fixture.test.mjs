@@ -765,3 +765,24 @@ test('noisy 160-selector retailer listings still preserve source-observed produc
     assert.equal((await verifyPrivateSyntheticHtmlFixture(filename,out)).verified,true)
   }
 })
+
+test('two-retailer source-observed multi-type Schema.org Product/Thing microdata survives private review',async t=>{
+  for(const retailerId of ['plus','dekamarkt']){
+    const type='https://schema.org/Product https://schema.org/Thing'
+    const html='<section itemscope itemtype="'+type+'"><span itemprop="name">PRIVATE_NAME</span></section>'
+    const {filename,dir,capture}=await archive(t,retailerId,retailerId==='plus'?'catalog':'offers',html)
+    const origin={retailerId,url:capture.source.url,capturedAt:capture.source.capturedAt}
+    const selector='section[itemtype="'+type+'"]'
+    const direct=proposeOfflineRetailerSelectors({html,origin})
+    assert.equal(direct.structuredSignals.schemaOrgProduct,true)
+    assert.equal(direct.selectors.find(x=>x.selector===selector)?.field,'product',retailerId)
+    assert.equal(summarizeOfflineSelectorProposals(direct).selectors.find(x=>x.selector===selector)?.field,'product')
+    const out=join(dir,'schema-multitype')
+    await buildPrivateSyntheticHtmlFixture(filename,out)
+    const synthetic=await readFile(join(out,'synthetic-structure.html'),'utf8')
+    const replay=proposeOfflineRetailerSelectors({html:synthetic,origin})
+    assert.equal(replay.selectors.find(x=>x.selector===selector)?.field,'product',retailerId)
+    assert.equal((await verifyPrivateSyntheticHtmlFixture(filename,out)).verified,true)
+    assert.doesNotMatch(synthetic,/PRIVATE_NAME/)
+  }
+})
