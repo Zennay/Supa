@@ -261,8 +261,16 @@ export async function main() {
 
   const report = await inspectCaptureDirectory(rootDir)
   const outputPath = path.join(rootDir, 'inspection.json')
-  await writeFile(outputPath, JSON.stringify(report, null, 2) + '\n', 'utf8')
-  console.log(JSON.stringify(report, null, 2))
+  // Raw inspected product names, SKUs and unverified prices belong only in
+  // the permission-gated local report, never in shared CI console logs.
+  // Exclusive creation keeps reruns from replacing a reviewer's evidence.
+  await writeFile(outputPath, JSON.stringify(report, null, 2) + '\n',
+    {flag:'wx',mode:0o600})
+  console.log(JSON.stringify({milestone:report.milestone,
+    sourceCount:report.sourceCount,successCount:report.successCount,
+    failureCount:report.failureCount,
+    integrityVerifiedCount:report.integrityVerifiedCount,
+    privateReportWritten:true,pricesPublished:false}))
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

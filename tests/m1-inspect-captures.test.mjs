@@ -285,3 +285,27 @@ test('one malformed or excessive JSON-LD block prevents a historical priced sour
     }
   }finally{await rm(root,{recursive:true,force:true})}
 })
+
+test('M1 inspection CLI prints only aggregate receipt and writes private non-overwriting report',async()=>{
+  const {rm,readFile,stat}=await import('node:fs/promises')
+  const {spawnSync}=await import('node:child_process')
+  const root=await mkdtemp(path.join(os.tmpdir(),'supa-m1-inspector-stdout-'))
+  try {
+    await mkdir(path.join(root,'plus'))
+    const data={'@context':'https://schema.org','@type':'Product',name:'SYNTHETIC_PRIVATE_PRODUCT',sku:'SYNTHETIC_PRIVATE_SKU',offers:{'@type':'Offer',price:'19.99',priceCurrency:'EUR'}}
+    const html='<script type="application/ld+json">'+JSON.stringify(data)+'</script>'
+    await writeFile(path.join(root,'plus','plus-product.html'),html)
+    await writeFile(path.join(root,'manifest.json'),JSON.stringify({milestone:'M1 Data Feasibility',bounded:true,sourceCount:1,results:[{id:'plus-product',supermarket:'plus',kind:'product',requestedUrl:'https://www.plus.nl/product/test',finalUrl:'https://www.plus.nl/product/test',capturedAt:'2026-10-04T00:00:00.000Z',sha256:createHash('sha256').update(html).digest('hex'),success:true}]}))
+    const command=[ '--experimental-strip-types',new URL('../scripts/m1-inspect-captures.mjs',import.meta.url).pathname,root ]
+    const run=()=>spawnSync(process.execPath,command,{encoding:'utf8',timeout:30000})
+    const first=run()
+    assert.equal(first.status,0,first.stderr)
+    assert.doesNotMatch(first.stdout,/SYNTHETIC_PRIVATE|19\.99|1999|www\.plus\.nl|sha256/i)
+    const receipt=JSON.parse(first.stdout)
+    assert.equal(receipt.integrityVerifiedCount,1)
+    assert.equal((await stat(path.join(root,'inspection.json'))).mode & 0o777,0o600)
+    const report=JSON.parse(await readFile(path.join(root,'inspection.json'),'utf8'))
+    assert.equal(report.sources[0].schemaOrgProduct.type,'observation')
+    assert.equal(run().status===0,false,'cannot silently overwrite existing private report')
+  }finally{await rm(root,{recursive:true,force:true})}
+})
