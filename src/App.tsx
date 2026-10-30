@@ -11,7 +11,6 @@ const BasketView = lazy(async () => {
   const module = await import('./features/basket/BasketView')
   return { default: module.BasketView }
 })
-import { CartIcon } from './components/HiFiIcons'
 import { HiFiRecipes } from './features/recipes/HiFiRecipes'
 import { ShoppingListView } from './features/shopping-list/ShoppingListView'
 import { PrivateSourceShoppingList } from './features/shopping-list/PrivateSourceShoppingList.tsx'
@@ -819,13 +818,6 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
         {tab === 'observe' && <ObservationView />}
       </div>
 
-      {(tab === 'home' || tab === 'products' || tab === 'recipes') && (
-        <button type="button" className="hifi-cart" aria-label={`Boodschappenlijst, ${designProductIds.length} producten toegevoegd`} onClick={() => navigate('list')}>
-          <CartIcon />
-          <span className={`hifi-cart-count${designProductIds.length === 0 ? ' empty' : ''}`} key={designProductIds.length}>{designProductIds.length}</span>
-        </button>
-      )}
-
       <nav className="bottom-nav hifi-nav" aria-label="Hoofdnavigatie">
         {tabs.map((item) => (
           <button
@@ -833,11 +825,15 @@ export function App({ initialTab = 'home' }: { initialTab?: Tab } = {}) {
             key={item.id}
             aria-label={item.label}
             className={tab === item.id ? 'active' : ''}
+            data-cart-target={item.id === 'list' ? '' : undefined}
             aria-current={tab === item.id ? 'page' : undefined}
             onClick={() => navigate(item.id)}
           >
             <FigmaImage asset={tab === item.id ? item.activeIcon : item.icon} alt="" />
             <span className="hifi-sr-only">{item.label}</span>
+            {item.id === 'list' && designProductIds.length > 0 && (
+              <span className="hifi-nav-badge" key={designProductIds.length} aria-label={`${designProductIds.length} producten toegevoegd`}>{designProductIds.length}</span>
+            )}
           </button>
         ))}
       </nav>

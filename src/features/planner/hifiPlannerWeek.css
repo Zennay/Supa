@@ -427,3 +427,11 @@
 .hifi-reuse-marks > span { overflow: hidden; }
 .hifi-reuse-marks > span img { width: 20px; height: 20px; display: block; }
 .hifi-reuse-more { color: #626569; }
+
+/* "Bekijk berekening": sum per meal. */
+.hifi-calc-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.hifi-calc-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 14px; color: #262527; }
+.hifi-calc-list li span { display: grid; gap: 2px; min-width: 0; }
+.hifi-calc-list small { color: #848484; font-size: 12px; }
+.hifi-calc-sum { padding-top: 10px; border-top: 1px solid #e5e5e5; }
+.hifi-calc-empty { margin: 0; color: #848484; font-size: 14px; }
