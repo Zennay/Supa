@@ -11,7 +11,6 @@
     "preview": "vite preview",
     "m1:matching-benchmark": "node --experimental-strip-types scripts/m1-run-matching-benchmark.mjs",
     "m1:inspect-captures": "node --experimental-strip-types scripts/m1-inspect-captures.mjs",
-    "m1:private-synthetic-fixture": "node --experimental-strip-types scripts/retailer-private-structural-fixture.mjs",
     "m1:export-candidates": "node scripts/m1-export-sanitized-candidates.mjs",
     "m1:compare-captures": "node scripts/m1-compare-captures.mjs",
     "m1:evaluate-freshness": "node scripts/m1-evaluate-freshness.mjs",
