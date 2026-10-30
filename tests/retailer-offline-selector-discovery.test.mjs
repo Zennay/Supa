@@ -777,3 +777,16 @@ test('offline selector signals agree with UTF-8 JSON-LD and Nuxt private price e
     assert.equal(report.structuredSignals.schemaOrgProduct, false)
   }
 })
+
+test('encoded script MIME types produce the same offline source signals as private price extraction', () => {
+  const valid = '<script type="application/ld+json&#59;charset=utf-8">' +
+    '{"@context":"https://schema.org","@type":"Product","name":"synthetic"}</script>'
+  const source = proposeOfflineRetailerSelectors({ html: valid, origin })
+  assert.equal(source.structuredSignals.jsonLd, true)
+  assert.equal(source.structuredSignals.schemaOrgProduct, true)
+  assert.equal(source.readyForIngestion, false)
+  const encodedInvalid = valid.replace('&#59;charset=utf-8','&amp;semi;charset=utf-8')
+  const refused = proposeOfflineRetailerSelectors({ html: encodedInvalid, origin })
+  assert.equal(refused.structuredSignals.jsonLd, false)
+  assert.equal(refused.structuredSignals.schemaOrgProduct, false)
+})

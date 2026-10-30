@@ -454,3 +454,42 @@ test('ambiguous or non-UTF8 JSON MIME metadata cannot be ignored beside valid ch
   assert.equal(readAuthorizedHtmlScriptEvidence(nuxt).invalid, true)
   assert.equal((await run('dekamarkt', nuxt)).status, 'review_required')
 })
+
+test('HTML character references in real script type attributes retain source-bound product evidence', async () => {
+  const variants = ['application/ld+json&#59; charset=UTF-8',
+    'application/ld+json&#x3B;charset=utf-8',
+    'application/ld+json&semi;charset&equals;utf-8',
+    'application/ld+json; charset=&quot;utf-8&quot;']
+  for (const type of variants) {
+    const html = '<script type="' + type + '">' + JSON.stringify(plusProduct) + '</script>'
+    const read = readAuthorizedHtmlScriptEvidence(html, plusUrl)
+    assert.equal(read.invalid, false, type)
+    assert.equal(read.jsonLdBlocks.length, 1, type)
+    const candidate = await run('plus', html)
+    assert.equal(candidate.status, 'candidate_needs_review', type)
+    assert.equal(candidate.observation.currentPriceCents, 199, type)
+    assert.equal(candidate.published, false)
+  }
+  const nuxt = dekaMarkup('id="__NUXT_DATA__" type="application/json&semi;charset&equals;utf-8"')
+  const deka = await run('dekamarkt', nuxt)
+  assert.equal(deka.status, 'candidate_needs_review')
+  assert.equal(deka.observation.currentPriceCents, 85)
+})
+
+test('encoded wrong charsets and nested entities cannot silently conceal contradictory JSON price sources', async () => {
+  const authoritative = script('type="application/ld+json"', plusProduct)
+  for (const type of ['application/ld+json&#59;charset=latin1',
+    'application/ld+json&semi;charset&equals;windows-1252',
+    'application/ld+json&amp;semi;charset=utf-8',
+    'application/ld+json&#x3b;charset=utf-8&#59;extra=1',
+    'application/ld+json&unknown;charset=utf-8']) {
+    const contradictory = '<script type="' + type + '">' +
+      JSON.stringify({ ...plusProduct, offers: { ...plusProduct.offers, price:'0.01' } }) + '</script>'
+    const evidence = readAuthorizedHtmlScriptEvidence(contradictory + authoritative, plusUrl)
+    assert.equal(evidence.invalid, true, type)
+    assert.deepEqual(evidence.jsonLdBlocks, [], type)
+    const result = await run('plus', contradictory + authoritative)
+    assert.equal(result.status, 'review_required', type)
+    assert.equal(result.observation, null, type)
+  }
+})
