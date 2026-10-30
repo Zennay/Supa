@@ -132,3 +132,43 @@ test('offline selector CLI writes a private new artifact and rejects overwrite a
     await rm(temp, { recursive: true, force: true })
   }
 })
+
+test('legacy M1 selector proposals refuse leading UTF-8 BOM and embedded NUL even with matching SHA', () => {
+  for(const html of ['\uFEFF'+plusHtml,plusHtml+'\u0000']) {
+    assert.throws(()=>proposeRetailerSelectors(source('plus','catalog',html),html),
+      /Offline selector review refused/)
+  }
+  assert.equal(proposeRetailerSelectors(source('plus','catalog',plusHtml),plusHtml)
+    .publicationAllowed,false)
+})
+
+test('legacy captured-source directory refuses invalid UTF-8 with a recomputed SHA manifest', async () => {
+  const dir=await mkdtemp(join(tmpdir(),'supa-legacy-byte-'))
+  try {
+    await mkdir(join(dir,'plus'))
+    const path=join(dir,'plus','fictional-plus-catalog.html')
+    const base=Buffer.from(plusHtml)
+    for(const bytes of [
+      Buffer.concat([Buffer.from([0xef,0xbb,0xbf]),base]),
+      Buffer.concat([base,Buffer.from([0])]),
+      Buffer.concat([base,Buffer.from([0xc3,0x28])]),
+    ]) {
+      await writeFile(path,bytes)
+      const record={...source('plus','catalog',plusHtml),success:true,
+        finalUrl:'https://www.plus.nl/producten',sha256:hash(bytes)}
+      await writeFile(join(dir,'manifest.json'),JSON.stringify({
+        sourceCount:1,results:[record],
+      }))
+      await assert.rejects(proposeFromM1CaptureDirectory(dir),/BOM|encoding|UTF-8/i)
+    }
+    await writeFile(path,base)
+    const record={...source('plus','catalog',plusHtml),success:true,
+      finalUrl:'https://www.plus.nl/producten'}
+    await writeFile(join(dir,'manifest.json'),JSON.stringify({
+      sourceCount:1,results:[record],
+    }))
+    const allowed=await proposeFromM1CaptureDirectory(dir)
+    assert.equal(allowed.analyzedSources,1)
+    assert.equal(allowed.productionEnabled,false)
+  } finally { await rm(dir,{recursive:true,force:true}) }
+})
