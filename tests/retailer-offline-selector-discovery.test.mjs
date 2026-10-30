@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { proposeOfflineRetailerSelectors } from '../scripts/retailer-offline-selector-discovery.mjs'
+import { proposeOfflineRetailerSelectors, summarizeOfflineSelectorProposals } from '../scripts/retailer-offline-selector-discovery.mjs'
 
 const origin = {
   retailerId: 'plus',
@@ -815,4 +815,20 @@ test('official named HTML script id references match the actual Nuxt/Next DOM me
   assert.equal(result.structuredSignals.nextData, true)
   assert.equal(result.readyForIngestion, false)
   assert.equal(result.productionEnabled, false)
+})
+
+test('offline operator summary never exposes private SKU-bearing custom component names', () => {
+  const html='<retailer-product-card class="product-card">' +
+    '<retailer-price-label data-testid="price-value">PRIVATE_PRICE</retailer-price-label>' +
+    '<retailer-product-991-card class="product-card">PRIVATE_SKU</retailer-product-991-card>' +
+    '<customer-secret-name-card data-testid="price-value">PRIVATE_PERSONAL</customer-secret-name-card>' +
+    '</retailer-product-card>'
+  const full=proposeOfflineRetailerSelectors({html,origin})
+  assert.ok(full.selectors.some(x=>x.selector.startsWith('retailer-product-991-card.')))
+  const publicReport=summarizeOfflineSelectorProposals(full)
+  assert.ok(publicReport.selectors.some(x=>x.selector==='retailer-product-card.product-card'))
+  assert.ok(publicReport.selectors.some(x=>x.selector==='retailer-price-label[data-testid="price-value"]'))
+  assert.doesNotMatch(JSON.stringify(publicReport),/retailer-product-991|customer-secret-name|PRIVATE_PRICE|PRIVATE_SKU|PRIVATE_PERSONAL/)
+  assert.ok(publicReport.privateSelectorCount>=2)
+  assert.equal(publicReport.readyForIngestion,false)
 })

@@ -3,6 +3,7 @@ import { isIP } from 'node:net'
 import { types as nodeTypes } from 'node:util'
 import { scanOfflineRetailerMarkup } from './retailer-offline-structural-scan.mjs'
 import { isPublicMerchantProductHrefSelector } from './retailer-public-product-href-selectors.mjs'
+import { isSafeStructuralReviewTag } from './retailer-public-structural-tag.mjs'
 import { ambiguousRetailerRoute, isAllowedM1RetailerSourcePath } from './retailer-source-route-safety.mjs'
 
 // Offline-first DOM selector proposal. NEVER downloads a page, executes scripts,
@@ -434,6 +435,12 @@ const PUBLIC_GENERIC_TOKENS = new Set([
 // usable observed absolute selectors for the operator's human drift review.
 export function summarizeOfflineSelectorProposals(report) {
   const safe = report.selectors.filter(row => {
+    if (!row || typeof row.selector !== 'string') return false
+    // CSS selectors contain observed tag names. A custom element may embed
+    // a product SKU, customer name or price even if its class is generic.
+    // Human-facing CLI output must obey the same vocabulary as private replay.
+    const tag = /^[a-z][a-z0-9-]*/.exec(row.selector)?.[0]
+    if (!isSafeStructuralReviewTag(tag)) return false
     if (row.field === 'product' && MICRODATA_PRODUCT.test(row.selector)) return true
     if (Object.entries(SCHEMA_ITEMPROP_FIELDS).some(([prop,field]) =>
       row.field === field && row.selector.endsWith('[itemprop="'+prop+'"]') &&
