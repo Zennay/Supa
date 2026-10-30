@@ -624,6 +624,10 @@ test('two PLUS catalog snapshots derive stable selectors only from real supplied
   assert.deepEqual(saved.stableCandidates.map(x=>x.selector).sort(),
     ['article.product-card','span.price-value'].sort())
   assert.equal(saved.samples.length,2)
+  assert.equal(saved.unstableCandidates.length,2)
+  assert.deepEqual(saved.unstableCandidates.map(x=>x.field).sort(),['name','product'])
+  assert.deepEqual(saved.fieldCoverage.price,{observedCandidates:1,stableCandidates:1})
+  assert.deepEqual(saved.fieldCoverage.pack,{observedCandidates:0,stableCandidates:0})
   assert.ok(saved.samples.every(x=>/^[a-f0-9]{64}$/.test(x.sha256)))
   assert.equal(saved.automatedSelectorPromotion,false)
   assert.equal(saved.sourceRightsForPublicationVerified,false)

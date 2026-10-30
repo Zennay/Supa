@@ -241,15 +241,25 @@ export async function savePrivateSelectorStabilityArchive(htmlFiles, reviewFile)
         observedInSnapshots:1, status:'needs-human-review'})
     }
   }
-  const stable = [...counts.values()].filter(row => row.observedInSnapshots === reports.length)
-    .sort((a,b) => a.field.localeCompare(b.field) || a.selector.localeCompare(b.selector))
+  const all = [...counts.values()].sort((a,b) =>
+    a.field.localeCompare(b.field) || a.selector.localeCompare(b.selector))
+  const stable = all.filter(row => row.observedInSnapshots === reports.length)
+  const unstable = all.filter(row => row.observedInSnapshots !== reports.length)
+  // Coverage records facts rather than inventing missing CSS selectors.
+  const fieldCoverage = Object.fromEntries([
+    'product','name','price','pack','offer','availability',
+  ].map(field => [field, {
+    observedCandidates:all.filter(x => x.field === field).length,
+    stableCandidates:stable.filter(x => x.field === field).length,
+  }]))
   const saved = await writePrivateReviewRecord({
     schemaVersion:1, mode:'offline-private-selector-stability',
     status:'human-selector-review-required', retailerId, kind,
     samples:reports.map(x => ({capturedAt:x.source.capturedAt,
       sha256:x.source.sha256, sourceUrlSha256:x.source.sourceUrlSha256})),
     sampleCount:reports.length, stableCandidateCount:stable.length,
-    unstableCandidateCount:counts.size-stable.length, stableCandidates:stable,
+    unstableCandidateCount:unstable.length, stableCandidates:stable,
+    unstableCandidates:unstable, fieldCoverage,
     humanReviewRequired:true, automatedSelectorPromotion:false,
     readyForIngestion:false, sourceRightsForPublicationVerified:false,
     priceExtractionEnabled:false, publicSavingsClaimEligible:false,
@@ -257,7 +267,7 @@ export async function savePrivateSelectorStabilityArchive(htmlFiles, reviewFile)
   }, reviewFile)
   // No raw selectors or source URLs in CLI/stdout/API return.
   return {...saved, sampleCount:reports.length, stableCandidateCount:stable.length,
-    unstableCandidateCount:counts.size-stable.length}
+    unstableCandidateCount:unstable.length}
 }
 
 /**

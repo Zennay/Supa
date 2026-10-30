@@ -367,3 +367,10 @@ bron-URL's verbinden voorstellen met de oorspronkelijke bestanden; afwijkende
 selectors worden geaggregeerd geteld. Stdout bevat slechts aantallen en SHA
 van het private archief. Geen voorgestelde selector wordt automatisch
 gepromoveerd, geen prijs gepubliceerd, geen HTTP-verzoek uitgevoerd.
+
+Voor handmatige analyse bevat het **private** reviewarchief naast de stabiele
+selectors ook de veranderlijke voorstellen met hun waargenomen frequentie,
+plus een per-field overzicht (`product`, `name`, `price`, `pack`, `offer`,
+`availability`). Een ontbrekend veld blijft een expliciete nul, nooit een
+verzonnen selector. De publiek leesbare CLI-samenvatting houdt alleen
+aggregaten bij.
