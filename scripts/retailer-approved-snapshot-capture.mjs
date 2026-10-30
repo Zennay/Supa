@@ -129,8 +129,19 @@ function assertDocumentSourceIdentity(html, target) {
     let destination
     try { destination = new URL(href, target) }
     catch { throw new Error('Untrusted HTML base URL') }
+    // A same-origin <base> can still silently redirect relative product-card
+    // links to another SKU, storefront or filtered listing. Accept only the
+    // current document, its containing directory or the retailer root.
+    // Browsers also use query/fragment from <base>, neither is a reviewed
+    // source identity for this one-URL capture grant.
+    const parentPath = expected.pathname.slice(0, expected.pathname.lastIndexOf('/') + 1)
+    const canonicalPath = path => path.replace(/\/$/, '') || '/'
+    const basePath = canonicalPath(destination.pathname)
     if (destination.origin !== expected.origin || destination.username ||
-        destination.password || destination.protocol !== 'https:') {
+        destination.password || destination.protocol !== 'https:' ||
+        destination.search || destination.hash ||
+        (basePath !== '/' && basePath !== canonicalPath(parentPath) &&
+         basePath !== canonicalPath(expected.pathname))) {
       throw new Error('Untrusted HTML base URL')
     }
   }

@@ -845,3 +845,30 @@ test('encoded dot/percent source aliases cannot rebind a 200 HTML capture to the
     }
   }
 })
+
+
+test('a same-host HTML base cannot silently rebase reviewed product links to a different page', async () => {
+  const cases = [
+    '/product/unrelated-sku',
+    '/producten?shop=unreviewed',
+    '/producten/#unreviewed',
+    '/unreviewed-assets/',
+  ]
+  for (const href of cases) {
+    await assert.rejects(captureApprovedRetailerPage({
+      source, permissionGate: gate, grant,
+      fetchFn: async () => new Response(
+        '<html><head><base href="' + href + '"></head><body><a href="sku">SYNTHETIC</a></body></html>',
+        { status: 200, headers: { 'content-type': 'text/html' } },
+      ),
+    }), /Untrusted HTML base URL/, 'must reject base ' + href)
+  }
+  for (const href of ['/', '/producten/', '/producten']) {
+    const proof = await captureApprovedRetailerPage({
+      source, permissionGate: gate, grant,
+      fetchFn: async () => new Response('<html><head><base href="' + href + '"></head><body>SYNTHETIC</body></html>',
+        { status: 200, headers: { 'content-type': 'text/html' } }),
+    })
+    assert.equal(proof.published, false)
+  }
+})
