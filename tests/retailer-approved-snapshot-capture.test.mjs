@@ -522,3 +522,17 @@ test('HTTP no-store and attachment HTML cannot enter a SHA-pinned snapshot archi
   assert.equal(allowed.html, html)
   assert.equal(allowed.published, false)
 })
+
+test('live HTML meta no-store refuses archival without header no-store', async () => {
+  const meta='<meta http-equiv="Cache-Control" content="max-age=0, no-store">'
+  const page=tag=>'<html><head>'+tag+'</head><body><a href="/product/synthetic-1">SYNTHETIC</a></body></html>'
+  const fetchFn=html=>async()=>new Response(html,{status:200,headers:{'content-type':'text/html'}})
+  await assert.rejects(captureApprovedRetailerPage({
+    source,permissionGate:gate,grant,fetchFn:fetchFn(page(meta)),
+  }),/HTML disallows snapshot archival/)
+  const allowed=await captureApprovedRetailerPage({
+    source,permissionGate:gate,grant,fetchFn:fetchFn(page('<template>'+meta+'</template>')),
+  })
+  assert.equal(allowed.published,false)
+  assert.equal(allowed.readyForIngestion,false)
+})
