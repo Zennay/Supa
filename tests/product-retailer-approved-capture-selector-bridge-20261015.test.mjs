@@ -320,3 +320,28 @@ test('one approved synthetic capture preserves h1/h4/h5/h6 source markup only as
     assert.equal(review.productionEnabled,false)
   }
 })
+
+test('single synthetic approved PLUS/Deka capture retains observed sale/price/pack element selectors without any price publication',async()=>{
+  for(const [supermarket,kind,url] of [
+    ['plus','catalog','https://www.plus.nl/producten'],
+    ['dekamarkt','offers','https://www.dekamarkt.nl/aanbiedingen']]){
+    const html='<article itemscope itemtype="https://schema.org/Product">' +
+      '<ins itemprop="price">PRIVATE_2.49</ins>' +
+      '<del class="offer-label">PRIVATE_3.99</del>' +
+      '<small data-testid="pack-size">PRIVATE_500_ML</small></article>'
+    let calls=0
+    const review=await captureToPrivateSelectorReview({
+      source:{supermarket,kind,url},grant:consent(supermarket,kind,url),
+      permissionGate:syntheticGate(),capturedAt:at,
+      fetchFn:async()=>{calls++;return new Response(html,{status:200,headers:{'content-type':'text/html'}})},
+    })
+    assert.equal(calls,1)
+    for(const selector of ['ins[itemprop="price"]','del.offer-label','small[data-testid="pack-size"]'])
+      assert.ok(review.selectorProposals.some(row=>row.selector===selector),supermarket+': '+selector)
+    assert.equal(review.source.sha256,createHash('sha256').update(html).digest('hex'))
+    assert.doesNotMatch(JSON.stringify(review),/PRIVATE_2\.49|PRIVATE_3\.99|PRIVATE_500_ML/)
+    assert.equal(review.currentPricesExtracted,false)
+    assert.equal(review.readyForIngestion,false)
+    assert.equal(review.publicSavingsClaimEligible,false)
+  }
+})

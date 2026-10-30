@@ -90,8 +90,8 @@ const GENERIC_TEST_ID_FIELDS = Object.freeze({
   'pack-size':'pack', 'offer-card':'offer', 'offer-label':'offer',
   'stock-label':'availability',
 })
-const SCHEMA_PROP_SELECTOR = /^(article|section|div|li|a|span|h[1-6]|p|strong|meta|link|data|time|[a-z][a-z0-9]*-[a-z0-9-]{1,31})\[itemprop="([a-zA-Z]+)"\]$/
-const GENERIC_TEST_ID_SELECTOR = /^(article|section|div|li|a|span|h[1-6]|p|strong|meta|link|data|time|[a-z][a-z0-9]*-[a-z0-9-]{1,31})\[data-testid="([a-z][a-z-]+)"\]$/
+const SCHEMA_PROP_SELECTOR = /^(article|section|div|li|a|span|h[1-6]|p|strong|ins|del|small|meta|link|data|time|[a-z][a-z0-9]*-[a-z0-9-]{1,31})\[itemprop="([a-zA-Z]+)"\]$/
+const GENERIC_TEST_ID_SELECTOR = /^(article|section|div|li|a|span|h[1-6]|p|strong|ins|del|small|meta|link|data|time|[a-z][a-z0-9]*-[a-z0-9-]{1,31})\[data-testid="([a-z][a-z-]+)"\]$/
 const SCHEMA_PRODUCT_SELECTOR = /^(article|section|div|li|a)\[itemtype="https?:\/\/schema\.org\/Product"\]$/
 function publicReviewSelector(row, retailerId) {
   // Source tag names may themselves be user/product identifiers; the same

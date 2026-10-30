@@ -603,3 +603,24 @@ test('PLUS/Deka source-observed h1 to h6 fields survive SHA-private fixture gene
     assert.equal((await verifyPrivateSyntheticHtmlFixture(filename,out)).verified,true)
   }
 })
+
+test('PLUS/Deka catalog or offers retain observed ins/del/small price, promotion and pack structures',async t=>{
+  for(const retailerId of ['plus','dekamarkt']){
+    const html='<article itemscope itemtype="https://schema.org/Product">' +
+      '<ins itemprop="price">PRIVATE_CURRENT_2.49</ins>'+
+      '<del class="offer-label">PRIVATE_OLD_3.99</del>'+
+      '<small data-testid="pack-size">PRIVATE_500_G</small></article>'
+    const {filename,dir,capture}=await archive(t,retailerId,retailerId==='plus'?'catalog':'offers',html)
+    const out=join(dir,'private-price-structure')
+    await buildPrivateSyntheticHtmlFixture(filename,out)
+    const generated=await readFile(join(out,'synthetic-structure.html'),'utf8')
+    const replay=proposeOfflineRetailerSelectors({html:generated,origin:{retailerId,
+      url:capture.source.url,capturedAt:capture.source.capturedAt}})
+    for(const selector of ['ins[itemprop="price"]','del.offer-label',
+      'small[data-testid="pack-size"]']){
+      assert.ok(replay.selectors.some(x=>x.selector===selector),retailerId+': '+selector)
+    }
+    assert.doesNotMatch(generated,/PRIVATE_CURRENT|PRIVATE_OLD|PRIVATE_500_G/)
+    assert.equal((await verifyPrivateSyntheticHtmlFixture(filename,out)).verified,true)
+  }
+})
