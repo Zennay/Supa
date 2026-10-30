@@ -190,3 +190,22 @@ test('actual consent-injected capture refuses cross-origin live HTML base before
   assert.equal(admitted.readyForIngestion,false)
   assert.doesNotMatch(JSON.stringify(admitted),/synthetic-123|foreign.example/)
 })
+
+test('injected one-URL capture never returns cross-store canonical selector candidates',async()=>{
+  const url='https://www.plus.nl/producten'
+  const request={source:{supermarket:'plus',kind:'catalog',url},
+    grant:consent('plus','catalog',url),permissionGate:syntheticGate(),
+    capturedAt:at}
+  const page='<html><head><link rel="canonical" href="https://www.dekamarkt.nl/producten"></head>' +
+    '<body><a href="/product/synthetic-123">Private mock</a></body></html>'
+  await assert.rejects(captureToPrivateSelectorReview({...request,
+    fetchFn:async()=>new Response(page,{status:200,headers:{'content-type':'text/html'}})}),
+    /Untrusted HTML canonical source URL/)
+  const corrected=page.replace('https://www.dekamarkt.nl/producten','https://www.plus.nl/producten')
+  const accepted=await captureToPrivateSelectorReview({...request,
+    fetchFn:async()=>new Response(corrected,{status:200,headers:{'content-type':'text/html'}})})
+  assert.ok(accepted.selectorProposals.some(x=>x.selector==='a[href^="/product/"]'))
+  assert.equal(accepted.humanSelectorApprovalRequired,true)
+  assert.equal(accepted.readyForIngestion,false)
+  assert.doesNotMatch(JSON.stringify(accepted),/synthetic-123|www.dekamarkt.nl/)
+})
