@@ -82,7 +82,9 @@ function hasProduct(value, depth = 0) {
   if (Object.hasOwn(value,'@context') && !schemaContext(value['@context']))
     return false;
   if (isType(value,'Product')) return true;
-  return ['@graph','mainEntity','itemListElement'].some(key =>
+  // Schema.org ItemList stores catalog products in ListItem.item, not
+  // necessarily directly in itemListElement. Keep the same bounded depth.
+  return ['@graph','mainEntity','itemListElement','item'].some(key =>
     hasProduct(value[key],depth+1));
 }
 

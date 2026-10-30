@@ -33,3 +33,19 @@ test('official Schema.org graph still provides a nested Product signal',()=>{
     '@graph':[{'@type':'Product'}]}))
   assert.equal(found.structuredSignals.schemaOrgProduct,true)
 })
+
+test('Schema.org ItemList ListItem.item detects actual nested catalog products',()=>{
+  const html=capture({'@context':'https://schema.org/',
+    '@type':'ItemList',itemListElement:[{'@type':'ListItem',position:1,
+      item:{'@type':'Product',name:'SYNTHETIC ITEM'}}]})
+  const found=scanOfflineRetailerMarkup(html)
+  assert.equal(found.structuredSignals.jsonLd,true)
+  assert.equal(found.structuredSignals.schemaOrgProduct,true)
+  assert.doesNotMatch(found.visible,/SYNTHETIC ITEM/)
+})
+test('foreign nested ListItem.item type never promotes a product signal',()=>{
+  const html=capture({'@context':'https://schema.org/',
+    '@type':'ItemList',itemListElement:[{'@type':'ListItem',position:1,
+      item:{'@context':'https://foreign.invalid/','@type':'Product'}}]})
+  assert.equal(scanOfflineRetailerMarkup(html).structuredSignals.schemaOrgProduct,false)
+})
