@@ -671,14 +671,32 @@ test('portable class review detects a real reused class after HTML tag changes',
   const file = first.replace('captured.html','portable-selector-review.json')
   const receipt = await savePrivateSelectorStabilityArchive([first,second],file)
   assert.equal(receipt.stableCandidateCount,0)
-  assert.equal(receipt.stablePortableClassCandidateCount,2)
+  assert.equal(receipt.stablePortableTokenCandidateCount,2)
   assert.doesNotMatch(JSON.stringify(receipt),/product-card|price-value|www\.plus\.nl|captured\.html/)
   const archived = JSON.parse(await readFile(file,'utf8'))
-  assert.deepEqual(archived.stablePortableClassCandidates.map(row=>row.selector).sort(),
+  assert.deepEqual(archived.stablePortableTokenCandidates.map(row=>row.selector).sort(),
     ['.price-value','.product-card'])
-  assert.ok(archived.stablePortableClassCandidates.every(row=>
-    row.status==='needs-human-review' && row.derivedFromActualClassTokens))
+  assert.ok(archived.stablePortableTokenCandidates.every(row=>
+    row.status==='needs-human-review' && row.derivedFromActualHtmlTokens))
   assert.equal(archived.automatedSelectorPromotion,false)
   assert.equal(archived.readyForIngestion,false)
   assert.equal((await stat(file)).mode & 0o777,0o600)
+})
+
+test('portable data-testid remains grounded across different element tags, never public', async t => {
+  const url='https://www.plus.nl/producten'
+  const first=await archivedSelectorPage(t,'plus','catalog',url,
+    '<article data-testid="product-card"><span itemprop="price">SYNTHETIC</span></article>')
+  const after=await archivedSelectorPage(t,'plus','catalog',url,
+    '<div data-testid="product-card"><meta itemprop="price" content="SYNTHETIC"></div>')
+  const filename=first.replace('captured.html','portable-data-attrs.json')
+  const receipt=await savePrivateSelectorStabilityArchive([first,after],filename)
+  assert.equal(receipt.stableCandidateCount,0)
+  assert.ok(receipt.stablePortableTokenCandidateCount>=2)
+  const review=JSON.parse(await readFile(filename,'utf8'))
+  assert.ok(review.stablePortableTokenCandidates.some(x=>x.selector==='[data-testid="product-card"]'))
+  assert.ok(review.stablePortableTokenCandidates.some(x=>x.selector==='[itemprop="price"]'))
+  assert.ok(review.stablePortableTokenCandidates.every(x=>x.status==='needs-human-review'))
+  assert.doesNotMatch(JSON.stringify(receipt),/product-card|SYNTHETIC|data-testid|itemprop/)
+  assert.equal(review.automatedSelectorPromotion,false)
 })

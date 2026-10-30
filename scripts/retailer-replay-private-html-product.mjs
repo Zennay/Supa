@@ -241,19 +241,22 @@ export async function savePrivateSelectorStabilityArchive(htmlFiles, reviewFile)
       if (found) found.observedInSnapshots++
       else counts.set(key, {field:row.field, selector:row.selector,
         observedInSnapshots:1, status:'needs-human-review'})
-      // A CSS class found on different actual HTML tags may be a more
-      // resilient review hint than either tag-qualified selector. These are
-      // grounded class tokens, never a validated/automated DOM selector.
-      const klass = /^[a-z][a-z0-9-]*\.([a-z][a-z0-9_-]{1,59})$/i.exec(row.selector)?.[1]
-      if (klass) {
-        const key = row.field + '\u0000' + '.' + klass
-        if (!seenClasses.has(key)) {
-          seenClasses.add(key)
-          const existing = portable.get(key)
+      // Stable class/data-testid/itemprop tokens can survive DOM tag changes.
+      // Normalize only tokens OBSERVED in each actual snapshot; these hints
+      // remain private, human-reviewed and never auto-applied.
+      const classToken = /^[a-z][a-z0-9-]*\.([a-z][a-z0-9_-]{1,59})$/i.exec(row.selector)?.[1]
+      const attribute = /^[a-z][a-z0-9-]*\[(data-testid|itemprop)="([a-z][a-z0-9_-]{1,59})"\]$/i.exec(row.selector)
+      const token = classToken ? '.'+classToken : attribute
+        ? '['+attribute[1]+'="'+attribute[2]+'"]' : null
+      if (token) {
+        const normalized = row.field + '\u0000' + token
+        if (!seenClasses.has(normalized)) {
+          seenClasses.add(normalized)
+          const existing = portable.get(normalized)
           if (existing) existing.observedInSnapshots++
-          else portable.set(key,{field:row.field, selector:'.'+klass,
+          else portable.set(normalized,{field:row.field, selector:token,
             observedInSnapshots:1, status:'needs-human-review',
-            derivedFromActualClassTokens:true})
+            derivedFromActualHtmlTokens:true})
         }
       }
     }
@@ -280,8 +283,8 @@ export async function savePrivateSelectorStabilityArchive(htmlFiles, reviewFile)
     sampleCount:reports.length, stableCandidateCount:stable.length,
     unstableCandidateCount:unstable.length, stableCandidates:stable,
     unstableCandidates:unstable, fieldCoverage,
-    stablePortableClassCandidates:stablePortable,
-    stablePortableClassCandidateCount:stablePortable.length,
+    stablePortableTokenCandidates:stablePortable,
+    stablePortableTokenCandidateCount:stablePortable.length,
     humanReviewRequired:true, automatedSelectorPromotion:false,
     readyForIngestion:false, sourceRightsForPublicationVerified:false,
     priceExtractionEnabled:false, publicSavingsClaimEligible:false,
@@ -290,7 +293,7 @@ export async function savePrivateSelectorStabilityArchive(htmlFiles, reviewFile)
   // No raw selectors or source URLs in CLI/stdout/API return.
   return {...saved, sampleCount:reports.length, stableCandidateCount:stable.length,
     unstableCandidateCount:unstable.length,
-    stablePortableClassCandidateCount:stablePortable.length}
+    stablePortableTokenCandidateCount:stablePortable.length}
 }
 
 /**

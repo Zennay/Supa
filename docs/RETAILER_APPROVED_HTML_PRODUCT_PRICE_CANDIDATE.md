@@ -382,3 +382,10 @@ uitsluitend het bestaan van de klas `product-card`; het nieuwe bredere voorstel
 `.product-card` blijft expliciet `needs-human-review`, omdat uniciteit en
 DOM-selectie nooit automatisch zijn bewezen. Ook dit voorstel verschijnt niet
 als CSS-waarde op stdout en telt nooit als productieadmissie.
+
+Dezelfde private beoordeling geldt ook voor aantoonbaar herhaalde `data-testid`
+- en `itemprop`-waarden op verschillende HTML-tags. Een breder attribuutvoorstel
+wordt uitsluitend gevormd uit daadwerkelijk gemeten attributen in iedere
+opname; ook hier blijven selectoruniciteit en geschiktheid onbewezen en is
+een menselijke review verplicht. Dit geldt voor de M1 catalogus-/aanbiedingsroute,
+niet voor automatische live prijsverwerking.
