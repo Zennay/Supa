@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { open, lstat, mkdtemp, rename, rm } from 'node:fs/promises'
 import { constants as fsFlags } from 'node:fs'
 import { parseUniqueKeyRetailerJson } from './retailer-private-unique-key-json.mjs'
+import { isPublicMerchantProductHrefSelector } from './retailer-public-product-href-selectors.mjs'
 import { resolve, join, dirname } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { replayPrivateProductHtmlSnapshot, replayPrivateSelectorHtmlSnapshot } from './retailer-replay-private-html-product.mjs'
@@ -12,7 +13,7 @@ const FIELD = new Set(['product','name','price','pack','offer','availability'])
 const TAG = /^(article|section|div|span|p|li|h[1-6]|a)\.([a-z][a-z0-9_-]{0,58})$/i
 const ATTRIBUTE = /^(article|section|div|span|p|li|h[1-6])\[(data-testid|itemprop)="([a-z][a-z0-9_-]{1,59})"\]$/i
 const refuse = () => { throw Error('Private synthetic structural fixture refused') }
-function elementFor(row) {
+function elementFor(row, retailerId) {
   if (!FIELD.has(row.field) || row.status !== 'needs-human-review' ||
       !Number.isSafeInteger(row.instances) || row.instances < 1) return null
   let match = TAG.exec(row.selector)
@@ -21,8 +22,10 @@ function elementFor(row) {
   match = ATTRIBUTE.exec(row.selector)
   if (match) return '<'+match[1].toLowerCase()+' '+match[2]+'="'+match[3]+
     '" data-synthetic="true">SYNTHETIC STRUCTURE</'+match[1].toLowerCase()+'>'
-  if (row.field === 'product' && /^a\[href\^="\/(?:product|producten)\/"\]$/.test(row.selector)) {
-    const root = row.selector.includes('/producten/') ? '/producten/' : '/product/'
+  if (row.field === 'product' &&
+      isPublicMerchantProductHrefSelector(retailerId, row.selector)) {
+    const root = /^a\[href\^="([^"<>]+)"\]$/.exec(row.selector)?.[1]
+    if (!root) return null
     return '<a href="'+root+'synthetic-only" data-synthetic="true">SYNTHETIC STRUCTURE</a>'
   }
   return null
@@ -52,7 +55,8 @@ async function derivePrivateSyntheticFixture(htmlFile) {
       snapshot.humanReviewRequired !== true || snapshot.readyForIngestion !== false)
     refuse()
   const safe = summarizeOfflineSelectorProposals(snapshot).selectors
-  const rendered = safe.map(row => ({row, markup:elementFor(row)}))
+  const rendered = safe.map(row => ({row,
+    markup:elementFor(row,source.retailerId)}))
     .filter(x=>x.markup!==null).slice(0,24)
   const htmlNodes = rendered.map(x=>x.markup)
   if (htmlNodes.length === 0) refuse()
