@@ -180,3 +180,32 @@ test('real same-store product href survives noisy selector candidates without gu
     row.selector==='a[href^="/product/"]'))
   assert.equal(report.readyForIngestion,false)
 })
+
+test('Schema.org name, price, availability and pack fields survive noisy catalog proposal budget',()=>{
+  const noise=Array.from({length:50},(_,i)=>
+    '<span class="price-noise-'+i+'">PRIVATE VALUE</span>').join('')
+  const html='<html><body>'+noise+
+    '<article itemscope itemtype="https://schema.org/Product">'+
+    '<meta itemprop="price" content="99.99">'+
+    '<span itemprop="name">PRIVATE PRODUCT</span>'+
+    '<span itemprop="availability">InStock</span>'+
+    '<span itemprop="size">1000 ml</span></article></body></html>'
+  const report=proposeOfflineRetailerSelectors({html,origin:{
+    retailerId:'dekamarkt',url:'https://www.dekamarkt.nl/producten',
+    capturedAt:'2026-10-14T12:00:00.000Z'}},true)
+  assert.equal(report.candidateLimitReached,true)
+  const safe=summarizeOfflineSelectorProposals(report)
+  for(const [field,selector] of [
+    ['product','article[itemtype="https://schema.org/Product"]'],
+    ['price','meta[itemprop="price"]'],
+    ['name','span[itemprop="name"]'],
+    ['availability','span[itemprop="availability"]'],
+    ['pack','span[itemprop="size"]']]) {
+    assert.ok(safe.selectors.some(row=>row.field===field&&row.selector===selector),
+      'missing observed source field '+field)
+  }
+  assert.equal(report.selectors.length,24)
+  assert.equal(report.readyForIngestion,false)
+  assert.equal(report.publicSavingsClaimEligible,false)
+  assert.doesNotMatch(JSON.stringify(safe),/PRIVATE VALUE|99.99|PRIVATE PRODUCT/)
+})

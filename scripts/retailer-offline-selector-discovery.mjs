@@ -345,11 +345,18 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
   // review budget even when a large listing emits many noisy price classes.
   // Every proposal must still exist in the original HTML: this ranks, never
   // invents, selectors or enables automatic promotion.
-  const observedProductAnchor = row => Number(row.field === 'product' &&
-    (MICRODATA_PRODUCT.test(row.selector) ||
-      isPublicMerchantProductHrefSelector(origin.retailerId,row.selector)))
+  const observedStructuralConfidence = row => {
+    if (row.field === 'product' && (MICRODATA_PRODUCT.test(row.selector) ||
+        isPublicMerchantProductHrefSelector(origin.retailerId,row.selector))) return 2
+    // Known public Schema.org property names are more stable than ephemeral
+    // CSS classes on a large listing. This is only a selector review order;
+    // values, price trust and permission gates remain untouched.
+    if (/\[itemprop="(?:name|price|availability|size)"\]$/.test(row.selector))
+      return 1
+    return 0
+  }
   const selectors = [...candidates.values()]
-    .sort((a, b) => observedProductAnchor(b)-observedProductAnchor(a) ||
+    .sort((a, b) => observedStructuralConfidence(b)-observedStructuralConfidence(a) ||
       b.instances - a.instances || a.field.localeCompare(b.field) ||
       a.selector.localeCompare(b.selector))
     .slice(0, MAX_SELECTORS)
