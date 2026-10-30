@@ -83,6 +83,7 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
   // Keep live HTML base href facts separate from visible DOM selectors.
   const baseHrefs = [];
   const canonicalHrefs = [];
+  let hasMetaRefresh = false;
   let pos = 0;
   let inspected = 0;
   while (pos < html.length) {
@@ -146,6 +147,14 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
         throw new Error('Ambiguous canonical retailer source URL');
       canonicalHrefs.push(values.get('href'));
     }
+    // A live document-level meta refresh can navigate away after the initial
+    // 200 capture. Such HTML is not a stable product-price/selector source.
+    if (tag === 'meta' && (hidden.length === 0 ||
+        hidden.length === 1 && hidden[0] === 'head') &&
+        typeof values.get('http-equiv') === 'string' &&
+        values.get('http-equiv').trim().toLowerCase() === 'refresh') {
+      hasMetaRefresh = true;
+    }
     if (!suppressed && !HIDDEN.has(tag) && tag !== 'script') {
       // Retain the *actual* start tag only. Never reinterpret its attributes
       // as independent HTML elements, even if they contain "<span ...>".
@@ -191,5 +200,6 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
   }
   if (hidden.length) throw new Error('Unbalanced inert HTML element');
   return { visible: visible.join(''), structuredSignals: signals,
-    baseHrefs, canonicalHrefs, ...(includeScripts ? { scripts } : {}) };
+    baseHrefs, canonicalHrefs, hasMetaRefresh,
+    ...(includeScripts ? { scripts } : {}) };
 }
