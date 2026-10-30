@@ -44,7 +44,16 @@ function oneDekaProduct(jsonLdBlocks) {
       (Object.hasOwn(value,'@context') &&
         !knownSchemaContext(value['@context'])))) return null
   const products = values.filter(value => value['@type'] === 'Product')
-  return products.length === 1 ? products[0] : null
+  if (products.length !== 1) return null
+  // Another standalone Offer, AggregateOffer or price-bearing document may
+  // contradict the single Product's price. In this historical fallback only
+  // one flat Product is an independently reviewable private price source.
+  if (values.some(value => value !== products[0] && (
+      ['Offer','AggregateOffer'].includes(value['@type']) ||
+      Object.keys(value).some(key =>
+        /^(?:offers?|price|prices|lowprice|highprice|pricespecification)$/i.test(key)))))
+    return null
+  return products[0]
 }
 
 // Nuxt packaging cannot override a second, contradictory physical pack

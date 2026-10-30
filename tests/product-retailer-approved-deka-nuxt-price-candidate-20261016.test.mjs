@@ -341,3 +341,13 @@ test('direct Deka HTML fallback corroborates explicit physical pack facts before
     assert.equal(output.type,allowed?'observation':'abstain',JSON.stringify({field,value}))
   }
 })
+
+test('Deka source refuses extra independent Offer price claims beside the corroborating Product', async () => {
+  const extra={ '@context':'https://schema.org', '@type':'Offer',
+    price:'0.01',priceCurrency:'EUR',url }
+  const markup=html().replace('</head>',
+    '<script type="application/ld+json">'+JSON.stringify(extra)+'</script></head>')
+  const result=await captureApprovedProductPriceCandidate(options(markup))
+  assert.equal(result.status,'review_required')
+  assert.equal(result.observation,null)
+})
