@@ -174,6 +174,15 @@ export function parseSchemaOrgProductForPage(
 
     if (products.length === 1) {
       const declared = readData(products[0], 'url')
+      // The legacy URL-less case applies only to a standalone Product
+      // document (or an actual top-level block). A nested ItemList
+      // recommendation is NOT evidence that the page's own item costs that
+      // price, even when it is the only Product in the JSON-LD graph.
+      const standalone = jsonLd === products[0] ||
+        (Array.isArray(jsonLd) && jsonLd.some(item => item === products[0]))
+      if (declared === undefined && !standalone) {
+        return refuses('nested Product lacks captured page URL')
+      }
       if (declared !== undefined &&
           normalizedHttpsUrl(declared) !== sourceUrl) {
         return refuses('Product URL disagrees with captured page')

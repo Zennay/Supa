@@ -412,3 +412,22 @@ test('nested ItemList selects only the exact URL and rejects duplicate or foreig
     if(entry.expected) assert.equal(saved.priceReview.observation.currentPriceCents,249)
   }
 })
+
+test('nested URL-less recommendation never becomes the product-page price',async t=>{
+  const source=targets.plus
+  const nested={'@context':'https://schema.org','@type':'ItemList',
+    itemListElement:[{'@type':'ListItem',position:1,item:{
+      '@type':'Product',name:'SYNTHETIC UNLINKED RECOMMENDATION',
+      weight:{value:'500 g'},offers:{'@type':'Offer',price:'0.01',
+        priceCurrency:'EUR',availability:'https://schema.org/InStock'},
+    }}]}
+  const html='<html><head><script type="application/ld+json">'+
+    JSON.stringify(nested)+'</script></head><body><article class="product-card"></article></body></html>'
+  const file=join(await folder(t),'unlinked-recommendation.json')
+  const status=await archive(options('plus',html),file)
+  const saved=JSON.parse(await readFile(file,'utf8'))
+  assert.equal(status.candidateCount,0)
+  assert.equal(saved.priceReview.reason,'product_identity_or_price_unverified')
+  assert.equal(saved.priceReview.observation,null)
+  assert.equal(saved.published,false)
+})
