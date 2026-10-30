@@ -346,3 +346,69 @@ test('legacy v1 without structured source evidence is rejected, never auto-upgra
   await assert.rejects(compareArchivedSourceReviews(file, file),
     /Private source review archive refused/)
 })
+
+test('private one-capture archive extracts exact page Product nested in real Schema.org mainEntity', async t => {
+  const dir = await folder(t)
+  const source = targets.plus
+  const nested = {
+    '@context': 'https://schema.org', '@type': 'WebPage',
+    mainEntity: { '@type': 'Product', url: source, name: 'SYNTHETIC NESTED MILK',
+      weight: {value:'500 g'},
+      offers: {'@type':'Offer',price:'2.49',priceCurrency:'EUR',
+        availability:'https://schema.org/InStock'} },
+  }
+  const body = '<!doctype html><html><head><script type="application/ld+json">' +
+    JSON.stringify(nested) + '</script></head><body><article class="product-card">' +
+    '<span class="price-value">SYNTHETIC</span></article></body></html>'
+  const file = join(dir,'nested-review.json')
+  let calls=0
+  const result=await archive(options('plus',body,{
+    fetchFn:async()=>{calls++;return new Response(body,{
+      status:200,headers:{'content-type':'text/html;charset=utf-8'}})},
+  }),file)
+  const saved=JSON.parse(await readFile(file,'utf8'))
+  assert.equal(calls,1)
+  assert.equal(result.candidateCount,1)
+  assert.equal(saved.priceReview.status,'candidate_needs_review')
+  assert.equal(saved.priceReview.observation.currentPriceCents,249)
+  assert.equal(saved.selectorReview.structuredSignals.schemaOrgProduct,true)
+  assert.equal(saved.source.sha256,createHash('sha256').update(body).digest('hex'))
+  assert.equal(saved.published,false)
+  assert.equal((await stat(file)).mode & 0o777,0o600)
+  assert.doesNotMatch(JSON.stringify(result),/SYNTHETIC NESTED MILK|2.49/)
+})
+
+test('nested ItemList selects only the exact URL and rejects duplicate or foreign-context Products', async t => {
+  const source = targets.plus
+  const item = url => ({
+    '@type':'Product', url, name:'SYNTHETIC REVIEW PRODUCT',
+    weight:{value:'500 g'}, offers:{'@type':'Offer',price:'2.49',
+      priceCurrency:'EUR',availability:'https://schema.org/InStock'},
+  })
+  const second='https://www.plus.nl/product/fictional-other'
+  const cases=[
+    { products:[item(second),item(source)], expected:1, reason:null },
+    { products:[item(source),item(source)], expected:0,
+      reason:'product_identity_or_price_unverified' },
+    { products:[item(source),{...item(second),
+        '@context':'https://untrusted.example/'}], expected:0,
+      reason:'unverified_schema_context' },
+  ]
+  for(const [index,entry] of cases.entries()){
+    const list={'@context':'https://schema.org','@type':'ItemList',
+      itemListElement:entry.products.map((value,i)=>({
+        '@type':'ListItem',position:i+1,item:value,
+      })) }
+    const body='<html><head><script type="application/ld+json">'+
+      JSON.stringify(list)+'</script></head><body>'+
+      '<article class="product-card">SYNTHETIC</article></body></html>'
+    const file=join(await folder(t),'list-'+index+'.json')
+    const result=await archive(options('plus',body),file)
+    const saved=JSON.parse(await readFile(file,'utf8'))
+    assert.equal(result.candidateCount,entry.expected,'case '+index)
+    assert.equal(saved.priceReview.reason,entry.reason,'case '+index)
+    assert.equal(saved.published,false)
+    assert.equal(saved.readyForIngestion,false)
+    if(entry.expected) assert.equal(saved.priceReview.observation.currentPriceCents,249)
+  }
+})

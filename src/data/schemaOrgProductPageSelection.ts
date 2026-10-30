@@ -60,10 +60,17 @@ function productNodes(jsonLd: unknown): DataObject[] {
       result.push(record)
       if (result.length > 32) throw new Error('too many Product nodes')
     }
-    const graph = readData(record, '@graph')
-    if (graph !== undefined) {
-      if (!Array.isArray(graph)) throw new Error('invalid @graph')
-      inspect(graph, depth + 1)
+    // WebPage.mainEntity and ItemList.itemListElement[].item are standard
+    // Schema.org Product placements, not invented selectors. Inspect their
+    // actual nested objects while retaining the same bounded all-Product
+    // ambiguity policy as a top-level @graph.
+    for (const key of ['@graph', 'mainEntity', 'itemListElement', 'item']) {
+      const child = readData(record, key)
+      if (child === undefined) continue
+      if (key === '@graph' && !Array.isArray(child)) {
+        throw new Error('invalid @graph')
+      }
+      inspect(child, depth + 1)
     }
   }
   inspect(jsonLd, 0)

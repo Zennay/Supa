@@ -55,8 +55,16 @@ function verifyProductContexts(root) {
       if (!(inherited || own || absolute)) return false
       count++
     }
-    return !Object.hasOwn(v, '@graph') ||
-      (Array.isArray(v['@graph']) && walk(v['@graph'], inherited || own, depth + 1))
+    // Match the actual Schema.org nested-Product places used by the private
+    // page parser and offline structural scanner. An unapproved nested
+    // @context blocks the whole price candidate, not only the visible node.
+    for (const key of ['@graph', 'mainEntity', 'itemListElement', 'item']) {
+      if (!Object.hasOwn(v, key)) continue
+      const child = v[key]
+      if (key === '@graph' && !Array.isArray(child)) return false
+      if (!walk(child, inherited || own, depth + 1)) return false
+    }
+    return true
   }
   return { valid: walk(root), count }
 }
