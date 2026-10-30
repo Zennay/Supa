@@ -410,3 +410,12 @@ plaats van ontbrekende voorstellen als instabiel of afwezig te classificeren.
 De private stabiliteitsroute vraagt hiervoor een afzonderlijk telgegeven op;
 de bestaande SHA-pinned v1 drift-json en zijn afgeschermde publicatiecontract
 blijven byte-/schema-compatibel.
+
+### HTML-endtags moeten echt geldig zijn
+
+Een ongeldig `</ script>` of `</ template>` sluit volgens de HTML-tokenregels
+geen script of template af. De gedeelde scanner herkent nu uitsluitend echte
+`</script>` / `</template>`-grenzen, zodat een bedrieglijke ongeldige afsluiter
+niet alsnog zichtbare Product-, prijs- of selectorinformatie kan opleveren.
+Evenzo wordt `< script>` nooit als JSON-LD-script aangemerkt. Ongeldig
+bronscript levert geen prijswaarneming; echt geldig HTML blijft ondersteund.

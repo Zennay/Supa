@@ -95,7 +95,7 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
       pos = end + 3;
       continue;
     }
-    const token = /^<\s*(\/?)\s*([a-z][a-z0-9-]{0,32})\b/i.exec(html.slice(start));
+    const token = /^<(\/?)([a-z][a-z0-9-]{0,32})\b/i.exec(html.slice(start));
     if (!token) { pos = start + 1; continue; }
     if (++inspected > 25000) throw new Error('Offline token budget exceeded');
     const end = tagEnd(html, start + token[0].length);
@@ -120,7 +120,7 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
       visible.push(html.slice(start, end + 1));
     }
     if (RAW.has(tag)) {
-      const closer = new RegExp('<\\/\\s*' + tag + '\\s*>', 'gi');
+      const closer = new RegExp('<\\/' + tag + '\\s*>', 'gi');
       closer.lastIndex = end + 1;
       const closing = closer.exec(html);
       if (!closing) throw new Error('Unbalanced inert HTML element');

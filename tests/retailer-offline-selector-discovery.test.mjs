@@ -265,3 +265,19 @@ test('plain-text and legacy fallback containers cannot supply spoofed product or
   assert.equal(legitimate.scannedTags, 1)
   assert.ok(legitimate.selectors.some(x => x.field === 'product'))
 })
+
+test('invalid HTML spacing in start/end tags cannot reveal inert Product markup', () => {
+  for (const [html, hiddenField] of [
+    ['<script type="text/plain">ignore</ script><span class="price-value">SYNTHETIC</span></script>', 'price'],
+    ['<template><div class="price-value">ignore</div></ template><article class="product-card">SYNTHETIC</article></template>', 'product'],
+  ]) {
+    const report=proposeOfflineRetailerSelectors({html,origin})
+    assert.equal(report.selectors.some(row=>row.field===hiddenField),false)
+    assert.equal(report.productionEnabled,false)
+  }
+  const bogus='< script type="application/ld+json">{"@type":"Product"}</script>'
+  const report=proposeOfflineRetailerSelectors({html:bogus,origin})
+  assert.equal(report.structuredSignals.schemaOrgProduct,false)
+  assert.equal(report.structuredSignals.jsonLd,false)
+  assert.equal(report.selectors.length,0)
+})

@@ -230,3 +230,16 @@ test('Nuxt JSON must be an actual JSON script, not mislabeled JSON-LD', async ()
   assert.equal(result.status, 'review_required')
   assert.equal(result.observation, null)
 })
+
+test('invalid HTML start-tag whitespace or fake script closer cannot admit a Product price', async () => {
+  const markup=script('type="application/ld+json"',plusProduct)
+  const bogus='< script type="application/ld+json">'+JSON.stringify(plusProduct)+'</script>'
+  const proof=readAuthorizedHtmlScriptEvidence(bogus)
+  assert.equal(proof.jsonLdBlocks.length,0)
+  assert.equal((await run('plus',bogus)).status,'review_required')
+  const falseClosing='<script type="text/plain">ignore</ script>'+markup+'</script>'
+  const report=readAuthorizedHtmlScriptEvidence(falseClosing)
+  assert.equal(report.jsonLdBlocks.length,0)
+  assert.equal((await run('plus',falseClosing)).status,'review_required')
+  assert.equal((await run('plus',markup)).status,'candidate_needs_review')
+})
