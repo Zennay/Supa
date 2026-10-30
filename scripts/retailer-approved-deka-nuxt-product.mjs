@@ -12,6 +12,7 @@ import { normalizeMoneyToCents, normalizePackText } from '../src/data/normalize.
 import { validateRawProductObservation } from '../src/data/ingestion.ts'
 import { normalizeSchemaOrgAvailability } from '../src/data/schemaOrgProduct.ts'
 import { readAuthorizedHtmlScriptEvidence } from './retailer-approved-html-script-evidence.mjs'
+import { parseSchemaOrgProductForPage } from '../src/data/schemaOrgProductPageSelection.ts'
 
 const fail = () => ({ type: 'abstain', reason: 'DekaMarkt Nuxt product cannot be independently corroborated' })
 const data = value => value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -182,7 +183,10 @@ export function corroborateDekaNuxtProduct({ html, provenance, jsonLdBlocks,
   const evidence = readAuthorizedHtmlScriptEvidence(html, provenance?.url)
   if (evidence.invalid || Boolean(evidence.nuxtPayload) !== Boolean(nuxtPresent))
     return fail()
-  if (!nuxtPresent) return structured
+  // Without Nuxt, a caller-supplied `structured` observation is not a
+  // source of trust. Re-parse only Product nodes read from the captured HTML.
+  if (!nuxtPresent) return parseSchemaOrgProductForPage(
+    evidence.jsonLdBlocks, provenance)
   const fallback = parseDekaNuxtFromAuthorizedHtml({
     html, provenance, jsonLdBlocks,
   })

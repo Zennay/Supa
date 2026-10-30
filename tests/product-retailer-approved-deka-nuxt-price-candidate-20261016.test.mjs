@@ -290,3 +290,23 @@ test('Deka Nuxt fallback refuses a second nested graph Product contradicting the
   assert.equal(result.status,'review_required')
   assert.equal(result.observation,null)
 })
+
+test('direct Deka corroboration without Nuxt cannot publish caller-forged structured prices', async () => {
+  const { corroborateDekaNuxtProduct, parseDekaNuxtFromAuthorizedHtml } =
+    await import('../scripts/retailer-approved-deka-nuxt-product.mjs')
+  const { createHash } = await import('node:crypto')
+  const realPage=html()
+  const source=page=>({supermarket:'dekamarkt',kind:'product',url,
+    capturedAt:time,sha256:createHash('sha256').update(page).digest('hex')})
+  const valid=parseDekaNuxtFromAuthorizedHtml({html:realPage,
+    provenance:source(realPage),jsonLdBlocks:[fixture.jsonLdProduct]})
+  assert.equal(valid.type,'observation')
+  const withoutNuxt=realPage.replace('<script id="__NUXT_DATA__">'+
+    JSON.stringify(fixture.nuxtPayload)+'</script>','')
+  assert.notEqual(withoutNuxt,realPage)
+  const claimed={...valid,observation:{...valid.observation,currentPriceCents:1}}
+  const result=corroborateDekaNuxtProduct({html:withoutNuxt,
+    provenance:source(withoutNuxt),jsonLdBlocks:[fixture.jsonLdProduct],
+    structured:claimed,nuxtPresent:false})
+  assert.notEqual(result.observation?.currentPriceCents,1)
+})
