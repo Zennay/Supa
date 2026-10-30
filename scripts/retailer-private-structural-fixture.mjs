@@ -100,7 +100,12 @@ async function derivePrivateSyntheticFixture(htmlFile) {
     syntheticSelectorRoundtripVerified:true,
     sourceTextRetained:false,sourcePricesRetained:false,originalHtmlRetained:false,
     humanReviewRequired:true,productionEnabled:false,published:false}
-  return {synthetic,manifest}
+  // Aggregate ONLY: source-observed, sanitised DOM selectors that survived
+  // an actual offline roundtrip. No source names, prices, CSS or URLs.
+  const fieldCoverage=Object.fromEntries([...FIELD].map(field=>[
+    field,rendered.some(({row})=>row.field===field),
+  ]))
+  return {synthetic,manifest,fieldCoverage}
 }
 async function assertVacantPrivateOutput(out) {
   try {
@@ -111,7 +116,7 @@ async function assertVacantPrivateOutput(out) {
 
 export async function buildPrivateSyntheticHtmlFixture(htmlFile, newDirectory) {
   if (typeof newDirectory !== 'string' || !newDirectory.trim()) refuse()
-  const {synthetic,manifest} = await derivePrivateSyntheticFixture(htmlFile)
+  const {synthetic,manifest,fieldCoverage} = await derivePrivateSyntheticFixture(htmlFile)
   const out = resolve(newDirectory)
   await assertNoSymlinkedM3OutputParents(out)
   const parent = dirname(out)
@@ -147,7 +152,8 @@ export async function buildPrivateSyntheticHtmlFixture(htmlFile, newDirectory) {
     }
   }
   return {created:true,htmlSha256:manifest.syntheticHtmlSha256,
-    syntheticNodes:manifest.syntheticNodes,productionEnabled:false,published:false}
+    syntheticNodes:manifest.syntheticNodes,fieldCoverage,
+    productionEnabled:false,published:false}
 }
 // Read the original output as a bounded, same-inode private file. Do not
 // accept altered fixtures by recomputing only a self-declared manifest hash.
@@ -189,7 +195,7 @@ export async function verifyPrivateSyntheticHtmlFixture(htmlFile, directory) {
   if (!info.isDirectory() || info.isSymbolicLink() ||
       (info.mode & 0o077) !== 0) refuse()
   await assertExactPrivateBundleEntries(out,['synthetic-structure.html','provenance.json'])
-  const {synthetic,manifest} = await derivePrivateSyntheticFixture(htmlFile)
+  const {synthetic,manifest,fieldCoverage} = await derivePrivateSyntheticFixture(htmlFile)
   const htmlBytes = await readPinnedSyntheticFile(join(out,'synthetic-structure.html'),65536)
   const manifestBytes = await readPinnedSyntheticFile(join(out,'provenance.json'),16384)
   if (!htmlBytes.equals(Buffer.from(synthetic,'utf8'))) refuse()
@@ -201,7 +207,8 @@ export async function verifyPrivateSyntheticHtmlFixture(htmlFile, directory) {
       createHash('sha256').update(htmlBytes).digest('hex') !== manifest.syntheticHtmlSha256)
     refuse()
   return {verified:true,syntheticNodes:manifest.syntheticNodes,
-    htmlSha256:manifest.syntheticHtmlSha256,productionEnabled:false,published:false}
+    htmlSha256:manifest.syntheticHtmlSha256,fieldCoverage,
+    productionEnabled:false,published:false}
 }
 function pairManifest(plus, deka, schemaVersion=2) {
   return {schemaVersion,kind:'synthetic-two-retailer-private-fixtures',
@@ -235,7 +242,13 @@ export async function verifyPrivateSyntheticFixturePair(plusFile,dekaFile,direct
     .decode(data),16384)} catch {refuse()}
   if((parsed.schemaVersion!==1&&parsed.schemaVersion!==2)||
       JSON.stringify(parsed)!==JSON.stringify(pairManifest(p,d,parsed.schemaVersion))) refuse()
+  const fieldCoverageByRetailer={
+    plus:sourceChecks[0].fieldCoverage,dekamarkt:sourceChecks[1].fieldCoverage,
+  }
   return {verified:true,retailers:2,sourceUrlHashBound:parsed.schemaVersion===2,
+    fieldCoverageByRetailer,
+    allFieldsCoveredByBoth:Object.values(fieldCoverageByRetailer)
+      .every(fields=>Object.values(fields).every(Boolean)),
     productionEnabled:false,published:false}
 }
 
@@ -294,12 +307,13 @@ export async function buildPrivateSyntheticFixturePair(plusFile,dekaFile,newDire
   const staged=await mkdtemp(join(parent,'.supa-two-store-'))
   const identity=await lstat(staged)
   let published=false
+  let verifiedPair
   try {
     await buildPrivateSyntheticHtmlFixture(plusFile,join(staged,'plus'))
     await buildPrivateSyntheticHtmlFixture(dekaFile,join(staged,'dekamarkt'))
     await writePrivate(join(staged,'pair-provenance.json'),
       JSON.stringify(pairManifest(plus,deka),null,2)+'\n')
-    await verifyPrivateSyntheticFixturePair(plusFile,dekaFile,staged)
+    verifiedPair=await verifyPrivateSyntheticFixturePair(plusFile,dekaFile,staged)
     const parentNow=await lstat(parent)
     if(!parentNow.isDirectory()||parentNow.ino!==pinnedParent.ino||
         parentNow.dev!==pinnedParent.dev) refuse()
@@ -317,7 +331,10 @@ export async function buildPrivateSyntheticFixturePair(plusFile,dekaFile,newDire
       } catch { /* do not remove unrecognized replacements */ }
     }
   }
-  return {created:true,retailers:2,productionEnabled:false,published:false}
+  return {created:true,retailers:2,
+    fieldCoverageByRetailer:verifiedPair.fieldCoverageByRetailer,
+    allFieldsCoveredByBoth:verifiedPair.allFieldsCoveredByBoth,
+    productionEnabled:false,published:false}
 }
 
 if(process.argv[1] && import.meta.url===pathToFileURL(resolve(process.argv[1])).href) {

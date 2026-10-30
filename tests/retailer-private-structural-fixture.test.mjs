@@ -786,3 +786,45 @@ test('two-retailer source-observed multi-type Schema.org Product/Thing microdata
     assert.doesNotMatch(synthetic,/PRIVATE_NAME/)
   }
 })
+
+test('private two-retailer fixture CLI reports proven semantic field coverage without original values',async t=>{
+  const html='<article class="product-card">'+
+    '<h2 class="product-name">PRIVATE_NAME_VALUE</h2>'+
+    '<ins class="price-value">PRIVATE_PRICE_VALUE</ins>'+
+    '<small class="pack-size">PRIVATE_PACK_VALUE</small>'+
+    '<del class="offer-label">PRIVATE_OLD_VALUE</del>'+
+    '<span class="stock-label">PRIVATE_STOCK_VALUE</span></article>'
+  const plus=await archive(t,'plus','catalog',html)
+  const deka=await archive(t,'dekamarkt','offers',html)
+  const output=join(plus.dir,'coverage-pair')
+  const expected={product:true,name:true,price:true,pack:true,offer:true,availability:true}
+  const receipt=await buildPrivateSyntheticFixturePair(plus.filename,deka.filename,output)
+  assert.deepEqual(receipt.fieldCoverageByRetailer,{plus:expected,dekamarkt:expected})
+  const checked=await verifyPrivateSyntheticFixturePair(plus.filename,deka.filename,output)
+  assert.deepEqual(checked.fieldCoverageByRetailer,{plus:expected,dekamarkt:expected})
+  assert.equal(checked.allFieldsCoveredByBoth,true)
+  assert.equal(checked.productionEnabled,false)
+  assert.doesNotMatch(JSON.stringify(receipt)+JSON.stringify(checked),/PRIVATE_NAME|PRIVATE_PRICE|PRIVATE_PACK|PRIVATE_OLD|PRIVATE_STOCK|https?:\/\//)
+})
+
+test('private pair coverage distinguishes an incomplete source without treating it as ready',async t=>{
+  const complete='<article class="product-card"><span class="product-name">PRIVATE_NAME</span>'+
+    '<ins class="price-value">PRIVATE_PRICE</ins><small class="pack-size">PRIVATE_PACK</small>'+
+    '<del class="offer-label">PRIVATE_OLD</del><span class="stock-label">PRIVATE_STOCK</span></article>'
+  const limited='<article class="product-card"><span class="product-name">PRIVATE_NAME</span>'+
+    '<span class="price-value">PRIVATE_PRICE</span></article>'
+  const plus=await archive(t,'plus','catalog',complete)
+  const deka=await archive(t,'dekamarkt','offers',limited)
+  const out=join(plus.dir,'incomplete-pair')
+  const receipt=await buildPrivateSyntheticFixturePair(plus.filename,deka.filename,out)
+  assert.equal(receipt.allFieldsCoveredByBoth,false)
+  assert.equal(receipt.fieldCoverageByRetailer.plus.pack,true)
+  assert.equal(receipt.fieldCoverageByRetailer.dekamarkt.pack,false)
+  assert.equal(receipt.fieldCoverageByRetailer.dekamarkt.offer,false)
+  assert.equal(receipt.fieldCoverageByRetailer.dekamarkt.availability,false)
+  const verified=await verifyPrivateSyntheticFixturePair(plus.filename,deka.filename,out)
+  assert.deepEqual(verified.fieldCoverageByRetailer,receipt.fieldCoverageByRetailer)
+  assert.equal(verified.allFieldsCoveredByBoth,false)
+  assert.equal(verified.productionEnabled,false)
+  assert.doesNotMatch(JSON.stringify(verified),/PRIVATE_NAME|PRIVATE_PRICE|PRIVATE_PACK/)
+})
