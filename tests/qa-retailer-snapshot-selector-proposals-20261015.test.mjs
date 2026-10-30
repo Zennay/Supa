@@ -271,3 +271,21 @@ test('legacy M1 source review refuses live HTML no-store, charset drift and page
   assert.equal(report.readyForScraping,false)
   assert.ok(report.proposedSelectors.some(row=>row.selector==='article.product-card'))
 })
+
+test('historical source provenance rejects redirects, encoded separators and URL normalization aliases', () => {
+  const valid=source('plus','catalog',plusHtml)
+  const explicit={...valid,finalUrl:valid.requestedUrl}
+  assert.equal(proposeRetailerSelectors(explicit,plusHtml).readyForScraping,false)
+  for(const mutate of [
+    x=>{x.finalUrl='https://www.plus.nl/aanbiedingen'},
+    x=>{x.requestedUrl='https://www.plus.nl/producten/%2fsecret'},
+    x=>{x.requestedUrl='https://www.plus.nl:443/producten'},
+    x=>{x.requestedUrl='https://www.plus.nl/producten/../login'},
+    x=>{x.requestedUrl='https://www.plus.nl/producten/%252fsecret'},
+  ]) {
+    const candidate={...valid}
+    mutate(candidate)
+    assert.throws(()=>proposeRetailerSelectors(candidate,plusHtml),
+      /Offline selector review refused:/)
+  }
+})
