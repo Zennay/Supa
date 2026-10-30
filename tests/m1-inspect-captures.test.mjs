@@ -173,3 +173,25 @@ test('rejects unsafe supermarket path segments before reading HTML', async () =>
     /Unsafe capture supermarket path segment/,
   )
 })
+
+test('M1 source inspection accepts only real DOM JSON-LD/Nuxt scripts, not inert or forged script text',()=>{
+  const actual='<script type="application/ld+json&#59;charset=UTF-8">{"@context":"https://schema.org","@type":"Product","name":"SYNTHETIC"}</script>'
+  const inert='<template><script type="application/ld+json">{"@type":"Offer","price":0.01}</script></template>'
+  const spoof='<div data-copy="<script type=\'application/ld+json\'>{&quot;@type&quot;:&quot;Offer&quot;}</script>"></div>'
+  const nested='<script id="__NEXT&#95;DATA__" type="application/json">{"props":{}}</script>'
+  const html='<!doctype html><body>'+inert+'<!--<script type="application/ld+json">{"@type":"Offer"}</script>-->'+spoof+actual+nested+'</body>'
+  const report=inspectHtml(html)
+  assert.deepEqual(report.jsonLd.map(x=>x.type),[['Product']])
+  assert.equal(report.hasNextData,true)
+  assert.deepEqual(report.applicationJsonScripts,[{id:'__NEXT_DATA__',bytes:12}])
+})
+
+test('M1 original inspector marks duplicate JSON keys, malformed data MIME and external JSON scripts invalid',()=>{
+  const html='<script type="application/ld+json">{"@context":"https://schema.org","@type":"Offer","@type":"Product"}</script>'+
+    '<script type="application/ld+json; charset=latin1">{"@type":"Offer"}</script>'+
+    '<script type="application/ld+json" src="https://outside.invalid/json">{"@type":"Product"}</script>'
+  const report=inspectHtml(html)
+  assert.ok(report.jsonLd.length>=2)
+  assert.ok(report.jsonLd.every(x=>x.parseError===true))
+  assert.equal(report.hasNextData,false)
+})

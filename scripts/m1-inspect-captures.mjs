@@ -4,6 +4,9 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import { parseSchemaOrgProduct } from '../src/data/schemaOrgProduct.ts'
+import { scanOfflineRetailerMarkup } from './retailer-offline-structural-scan.mjs'
+import { admittedJsonScriptType, admittedRetailerScriptId } from './retailer-json-script-mime.mjs'
+import { parseUniqueKeyRetailerJson } from './retailer-private-unique-key-json.mjs'
 
 function sha256(text) {
   return createHash('sha256').update(text).digest('hex')
@@ -26,19 +29,26 @@ function decodeHtmlEntities(value) {
     .replace(/&gt;/g, '>')
 }
 
-export function extractJsonLdValues(html) {
-  const values = []
-  const pattern =
-    /<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi
+function liveEmbeddedScripts(html) {
+  // Inspect only live DOM scripts, never template/comment/quoted attribute text.
+  // Reuse the source scanner that guards the private capture replay path.
+  return scanOfflineRetailerMarkup(html,{includeScripts:true}).scripts
+}
 
-  for (const match of html.matchAll(pattern)) {
-    const raw = match[1].trim()
-    if (!raw) continue
-    try {
-      values.push(JSON.parse(raw))
-    } catch {
-      values.push({ __supaParseError: true })
+export function extractJsonLdValues(html) {
+  const values=[]
+  let scripts
+  try { scripts=liveEmbeddedScripts(html) } catch { return [{__supaParseError:true}] }
+  for(const script of scripts) {
+    const type=admittedJsonScriptType(script.attrs.get('type'))
+    if (type === null) { values.push({__supaParseError:true}); continue }
+    if(type !== 'application/ld+json') continue
+    if(script.attrs.has('src') || !script.content.trim()) {
+      values.push({__supaParseError:true})
+      continue
     }
+    try { values.push(parseUniqueKeyRetailerJson(script.content.trim())) }
+    catch { values.push({__supaParseError:true}) }
   }
   return values
 }
@@ -69,21 +79,16 @@ export function inspectHtml(html) {
     }
   }
 
-  const hasNextData =
-    /<script\b[^>]*id=["']__NEXT_DATA__["'][^>]*>[\s\S]*?<\/script>/i.test(html)
-
-  const applicationJsonScripts = Array.from(
-    html.matchAll(
-      /<script\b([^>]*)type=["']application\/json["']([^>]*)>([\s\S]*?)<\/script>/gi,
-    ),
-  ).map((match) => {
-    const attrs = `${match[1]} ${match[2]}`
-    const id = attrs.match(/\bid=["']([^"']+)["']/i)?.[1] ?? null
-    return {
-      id,
-      bytes: Buffer.byteLength(match[3], 'utf8'),
-    }
-  })
+  let scripts=[]
+  try { scripts=liveEmbeddedScripts(html) } catch { /* source refused */ }
+  const applicationJsonScripts = scripts.filter(script =>
+    !script.attrs.has('src') &&
+    admittedJsonScriptType(script.attrs.get('type'))==='application/json')
+    .map(script=>({
+      id:admittedRetailerScriptId(script.attrs.get('id')) ?? null,
+      bytes:Buffer.byteLength(script.content,'utf8'),
+    }))
+  const hasNextData=applicationJsonScripts.some(script=>script.id==='__NEXT_DATA__')
 
   return {
     title,
