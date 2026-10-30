@@ -77,7 +77,7 @@ export async function captureApprovedProductPriceCandidate(options = {}) {
     sha256: captured.source.sha256,
   }
 
-  const scripts = readAuthorizedHtmlScriptEvidence(captured.html)
+  const scripts = readAuthorizedHtmlScriptEvidence(captured.html, captured.source.url)
   const blocks = scripts.jsonLdBlocks
   if (scripts.invalid || blocks.length === 0 || blocks.length > MAX_JSONLD_BLOCKS) {
     return unavailable('missing_or_invalid_jsonld', captured)

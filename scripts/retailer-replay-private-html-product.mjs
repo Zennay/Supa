@@ -99,7 +99,7 @@ async function readPrivateCapture(filename) {
 export async function replayPrivateProductHtmlSnapshot(filename) {
   const { html, src, provenance } = await readPrivateCapture(filename)
   if (src.kind !== 'product') fail()
-  const scripts = readAuthorizedHtmlScriptEvidence(html)
+  const scripts = readAuthorizedHtmlScriptEvidence(html, src.url)
   if (scripts.invalid || scripts.jsonLdBlocks.length > 16) fail()
   let parsed = parseSchemaOrgProductForPage(scripts.jsonLdBlocks, provenance)
   if (src.retailerId === 'dekamarkt') {

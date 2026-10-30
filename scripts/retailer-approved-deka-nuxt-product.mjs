@@ -66,7 +66,7 @@ export function parseDekaNuxtFromAuthorizedHtml({ html, provenance, jsonLdBlocks
         parsedUrl.search || parsedUrl.hash ||
         parsedUrl.href !== provenance.url) return fail()
 
-    const scriptEvidence = readAuthorizedHtmlScriptEvidence(html)
+    const scriptEvidence = readAuthorizedHtmlScriptEvidence(html, provenance.url)
     const values = scriptEvidence.nuxtPayload
     if (scriptEvidence.invalid || !values) return fail()
     const references = []

@@ -809,3 +809,16 @@ test('SHA-verified private catalog capture with alien canonical identity never w
     /Untrusted HTML canonical source URL/)
   await assert.rejects(stat(archive),/ENOENT/)
 })
+
+test('private source HTML with foreign live canonical URL cannot become a replayed product price',async t=>{
+  const markup=page.replace('<html><body>',
+    '<html><head><link rel="canonical" href="https://foreign.example/product/fictional-flour-123"></head><body>')
+  const file=await capture(t,markup)
+  assert.equal((await stat(file)).mode & 0o777,0o600)
+  await assert.rejects(replayPrivateProductHtmlSnapshot(file),
+    /Private source replay refused/)
+  const review=file.replace('captured.html','foreign-price-review.json')
+  await assert.rejects(savePrivateOfflineProductReview(file,review),
+    /Private source replay refused/)
+  await assert.rejects(stat(review),/ENOENT/)
+})

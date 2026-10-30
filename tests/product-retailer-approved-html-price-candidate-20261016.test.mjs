@@ -197,3 +197,29 @@ test('unapproved host never reaches external transport', async () => {
   })), /outside exact approved HTTPS route/)
   assert.equal(calls, 0)
 })
+
+test('synthetic approved PLUS price cannot cross a foreign canonical/base HTML source origin', async () => {
+  const normal=html(product('plus'))
+  for (const extra of [
+    '<link rel="canonical" href="https://foreign.example/product/fictional-123">',
+    '<base href="//www.dekamarkt.nl/">',
+    '<link rel="canonical" href="http://www.plus.nl/product/fictional-123">',
+  ]) {
+    const markup=normal.replace('<head>','<head>'+extra)
+    const result=await captureApprovedProductPriceCandidate(options('plus',markup))
+    assert.equal(result.status,'review_required')
+    assert.equal(result.reason,'missing_or_invalid_jsonld')
+    assert.equal(result.observation,null)
+    assert.equal(result.published,false)
+  }
+  for (const extra of [
+    '<link rel="canonical" href="https://www.plus.nl/product/fictional-milk-123">',
+    '<base href="https://www.plus.nl/">',
+  ]) {
+    const result=await captureApprovedProductPriceCandidate(options('plus',
+      normal.replace('<head>','<head>'+extra)))
+    assert.equal(result.status,'candidate_needs_review')
+    assert.equal(result.observation.currentPriceCents,249)
+    assert.equal(result.verifiedCurrentCheckoutPrice,false)
+  }
+})

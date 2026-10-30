@@ -30,7 +30,27 @@ function normalizeKnownSchemaType(value) {
 // selector review, not a separate regex that could treat inert HTML as prices.
 // No raw HTML or private product values are returned to public callers.
 
-export function readAuthorizedHtmlScriptEvidence(html) {
+// HTML base/canonical metadata is authoritative for browser navigation and
+// source identity. Resolve only observed numeric references, then require
+// every live document URI to remain on the SHA-captured official source origin.
+function matchingSourceHtmlUri(raw, sourceUrl) {
+  if (typeof raw !== 'string') return false
+  const decoded = raw.replace(/&#(?:x([0-9a-f]{1,6})|([0-9]{1,7}));/gi,
+    (original, hex, decimal) => {
+      const point = Number.parseInt(hex ?? decimal, hex === undefined ? 10 : 16)
+      return point > 0 && point <= 0x10ffff &&
+        !(point >= 0xd800 && point <= 0xdfff)
+        ? String.fromCodePoint(point) : original
+    })
+  try {
+    const source = new URL(sourceUrl)
+    const observed = new URL(decoded, source)
+    return source.protocol === 'https:' && observed.protocol === 'https:' &&
+      observed.origin === source.origin && !observed.username && !observed.password
+  } catch { return false }
+}
+
+export function readAuthorizedHtmlScriptEvidence(html, sourceUrl = undefined) {
   if (typeof html !== 'string' ||
       Buffer.byteLength(html, 'utf8') > MAX_HTML_BYTES) {
     return { invalid: true, jsonLdBlocks: [], nuxtPayload: null }
@@ -40,6 +60,12 @@ export function readAuthorizedHtmlScriptEvidence(html) {
   try {
     const scanned = scanOfflineRetailerMarkup(html, { includeScripts: true })
     if (scanned.hasMetaRefresh) return invalid()
+    // All capture/replay price paths supply the exact SHA-bound source URL.
+    // A foreign live canonical/base may not be treated as retailer price.
+    if (sourceUrl !== undefined &&
+        (typeof sourceUrl !== 'string' || [
+          ...scanned.baseHrefs, ...scanned.canonicalHrefs,
+        ].some(value => !matchingSourceHtmlUri(value, sourceUrl)))) return invalid()
     elements = scanned.scripts
   } catch { return invalid() }
   if (elements.length > MAX_SCRIPT_TAGS) return invalid()
