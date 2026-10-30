@@ -273,6 +273,30 @@ export async function savePrivateSelectorStabilityArchive(htmlFiles, reviewFile)
   const stablePortable = [...portable.values()].filter(x =>
     x.observedInSnapshots === reports.length).sort((a,b) =>
     a.field.localeCompare(b.field) || a.selector.localeCompare(b.selector))
+  // Relative and absolute product anchor prefixes are different CSS selectors,
+  // so they must NOT be marked stable CSS. Preserve a separate review-only
+  // semantic route hint when independently captured pages all show item links
+  // for the same official retailer route, regardless of DOM href format.
+  const knownRoute = retailerId === 'plus' ? '/product/'
+    : retailerId === 'dekamarkt' ? '/producten/' : null
+  const officialHost = retailerId === 'plus' ? 'www.plus.nl'
+    : retailerId === 'dekamarkt' ? 'www.dekamarkt.nl' : null
+  const observedForms = knownRoute ? [
+    ['relative', 'a[href^="' + knownRoute + '"]'],
+    ['absolute', 'a[href^="https://' + officialHost + knownRoute + '"]'],
+    ['scheme-relative', 'a[href^="//' + officialHost + knownRoute + '"]'],
+  ] : []
+  const capturedForms = reports.map(report => observedForms
+    .filter(([, selector]) => report.proposals.selectors.some(row =>
+      row.field === 'product' && row.selector === selector))
+    .map(([form]) => form))
+  const stableObservedProductRoutes = knownRoute &&
+    capturedForms.every(forms => forms.length > 0) ? [{
+      routePrefix: knownRoute, observedInSnapshots: reports.length,
+      observedLinkForms: [...new Set(capturedForms.flat())].sort(),
+      isCssSelector: false, status: 'needs-human-review',
+      autoPromotionAllowed: false,
+    }] : []
   const all = [...counts.values()].sort((a,b) =>
     a.field.localeCompare(b.field) || a.selector.localeCompare(b.selector))
   const stable = all.filter(row => row.observedInSnapshots === reports.length)
@@ -294,6 +318,8 @@ export async function savePrivateSelectorStabilityArchive(htmlFiles, reviewFile)
     unstableCandidates:unstable, fieldCoverage,
     stablePortableTokenCandidates:stablePortable,
     stablePortableTokenCandidateCount:stablePortable.length,
+    stableObservedProductRoutes,
+    stableObservedProductRouteCount:stableObservedProductRoutes.length,
     humanReviewRequired:true, automatedSelectorPromotion:false,
     readyForIngestion:false, sourceRightsForPublicationVerified:false,
     priceExtractionEnabled:false, publicSavingsClaimEligible:false,
@@ -302,7 +328,8 @@ export async function savePrivateSelectorStabilityArchive(htmlFiles, reviewFile)
   // No raw selectors or source URLs in CLI/stdout/API return.
   return {...saved, sampleCount:reports.length, stableCandidateCount:stable.length,
     unstableCandidateCount:unstable.length,
-    stablePortableTokenCandidateCount:stablePortable.length}
+    stablePortableTokenCandidateCount:stablePortable.length,
+    stableObservedProductRouteCount:stableObservedProductRoutes.length}
 }
 
 /**
