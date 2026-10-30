@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { SOURCES, validateSources, assertArchivableRetailerHtml } from '../scripts/m1-capture-sources.mjs'
+import { SOURCES, validateSources, assertArchivableRetailerHtml, readBoundedRetailerUtf8Response } from '../scripts/m1-capture-sources.mjs'
 
 test('M1 capture source set is bounded to two supermarkets and three page kinds', () => {
   assert.equal(SOURCES.length, 6)
@@ -180,4 +180,31 @@ test('M1 capture uses lossless UTF-8 decoding and checks archive opt-outs before
  const verified=code.indexOf('const bytes = assertArchivableRetailerHtml(body, contentType)')
  const write=code.indexOf('await writeFile(path.join(dir,')
  assert.ok(verified>0 && write>verified)
+})
+
+test('bounded retailer stream retains exact multi-chunk UTF-8 bytes without a content-length',async()=>{
+ const html='<html><body>synthetic café</body></html>'
+ const utf8=new TextEncoder().encode(html)
+ const response=new Response(new ReadableStream({start(c){c.enqueue(utf8.subarray(0,21));c.enqueue(utf8.subarray(21));c.close()}}),{headers:{'content-type':'text/html'}})
+ const read=await readBoundedRetailerUtf8Response(response)
+ assert.equal(read,html)
+ assert.equal(assertArchivableRetailerHtml(read,'text/html'),utf8.length)
+})
+
+test('stream aborts oversized bytes before retaining, even with no declared content length',async()=>{
+ let canceled=false
+ const response=new Response(new ReadableStream({
+  start(c){c.enqueue(new Uint8Array(5*1024*1024));c.enqueue(new Uint8Array(1))},
+  cancel(){canceled=true},
+ }),{headers:{'content-type':'text/html'}})
+ await assert.rejects(readBoundedRetailerUtf8Response(response),/exceeded cap/)
+ assert.equal(canceled,true)
+})
+
+test('stream rejects malformed UTF-8, BOM and missing response body',async()=>{
+ for(const bytes of [new Uint8Array([0xc3,0x28]),new Uint8Array([0xef,0xbb,0xbf,65])]){
+  await assert.rejects(readBoundedRetailerUtf8Response(new Response(bytes)),
+   /encoded|BOM|valid|UTF|input/,Array.from(bytes).join(','))
+ }
+ await assert.rejects(readBoundedRetailerUtf8Response(new Response(null)),/Missing streamed/)
 })

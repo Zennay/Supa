@@ -133,6 +133,35 @@ export function assertArchivableRetailerHtml(body, contentType) {
   return Buffer.byteLength(body, 'utf8')
 }
 
+// Streaming byte cap protects the VPS even when a retailer sends no reliable
+// Content-Length or a decompressed payload larger than its advertised size.
+// Decode only AFTER bounding original bytes; no replacement UTF-8 characters.
+export async function readBoundedRetailerUtf8Response(response) {
+  const body = response?.body
+  if (!body || typeof body.getReader !== 'function')
+    throw new Error('Missing streamed retailer response body')
+  const reader = body.getReader()
+  const chunks = []
+  let bytes = 0
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      if (!(value instanceof Uint8Array)) throw new Error('Invalid retailer response chunk')
+      bytes += value.byteLength
+      if (bytes > MAX_BYTES) throw new Error('Retailer HTML response exceeded cap')
+      chunks.push(value)
+    }
+  } catch (error) {
+    try { await reader.cancel() } catch { /* transport already failed */ }
+    throw error
+  } finally { reader.releaseLock() }
+  const raw = Buffer.concat(chunks, bytes)
+  if (raw.length >= 3 && raw[0] === 0xef && raw[1] === 0xbb && raw[2] === 0xbf)
+    throw new Error('Retailer HTML BOM not allowed')
+  return new TextDecoder('utf-8', { fatal: true }).decode(raw)
+}
+
 async function captureSource(source, rootDir) {
   const capturedAt = new Date().toISOString()
   const controller = new AbortController()
@@ -193,11 +222,7 @@ async function captureSource(source, rootDir) {
     if (!isHtmlContentType(contentType))
       throw new Error(`Unexpected content type: ${contentType || 'missing'}`)
 
-    const raw = new Uint8Array(await response.arrayBuffer())
-    if (raw.byteLength > MAX_BYTES) throw new Error('Retailer HTML response exceeded cap')
-    if (raw.length >= 3 && raw[0] === 0xef && raw[1] === 0xbb && raw[2] === 0xbf)
-      throw new Error('Retailer HTML BOM not allowed')
-    const body = new TextDecoder('utf-8', { fatal: true }).decode(raw)
+    const body = await readBoundedRetailerUtf8Response(response)
     const bytes = assertArchivableRetailerHtml(body, contentType)
     Object.assign(metadata, {
       finalUrl: response.url,
