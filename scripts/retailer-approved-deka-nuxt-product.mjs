@@ -32,8 +32,8 @@ function oneDekaProduct(jsonLdBlocks) {
 // evidence, not harmless metadata: any disagreement or ambiguous range must
 // block this otherwise independently corroborated fallback.
 function consistentOfferPriceEvidence(offer, expectedCents) {
-  if (!data(offer) || offer.priceSpecification !== undefined ||
-      Object.keys(offer).some(key => ['lowprice','highprice'].includes(key.toLowerCase()))) {
+  if (!data(offer) ||
+      Object.keys(offer).some(key => ['pricespecification','lowprice','highprice'].includes(key.toLowerCase()))) {
     return false
   }
   const prices = Object.entries(offer)
@@ -44,6 +44,11 @@ function consistentOfferPriceEvidence(offer, expectedCents) {
   const currencies = Object.entries(offer)
     .filter(([key]) => key.toLowerCase() === 'pricecurrency')
   if (!currencies.length || currencies.some(([, value]) => value !== 'EUR')) return false
+  const stocks = Object.entries(offer)
+    .filter(([key]) => key.toLowerCase() === 'availability')
+  if (!stocks.length || stocks.some(([, value]) =>
+      normalizeSchemaOrgAvailability(value) !==
+        normalizeSchemaOrgAvailability(offer.availability))) return false
   return true
 }
 

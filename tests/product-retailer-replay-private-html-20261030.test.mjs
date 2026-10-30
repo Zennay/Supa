@@ -5,7 +5,7 @@ import { mkdtemp, writeFile, readFile, rm, chmod, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { main as download } from '../scripts/retailer-download-reviewed-source.mjs'
-import { replayPrivateProductHtmlSnapshot, savePrivateOfflineProductReview, compareArchivedPrivateProductSnapshots, savePrivateOfflineReviewBatch, savePrivateOfflineDriftReview } from '../scripts/retailer-replay-private-html-product.mjs'
+import { replayPrivateProductHtmlSnapshot, savePrivateOfflineProductReview, compareArchivedPrivateProductSnapshots, savePrivateOfflineReviewBatch, savePrivateOfflineDriftReview, replayPrivateSelectorHtmlSnapshot, comparePrivateSelectorHtmlSnapshots, savePrivateSelectorHtmlReview, savePrivateSelectorDriftReview } from '../scripts/retailer-replay-private-html-product.mjs'
 
 const url = 'https://www.plus.nl/product/fictional-flour-123'
 const grant = { supermarket: 'plus', kind: 'product', sourceUrl: url,
@@ -45,6 +45,7 @@ test('real archived HTML+manifest path replays offline pack-price and selectors 
   const output = await capture(t)
   const replay = await replayPrivateProductHtmlSnapshot(output)
   assert.equal(replay.status, 'candidate_for_human_review')
+  assert.equal(replay.reviewReason, null)
   assert.equal(replay.observation.currentPriceCents, 325)
   assert.equal(replay.observation.pack.amount, 500)
   assert.equal(replay.observation.provenance.sha256, createHash('sha256').update(page).digest('hex'))
@@ -263,6 +264,7 @@ test('batch never counts an out-of-stock SKU as price; still retains review evid
   assert.equal(summary.candidateCount, 1)
   assert.equal(summary.unverifiedCount, 1)
   assert.equal(summary.retailerCounts.plus.unverified, 1)
+  assert.equal(summary.reviewReasonCounts.availability_unconfirmed, 1)
   const archived = JSON.parse(await readFile(output, 'utf8'))
   assert.equal(archived.entries[1].observation, null)
   assert.equal(archived.entries[1].status, 'unverified_product')
@@ -315,6 +317,7 @@ test('historical HTML remains inspectable but is not a fresh price candidate', a
   await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n')
   const historical = await replayPrivateProductHtmlSnapshot(output)
   assert.equal(historical.status, 'unverified_product')
+  assert.equal(historical.reviewReason, 'stale_capture')
   assert.equal(historical.observation, null)
   assert.ok(historical.selectorProposals.length > 0)
   assert.equal(historical.permissionVerifiedForThisReplay, false)
@@ -425,7 +428,179 @@ test('archived Deka HTML never trusts parseable JSON-LD over contradictory Nuxt 
   })
   const replay = await replayPrivateProductHtmlSnapshot(output)
   assert.equal(replay.status, 'unverified_product')
+  assert.equal(replay.reviewReason, 'missing_or_conflicting_product_evidence')
   assert.equal(replay.observation, null)
   assert.equal(replay.sourceRightsForPublicationVerified, false)
   assert.equal(replay.published, false)
+})
+
+
+test('missing physical pack becomes an actionable private review reason', async t => {
+  const incomplete = page.replace('"weight":{"value":"500 g"}',
+    '"weight":{"value":"unspecified bag"}')
+  const file = await capture(t, incomplete)
+  const review = await replayPrivateProductHtmlSnapshot(file)
+  assert.equal(review.status, 'unverified_product')
+  assert.equal(review.reviewReason, 'price_or_physical_pack_missing')
+  assert.equal(review.observation, null)
+  assert.equal(review.permissionVerifiedForThisReplay, false)
+})
+
+async function archivedSelectorPage(t, supermarket, kind, sourceUrl, markup) {
+  const dir = await mkdtemp(join(tmpdir(), 'supa-offline-selector-'))
+  t.after(() => rm(dir, { recursive: true, force: true }))
+  const grantPath = join(dir, 'fictional-grant.json')
+  const htmlPath = join(dir, 'captured.html')
+  const fictional = structuredClone(gate)
+  fictional.sources.find(x => x.supermarket === supermarket).permissionStatus = 'permitted'
+  fictional.sources.find(x => x.supermarket === supermarket).productionEnabled = true
+  await writeFile(grantPath, JSON.stringify({
+    supermarket, kind, sourceUrl, reviewed: true,
+    termsReviewed: true, robotsReviewed: true, noAntiBotBypass: true,
+  }), { mode: 0o600 })
+  await download([grantPath, htmlPath], {
+    testGateDocument: fictional, writeOutput() {},
+    fetchFn: async () => new Response(markup, {
+      status: 200, headers: { 'content-type': 'text/html' },
+    }),
+  })
+  return htmlPath
+}
+
+test('PLUS catalog HTML can be SHA-replayed into a private selector review without price claims', async t => {
+  const html = '<html><article class="product-card"><h3 class="product-name">Synthetic product</h3>' +
+    '<span class="offer-price">3,25</span></article></html>'
+  const file = await archivedSelectorPage(t, 'plus', 'catalog',
+    'https://www.plus.nl/producten', html)
+  const record = await replayPrivateSelectorHtmlSnapshot(file)
+  assert.equal(record.status, 'human-selector-review-required')
+  assert.equal(record.source.kind, 'catalog')
+  assert.equal(record.proposals.source.sha256, createHash('sha256').update(html).digest('hex'))
+  assert.ok(record.proposals.selectors.some(x => x.selector === 'article.product-card'))
+  assert.equal(record.priceExtractionEnabled, false)
+  assert.equal(record.automatedSelectorPromotion, false)
+  assert.equal(record.published, false)
+  assert.doesNotMatch(JSON.stringify(record), /www\.plus\.nl|Synthetic product|3,25/)
+  await assert.rejects(replayPrivateProductHtmlSnapshot(file), /refused/)
+  const review = file.replace('captured.html', 'private-catalog-review.json')
+  const summary = await savePrivateSelectorHtmlReview(file, review)
+  assert.equal(summary.created, true)
+  assert.equal((await stat(review)).mode & 0o777, 0o600)
+  assert.equal(summary.archiveSha256,
+    createHash('sha256').update(await readFile(review)).digest('hex'))
+})
+
+test('Deka offers and PLUS catalog selectors support offline drift but reject mixed URLs/kinds', async t => {
+  const dekaUrl = 'https://www.dekamarkt.nl/aanbiedingen'
+  const beforeMarkup = '<html><article class="offer-card"><span class="offer-price">1.99</span></article></html>'
+  const afterMarkup = '<html><article class="deal-card"><span class="offer-price">2.29</span></article></html>'
+  const before = await archivedSelectorPage(t, 'dekamarkt', 'offers', dekaUrl, beforeMarkup)
+  const after = await archivedSelectorPage(t, 'dekamarkt', 'offers', dekaUrl, afterMarkup)
+  const offer = await replayPrivateSelectorHtmlSnapshot(before)
+  assert.equal(offer.source.retailerId, 'dekamarkt')
+  assert.equal(offer.source.kind, 'offers')
+  assert.equal(offer.priceExtractionEnabled, false)
+  const drift = await comparePrivateSelectorHtmlSnapshots(before, after)
+  assert.equal(drift.mode, 'private-offline-selector-drift-alert')
+  assert.equal(drift.htmlBytesDiffer, true)
+  assert.ok(drift.missingSelectorCandidates > 0)
+  assert.equal(drift.automatedSelectorPromotion, false)
+  assert.doesNotMatch(JSON.stringify(drift), /www\.dekamarkt\.nl|1\.99|2\.29|offer-card/)
+  const other = await archivedSelectorPage(t, 'dekamarkt', 'offers',
+    'https://www.dekamarkt.nl/aanbiedingen/week', afterMarkup)
+  await assert.rejects(comparePrivateSelectorHtmlSnapshots(before, other), /refused/)
+  const catalog = await archivedSelectorPage(t, 'plus', 'catalog',
+    'https://www.plus.nl/producten', beforeMarkup)
+  await assert.rejects(comparePrivateSelectorHtmlSnapshots(before, catalog), /refused/)
+})
+
+test('catalog/offer CLI records redacted private selectors and compare-only drift', async t => {
+  const { execFile } = await import('node:child_process')
+  const { promisify } = await import('node:util')
+  const run = promisify(execFile)
+  const url = 'https://www.dekamarkt.nl/aanbiedingen'
+  const before = await archivedSelectorPage(t, 'dekamarkt', 'offers', url,
+    '<article class="offer-card">Synthetic 1.99</article>')
+  const after = await archivedSelectorPage(t, 'dekamarkt', 'offers', url,
+    '<article class="deal-card">Synthetic 2.29</article>')
+  const tool = new URL('../scripts/retailer-replay-private-html-product.mjs', import.meta.url).pathname
+  const privateFile = before.replace('captured.html', 'selector-review.json')
+  const { stdout: saved } = await run(process.execPath,
+    ['--experimental-strip-types', tool, '--selectors', before, privateFile])
+  const receipt = JSON.parse(saved)
+  assert.equal(receipt.created, true)
+  assert.equal(receipt.archiveSha256,
+    createHash('sha256').update(await readFile(privateFile)).digest('hex'))
+  const { stdout: reportText } = await run(process.execPath,
+    ['--experimental-strip-types', tool, '--selector-drift', before, after])
+  const report = JSON.parse(reportText)
+  assert.equal(report.htmlBytesDiffer, true)
+  assert.ok(report.newSelectorCandidates > 0)
+  assert.doesNotMatch(saved + reportText, /Synthetic|www\.dekamarkt|offer-card|deal-card|1\.99|2\.29/)
+})
+
+
+test('catalog/offer drift-save persists private immutable aggregate alert with provenance', async t => {
+  const source = 'https://www.plus.nl/producten'
+  const before = await archivedSelectorPage(t, 'plus', 'catalog', source,
+    '<article class="product-card">Synthetic first</article>')
+  const after = await archivedSelectorPage(t, 'plus', 'catalog', source,
+    '<article class="item-card">Synthetic next</article>')
+  const target = before.replace('captured.html', 'catalog-drift.json')
+  const saved = await savePrivateSelectorDriftReview(before, after, target)
+  assert.equal(saved.created, true)
+  assert.equal(saved.published, false)
+  const archive = JSON.parse(await readFile(target, 'utf8'))
+  assert.equal(archive.mode, 'private-catalog-offer-selector-drift-review')
+  assert.equal(archive.source.kind, 'catalog')
+  assert.ok(archive.alert.newSelectorCandidates > 0)
+  assert.equal(archive.priceExtractionEnabled, false)
+  assert.equal(archive.automatedSelectorPromotion, false)
+  assert.equal(saved.archiveSha256,
+    createHash('sha256').update(await readFile(target)).digest('hex'))
+  assert.doesNotMatch(JSON.stringify(archive), /Synthetic|www\.plus\.nl|product-card|item-card/)
+  await assert.rejects(savePrivateSelectorDriftReview(before, after, target), /refused/)
+})
+
+test('canonical PLUS catalog and Deka offers rights prevent network capture', async t => {
+  const cases = [
+    ['plus', 'catalog', 'https://www.plus.nl/producten'],
+    ['dekamarkt', 'offers', 'https://www.dekamarkt.nl/aanbiedingen'],
+  ]
+  for (const [supermarket, kind, sourceUrl] of cases) {
+    const dir = await mkdtemp(join(tmpdir(), 'supa-denied-catalog-'))
+    t.after(() => rm(dir, { recursive: true, force: true }))
+    const input = join(dir, 'fictional-grant.json')
+    const output = join(dir, 'must-not-exist.html')
+    await writeFile(input, JSON.stringify({
+      supermarket, kind, sourceUrl, reviewed: true,
+      termsReviewed: true, robotsReviewed: true, noAntiBotBypass: true,
+    }), { mode: 0o600 })
+    let networkCalls = 0
+    await assert.rejects(download([input, output], {
+      fetchFn: async () => { networkCalls++; throw Error('unexpected network') },
+      writeOutput() {},
+    }), /Explicit retailer source permission required/)
+    assert.equal(networkCalls, 0)
+    await assert.rejects(stat(output), /ENOENT/)
+  }
+})
+
+test('CLI selector drift archive refuses overwrite and prints no retailer evidence', async t => {
+  const { execFile } = await import('node:child_process')
+  const { promisify } = await import('node:util')
+  const run = promisify(execFile)
+  const source = 'https://www.plus.nl/producten'
+  const before = await archivedSelectorPage(t, 'plus', 'catalog', source,
+    '<article class="product-card">Synthetic</article>')
+  const after = await archivedSelectorPage(t, 'plus', 'catalog', source,
+    '<article class="item-card">Synthetic</article>')
+  const file = before.replace('captured.html', 'selectors-drift-cli.json')
+  const tool = new URL('../scripts/retailer-replay-private-html-product.mjs', import.meta.url).pathname
+  const args = ['--experimental-strip-types', tool, '--selector-drift-save', before, after, file]
+  const { stdout } = await run(process.execPath, args)
+  assert.equal(JSON.parse(stdout).created, true)
+  assert.equal((await stat(file)).mode & 0o777, 0o600)
+  assert.doesNotMatch(stdout, /Synthetic|www\.plus|product-card|item-card/)
+  await assert.rejects(run(process.execPath, args))
 })

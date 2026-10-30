@@ -12,6 +12,18 @@ import { compareOfflineSelectorProposals } from './retailer-private-selector-dri
 
 const LIMIT = 2 * 1024 * 1024
 const HOST = Object.freeze({ plus: 'www.plus.nl', dekamarkt: 'www.dekamarkt.nl' })
+const CAPTURE_ROUTES = Object.freeze({
+  plus: { product: '/product/', catalog: '/producten', offers: '/aanbiedingen' },
+  dekamarkt: { product: '/producten/', catalog: '/producten/', offers: '/aanbiedingen' },
+})
+function allowedCaptureRoute(source, url) {
+  const prefix = CAPTURE_ROUTES[source.retailerId]?.[source.kind]
+  if (!prefix) return false
+  return prefix.endsWith('/') ? url.pathname.startsWith(prefix) &&
+    (source.kind !== 'product' || url.pathname.length > prefix.length) :
+    url.pathname === prefix || url.pathname.startsWith(prefix + '/')
+}
+
 const fail = () => { throw Error('Private source replay refused: untrusted HTML or manifest') }
 async function privateBytes(path, size) {
   await assertNoSymlinkedM3OutputParents(path)
@@ -40,8 +52,8 @@ function admitManifest(record) {
       record.status !== 'private-review-required' ||
       record.selectorReviewComplete !== false || record.releaseReady !== false ||
       record.publicSavingsClaimEligible !== false ||
-      !record.source || record.source.kind !== 'product' ||
-      !Object.hasOwn(HOST, record.source.retailerId) ||
+      !record.source || !Object.hasOwn(HOST, record.source.retailerId) ||
+      !Object.hasOwn(CAPTURE_ROUTES[record.source.retailerId], record.source.kind) ||
       typeof record.source.url !== 'string' ||
       typeof record.source.capturedAt !== 'string' ||
       typeof record.source.sha256 !== 'string' ||
@@ -53,7 +65,7 @@ function admitManifest(record) {
   if (url.href !== src.url || url.protocol !== 'https:' ||
       url.hostname !== HOST[src.retailerId] || url.port || url.search || url.hash ||
       url.username || url.password ||
-      !url.pathname.startsWith(src.retailerId === 'plus' ? '/product/' : '/producten/')) fail()
+      !allowedCaptureRoute(src, url)) fail()
   const ms = Date.parse(src.capturedAt)
   if (!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(src.capturedAt) ||
       !Number.isFinite(ms) || new Date(ms).toISOString() !== src.capturedAt ||
@@ -61,8 +73,8 @@ function admitManifest(record) {
   return src
 }
 
-/** Existing private capture bytes only: this function cannot fetch or publish. */
-export async function replayPrivateProductHtmlSnapshot(filename) {
+/** Original privately captured HTML and its immutable SHA-bound manifest only. */
+async function readPrivateCapture(filename) {
   if (typeof filename !== 'string' || !filename.endsWith('.html') ||
       filename.length > 512 || filename.trim() !== filename) fail()
   const path = resolve(filename)
@@ -80,6 +92,13 @@ export async function replayPrivateProductHtmlSnapshot(filename) {
   const html = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
   const provenance = { supermarket: src.retailerId, kind: src.kind,
     url: src.url, capturedAt: src.capturedAt, sha256: src.sha256 }
+  return { html, src, provenance }
+}
+
+/** Existing private product capture only: no HTTP, production price or permission grant. */
+export async function replayPrivateProductHtmlSnapshot(filename) {
+  const { html, src, provenance } = await readPrivateCapture(filename)
+  if (src.kind !== 'product') fail()
   const scripts = readAuthorizedHtmlScriptEvidence(html)
   if (scripts.invalid || scripts.jsonLdBlocks.length > 16) fail()
   let parsed = parseSchemaOrgProductForPage(scripts.jsonLdBlocks, provenance)
@@ -96,11 +115,16 @@ export async function replayPrivateProductHtmlSnapshot(filename) {
   const price = parsed.type === 'observation' ? parsed.observation : null
   const maxCandidateAgeMs = 24 * 60 * 60 * 1000
   const freshEnoughForPriceReview = Date.now() - Date.parse(src.capturedAt) <= maxCandidateAgeMs
-  const plausible = freshEnoughForPriceReview &&
-    price && Number.isSafeInteger(price.currentPriceCents) &&
-    price.currentPriceCents > 0 && price.pack.amount !== null &&
-    price.availability === 'available' &&
-    !['unknown', 'pack'].includes(price.pack.unit)
+  const invalidPackOrPrice = !price || !Number.isSafeInteger(price.currentPriceCents) ||
+    price.currentPriceCents <= 0 || price.pack.amount === null ||
+    ['unknown', 'pack'].includes(price.pack.unit)
+  // Non-sensitive operator diagnoses: no product names, prices, HTML or URLs.
+  const reviewReason = !freshEnoughForPriceReview ? 'stale_capture'
+    : !price ? 'missing_or_conflicting_product_evidence'
+    : price.availability !== 'available' ? 'availability_unconfirmed'
+    : invalidPackOrPrice ? 'price_or_physical_pack_missing'
+    : null
+  const plausible = reviewReason === null
   return {
     schemaVersion: 1, mode: 'offline-private-product-review',
     // Pin the actual product URL without returning or logging that private URL.
@@ -109,6 +133,7 @@ export async function replayPrivateProductHtmlSnapshot(filename) {
       sha256: src.sha256,
       productUrlSha256: createHash('sha256').update(src.url).digest('hex') },
     status: plausible ? 'candidate_for_human_review' : 'unverified_product',
+    reviewReason,
     observation: plausible ? price : null,
     selectorProposals: selectors.selectors,
     selectorSnapshot: selectors, selectorReviewRequired: true,
@@ -116,6 +141,66 @@ export async function replayPrivateProductHtmlSnapshot(filename) {
     verifiedCurrentCheckoutPrice: false, readyForIngestion: false,
     publicSavingsClaimEligible: false, productionEnabled: false, published: false,
   }
+}
+
+/**
+ * Product-independent selector discovery for already archived catalog/search
+ * and offer pages. This NEVER parses a displayed price into a product quote.
+ */
+export async function replayPrivateSelectorHtmlSnapshot(filename) {
+  const { html, src } = await readPrivateCapture(filename)
+  if (!['catalog', 'offers'].includes(src.kind)) fail()
+  const proposals = proposeOfflineRetailerSelectors({
+    html, origin: {
+      retailerId: src.retailerId, url: src.url, capturedAt: src.capturedAt,
+    },
+  })
+  if (proposals.source.sha256 !== src.sha256) fail()
+  return {
+    schemaVersion: 1, mode: 'offline-private-catalog-offer-selector-review',
+    status: 'human-selector-review-required',
+    source: { retailerId: src.retailerId, kind: src.kind,
+      capturedAt: src.capturedAt, sha256: src.sha256,
+      sourceUrlSha256: createHash('sha256').update(src.url).digest('hex') },
+    proposals, humanReviewRequired: true, automatedSelectorPromotion: false,
+    priceExtractionEnabled: false, readyForIngestion: false,
+    permissionVerifiedForThisReplay: false, sourceRightsForPublicationVerified: false,
+    publicSavingsClaimEligible: false, productionEnabled: false, published: false,
+  }
+}
+
+async function inspectPrivateSelectorChange(beforeFile, afterFile) {
+  const before = await replayPrivateSelectorHtmlSnapshot(beforeFile)
+  const after = await replayPrivateSelectorHtmlSnapshot(afterFile)
+  if (before.source.kind !== after.source.kind ||
+      before.source.sourceUrlSha256 !== after.source.sourceUrlSha256) fail()
+  return { before, after,
+    alert: compareOfflineSelectorProposals(before.proposals, after.proposals) }
+}
+
+export async function comparePrivateSelectorHtmlSnapshots(beforeFile, afterFile) {
+  return (await inspectPrivateSelectorChange(beforeFile, afterFile)).alert
+}
+
+export async function savePrivateSelectorDriftReview(beforeFile, afterFile, reviewFile) {
+  const { before, after, alert } = await inspectPrivateSelectorChange(beforeFile, afterFile)
+  return writePrivateReviewRecord({
+    schemaVersion: 1, mode: 'private-catalog-offer-selector-drift-review',
+    status: 'human-review-required',
+    source: { retailerId: before.source.retailerId, kind: before.source.kind,
+      sourceUrlSha256: before.source.sourceUrlSha256 },
+    before: { capturedAt: before.source.capturedAt, sha256: before.source.sha256 },
+    after: { capturedAt: after.source.capturedAt, sha256: after.source.sha256 },
+    alert, humanReviewRequired: true, automatedSelectorPromotion: false,
+    priceExtractionEnabled: false, readyForIngestion: false,
+    sourceRightsForPublicationVerified: false, productionEnabled: false,
+    publicSavingsClaimEligible: false, published: false,
+  }, reviewFile)
+}
+
+export async function savePrivateSelectorHtmlReview(htmlFile, reviewFile) {
+  return writePrivateReviewRecord(await replayPrivateSelectorHtmlSnapshot(htmlFile),
+    reviewFile)
 }
 
 /**
@@ -270,27 +355,52 @@ export async function savePrivateOfflineReviewBatch(htmlFiles, reviewFile) {
         x.status === 'unverified_product').length,
     },
   ]))
+  const reviewReasonCounts = Object.fromEntries([
+    'stale_capture', 'missing_or_conflicting_product_evidence',
+    'availability_unconfirmed', 'price_or_physical_pack_missing',
+  ].map(reason => [reason, records.filter(x => x.reviewReason === reason).length]))
   const saved = await writePrivateReviewRecord({
     schemaVersion: 1, mode: 'offline-private-product-review-batch',
     status: 'private-batch-needs-review',
     count: records.length,
     candidateCount: records.filter(x => x.status === 'candidate_for_human_review').length,
     unverifiedCount: records.filter(x => x.status === 'unverified_product').length,
-    entries: records, retailerCounts, humanReviewRequired: true,
+    entries: records, retailerCounts, reviewReasonCounts, humanReviewRequired: true,
     sourceRightsForPublicationVerified: false, verifiedCurrentCheckoutPrices: 0,
     productionEnabled: false, published: false, publicSavingsClaimEligible: false,
   }, reviewFile)
   return { ...saved, count: records.length,
     candidateCount: records.filter(x => x.status === 'candidate_for_human_review').length,
     unverifiedCount: records.filter(x => x.status === 'unverified_product').length,
-    retailerCounts }
+    retailerCounts, reviewReasonCounts }
 }
 
 // Operator CLI: no network and no source URL, price, HTML or private path stdout.
 const { pathToFileURL } = await import('node:url')
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const args = process.argv.slice(2)
-  if (args.length === 4 && args[0] === '--drift-save') {
+  if (args.length === 4 && args[0] === '--selector-drift-save') {
+    savePrivateSelectorDriftReview(args[1], args[2], args[3])
+      .then(result => process.stdout.write(JSON.stringify(result) + '\n'))
+      .catch(() => {
+        console.error('Private catalog/offer selector drift archive refused')
+        process.exitCode = 2
+      })
+  } else if (args.length === 3 && args[0] === '--selectors') {
+    savePrivateSelectorHtmlReview(args[1], args[2])
+      .then(result => process.stdout.write(JSON.stringify(result) + '\n'))
+      .catch(() => {
+        console.error('Private offline catalog/offer selector review refused')
+        process.exitCode = 2
+      })
+  } else if (args.length === 3 && args[0] === '--selector-drift') {
+    comparePrivateSelectorHtmlSnapshots(args[1], args[2])
+      .then(result => process.stdout.write(JSON.stringify(result) + '\n'))
+      .catch(() => {
+        console.error('Private offline catalog/offer selector drift refused')
+        process.exitCode = 2
+      })
+  } else if (args.length === 4 && args[0] === '--drift-save') {
     savePrivateOfflineDriftReview(args[1], args[2], args[3])
       .then(result => process.stdout.write(JSON.stringify(result) + '\n'))
       .catch(() => {
@@ -319,7 +429,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
         process.exitCode = 2
       })
   } else {
-    console.error('Usage: retailer-replay-private-html-product.mjs <captured.html> <new-review.json> OR --drift <before.html> <after.html> OR --batch <new-review.json> <source1.html> [source2.html ...] OR --drift-save <before.html> <after.html> <new-drift.json>')
+    console.error('Usage: <product.html> <new-review.json> | --batch <new-batch.json> <product1.html> ... | --drift <old-product.html> <new-product.html> | --drift-save <old-product.html> <new-product.html> <new-drift.json> | --selectors <catalog-or-offers.html> <new-review.json> | --selector-drift <old-page.html> <new-page.html> | --selector-drift-save <old-page.html> <new-page.html> <new-drift.json>')
     process.exitCode = 2
   }
 }

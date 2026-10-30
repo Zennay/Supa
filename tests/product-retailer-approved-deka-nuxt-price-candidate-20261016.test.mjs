@@ -174,3 +174,17 @@ test('complete schema pack/stock must corroborate Deka Nuxt and cannot silently 
   assert.equal(result.status, 'review_required')
   assert.equal(result.observation, null)
 })
+
+test('Deka rejects case-variant stock and price-spec evidence that conflicts with Nuxt', async () => {
+  const mismatch = structuredClone(fixture.jsonLdProduct)
+  mismatch.offers.Availability = 'https://schema.org/OutOfStock'
+  const stock = await captureApprovedProductPriceCandidate(options(html(undefined, mismatch)))
+  assert.equal(stock.status, 'review_required')
+  assert.equal(stock.observation, null)
+
+  const spec = structuredClone(fixture.jsonLdProduct)
+  spec.offers.PriceSpecification = { price: '0.01', priceCurrency: 'EUR' }
+  const extra = await captureApprovedProductPriceCandidate(options(html(undefined, spec)))
+  assert.equal(extra.status, 'review_required')
+  assert.equal(extra.observation, null)
+})

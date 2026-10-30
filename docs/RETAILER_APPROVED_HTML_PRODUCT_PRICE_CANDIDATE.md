@@ -227,3 +227,41 @@ priceSpecification of lowPrice leiden tot een onbesliste opname.
 Volledig overeenstemmende bronnen blijven alleen een kandidaat voor menselijke
 review, nooit een geverifieerde kassaprijs. Tests zijn synthetisch: geen live
 webshop, geen productieprijs of verzonnen toestemming.
+
+### Product-, catalogus- en aanbiedingen-HTML: offline selectors van bestaande snapshots
+
+De oorspronkelijke toestemmingstoets en eenpagina-downloader bestaan al voor
+product-, catalogus- en aanbiedingenroutes, maar de *productprijskandidaat*
+blijft beperkt tot de productroute. De nieuwe private replay ondersteunt nu ook
+PLUS en DekaMarkt catalogus/zoeken en aanbiedingen: iedere originele HTML
+wordt samen met de 0600 manifest gecontroleerd op originele winkelhost,
+exacte soort/URL, UTC, SHA-256 en eigenaar-only map en inode.
+
+De offline operator-CLI kan voor deze twee niet-producttypen uitsluitend
+CSS-selectorvoorstellen ter menselijke beoordeling maken en bewaren:
+
+```bash
+node --experimental-strip-types scripts/retailer-replay-private-html-product.mjs \
+  --selectors /private/catalog.html /private/nieuw-catalog-review.json
+node --experimental-strip-types scripts/retailer-replay-private-html-product.mjs \
+  --selector-drift /private/oude-aanbiedingen.html /private/nieuwe-aanbiedingen.html
+node --experimental-strip-types scripts/retailer-replay-private-html-product.mjs \
+  --selector-drift-save /private/oude-aanbiedingen.html /private/nieuwe-aanbiedingen.html \
+  /private/nieuwe-drift-review.json
+```
+
+Drift accepteert alleen twee bestaande SHA-gecontroleerde HTMLs van dezelfde
+winkel, dezelfde paginacategorie en de **identieke URL**. De uitvoer bestaat
+uitsluitend uit tellingen; reviewbestanden zijn exclusief 0600 met
+archiveSha256-ontvangstbewijs. Geen producten of prijzen worden uit catalogus-
+of aanbiedingenpagina's tot een kassaprijs afgeleid; geen selector wordt
+geactiveerd. Alle test-HTML is synthetisch en de echte PLUS/Deka-bronrechtengate
+blijft uitgeschakeld. Operator heeft nog steeds aantoonbaar retailerbewijs
+nodig voordat originele live HTML wordt opgevraagd.
+
+Onbesliste productreviews hebben voortaan een niet-gevoelige reviewReason:
+`stale_capture`, `missing_or_conflicting_product_evidence`,
+`availability_unconfirmed` of `price_or_physical_pack_missing`. Een privébatch
+toont uitsluitend geaggregeerde reviewReasonCounts zodat de operator kan zien
+of heropname, voorraadcontrole of bronnenreview zinvol is, zonder artikelprijzen
+of URL's via stdout te delen.
