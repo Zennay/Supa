@@ -170,3 +170,31 @@ test('invalid or ambiguous structural evidence fails closed without a selector o
     assert.throws(() => proposeOfflineRetailerSelectors({ html, origin }), /Duplicate|Unterminated|Unbalanced/)
   }
 })
+
+test('Schema.org class IRIs and JSON-LD graphs are actual product signals, never external lookalikes', () => {
+  const make = type => '<html><head><script type="application/ld+json">' +
+    JSON.stringify({ '@context': 'https://schema.org', '@graph': [{ '@type': type, name: 'Fictional' }] }) +
+    '</script></head></html>'
+  for (const klass of ['Product', 'https://schema.org/Product', 'http://schema.org/Product',
+    ['Thing', 'https://schema.org/Product']]) {
+    const report = proposeOfflineRetailerSelectors({ html: make(klass), origin })
+    assert.equal(report.structuredSignals.schemaOrgProduct, true, String(klass))
+    assert.equal(report.readyForIngestion, false)
+  }
+  const fake = proposeOfflineRetailerSelectors({
+    html: make('https://attacker.example/schema.org/Product'), origin,
+  })
+  assert.equal(fake.structuredSignals.schemaOrgProduct, false)
+  assert.equal(fake.structuredSignals.jsonLd, true)
+})
+
+test('UTF-8 encoded JSON-LD is byte-bounded rather than incorrectly using character count', () => {
+  const content = JSON.stringify({ '@type': 'Product', name: '€'.repeat(370000) })
+  assert.ok(content.length < 1024 * 1024)
+  assert.ok(Buffer.byteLength(content) > 1024 * 1024)
+  const html = '<script type="application/ld+json">' + content + '</script>'
+  const result = proposeOfflineRetailerSelectors({ html, origin })
+  assert.equal(result.structuredSignals.jsonLd, false)
+  assert.equal(result.structuredSignals.schemaOrgProduct, false)
+  assert.equal(result.productionEnabled, false)
+})

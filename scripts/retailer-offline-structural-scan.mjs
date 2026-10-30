@@ -58,7 +58,11 @@ function tagEnd(html, start) {
 function isType(record, type) {
   if (!record || typeof record !== 'object') return false;
   const t = record['@type'];
-  return t === type || (Array.isArray(t) && t.includes(type));
+  // Schema.org permits a short term or an absolute class IRI. An arbitrary
+  // host ending in /Product is not evidence of a Schema.org product.
+  const expected = new Set([type, 'https://schema.org/' + type, 'http://schema.org/' + type]);
+  return typeof t === 'string' ? expected.has(t) :
+    (Array.isArray(t) && t.some(x => typeof x === 'string' && expected.has(x)));
 }
 function hasProduct(value, depth = 0) {
   if (depth > 5 || !value || typeof value !== 'object') return false;
@@ -117,7 +121,7 @@ export function scanOfflineRetailerMarkup(html) {
         const type = values.get('type')?.toLowerCase();
         const id = values.get('id');
         const content = html.slice(end + 1, closing.index).trim();
-        if (content.length <= 1024 * 1024) {
+        if (Buffer.byteLength(content, 'utf8') <= 1024 * 1024) {
           let parsed = null;
           try { parsed = JSON.parse(content); } catch {}
           if (type === 'application/ld+json' && parsed !== null) {
