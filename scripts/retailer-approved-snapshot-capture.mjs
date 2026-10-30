@@ -178,6 +178,16 @@ async function collectBoundedBody(response) {
     reader.releaseLock()
   }
   if (bytes === 0) throw new Error('Empty HTML capture refused')
+  // Undecompressed identity transfer has one authoritative byte count.
+  // A short or overlong 200 response must never become SHA-pinned evidence.
+  // Fetch commonly decodes gzip/br while retaining the wire Content-Length:
+  // in that case the decoded HTML bytes cannot be compared to wire length.
+  const encoding = response.headers?.get?.('content-encoding')
+  if ((!encoding || encoding.toLowerCase() === 'identity') &&
+      declared !== null && declared !== undefined &&
+      Number(declared) !== bytes) {
+    throw new Error('Incomplete HTML capture: declared length mismatch')
+  }
   const all = Buffer.concat(chunks)
   const html = new TextDecoder('utf-8', { fatal: true }).decode(all)
   return { html, bytes, sha256: createHash('sha256').update(all).digest('hex') }
