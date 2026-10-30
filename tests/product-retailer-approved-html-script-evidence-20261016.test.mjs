@@ -195,3 +195,38 @@ test('script-looking text in a quoted HTML attribute or inert style/title is not
   assert.equal(accepted.status, 'candidate_needs_review')
   assert.equal(accepted.observation.currentPriceCents, 199)
 })
+
+test('real PLUS and Deka evidence ignores HTML plaintext and legacy fallback markup', async () => {
+  const plus = script('type="application/ld+json"', plusProduct)
+  for (const tag of ['plaintext','noembed','noframes']) {
+    const wrapped = `<${tag}>${plus}</${tag}>`
+    const evidence = readAuthorizedHtmlScriptEvidence(wrapped)
+    assert.deepEqual(evidence.jsonLdBlocks, [], tag)
+    const candidate = await run('plus', wrapped)
+    assert.equal(candidate.status, 'review_required', tag)
+    assert.equal(candidate.observation, null, tag)
+    assert.equal(candidate.published, false, tag)
+  }
+  for (const tag of ['noembed','noframes']) {
+    const legitimate = `<${tag}>${plus}</${tag}>${plus}`
+    const candidate = await run('plus', legitimate)
+    assert.equal(candidate.status, 'candidate_needs_review', tag)
+    assert.equal(candidate.observation.currentPriceCents, 199, tag)
+  }
+  const deka = script('type="application/ld+json"', dekaFixture.jsonLdProduct)
+  const nuxt = script('id="__NUXT_DATA__" type="application/json"', dekaFixture.nuxtPayload)
+  for (const tag of ['plaintext','noembed','noframes']) {
+    const wrapped = `<${tag}>${nuxt}${deka}</${tag}>`
+    const result = readAuthorizedHtmlScriptEvidence(wrapped)
+    assert.equal(result.nuxtPayload, null, tag)
+    assert.deepEqual(result.jsonLdBlocks, [], tag)
+  }
+})
+
+test('Nuxt JSON must be an actual JSON script, not mislabeled JSON-LD', async () => {
+  const tampered = dekaMarkup('id="__NUXT_DATA__" type="application/ld+json"')
+  assert.equal(readAuthorizedHtmlScriptEvidence(tampered).invalid, true)
+  const result = await run('dekamarkt', tampered)
+  assert.equal(result.status, 'review_required')
+  assert.equal(result.observation, null)
+})

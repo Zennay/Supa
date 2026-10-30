@@ -249,3 +249,19 @@ test('fake script types cannot claim Nuxt/Next hydration signals', () => {
     assert.equal(real.permissionVerified, false)
   }
 })
+
+test('plain-text and legacy fallback containers cannot supply spoofed product or selector signals', () => {
+  for (const tag of ['plaintext', 'noembed', 'noframes']) {
+    const forged = `<${tag}><article class="product-card"><script type="application/ld+json">{"@type":"Product"}</script></${tag}>`
+    const report = proposeOfflineRetailerSelectors({ html: forged, origin })
+    assert.equal(report.structuredSignals.jsonLd, false, tag)
+    assert.equal(report.structuredSignals.schemaOrgProduct, false, tag)
+    assert.equal(report.scannedTags, 0, tag)
+    assert.equal(report.selectors.length, 0, tag)
+    assert.equal(report.readyForIngestion, false)
+  }
+  const legitimate = proposeOfflineRetailerSelectors({html:
+    '<noembed><article class="product-card">hidden</article></noembed><article class="product-card">visible</article>', origin})
+  assert.equal(legitimate.scannedTags, 1)
+  assert.ok(legitimate.selectors.some(x => x.field === 'product'))
+})

@@ -3,8 +3,8 @@
  * Script JSON and quoted markup are never executed or promoted as prices.
  * Not a DOM validation or an approval for live retailer access.
  */
-const RAW = new Set(['script','style','textarea','title','xmp','iframe']);
-const HIDDEN = new Set(['template','noscript','svg','head','style','textarea','title','xmp','iframe']);
+const RAW = new Set(['script','style','textarea','title','xmp','iframe','noembed','noframes']);
+const HIDDEN = new Set(['template','noscript','svg','head','style','textarea','title','xmp','iframe','noembed','noframes']);
 const VOID = new Set(['area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr']);
 
 function attrs(raw) {
@@ -71,8 +71,11 @@ function hasProduct(value, depth = 0) {
   return ['@graph','mainEntity','itemListElement'].some(key => hasProduct(value[key], depth + 1));
 }
 
-export function scanOfflineRetailerMarkup(html) {
+// includeScripts is for the trusted private PRICE parser only. The public
+// selector report continues to expose only counts and booleans by default.
+export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {}) {
   const visible = [];
+  const scripts = includeScripts ? [] : null;
   const signals = { schemaOrgProduct:false, nextData:false, nuxtData:false, jsonLd:false };
   const hidden = [];
   let pos = 0;
@@ -106,6 +109,10 @@ export function scanOfflineRetailerMarkup(html) {
       continue;
     }
     const values = attrs(attrText);
+    // HTML plaintext mode consumes the rest of the document as literal text;
+    // even a matching </plaintext> is not a real closing tag in the DOM.
+    // Ignore any apparent script/selector tags following it.
+    if (tag === 'plaintext') break;
     const suppressed = hidden.length > 0;
     if (!suppressed && !HIDDEN.has(tag) && tag !== 'script') {
       // Retain the *actual* start tag only. Never reinterpret its attributes
@@ -117,7 +124,12 @@ export function scanOfflineRetailerMarkup(html) {
       closer.lastIndex = end + 1;
       const closing = closer.exec(html);
       if (!closing) throw new Error('Unbalanced inert HTML element');
-      if (!hidden.some(name => name !== 'head') && tag === 'script' && !values.has('src')) {
+      const trustedScriptContext = !hidden.some(name => name !== 'head') && tag === 'script';
+      if (trustedScriptContext && includeScripts) {
+        scripts.push({ attrs: values, rawAttributeLength: attrText.length,
+          content: html.slice(end + 1, closing.index) });
+      }
+      if (trustedScriptContext && !values.has('src')) {
         const type = values.get('type')?.toLowerCase();
         const id = values.get('id');
         const content = html.slice(end + 1, closing.index).trim();
@@ -141,5 +153,6 @@ export function scanOfflineRetailerMarkup(html) {
     pos = end + 1;
   }
   if (hidden.length) throw new Error('Unbalanced inert HTML element');
-  return { visible: visible.join(''), structuredSignals: signals };
+  return { visible: visible.join(''), structuredSignals: signals,
+    ...(includeScripts ? { scripts } : {}) };
 }

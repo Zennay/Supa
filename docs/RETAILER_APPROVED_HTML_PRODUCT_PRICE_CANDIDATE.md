@@ -335,3 +335,15 @@ inspectie-CLI verifieert daarom `0600`-achtige private bestandsrechten op
 hetzelfde geopende bestand zowel vóór als na het lezen, naast het bestaande
 SHA-, size- en inodebewijs. `0640` en `0644` worden geweigerd; na veilig
 terugzetten van de filemode kan het offline rapport opnieuw worden gemaakt.
+
+### Eén HTML-grens voor prijs- en selectorbewijs
+
+De privé-JSON-LD/Nuxt-prijsroute en de offline selectorontdekking gebruiken
+nu dezelfde quote-aware structurele HTML-scanner. `plaintext` consumeert de
+resterende HTML uitsluitend als tekst; `noembed` en `noframes` bevatten geen
+actieve scripts of selectors. Daardoor kan een gekopieerd Product-script in
+fallbacktekst geen heimelijke prijswaarneming of selector worden, terwijl een
+los echt script ná een afgesloten fallbackcontainer wel bruikbaar blijft.
+De parser voert nooit scripts uit en controleert de precieze Nuxt-JSON
+scriptmetadata; echt downloaden/publiceren blijft afhankelijk van de
+ongewijzigde afzonderlijke source-rechten- en reviewgates.
