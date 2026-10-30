@@ -9,17 +9,17 @@ import {replayPrivateProductHtmlSnapshot,replayPrivateSelectorHtmlSnapshot} from
 import {proposeOfflineRetailerSelectors,summarizeOfflineSelectorProposals} from '../scripts/retailer-offline-selector-discovery.mjs'
 
 const digest=x=>createHash('sha256').update(x).digest('hex')
-async function archive(t,retailerId,kind) {
+async function archive(t,retailerId,kind,customHtml=null) {
   const dir=await mkdtemp(join(tmpdir(),'supa-structural-'))
   t.after(()=>rm(dir,{recursive:true,force:true}))
   const root=retailerId==='plus'?'/product/':'/producten/'
   const srcUrl='https://www.'+(retailerId==='plus'?'plus':'dekamarkt')+
     '.nl/'+(kind==='product'?root.slice(1)+'synthetic-321':
       kind==='catalog'?'producten':'aanbiedingen')
-  const html='<html><head><meta charset="UTF-8"></head><body>'+
+  const html=customHtml??('<html><head><meta charset="UTF-8"></head><body>'+
     '<article class="product-card"><span class="product-name">PRIVATE_SECRET_123</span>'+
     '<span class="price-label">€999,99</span><a href="'+root+
-    'private-sku-secret">PRIVATE PRODUCT NAME</a></article></body></html>'
+    'private-sku-secret">PRIVATE PRODUCT NAME</a></article></body></html>')
   const filename=join(dir,'original.html')
   const capture={schemaVersion:1,recordType:'one-page-private-html-capture',
     status:'private-review-required',
@@ -275,3 +275,33 @@ test('real operator two-store CLI publishes only private verified synthetic rece
   assert.equal(duplicate.status,2)
   assert.doesNotMatch(duplicate.stdout+duplicate.stderr,/private-sku-secret|PRIVATE_SECRET_123/)
 })
+
+for(const [retailer,kind,root] of [
+  ['plus','catalog','product'],
+  ['dekamarkt','offers','producten'],
+]) {
+  test('public '+retailer+' relative and absolute product roots survive synthetic HTML replay',async t=>{
+    const origin='www.'+retailer+'.nl'
+    const roots=['/'+root+'/',root+'/','./'+root+'/','../'+root+'/',
+      'https://'+origin+'/'+root+'/','//'+origin+'/'+root+'/']
+    const sourceMarkup='<html><head><meta charset="UTF-8"></head><body>'+
+      roots.map((r,i)=>'<a href="'+r+'private-identity-'+i+'">SECRET PRODUCT '+i+'</a>').join('')+
+      '</body></html>'
+    const {filename,dir,capture}=await archive(t,retailer,kind,sourceMarkup)
+    const output=join(dir,'links-only')
+    await buildPrivateSyntheticHtmlFixture(filename,output)
+    const generated=await readFile(join(output,'synthetic-structure.html'),'utf8')
+    const reviewed=await replayPrivateSelectorHtmlSnapshot(filename)
+    const safe=summarizeOfflineSelectorProposals(reviewed.proposals).selectors
+      .filter(row=>row.field==='product'&&row.selector.startsWith('a[href^='))
+    assert.equal(safe.length,6)
+    const reproduced=proposeOfflineRetailerSelectors({html:generated,
+      origin:{retailerId:retailer,url:capture.source.url,
+        capturedAt:capture.source.capturedAt}})
+    const actual=new Set(reproduced.selectors.map(x=>x.field+'|'+x.selector))
+    for(const row of safe)
+      assert.ok(actual.has(row.field+'|'+row.selector),'lost observed public link root '+row.selector)
+    assert.equal((await verifyPrivateSyntheticHtmlFixture(filename,output)).verified,true)
+    assert.doesNotMatch(generated,/private-identity-|SECRET PRODUCT/)
+  })
+}
