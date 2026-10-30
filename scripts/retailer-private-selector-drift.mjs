@@ -9,6 +9,7 @@ import { constants } from 'node:fs'
 import { basename, dirname, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { types as nodeTypes } from 'node:util'
+import { isPublicMerchantProductHrefSelector } from './retailer-public-product-href-selectors.mjs'
 
 const FIELDS=['product','name','price','pack','offer','availability']
 const SIGNALS=['schemaOrgProduct','nextData','nuxtData','jsonLd']
@@ -22,17 +23,6 @@ const fail=()=>{throw new Error('Private selector drift comparison refused')}
 // Exact source-observed absolute/protocol-relative links are real DOM
 // selectors, not invented path guesses. Only official retailer product roots
 // are admissible and never a product ID, query, fragment or user-defined host.
-const MERCHANT_ABSOLUTE_HREFS = Object.freeze({
-  plus: new Set([
-    'a[href^="https://www.plus.nl/product/"]',
-    'a[href^="//www.plus.nl/product/"]',
-  ]),
-  dekamarkt: new Set([
-    'a[href^="https://www.dekamarkt.nl/producten/"]',
-    'a[href^="//www.dekamarkt.nl/producten/"]',
-  ]),
-})
-
 // A stored selector proposal is an archive claim, not a fresh HTML capture.
 // Date.parse normalizes impossible civil days: only exact physical UTC dates
 // may participate in drift/change chronology or hash-linked source proof.
@@ -69,7 +59,7 @@ function canonical(report) {
       typeof s.selector!=='string'||s.selector.length>200||
       !(/^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9_-]*|\[(?:data-testid|itemprop)="[a-z][a-z0-9_-]*"\]|\[href\^="\/(?:product|producten)\/"\])$/i.test(s.selector) ||
         (s.field === 'product' &&
-          MERCHANT_ABSOLUTE_HREFS[report.source.retailerId].has(s.selector)))||
+          isPublicMerchantProductHrefSelector(report.source.retailerId, s.selector)))||
       !integer(s.instances,25000)||s.instances<1)fail()
     const id=JSON.stringify([s.field,s.selector])
     if(out.has(id))fail()

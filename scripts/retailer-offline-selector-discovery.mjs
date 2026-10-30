@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { isIP } from 'node:net'
 import { types as nodeTypes } from 'node:util'
 import { scanOfflineRetailerMarkup } from './retailer-offline-structural-scan.mjs'
+import { isPublicMerchantProductHrefSelector } from './retailer-public-product-href-selectors.mjs'
 
 // Offline-first DOM selector proposal. NEVER downloads a page, executes scripts,
 // exports product/price text, or labels proposed selectors as confirmed.
@@ -364,10 +365,14 @@ const PUBLIC_GENERIC_TOKENS = new Set([
   'pack','pack-size','size','unit','offer','offer-card','offer-label',
   'deal','sale','discount','stock','stock-label','availability',
 ])
+// Offline CLI reports may reveal only the known exact merchant product roots,
+// not private per-product hrefs or arbitrary host/source metadata. Preserve
+// usable observed absolute selectors for the operator's human drift review.
 export function summarizeOfflineSelectorProposals(report) {
   const safe = report.selectors.filter(row => {
     if (row.selector === 'a[href^="/product/"]' ||
-        row.selector === 'a[href^="/producten/"]') return true
+        row.selector === 'a[href^="/producten/"]' ||
+        (row.field === 'product' && isPublicMerchantProductHrefSelector(report.source.retailerId, row.selector))) return true
     const match = /^[a-z][a-z0-9-]{0,30}(?:\.([a-z][a-z0-9_-]{1,59})|\[(?:data-testid|itemprop)="([a-z][a-z0-9_-]{1,59})"\])$/.exec(row.selector)
     return match && PUBLIC_GENERIC_TOKENS.has(match[1] ?? match[2])
   })

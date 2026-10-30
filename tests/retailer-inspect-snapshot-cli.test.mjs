@@ -85,6 +85,35 @@ test('CLI excludes identifier-bearing CSS selectors and testids from stdout, ret
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
+test('CLI operator can see legitimate source-observed absolute product URL root selectors', async () => {
+  for (const [retailerId, host, listing, productRoot] of [
+    ['plus','www.plus.nl','/producten','/product/'],
+    ['dekamarkt','www.dekamarkt.nl','/aanbiedingen','/producten/'],
+  ]) {
+    const root = await mkdtemp(join(tmpdir(), 'supa-merchant-link-cli-'))
+    try {
+      const html = '<html><body>' +
+        '<a href="https://' + host + productRoot + 'synthetic-321">Synthetic</a>' +
+        '<a href="//' + host + productRoot + 'synthetic-999">Synthetic</a>' +
+        '<div class="product-internal-sku-987">Sensitive</div></body></html>'
+      const file = join(root, 'source.html')
+      await writeFile(file, html, { mode: 0o600 })
+      let output = ''
+      const report = await main([
+        retailerId, 'https://' + host + listing, '2026-10-14T11:00:00.000Z',
+        createHash('sha256').update(html).digest('hex'), file,
+      ], chunk => { output += String(chunk) })
+      assert.ok(report.selectors.some(row =>
+        row.selector === 'a[href^="https://' + host + productRoot + '"]'))
+      assert.ok(report.selectors.some(row =>
+        row.selector === 'a[href^="//' + host + productRoot + '"]'))
+      assert.equal(report.privateSelectorCount, 1)
+      assert.equal(report.productionEnabled, false)
+      assert.doesNotMatch(output, /synthetic-321|synthetic-999|internal-sku-987|source\.html/i)
+    } finally { await rm(root, { recursive: true, force: true }) }
+  }
+})
+
 test('CLI refuses world-readable HTML parents and symlinked ancestors before review', async () => {
   const { mkdir, chmod, symlink } = await import('node:fs/promises')
   const root = await mkdtemp(join(tmpdir(), 'supa-inspector-dir-'))
