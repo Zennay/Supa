@@ -84,6 +84,7 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
   const baseHrefs = [];
   const canonicalHrefs = [];
   let hasMetaRefresh = false;
+  let hasMetaNoStore = false;
   let pos = 0;
   let inspected = 0;
   while (pos < html.length) {
@@ -155,6 +156,15 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
         values.get('http-equiv').trim().toLowerCase() === 'refresh') {
       hasMetaRefresh = true;
     }
+    // Honor live document-level no-store without trusting inert fake tags.
+    if (tag === 'meta' && (hidden.length === 0 ||
+        hidden.length === 1 && hidden[0] === 'head') &&
+        typeof values.get('http-equiv') === 'string' &&
+        values.get('http-equiv').trim().toLowerCase() === 'cache-control' &&
+        typeof values.get('content') === 'string' &&
+        /(?:^|,)\s*no-store(?:\s*(?:[=;,]|$))/i.test(values.get('content'))) {
+      hasMetaNoStore = true;
+    }
     if (!suppressed && !HIDDEN.has(tag) && tag !== 'script') {
       // Retain the *actual* start tag only. Never reinterpret its attributes
       // as independent HTML elements, even if they contain "<span ...>".
@@ -200,6 +210,6 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
   }
   if (hidden.length) throw new Error('Unbalanced inert HTML element');
   return { visible: visible.join(''), structuredSignals: signals,
-    baseHrefs, canonicalHrefs, hasMetaRefresh,
+    baseHrefs, canonicalHrefs, hasMetaRefresh, hasMetaNoStore,
     ...(includeScripts ? { scripts } : {}) };
 }
