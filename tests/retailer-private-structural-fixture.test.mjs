@@ -305,3 +305,31 @@ for(const [retailer,kind,root] of [
     assert.doesNotMatch(generated,/private-identity-|SECRET PRODUCT/)
   })
 }
+
+test('synthetic-only export refuses added original or unrelated files after creation', async t=>{
+  const plus=await archive(t,'plus','catalog')
+  const deka=await archive(t,'dekamarkt','offers')
+  const single=join(plus.dir,'single')
+  await buildPrivateSyntheticHtmlFixture(plus.filename,single)
+  assert.equal((await verifyPrivateSyntheticHtmlFixture(plus.filename,single)).verified,true)
+  const extra=join(single,'original-source.html')
+  await writeFile(extra,plus.html,{mode:0o600})
+  await assert.rejects(verifyPrivateSyntheticHtmlFixture(plus.filename,single),
+    /Private synthetic structural fixture refused/)
+  await unlink(extra)
+  assert.equal((await verifyPrivateSyntheticHtmlFixture(plus.filename,single)).verified,true)
+  const pair=join(plus.dir,'pair-extra')
+  await buildPrivateSyntheticFixturePair(plus.filename,deka.filename,pair)
+  assert.equal((await verifyPrivateSyntheticFixturePair(plus.filename,deka.filename,pair)).verified,true)
+  const hidden=join(pair,'.unreviewed-source.html')
+  await writeFile(hidden,deka.html,{mode:0o600})
+  await assert.rejects(verifyPrivateSyntheticFixturePair(plus.filename,deka.filename,pair),
+    /Private synthetic structural fixture refused/)
+  await unlink(hidden)
+  const childExtra=join(pair,'dekamarkt','unreviewed-raw.html')
+  await writeFile(childExtra,deka.html,{mode:0o600})
+  await assert.rejects(verifyPrivateSyntheticFixturePair(plus.filename,deka.filename,pair),
+    /Private synthetic structural fixture refused/)
+  await unlink(childExtra)
+  assert.equal((await verifyPrivateSyntheticFixturePair(plus.filename,deka.filename,pair)).verified,true)
+})

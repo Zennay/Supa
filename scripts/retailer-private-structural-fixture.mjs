@@ -1,6 +1,6 @@
 /** Private synthetic HTML topology from one verified source, never real retailer HTML. */
 import { createHash } from 'node:crypto'
-import { open, lstat, mkdtemp, rename, rm } from 'node:fs/promises'
+import { open, lstat, mkdtemp, rename, rm, readdir } from 'node:fs/promises'
 import { constants as fsFlags } from 'node:fs'
 import { parseUniqueKeyRetailerJson } from './retailer-private-unique-key-json.mjs'
 import { isPublicMerchantProductHrefSelector } from './retailer-public-product-href-selectors.mjs'
@@ -157,6 +157,12 @@ async function readPinnedSyntheticFile(path, maxBytes) {
   } finally { await handle.close() }
 }
 
+// A verified synthetic-only export must not silently carry unrelated originals.
+async function assertExactPrivateBundleEntries(directory, expected) {
+  const entries = await readdir(directory)
+  if (entries.length !== expected.length ||
+      entries.some(name => !expected.includes(name))) refuse()
+}
 export async function verifyPrivateSyntheticHtmlFixture(htmlFile, directory) {
   if (typeof directory !== 'string' || !directory.trim()) refuse()
   const out = resolve(directory)
@@ -164,6 +170,7 @@ export async function verifyPrivateSyntheticHtmlFixture(htmlFile, directory) {
   const info = await lstat(out)
   if (!info.isDirectory() || info.isSymbolicLink() ||
       (info.mode & 0o077) !== 0) refuse()
+  await assertExactPrivateBundleEntries(out,['synthetic-structure.html','provenance.json'])
   const {synthetic,manifest} = await derivePrivateSyntheticFixture(htmlFile)
   const htmlBytes = await readPinnedSyntheticFile(join(out,'synthetic-structure.html'),65536)
   const manifestBytes = await readPinnedSyntheticFile(join(out,'provenance.json'),16384)
@@ -195,6 +202,7 @@ export async function verifyPrivateSyntheticFixturePair(plusFile,dekaFile,direct
   await assertNoSymlinkedM3OutputParents(out)
   const dir=await lstat(out)
   if(!dir.isDirectory()||dir.isSymbolicLink()||(dir.mode&0o077)!==0) refuse()
+  await assertExactPrivateBundleEntries(out,['plus','dekamarkt','pair-provenance.json'])
   const p=(await derivePrivateSyntheticFixture(plusFile)).manifest
   const d=(await derivePrivateSyntheticFixture(dekaFile)).manifest
   if(p.source.retailerId!=='plus'||d.source.retailerId!=='dekamarkt') refuse()
