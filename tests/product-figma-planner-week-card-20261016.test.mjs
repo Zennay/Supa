@@ -29,6 +29,9 @@ test('actual Planner renders the Figma week control with real plan and preferenc
     assert.match(selected, /Maandag \d+ uit planning halen/)
     assert.match(selected, /Dinsdag \d+ aan planning toevoegen/)
     assert.doesNotMatch(selected, /bespaar tot 40%|€[0-9]|Nick Bergen/)
+    // Only the first open day (Di) carries Figma's green add marker.
+    assert.equal((selected.match(/hifi-planner-day-number next-open/g) ?? []).length, 1)
+    assert.match(selected, /aria-label="Dinsdag \d+ aan planning toevoegen"[^>]*><span class="hifi-planner-day-label">D<\/span><span class="hifi-planner-day-number next-open">/)
 
     const none = renderCard([])
     assert.match(none, /0 van 4 dagen geselecteerd/)

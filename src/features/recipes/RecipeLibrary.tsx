@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { FigmaImage } from '../../components/FigmaImage'
-import { figmaAssets as a } from '../home/figmaAssets'
+import { figmaAssets as a, figmaRecipeImages } from '../home/figmaAssets'
 import { createManualRecipeDraft, importRecipeFromHtml, type UserRecipeDraft } from '../../domain/userRecipeImport'
 import { safeRecipeSourceUrl } from '../../domain/recipeSourceUrl'
 import { RECIPE_LIBRARY_KEY, readRecipeLibrary, saveRecipeLibrary, reviewRecipe, retainUnresolvedRecipeReview, sourceOnlyRecipeWarnings, acknowledgeRecipeSourceWarnings, type LibraryState, type SavedRecipe } from './recipeLibrary.ts'
@@ -50,14 +50,6 @@ function keyed<T>(items: readonly T[], identity: (item: T) => string) {
   })
 }
 
-const figmaRecipeImages: Record<string, string> = {
-  'supa-thai': a.recipeThai,
-  'supa-quesadillas': a.recipeQuesadillas,
-  'supa-fried-rice': a.imgRecepten,
-  'supa-bao': a.imgRecepten1,
-  'supa-katsu': a.imgRecepten2,
-  'supa-veg-pasta': a.recipePasta,
-}
 const examples = curatedFigmaRecipes.map(recipe => ({
   ...recipe, image: figmaRecipeImages[recipe.id] ?? null,
   sourceLabel: 'SUPA-recept',
@@ -76,7 +68,7 @@ function initialFavorites(): RecipeFavorites {
   catch { return { ids: [], raw: null, error: 'Favorieten kunnen niet worden geopend in deze browser.' } }
 }
 
-export function RecipeLibrary({ onBack }: { onBack: () => void }) {
+export function RecipeLibrary() {
   const [library, setLibrary] = useState(initialLibrary)
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<'all' | 'own' | 'favorites'>('all')
@@ -902,8 +894,8 @@ export function RecipeLibrary({ onBack }: { onBack: () => void }) {
     finally { saving.current = false }
   }
   return <div className="hifi-home recipe-library" data-figma-node="3342:5608">
-    <header className="recipe-heading"><button className="recipe-back" onClick={onBack} aria-label="Terug naar Home"><FigmaImage asset={a.recipeBack} alt="" /></button><h1>{filter === 'own' ? 'Mijn eigen recepten' : 'Alle recepten'}</h1></header>
-    <div className="hifi-search-row"><label className="hifi-search"><FigmaImage asset={a.recipeSearch} alt="" /><input type="search" aria-label="Zoek recepten op naam of ingrediënt" placeholder="Zoek recept of ingrediënt" value={query} onChange={e => setQuery(e.target.value)} /></label><button className="hifi-filter" aria-label="Receptfilters" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(!filtersOpen)}><FigmaImage asset={a.imgVector2} alt="" /></button></div>
+    <header className="recipe-heading"><h1>{filter === 'own' ? 'Mijn eigen recepten' : filter === 'favorites' ? 'Favoriete recepten' : 'Recepten'}</h1><button className="recipe-favorites-toggle" aria-label="Toon alleen favoriete recepten" aria-pressed={filter === 'favorites'} onClick={() => setFilter(filter === 'favorites' ? 'all' : 'favorites')}><svg width="26" height="24" viewBox="0 0 26 24" fill="none" aria-hidden="true"><path d="M13 22.2 3.6 13A6 6 0 0 1 12.1 4.5l.9.9.9-.9A6 6 0 0 1 22.4 13Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /></svg></button></header>
+    <div className="hifi-search-row"><label className="hifi-search"><FigmaImage asset={a.recipeSearch} alt="" /><input type="search" aria-label="Zoek recepten op naam of ingrediënt" placeholder="Zoek recepten" value={query} onChange={e => setQuery(e.target.value)} /></label><button className="hifi-filter" aria-label="Receptfilters" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(!filtersOpen)}><FigmaImage asset={a.imgVector2} alt="" /></button></div>
     {filtersOpen && <div className="recipe-tabs" aria-label="Receptfilter">{(['all', 'own', 'favorites'] as const).map((id, i) => <button key={id} aria-pressed={filter === id} onClick={() => setFilter(id)}>{['Alle recepten', 'Eigen recepten', 'Favorieten'][i]}</button>)}</div>}
     <section className="hifi-section"><div className="hifi-section-heading"><div><h2>Recepten</h2><p className="recipe-count">{demo.length + own.length} recepten</p></div><button aria-label="Sorteer recepten op naam" aria-pressed={sort} onClick={() => setSort(!sort)}><FigmaImage asset={a.recipeSort} alt="" /></button></div>
       <div className="hifi-recipe-grid">{[...own, ...demo].map(recipe => <article className={`hifi-recipe-card${'image' in recipe && recipe.image ? '' : ' own-recipe-card'}`} key={recipe.id}>

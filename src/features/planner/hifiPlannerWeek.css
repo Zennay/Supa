@@ -83,3 +83,308 @@
 @media (prefers-reduced-motion: reduce) {
   .hifi-planner-day-number { transition: none; }
 }
+
+/* Figma Planner 3359:4896 meal rows: white 20px cards, date column with
+   1.5px divider, 50px recipe photo, title + clock meta, green add button. */
+.hifi-planner-screen .day-grid { gap: 8px; }
+.hifi-planner-screen .hifi-meal-row,
+.hifi-planner-screen .hifi-meal-row.active {
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  gap: 12px;
+  min-height: 82px;
+  border: 0;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: none;
+  padding: 16px 12px 16px 16px;
+  cursor: default;
+}
+.hifi-meal-date,
+.hifi-planner-screen .hifi-meal-date {
+  width: auto;
+  aspect-ratio: auto;
+  align-self: stretch;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 2px;
+  border-right: 1.5px solid #e5e5e5;
+  border-radius: 0;
+  background: none;
+  padding-right: 12px;
+  color: #262527;
+}
+.hifi-meal-date small { font-size: 12px; font-weight: 400; color: #3b3b3c; }
+.hifi-meal-date strong { font-size: 20px; font-weight: 500; line-height: 1.1; }
+.hifi-planner-screen .hifi-meal-copy {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.hifi-meal-thumb {
+  flex: none;
+  width: 50px;
+  height: 50px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #e8f8f1;
+  color: #005135;
+  font-size: 20px;
+  font-weight: 600;
+}
+.hifi-meal-thumb img { width: 50px; height: 50px; object-fit: cover; }
+.hifi-meal-text { min-width: 0; flex: 1; display: grid; gap: 2px; }
+.hifi-planner-screen .hifi-meal-text label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.hifi-planner-screen .hifi-meal-text select {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  min-height: 32px;
+  border: 0;
+  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='15' viewBox='0 0 9 15' fill='none'%3E%3Cpath d='M1.5 1.5 7.5 7.5l-6 6' stroke='%23262527' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 2px center;
+  padding: 0 22px 0 0;
+  color: #262527;
+  font: 500 15px/1.3 -apple-system, BlinkMacSystemFont, 'SF Pro', Inter, sans-serif;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.hifi-planner-screen .hifi-meal-text select:focus-visible {
+  outline: 3px solid #005135;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+.hifi-meal-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #848484;
+  font-size: 12px;
+}
+/* The original clock export is white for photo overlays; tint it for cards. */
+.hifi-meal-time img { filter: brightness(0) opacity(.48); }
+.hifi-meal-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 12px;
+  min-width: 0;
+}
+.hifi-planner-screen .hifi-meal-text .recipe-estimate-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 2px;
+  min-width: 0;
+}
+.hifi-planner-screen .hifi-meal-text .recipe-estimate-note small { color: #848484; font-size: 12px; }
+.hifi-planner-screen .hifi-meal-text .recipe-estimate-note details { display: contents; }
+/* Keep the native, 44px disclosure but present it as a compact info mark. */
+.hifi-planner-screen .hifi-meal-text .recipe-estimate-note summary {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  min-height: 44px;
+  margin: -12px 0;
+  font-size: 0;
+  list-style: none;
+}
+.hifi-planner-screen .hifi-meal-text .recipe-estimate-note summary::-webkit-details-marker { display: none; }
+.hifi-planner-screen .hifi-meal-text .recipe-estimate-note summary::before {
+  content: 'i';
+  width: 14px;
+  height: 14px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #b2b2b2;
+  border-radius: 50%;
+  color: #848484;
+  font: 600 9px/1 -apple-system, BlinkMacSystemFont, 'SF Pro', sans-serif;
+}
+.hifi-planner-screen .hifi-meal-text .recipe-estimate-note details[open] summary::before { border-color: #005135; color: #005135; }
+.hifi-planner-screen .hifi-meal-text .recipe-estimate-note details p { flex-basis: 100%; margin: 14px 0 0; font-size: 12px; color: #626569; }
+.hifi-meal-empty { display: grid; gap: 4px; min-width: 0; }
+.hifi-meal-empty strong { color: #262527; font-size: 14px; font-weight: 500; }
+.hifi-meal-empty small { color: #b2b2b2; font-size: 14px; }
+.hifi-planner-screen .hifi-meal-row .plan-check,
+.hifi-planner-screen .hifi-meal-row.active .plan-check {
+  width: 44px;
+  height: 44px;
+  align-self: center;
+  padding: 6px;
+  border: 0;
+  border-radius: 50%;
+  background: #e8f8f1 content-box;
+  color: #005135;
+  font-size: 18px;
+  font-weight: 600;
+}
+.hifi-planner-screen .hifi-meal-row:not(.active) .plan-check {
+  padding: 2px;
+  justify-self: center;
+  background: #1f6b4a content-box;
+  color: #fff;
+  font-size: 26px;
+  font-weight: 400;
+}
+.hifi-planner-screen .hifi-meal-row .plan-check:focus-visible { outline: 3px solid #005135; outline-offset: 2px; }
+
+/* Figma total card: Totaal row, divider, secondary value row and a grey
+   "Bekijk berekening" disclosure. Only real, own-source totals are shown. */
+.hifi-planner-screen .hifi-planner-total {
+  gap: 16px;
+  border: 0;
+  border-radius: 20px;
+  padding: 32px 24px 24px;
+  background: #fff;
+}
+.hifi-total-row { align-items: flex-end; }
+.hifi-total-row > span { display: grid; gap: 2px; }
+.hifi-total-label { color: #262527; font-size: 16px; font-weight: 500; }
+.hifi-total-row small { color: #848484; font-size: 12px; }
+.hifi-planner-screen .hifi-total-amount { color: #262527; font-size: 20px; font-weight: 600; text-align: right; }
+.hifi-total-divider { width: 100%; margin: 0; border: 0; border-top: 1px solid #e5e5e5; }
+.hifi-planner-screen .hifi-planner-total .budget-heading { align-items: flex-end; flex-direction: row; }
+.hifi-planner-total .budget-heading > span { display: grid; gap: 2px; }
+.hifi-budget-label { color: #262527; font-size: 16px; font-weight: 500; }
+.hifi-planner-total .budget-heading small { color: #848484; font-size: 12px; }
+.hifi-planner-screen .hifi-planner-total .budget-heading strong {
+  color: #3ccf91;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.hifi-planner-total .budget-status { justify-self: start; white-space: normal; font-weight: 600; }
+.hifi-planner-calc { display: grid; }
+.hifi-planner-calc > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 40px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  background: #efefef;
+  color: #262527;
+  font-size: 14px;
+  font-weight: 500;
+  list-style: none;
+  cursor: pointer;
+}
+.hifi-planner-calc > summary::-webkit-details-marker { display: none; }
+.hifi-planner-calc > summary::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  margin: -4px 4px 0 0;
+  border-right: 1.5px solid #626569;
+  border-bottom: 1.5px solid #626569;
+  transform: rotate(45deg);
+  transition: transform .15s ease;
+}
+.hifi-planner-calc[open] > summary::after { margin-top: 4px; transform: rotate(-135deg); }
+.hifi-planner-calc[open] > summary { margin-bottom: 14px; }
+.hifi-planner-calc[open] { gap: 14px; }
+.hifi-planner-calc > summary:focus-visible { outline: 3px solid #005135; outline-offset: 2px; }
+.hifi-planner-screen .budget-chip.active { background: #005135; border-color: #005135; color: #76f8ca; }
+@media (max-width: 375px) {
+  .hifi-planner-screen .hifi-meal-row,
+  .hifi-planner-screen .hifi-meal-row.active { gap: 12px; padding-left: 14px; padding-right: 12px; }
+  /* Give the recipe title the row on narrow phones; the photo is decorative. */
+  .hifi-meal-thumb { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hifi-planner-calc > summary::after { transition: none; }
+}
+
+/* Figma week strip: a planned day shows its recipe photo under the date. */
+.hifi-planner-day-number { position: relative; overflow: hidden; }
+.hifi-planner-day-number > span { position: relative; }
+.hifi-planner-day-number.with-photo img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.hifi-planner-day-number.with-photo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / .32);
+}
+.hifi-planner-day.selected .hifi-planner-day-number.with-photo { color: #fff; }
+.hifi-planner-day-number.with-photo > span { z-index: 1; }
+
+/* Figma overlap strip between week card and rows (no savings amount). */
+.hifi-reuse-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin: -8px 0;
+  color: #262527;
+  font-size: 12px;
+}
+.hifi-reuse-marks { display: flex; flex: none; }
+.hifi-reuse-marks > span {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 2px solid #f2f3f5;
+  border-radius: 50%;
+  background: #fff;
+  color: #626569;
+  font-size: 12px;
+  font-weight: 600;
+}
+.hifi-reuse-marks > span + span { margin-left: -12px; }
+.hifi-reuse-rings {
+  position: relative;
+  flex: none;
+  width: 18px;
+  height: 12px;
+}
+.hifi-reuse-rings::before,
+.hifi-reuse-rings::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 12px;
+  height: 12px;
+  box-sizing: border-box;
+  border: 1.5px solid #3ccf91;
+  border-radius: 50%;
+}
+.hifi-reuse-rings::before { left: 0; }
+.hifi-reuse-rings::after { right: 0; }
+.hifi-reuse-copy { min-width: 0; overflow-wrap: anywhere; }
+.hifi-reuse-copy strong { font-weight: 600; }
+.hifi-planner-day-number.next-open {
+  background: #f2f3f5;
+  color: #262527;
+  font-size: 26px;
+  font-weight: 400;
+}
+
+/* Figma Planner CTA: full-width dark green pill with mint label. */
+.hifi-planner-list-cta {
+  min-height: 60px;
+  border: 0;
+  border-radius: 999px;
+  background: #005135;
+  color: #76f8ca;
+  font: 500 16px/1.2 -apple-system, BlinkMacSystemFont, 'SF Pro', Inter, sans-serif;
+  cursor: pointer;
+}
+.hifi-planner-list-cta:disabled { opacity: .45; cursor: not-allowed; }
+.hifi-planner-list-cta:focus-visible { outline: 3px solid #005135; outline-offset: 3px; }
