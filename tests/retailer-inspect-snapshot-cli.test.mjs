@@ -114,6 +114,35 @@ test('CLI operator can see legitimate source-observed absolute product URL root 
   }
 })
 
+test('human CLI review shows observed relative product link forms, never item URLs', async () => {
+  for (const [retailerId, host, root] of [
+    ['plus','www.plus.nl','product/'],
+    ['dekamarkt','www.dekamarkt.nl','producten/'],
+  ]) {
+    const dir=await mkdtemp(join(tmpdir(),'supa-relative-link-preview-'))
+    try {
+      const markup='<html><head><base href="/"></head><body>' +
+        '<a href="' + root + 'fake-101">SYNTHETIC</a>' +
+        '<a href="./' + root + 'fake-202">SYNTHETIC</a>' +
+        '<a href="../' + root + 'fake-303">SYNTHETIC</a>' +
+        '</body></html>'
+      const file=join(dir,'review.html')
+      await writeFile(file,markup,{mode:0o600})
+      let stdout=''
+      const report=await main([
+        retailerId,'https://' + host + '/aanbiedingen/week',
+        '2026-10-14T11:00:00.000Z',
+        createHash('sha256').update(markup).digest('hex'),file,
+      ],part=>{stdout+=String(part)})
+      assert.equal(report.selectors.filter(s=>s.field==='product').length,3)
+      assert.ok(report.selectors.some(s=>s.selector==='a[href^="../'+root+'"]'))
+      assert.equal(report.humanReviewRequired,true)
+      assert.equal(report.readyForIngestion,false)
+      assert.doesNotMatch(stdout,/fake-101|fake-202|fake-303|review\.html/i)
+    } finally { await rm(dir,{recursive:true,force:true}) }
+  }
+})
+
 test('CLI refuses world-readable HTML parents and symlinked ancestors before review', async () => {
   const { mkdir, chmod, symlink } = await import('node:fs/promises')
   const root = await mkdtemp(join(tmpdir(), 'supa-inspector-dir-'))

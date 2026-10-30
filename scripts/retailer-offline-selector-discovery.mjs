@@ -181,7 +181,7 @@ function observedProductHrefPrefix(origin, href, documentBaseUrl) {
     // this merchant's product route. Do not fabricate root-relative hrefs.
     const formats = [prefix]
     if (host) formats.push('https://' + host + prefix, '//' + host + prefix,
-      prefix.slice(1), '.' + prefix)
+      prefix.slice(1), '.' + prefix, '..' + prefix)
     for (const observed of formats) {
       if (!href.startsWith(observed)) continue
       try {

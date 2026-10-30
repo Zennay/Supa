@@ -84,6 +84,34 @@ test('bridge: simulated Deka offers preserve Nuxt signal only, never promote ext
   assert.equal(result.humanSelectorApprovalRequired, true)
 })
 
+test('bridge promotes only observed effective-base relative URL prefixes to private review', async () => {
+  for (const [supermarket, host, prefix] of [
+    ['plus', 'www.plus.nl', 'product/'],
+    ['dekamarkt', 'www.dekamarkt.nl', 'producten/'],
+  ]) {
+    const url = 'https://' + host + '/aanbiedingen/week'
+    const html = '<html><head><base href="/"></head><body>' +
+      '<a href="' + prefix + 'synthetic-111">Mock product</a>' +
+      '<a href="../' + prefix + 'synthetic-222">Mock product</a>' +
+      '<a href="./' + prefix + 'synthetic-333">Mock product</a></body></html>'
+    const result = await captureToPrivateSelectorReview({
+      source: { supermarket, kind: 'offers', url },
+      grant: consent(supermarket, 'offers', url),
+      permissionGate: syntheticGate(), capturedAt: at,
+      fetchFn: async () => new Response(html, {
+        status: 200, headers: { 'content-type': 'text/html' },
+      }),
+    })
+    assert.equal(result.actualTransportInvocations, 1)
+    assert.equal(result.selectorProposals.filter(s=>s.field==='product').length,3)
+    assert.ok(result.selectorProposals.some(s=>s.selector==='a[href^="../'+prefix+'"]'))
+    assert.equal(result.approvedSelectors,0)
+    assert.equal(result.productionEnabled,false)
+    assert.equal(result.scheduledFetchEnabled,false)
+    assert.doesNotMatch(JSON.stringify(result), /synthetic-111|synthetic-222|synthetic-333/)
+  }
+})
+
 test('bridge: REAL checked-in rights refuse all injected transports before ANY invocation', async () => {
   const actual = JSON.parse(await readFile(
     new URL('../evidence/m1/source-permission-gate.v1.json', import.meta.url), 'utf8'))

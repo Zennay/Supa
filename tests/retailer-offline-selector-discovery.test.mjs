@@ -540,6 +540,26 @@ test('source-observed named HTML href entities yield actual DOM-equivalent produ
   assert.doesNotMatch(JSON.stringify(review), /mock-111|mock-222|not-real/i)
 })
 
+test('parent-relative product anchors are accepted only when the real page base resolves to a store item', () => {
+  for (const [retailerId, host, productRoot] of [
+    ['plus','www.plus.nl','product/'],
+    ['dekamarkt','www.dekamarkt.nl','producten/'],
+  ]) {
+    const source={retailerId,capturedAt:origin.capturedAt,
+      url:'https://' + host + '/aanbiedingen/week'}
+    const markup='<html><body><a href="../' + productRoot +
+      'synthetic-item-111">SYNTHETIC</a></body></html>'
+    const accepted=proposeOfflineRetailerSelectors({html:markup,origin:source})
+    assert.equal(accepted.selectors.find(x =>
+      x.selector === 'a[href^="../' + productRoot + '"]')?.instances,1)
+    assert.equal(accepted.readyForIngestion,false)
+    const changedBase='<html><head><base href="/aanbiedingen/week/"></head>' +
+      '<body><a href="../' + productRoot + 'synthetic-item-111">SYNTHETIC</a></body></html>'
+    const rejected=proposeOfflineRetailerSelectors({html:changedBase,origin:source})
+    assert.equal(rejected.selectors.filter(x=>x.field==='product').length,0)
+  }
+})
+
 test('resolves only source-observed relative product links under effective HTML base', () => {
   for (const [retailerId, host, itemRoot] of [
     ['plus', 'www.plus.nl', 'product/'],
