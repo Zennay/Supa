@@ -82,6 +82,7 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
   const hidden = [];
   // Keep live HTML base href facts separate from visible DOM selectors.
   const baseHrefs = [];
+  const canonicalHrefs = [];
   let pos = 0;
   let inspected = 0;
   while (pos < html.length) {
@@ -135,6 +136,16 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
       if (baseHrefs.length) throw new Error('Multiple live HTML base URLs');
       baseHrefs.push(values.get('href'));
     }
+    // Only genuine live <link rel=canonical> elements count as source page
+    // identity. Quoted fake markup and inert template/script tags are ignored.
+    if (tag === 'link' && (hidden.length === 0 ||
+        hidden.length === 1 && hidden[0] === 'head') &&
+        typeof values.get('rel') === 'string' &&
+        values.get('rel').toLowerCase().split(/[ \t\n\f\r]+/).includes('canonical')) {
+      if (canonicalHrefs.length || !values.has('href'))
+        throw new Error('Ambiguous canonical retailer source URL');
+      canonicalHrefs.push(values.get('href'));
+    }
     if (!suppressed && !HIDDEN.has(tag) && tag !== 'script') {
       // Retain the *actual* start tag only. Never reinterpret its attributes
       // as independent HTML elements, even if they contain "<span ...>".
@@ -180,5 +191,5 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
   }
   if (hidden.length) throw new Error('Unbalanced inert HTML element');
   return { visible: visible.join(''), structuredSignals: signals,
-    baseHrefs, ...(includeScripts ? { scripts } : {}) };
+    baseHrefs, canonicalHrefs, ...(includeScripts ? { scripts } : {}) };
 }
