@@ -226,6 +226,28 @@ function sameRetailerCanonicalLink(raw, source) {
   return true
 }
 
+function sourceHttpFreshness(headers) {
+  // Captured-at is a transport observation, not a guarantee that a CDN's
+  // HTTP representation is current. Reject explicitly stale source evidence
+  // instead of giving yesterday's cached prices a fresh acquisition clock.
+  const age = headers?.get?.('age')
+  const dated = headers?.get?.('date')
+  const maxAgeSeconds = 24 * 60 * 60
+  const now = Date.now()
+  if (age !== null && age !== undefined) {
+    const value = age.trim()
+    if (!/^(?:0|[1-9]\d{0,9})$/.test(value) ||
+        Number(value) >= maxAgeSeconds) return false
+  }
+  if (dated !== null && dated !== undefined) {
+    const timestamp = Date.parse(dated)
+    if (!Number.isFinite(timestamp) ||
+        timestamp > now + 5 * 60 * 1000 ||
+        now - timestamp >= maxAgeSeconds * 1000) return false
+  }
+  return true
+}
+
 async function collectBoundedBody(response) {
   if (!response?.body || typeof response.body.getReader !== 'function') {
     throw new Error('Missing streaming HTML body')
@@ -353,6 +375,10 @@ export async function captureApprovedRetailerPage(options = {}) {
       !sameRetailerCanonicalLink(links, target)) {
     await closeRejectedBody()
     throw new Error('Retailer response navigation/source identity refused')
+  }
+  if (!sourceHttpFreshness(response.headers)) {
+    await closeRejectedBody()
+    throw new Error('Stale or malformed retailer HTTP representation refused')
   }
   let body
   try { body = await collectBoundedBody(response) }

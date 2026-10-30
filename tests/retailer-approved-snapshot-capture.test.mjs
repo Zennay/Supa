@@ -458,3 +458,36 @@ test('HTTP canonical Link header cannot silently reattribute a 200 HTML snapshot
   assert.equal(allowed.source.sha256, createHash('sha256').update(html).digest('hex'))
   assert.equal(allowed.readyForIngestion, false)
 })
+
+test('HTTP Age/Date cannot launder stale price HTML into a fresh snapshot', async () => {
+  const oldDate = new Date(Date.now() - 26 * 60 * 60 * 1000).toUTCString()
+  const futureDate = new Date(Date.now() + 20 * 60 * 1000).toUTCString()
+  for (const headers of [
+    { age: '86400' }, { age: '100000' }, { age: '-1' }, { age: 'not-a-number' },
+    { date: oldDate }, { date: futureDate }, { date: 'not-a-date' },
+  ]) {
+    let cancelled = 0
+    const stream = new ReadableStream({
+      pull(controller) { controller.enqueue(new TextEncoder().encode('<html>MOCK</html>')) },
+      cancel() { cancelled++ },
+    })
+    await assert.rejects(captureApprovedRetailerPage({
+      source, permissionGate: gate, grant,
+      fetchFn: async () => new Response(stream, {
+        headers: { 'content-type': 'text/html', ...headers },
+      }),
+    }), /Stale or malformed retailer HTTP representation refused/)
+    assert.equal(cancelled, 1)
+  }
+  const recent = '<html><body>SYNTHETIC</body></html>'
+  const admitted = await captureApprovedRetailerPage({
+    source, permissionGate: gate, grant,
+    fetchFn: async () => new Response(recent, {
+      headers: { 'content-type': 'text/html', age: '22',
+        date: new Date(Date.now() - 30 * 1000).toUTCString() },
+    }),
+  })
+  assert.equal(admitted.source.sha256,
+    createHash('sha256').update(recent).digest('hex'))
+  assert.equal(admitted.readyForIngestion, false)
+})
