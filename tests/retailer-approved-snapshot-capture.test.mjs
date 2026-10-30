@@ -399,3 +399,34 @@ test('streamed capture snapshots chunks before a transport reuses its Uint8Array
   assert.equal(captured.source.sha256, createHash('sha256').update(expected).digest('hex'))
   assert.equal(captured.readyForIngestion, false)
 })
+
+test('HTTP 200 Refresh and Content-Location cannot rebind one-page capture', async () => {
+  for (const [headers, expected] of [
+    [{ refresh: '0; url=https://another.example/product' }, /navigation/],
+    [{ 'content-location': 'https://another.example/producten' }, /identity/],
+    [{ 'content-location': '/product/another-item' }, /identity/],
+    [{ 'content-location': '/producten?shop=another' }, /identity/],
+  ]) {
+    let cancelled = 0
+    const stream = new ReadableStream({
+      pull(controller) { controller.enqueue(new TextEncoder().encode('<html>MOCK</html>')) },
+      cancel() { cancelled++ },
+    })
+    await assert.rejects(captureApprovedRetailerPage({
+      source, permissionGate: gate, grant,
+      fetchFn: async () => new Response(stream, {
+        headers: { 'content-type': 'text/html', ...headers },
+      }),
+    }), expected)
+    assert.equal(cancelled, 1)
+  }
+  const body = '<html><body>Only synthetic data</body></html>'
+  const accepted = await captureApprovedRetailerPage({
+    source, permissionGate: gate, grant,
+    fetchFn: async () => new Response(body, {
+      headers: { 'content-type': 'text/html', 'content-location': '/producten/' },
+    }),
+  })
+  assert.equal(accepted.source.sha256, createHash('sha256').update(body).digest('hex'))
+  assert.equal(accepted.readyForIngestion, false)
+})

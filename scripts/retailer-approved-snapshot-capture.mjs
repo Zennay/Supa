@@ -190,6 +190,18 @@ function permittedForCapture(gate, source, grant, target) {
   }
 }
 
+function sameRetailerContentLocation(raw, source) {
+  if (typeof raw !== 'string' || !raw || raw.length > 2048 || raw.includes('&'))
+    return false
+  let claimed
+  try { claimed = new URL(raw, source) } catch { return false }
+  const expected = new URL(source)
+  const path = value => value.replace(/\/$/, '') || '/'
+  return claimed.origin === expected.origin && claimed.username === '' &&
+    claimed.password === '' && !claimed.search && !claimed.hash &&
+    path(claimed.pathname) === path(expected.pathname)
+}
+
 async function collectBoundedBody(response) {
   if (!response?.body || typeof response.body.getReader !== 'function') {
     throw new Error('Missing streaming HTML body')
@@ -306,6 +318,15 @@ export async function captureApprovedRetailerPage(options = {}) {
       (response.url && response.url !== target)) {
     await closeRejectedBody()
     throw new Error('Retailer capture failed or redirected')
+  }
+  // HTTP 200 can still carry a navigation or alternate representation
+  // identity without a 3xx. Refuse it before reading private source bytes.
+  const refresh = response.headers?.get?.('refresh')
+  const contentLocation = response.headers?.get?.('content-location')
+  if ((refresh != null && refresh.trim() !== '') ||
+      (contentLocation != null && !sameRetailerContentLocation(contentLocation, target))) {
+    await closeRejectedBody()
+    throw new Error('Retailer response navigation/source identity refused')
   }
   let body
   try { body = await collectBoundedBody(response) }
