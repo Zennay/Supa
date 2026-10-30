@@ -756,3 +756,26 @@ test('legacy M1 review may not label old-price child as current price field hint
     assert.doesNotMatch(JSON.stringify(report),/SYNTHETIC_OLD|SYNTHETIC_CURRENT/)
   }
 })
+
+test('legacy snapshots over the strict offline byte limit cannot relabel unverified old prices as current', () => {
+  // The historical 5 MiB review accepts a snapshot that the 2 MiB strict
+  // semantic scanner declines. The field hints still must fail closed.
+  const html='<div class="old-price"><span class="price-value">SYNTHETIC_OLD</span></div>'+ ' '.repeat(2 * 1024 * 1024)
+  for (const [store,kind] of [['plus','catalog'],['dekamarkt','offers']]) {
+    const report=proposeRetailerSelectors(source(store,kind,html),html)
+    assert.ok(report.proposedSelectors.some(x=>x.selector==='span.price-value'))
+    assert.deepEqual(report.possibleFieldSelectors.price,[],store)
+    assert.equal(report.publicationAllowed,false)
+  }
+})
+
+test('legacy nanosecond capture clocks never cause an unverified old-price field promotion', () => {
+  const html='<div class="old-price"><span class="price-value">SYNTHETIC_OLD</span></div>'
+  for (const [store,kind] of [['plus','catalog'],['dekamarkt','offers']]) {
+    const record=source(store,kind,html)
+    record.capturedAt='2026-10-04T12:00:00.123456789Z'
+    const report=proposeRetailerSelectors(record,html)
+    assert.deepEqual(report.possibleFieldSelectors.price,[],store)
+    assert.equal(report.source.capturedAt,record.capturedAt)
+  }
+})

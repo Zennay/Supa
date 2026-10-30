@@ -35,7 +35,7 @@ function owned(record, key) {
   const descriptor = Object.getOwnPropertyDescriptor(record, key)
   return descriptor && Object.hasOwn(descriptor, 'value') ? descriptor.value : undefined
 }
-function mapCandidateFields(suggestions, observedCurrentPriceSelectors = null) {
+function mapCandidateFields(suggestions, observedCurrentPriceSelectors = new Set()) {
   // Semantic hints for AI/human review; NOT parsed product values or vetted CSS.
   const patterns = {
     name: /name|naam|title/i,
@@ -47,8 +47,7 @@ function mapCandidateFields(suggestions, observedCurrentPriceSelectors = null) {
   return Object.fromEntries(Object.entries(patterns).map(([field, expression]) => [
     field,
     suggestions.filter(item => expression.test(item.selector) &&
-      (field !== 'price' || observedCurrentPriceSelectors === null ||
-       observedCurrentPriceSelectors.has(item.selector)))
+      (field !== 'price' || observedCurrentPriceSelectors.has(item.selector)))
       .slice(0, 8).map(item => ({
         selector: item.selector, status: 'UNVERIFIED_FIELD_HINT',
         reviewerMustVerifySemantics: true,
@@ -303,7 +302,9 @@ export function proposeRetailerSelectors(source, html) {
   // have older clock formats: if the modern analyzer declines, do not invent
   // candidates and preserve the original class-only review.
   let semantic = []
-  let observedCurrentPriceSelectors = null
+  // When the strict 2 MiB source scanner cannot verify ancestry, historical
+  // class tokens remain private review hints, NEVER current-price field hints.
+  let observedCurrentPriceSelectors = new Set()
   try {
     const discovered = proposeOfflineRetailerSelectors({html,origin:{
       retailerId:identity.supermarket,url:identity.url,capturedAt:identity.capturedAt}})
