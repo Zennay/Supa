@@ -130,3 +130,16 @@ geen live productbewijs. Malformeerde inert-containergrenzen en een externe
 geweigerd. Synthetische positieve en negatieve contracttests bewijzen dat
 gewone PLUS-JSON-LD en Deka Nuxt corroboratie werkzaam blijven; er is geen
 nieuwe echte bronpagina gecaptured of winkelprijs gepubliceerd.
+
+### Offline prijs- en verpakkingsdrift: alleen dezelfde bron en artikelidentiteit
+
+De `--drift`-bediening vergelijkt voortaan alleen snapshots van **dezelfde
+oorspronkelijke product-URL**; de URL-identiteit staat uitsluitend als
+SHA-256-fingerprint in het private reviewrecord. Bij verwisselde artikelen
+(inclusief gewijzigde productnaam bij hetzelfde source-ID), onbeschikbare
+producten of ontbrekende prijs-/packbewijzen wordt de geldvergelijking
+`null` (onbekend), nooit `0` (geen verschil). Voor een daadwerkelijk
+vergelijkbaar artikel worden alleen geaggregeerde 0/1-tellingen voor gewijzigde
+prijs of verpakking getoond. Eurobedragen, oorspronkelijke URLs en HTML blijven
+buiten stdout en elk resultaat blijft menselijke review vereisen. Dit is
+een historische bronkandidaatvergelijking, niet een actuele kassaprijs.

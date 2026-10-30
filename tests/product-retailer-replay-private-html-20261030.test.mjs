@@ -25,11 +25,11 @@ const page = '<html><body><div class="product-card">Synthetic only</div>' +
     offers: { '@type': 'Offer', price: '3.25', priceCurrency: 'EUR',
       availability: 'https://schema.org/InStock' } }) + '</script></body></html>'
 
-async function capture(t, markup = page) {
+async function capture(t, markup = page, sourceUrl = url) {
   const dir = await mkdtemp(join(tmpdir(), 'supa-replay-fixture-'))
   t.after(() => rm(dir, { recursive: true, force: true }))
   const input = join(dir, 'synthetic-grant.json'), output = join(dir, 'captured.html')
-  await writeFile(input, JSON.stringify(grant), { mode: 0o600 })
+  await writeFile(input, JSON.stringify({ ...grant, sourceUrl }), { mode: 0o600 })
   let calls = 0
   await download([input, output], {
     testGateDocument: gate,
@@ -157,4 +157,49 @@ test('operator CLI writes private candidate review and emits redacted drift coun
   assert.equal(JSON.parse(summary).created, true)
   assert.doesNotMatch(summary, /fictional-flour|3\.25|www\.plus\.nl/i)
   assert.equal((await stat(reviewPath)).mode & 0o777, 0o600)
+})
+
+
+test('private drift refuses comparing different SKUs even at the same store', async t => {
+  const before = await capture(t)
+  const secondUrl = 'https://www.plus.nl/product/fictional-flour-999'
+  const second = await capture(t, page.replaceAll(url, secondUrl), secondUrl)
+  const one = await replayPrivateProductHtmlSnapshot(before)
+  const two = await replayPrivateProductHtmlSnapshot(second)
+  assert.notEqual(one.source.productUrlSha256, two.source.productUrlSha256)
+  assert.doesNotMatch(JSON.stringify(one.source), /fictional-flour|www\.plus\.nl/)
+  await assert.rejects(compareArchivedPrivateProductSnapshots(before, second), /refused/)
+})
+
+
+test('same-product price drift is count-only, while unverified evidence remains unknown', async t => {
+  const first = await capture(t)
+  const changedPrice = await capture(t, page.replace('"price":"3.25"', '"price":"3.49"'))
+  const price = await compareArchivedPrivateProductSnapshots(first, changedPrice)
+  assert.equal(price.privateProductEvidence.priceChangeCount, 1)
+  assert.equal(price.privateProductEvidence.packChangeCount, 0)
+  assert.equal(price.privateProductEvidence.identityChangedCount, 0)
+  assert.equal(price.privateProductEvidence.currentCheckoutVerified, false)
+  assert.doesNotMatch(JSON.stringify(price), /3\.49|3\.25|Synthetic flour|www\.plus\.nl/)
+  const changedPack = await capture(t, page.replace('500 g', '750 g'))
+  const pack = await compareArchivedPrivateProductSnapshots(first, changedPack)
+  assert.equal(pack.privateProductEvidence.priceChangeCount, 0)
+  assert.equal(pack.privateProductEvidence.packChangeCount, 1)
+  const unavailable = await capture(t, page.replace('InStock', 'OutOfStock'))
+  const unknown = await compareArchivedPrivateProductSnapshots(first, unavailable)
+  assert.equal(unknown.privateProductEvidence.priceChangeCount, null)
+  assert.equal(unknown.privateProductEvidence.packChangeCount, null)
+  assert.equal(unknown.privateProductEvidence.humanReviewRequired, true)
+})
+
+
+test('same URL with changed product name cannot masquerade as comparable price', async t => {
+  const before = await capture(t)
+  const swappedName = await capture(t, page.replace('Synthetic flour', 'Different synthetic flour')
+    .replace('"price":"3.25"', '"price":"0.01"'))
+  const report = await compareArchivedPrivateProductSnapshots(before, swappedName)
+  assert.equal(report.privateProductEvidence.identityChangedCount, 1)
+  assert.equal(report.privateProductEvidence.priceChangeCount, null)
+  assert.equal(report.privateProductEvidence.packChangeCount, null)
+  assert.doesNotMatch(JSON.stringify(report), /Different synthetic flour|0\.01/)
 })

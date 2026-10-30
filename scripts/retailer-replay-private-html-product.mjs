@@ -94,10 +94,15 @@ export async function replayPrivateProductHtmlSnapshot(filename) {
   const price = parsed.type === 'observation' ? parsed.observation : null
   const plausible = price && Number.isSafeInteger(price.currentPriceCents) &&
     price.currentPriceCents > 0 && price.pack.amount !== null &&
+    price.availability === 'available' &&
     !['unknown', 'pack'].includes(price.pack.unit)
   return {
     schemaVersion: 1, mode: 'offline-private-product-review',
-    source: { retailerId: src.retailerId, capturedAt: src.capturedAt, sha256: src.sha256 },
+    // Pin the actual product URL without returning or logging that private URL.
+    // Drift between two unrelated SKUs is not a real selector regression.
+    source: { retailerId: src.retailerId, capturedAt: src.capturedAt,
+      sha256: src.sha256,
+      productUrlSha256: createHash('sha256').update(src.url).digest('hex') },
     status: plausible ? 'candidate_for_human_review' : 'unverified_product',
     observation: plausible ? price : null,
     selectorProposals: selectors.selectors,
@@ -115,7 +120,38 @@ export async function replayPrivateProductHtmlSnapshot(filename) {
 export async function compareArchivedPrivateProductSnapshots(beforeHtml, afterHtml) {
   const before = await replayPrivateProductHtmlSnapshot(beforeHtml)
   const after = await replayPrivateProductHtmlSnapshot(afterHtml)
-  return compareOfflineSelectorProposals(before.selectorSnapshot, after.selectorSnapshot)
+  if (before.source.productUrlSha256 !== after.source.productUrlSha256) fail()
+  const selectors = compareOfflineSelectorProposals(
+    before.selectorSnapshot, after.selectorSnapshot)
+  const left = before.observation
+  const right = after.observation
+  const identitiesComparable = !!(left && right &&
+    left.supermarket === right.supermarket &&
+    left.sourceProductId === right.sourceProductId &&
+    left.name === right.name && left.currency === right.currency)
+  const packComparable = identitiesComparable &&
+    left.pack.amount !== null && right.pack.amount !== null &&
+    left.pack.unit !== 'unknown' && right.pack.unit !== 'unknown'
+  // Count-only changes; never expose private prices or silently turn
+  // missing evidence into a fake zero-price change.
+  return {
+    ...selectors,
+    privateProductEvidence: {
+      identityChangedCount: left && right && (
+        left.sourceProductId !== right.sourceProductId ||
+        left.name !== right.name) ? 1 : 0,
+      priceChangeCount: identitiesComparable &&
+        left.currentPriceCents !== null && right.currentPriceCents !== null
+        ? Number(left.currentPriceCents !== right.currentPriceCents) : null,
+      packChangeCount: packComparable
+        ? Number(left.pack.amount !== right.pack.amount ||
+            left.pack.unit !== right.pack.unit) : null,
+      availabilityChangeCount: identitiesComparable
+        ? Number(left.availability !== right.availability) : null,
+      humanReviewRequired: true,
+      currentCheckoutVerified: false,
+    },
+  }
 }
 
 /**
