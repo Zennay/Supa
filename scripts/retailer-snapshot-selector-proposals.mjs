@@ -1,6 +1,6 @@
 import { ambiguousRetailerRoute } from './retailer-source-route-safety.mjs'
 import { scanOfflineRetailerMarkup } from './retailer-offline-structural-scan.mjs'
-import { proposeOfflineRetailerSelectors, summarizeOfflineSelectorProposals } from './retailer-offline-selector-discovery.mjs'
+import { proposeOfflineRetailerSelectors, summarizeOfflineSelectorProposals, assertObservedRetailerHtmlIdentity } from './retailer-offline-selector-discovery.mjs'
 import { parseUniqueKeyRetailerJson } from './retailer-private-unique-key-json.mjs'
 import { decodeExactRetailerHtmlBytes } from './retailer-private-html-byte-identity.mjs'
 /**
@@ -149,6 +149,14 @@ export function proposeRetailerSelectors(source, html) {
       document.hasConflictingCharset) {
     reject('retailer HTML source directives prohibit selector review')
   }
+  // The old M1 entrypoint must not silently fall back to class-only hints
+  // when the page advertises a foreign browser base or canonical identity.
+  // Apply the identical source-origin contract as the modern private engine,
+  // including over-2MiB historical captures not eligible for modern replay.
+  try {
+    assertObservedRetailerHtmlIdentity(identity.url,
+      document.baseHrefs,document.canonicalHrefs)
+  } catch { reject('untrusted retailer HTML base or canonical source identity') }
   const scripts = []
   const jsonLdTypes = new Set()
   const jsonLdKeys = new Set()

@@ -387,3 +387,45 @@ test('legacy and current capture review share source-observed Offer and inventor
     assert.doesNotMatch(JSON.stringify(review),/PRIVATE_PACK|88.22|OutOfStock/)
   }
 })
+
+test('legacy capture cannot bypass source identity via foreign HTML base or canonical',()=>{
+  const product='<article class="product-card"><span class="price-value">'+
+    'PRIVATE_PRICE</span></article>'
+  const page=header=>'<html><head>'+header+'</head><body>'+product+'</body></html>'
+  const invalid=[
+    '<base href="https://outside.invalid/producten/">',
+    '<base href="//outside.invalid/">',
+    '<base href="https://www.plus.nl@outside.invalid/">',
+    '<base href="&#47;&#47;outside.invalid/">',
+    '<link rel="canonical" href="https://outside.invalid/producten">',
+    '<link rel="canonical" href="/aanbiedingen">',
+    '<link rel="canonical" href="/producten?other=true">',
+    '<link rel="canonical" href="/producten#old">',
+    '<link rel="canonical" href="&#47;&#47;outside.invalid/">',
+    '<base href="/"><base href="/">',
+    '<link rel="canonical" href="/producten"><link rel="canonical" href="/producten">',
+  ]
+  for(const header of invalid){
+    const html=page(header)
+    assert.throws(()=>proposeRetailerSelectors(source('plus','catalog',html),html),
+      /Offline selector review refused:|Multiple live HTML base URLs|Ambiguous canonical retailer source URL/,header)
+  }
+  for(const header of [
+    '<base href="/">',
+    '<link rel="canonical" href="/producten">',
+    '<link rel="canonical" href="https://www.plus.nl/producten/">',
+    '<base href="/"><link rel="canonical" href="/producten">',
+  ]){
+    const html=page(header)
+    const report=proposeRetailerSelectors(source('plus','catalog',html),html)
+    assert.equal(report.readyForScraping,false)
+    assert.ok(report.proposedSelectors.some(row=>row.selector==='article.product-card'))
+  }
+})
+test('legacy large archival capture cannot evade canonical checks by skipping modern 2 MiB route',()=>{
+  const filler=' '.repeat(2*1024*1024+100)
+  const html='<html><head><link rel="canonical" href="https://outside.invalid/producten">'+
+    '</head><body><article class="product-card"></article>'+filler+'</body></html>'
+  assert.throws(()=>proposeRetailerSelectors(source('plus','catalog',html),html),
+    /Offline selector review refused: untrusted retailer HTML base or canonical source identity/)
+})

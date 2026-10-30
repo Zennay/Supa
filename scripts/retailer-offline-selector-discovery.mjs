@@ -221,6 +221,47 @@ function recordSelector(counters, field, selector, tag) {
   else counters.set(key, { field, selector, tag, instances: 1 })
 }
 
+export function assertObservedRetailerHtmlIdentity(originUrl, baseHrefs, canonicalHrefs) {
+  // Live HTML base href changes the browser resolution of relative product
+  // links. Foreign or malformed bases cannot become store product evidence.
+  let documentBaseUrl = originUrl
+  if (baseHrefs.length) {
+    // Offline archives must validate browser-facing href provenance too.
+    const href = baseHrefs[0]
+    if (typeof href !== 'string' || !href || href.length > 2048 ||
+        href.includes('&')) throw new Error('Untrusted HTML base URL')
+    let base
+    try { base = new URL(href, originUrl) }
+    catch { throw new Error('Untrusted HTML base URL') }
+    const expected = new URL(originUrl)
+    if (base.origin !== expected.origin || base.username || base.password ||
+        base.protocol !== 'https:') throw new Error('Untrusted HTML base URL')
+    documentBaseUrl = base.href
+  }
+
+  // An explicit canonical page identity belonging to another domain makes
+  // even otherwise plausible CSS product hints unsafe to attribute to this
+  // retailer. No canonical URL is emitted from the private review.
+  if (canonicalHrefs.length) {
+    const href = canonicalHrefs[0]
+    if (typeof href !== 'string' || !href || href.length > 2048 ||
+        href.includes('&')) throw new Error('Untrusted HTML canonical source URL')
+    let canonical
+    try { canonical = new URL(href, originUrl) }
+    catch { throw new Error('Untrusted HTML canonical source URL') }
+    const expected = new URL(originUrl)
+    const normalizedPath = path => path.replace(/\/$/, '') || '/'
+    // An older offline archive may claim another SKU on the same store.
+    if (canonical.origin !== expected.origin || canonical.username ||
+        canonical.password || canonical.protocol !== 'https:' ||
+        canonical.search || canonical.hash ||
+        normalizedPath(canonical.pathname) !== normalizedPath(expected.pathname))
+      throw new Error('Untrusted HTML canonical source URL')
+  }
+
+  return documentBaseUrl
+}
+
 export function proposeOfflineRetailerSelectors(options = {}, includePrivateCoverage = false) {
   // Inspect own DATA descriptors before reading untrusted provenance/HTML.
   // Never run a caller getter, inherited identity or Proxy trap.
@@ -252,42 +293,8 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
   if (hasMetaRefresh) throw new Error('Untrusted HTML redirect evidence')
   if (hasMetaNoStore) throw new Error('Untrusted HTML no-store archival directive')
   if (hasConflictingCharset) throw new Error('Untrusted HTML charset declaration')
-  // Live HTML base href changes the browser resolution of relative product
-  // links. Foreign or malformed bases cannot become store product evidence.
-  let documentBaseUrl = origin.url
-  if (baseHrefs.length) {
-    // Offline archives must validate browser-facing href provenance too.
-    const href = baseHrefs[0]
-    if (typeof href !== 'string' || !href || href.length > 2048 ||
-        href.includes('&')) throw new Error('Untrusted HTML base URL')
-    let base
-    try { base = new URL(href, origin.url) }
-    catch { throw new Error('Untrusted HTML base URL') }
-    const expected = new URL(origin.url)
-    if (base.origin !== expected.origin || base.username || base.password ||
-        base.protocol !== 'https:') throw new Error('Untrusted HTML base URL')
-    documentBaseUrl = base.href
-  }
-
-  // An explicit canonical page identity belonging to another domain makes
-  // even otherwise plausible CSS product hints unsafe to attribute to this
-  // retailer. No canonical URL is emitted from the private review.
-  if (canonicalHrefs.length) {
-    const href = canonicalHrefs[0]
-    if (typeof href !== 'string' || !href || href.length > 2048 ||
-        href.includes('&')) throw new Error('Untrusted HTML canonical source URL')
-    let canonical
-    try { canonical = new URL(href, origin.url) }
-    catch { throw new Error('Untrusted HTML canonical source URL') }
-    const expected = new URL(origin.url)
-    const normalizedPath = path => path.replace(/\/$/, '') || '/'
-    // An older offline archive may claim another SKU on the same store.
-    if (canonical.origin !== expected.origin || canonical.username ||
-        canonical.password || canonical.protocol !== 'https:' ||
-        canonical.search || canonical.hash ||
-        normalizedPath(canonical.pathname) !== normalizedPath(expected.pathname))
-      throw new Error('Untrusted HTML canonical source URL')
-  }
+  const documentBaseUrl=assertObservedRetailerHtmlIdentity(
+    origin.url,baseHrefs,canonicalHrefs)
 
   const candidates = new Map()
   // Duplicate links to one SKU on a listing are not independent products.
