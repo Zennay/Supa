@@ -690,3 +690,22 @@ test('M1 snapshot JSON-LD never reports partial Product evidence when a graph ex
     assert.equal(run(tall).invalidJsonLdCount,0)
   }
 })
+
+test('one malformed JSON-LD script or malformed graph poisons all aggregate archived Product signals',()=>{
+  for(const retailer of ['plus','dekamarkt']) {
+    const doc=blocks=>blocks.map(body=>'<script type="application/ld+json">'+body+'</script>').join('')
+    const good=JSON.stringify({'@context':'https://schema.org','@type':'Product',sku:'PRIVATE_ONLY',offers:{'@type':'Offer',price:'1.99'}})
+    const invalid=['{broken',JSON.stringify({'@context':'https://schema.org','@type':'Product','@graph':'not-a-graph'})]
+    for(const bad of invalid)for(const blocks of [[good,bad],[bad,good]]) {
+      const html=doc(blocks)
+      const out=proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',html),html).embeddedSignals
+      assert.equal(out.invalidJsonLdCount,1,retailer)
+      assert.deepEqual(out.jsonLdTypes,[],retailer)
+      assert.deepEqual(out.jsonLdKeys,[],retailer)
+    }
+    const both=doc([good,JSON.stringify({'@context':'https://schema.org','@type':'WebPage'})])
+    const valid=proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',both),both).embeddedSignals
+    assert.equal(valid.invalidJsonLdCount,0)
+    assert.deepEqual(valid.jsonLdTypes,['Offer','Product','WebPage'])
+  }
+})

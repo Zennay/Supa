@@ -156,8 +156,11 @@ function jsonLdShape(text, types, keys) {
       // even when they happen to carry an @type key or official-looking IRI.
       // This is an offline structural review hint, not a product price parser.
       if (['@graph','mainEntity','itemListElement','item','offers',
-           'priceSpecification'].includes(key) && child && typeof child === 'object')
+           'priceSpecification'].includes(key)) {
+        if (child === null || typeof child !== 'object')
+          throw new Error('Malformed JSON-LD graph relation')
         visit(child,depth+1,trusted)
+      }
     }
   }
   try { visit(value) } catch { return false }
@@ -236,6 +239,12 @@ export function proposeRetailerSelectors(source, html) {
         }
       }
     }
+  }
+  // Source evidence is an indivisible snapshot: one malformed JSON-LD block
+  // invalidates the aggregated review, even if another block was parseable.
+  if (invalidJsonLdCount !== 0) {
+    jsonLdTypes.clear()
+    jsonLdKeys.clear()
   }
   // Every class candidate must correspond to an actual visible opening tag,
   // not markup-shaped text inside a script/style/template/attribute.
