@@ -160,10 +160,14 @@ async function collectBoundedBody(response) {
   const reader = response.body.getReader()
   const chunks = []
   let bytes = 0
+  let segments = 0
   try {
     for (;;) {
       const { done, value } = await reader.read()
       if (done) break
+      // A dishonest or stalled transport can deliver unlimited zero/tiny
+      // chunks without ever exceeding the byte budget. Bound read work too.
+      if (++segments > 8192) throw new Error('HTML stream segment budget exceeded')
       if (!(value instanceof Uint8Array)) throw new Error('Invalid HTML chunk')
       bytes += value.byteLength
       if (bytes > MAX_BODY_BYTES) throw new Error('Snapshot exceeds size budget')
