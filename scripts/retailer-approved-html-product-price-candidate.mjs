@@ -12,6 +12,7 @@
 import { createHash } from 'node:crypto'
 import { captureApprovedRetailerPage } from './retailer-approved-snapshot-capture.mjs'
 import { readAuthorizedHtmlScriptEvidence } from './retailer-approved-html-script-evidence.mjs'
+import { proposeOfflineRetailerSelectors } from './retailer-offline-selector-discovery.mjs'
 import { parseSchemaOrgProductForPage } from '../src/data/schemaOrgProductPageSelection.ts'
 import { corroborateDekaNuxtProduct } from './retailer-approved-deka-nuxt-product.mjs'
 
@@ -48,8 +49,7 @@ function unavailable(reason, captured) {
  * The returned observation is PRIVATE REVIEW DATA, not a public price.
  * Read it only after the operator has confirmed source, package and region.
  */
-export async function captureApprovedProductPriceCandidate(options = {}) {
-  const captured = await captureApprovedRetailerPage(options)
+function priceReviewFromAuthorizedCapture(captured) {
   if (captured?.mode !== 'authorized-one-page-capture-needs-review' ||
       captured.permissionVerifiedForThisRequest !== true ||
       captured.readyForIngestion !== false ||
@@ -135,4 +135,66 @@ export async function captureApprovedProductPriceCandidate(options = {}) {
     productionEnabled: false,
     published: false,
   }
+}
+
+// Product and CSS structure used to require separate HTTP captures. A single
+// authorization-scoped fetch now produces TWO private reviews pinned to the
+// exact same HTML digest and UTC clock. Never reuse a raw caller-supplied
+// capture or treat selector guesses as approved price extraction rules.
+export async function captureApprovedProductReviewBundle(options = {}) {
+  const captured = await captureApprovedRetailerPage(options)
+  const priceReview = priceReviewFromAuthorizedCapture(captured)
+  if (captured.source.kind !== 'product') {
+    throw new Error('Authorized product review bundle requires a product page')
+  }
+  const selectors = proposeOfflineRetailerSelectors({
+    html: captured.html,
+    origin: {
+      retailerId: captured.source.retailerId,
+      url: captured.source.url,
+      capturedAt: captured.source.capturedAt,
+    },
+  })
+  if (selectors.mode !== 'offline-selector-proposals-only' ||
+      selectors.source?.retailerId !== priceReview.source.retailerId ||
+      selectors.source?.sha256 !== priceReview.source.sha256 ||
+      selectors.source?.capturedAt !== priceReview.source.capturedAt ||
+      selectors.bytes !== captured.bytes ||
+      selectors.humanReviewRequired !== true ||
+      selectors.readyForIngestion !== false ||
+      selectors.permissionVerified !== false ||
+      selectors.productionEnabled !== false ||
+      selectors.publicSavingsClaimEligible !== false ||
+      !Array.isArray(selectors.selectors) || selectors.selectors.length > 24 ||
+      selectors.selectors.some(row => row.status !== 'needs-human-review')) {
+    throw new Error('Authorized product selector and price provenance disagree')
+  }
+  return {
+    schemaVersion: 1,
+    mode: 'private-authorized-one-capture-product-review',
+    source: priceReview.source,
+    capturedBytes: captured.bytes,
+    actualTransportInvocations: 1,
+    priceReview,
+    selectorReview: {
+      mode: 'private-unapproved-selector-proposals',
+      structuredSignals: selectors.structuredSignals,
+      proposals: selectors.selectors,
+      inspectedTags: selectors.scannedTags,
+      humanReviewRequired: true,
+      approvedSelectors: 0,
+    },
+    rawHtmlReturned: false,
+    humanReviewRequired: true,
+    verifiedCurrentCheckoutPrice: false,
+    sourceRightsForPublicationVerified: false,
+    publicSavingsClaimEligible: false,
+    readyForIngestion: false,
+    productionEnabled: false,
+    published: false,
+  }
+}
+
+export async function captureApprovedProductPriceCandidate(options = {}) {
+  return priceReviewFromAuthorizedCapture(await captureApprovedRetailerPage(options))
 }
