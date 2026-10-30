@@ -617,3 +617,20 @@ test('official absolute Product IRI without context proves source fields, foreig
     assert.equal(official.currentPricesExtracted,false)
   }
 })
+
+test('archived source URL alias disagreement refuses selector extraction before attributing retailer origin',()=>{
+  const html='<article class="product-card">SYNTHETIC</article>'
+  const valid=source('plus','catalog',html)
+  assert.ok(proposeRetailerSelectors({...valid,url:valid.requestedUrl},html).proposedSelectors.length>0)
+  for(const forged of [
+    {...valid,url:'https://www.dekamarkt.nl/producten'},
+    {...valid,url:'https://www.plus.nl/producten/other-sku'},
+    {...valid,url:'https://www.plus.nl/aanbiedingen'},
+    {...valid,finalUrl:valid.requestedUrl,url:'https://www.plus.nl/product/other-sku'},
+    {...valid,finalUrl:valid.requestedUrl,url:44},
+  ]) {
+    assert.throws(()=>proposeRetailerSelectors(forged,html),/source|redirect|alias|unapproved/i)
+  }
+  assert.equal(proposeRetailerSelectors({...valid,finalUrl:valid.requestedUrl,url:valid.requestedUrl},html)
+    .source.url,valid.requestedUrl)
+})

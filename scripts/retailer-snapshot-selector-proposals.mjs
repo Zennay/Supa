@@ -63,14 +63,19 @@ function validCapture(source, requireHash = true) {
     reject('malformed source')
   const supermarket = owned(source, 'supermarket')
   const kind = owned(source, 'kind')
-  const urlValue = owned(source, 'finalUrl') ?? owned(source, 'requestedUrl') ?? owned(source, 'url')
+  const sourceUrl = owned(source, 'url')
+  const urlValue = owned(source, 'finalUrl') ?? owned(source, 'requestedUrl') ?? sourceUrl
   const capturedAt = owned(source, 'capturedAt')
   const id = owned(source, 'id')
   const expectedSha = owned(source, 'sha256')
   const requestedUrl = owned(source, 'requestedUrl')
   const finalUrl = owned(source, 'finalUrl')
-  if (requestedUrl !== undefined && finalUrl !== undefined &&
-      requestedUrl !== finalUrl) reject('unexpected retailer source redirect')
+  // Old and current M1 manifests may carry url/requestedUrl/finalUrl.
+  // All present identities must agree: selecting only the first non-nullish
+  // field would let an archive attach a different SKU/store to approved HTML.
+  const aliases=[sourceUrl,requestedUrl,finalUrl].filter(x=>x !== undefined)
+  if (aliases.length > 1 && aliases.some(x=>x!==aliases[0]))
+    reject('conflicting retailer source URL aliases or redirect')
   if (!Object.hasOwn(HOSTS, supermarket) || !KINDS.has(kind) ||
       typeof id !== 'string' || !/^[a-z0-9][a-z0-9._-]{0,99}$/i.test(id) ||
       (requireHash ? (typeof expectedSha !== 'string' || !/^[a-f0-9]{64}$/.test(expectedSha)) : (expectedSha !== undefined && (typeof expectedSha !== 'string' || !/^[a-f0-9]{64}$/.test(expectedSha)))) ||
