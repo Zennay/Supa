@@ -319,3 +319,22 @@ test('valid omitted head close before body preserves real JSON-LD and visible so
     '<head><template><body><article class="price-value">Fake</article></body>',origin,
   }),/Unbalanced inert HTML element/)
 })
+
+
+test('offline CSS class proposals count actual matching tags once and respect HTML ASCII whitespace', () => {
+  // HTML classList: duplicate tokens still select one tag, and U+00A0
+  // is NOT whitespace, unlike JavaScript String.split(/\s+/).
+  const html = [
+    '<article class="product-card product-card product-card"><span class="price-value price-value">a</span></article>',
+    '<article class="product-card\tproduct-card"><span class="price-value\nprice-value">b</span></article>',
+    '<article class="price-value\u00a0shadow">c</article>',
+  ].join('')
+  const report = proposeOfflineRetailerSelectors({ html, origin })
+  const product = report.selectors.find(s => s.selector === 'article.product-card')
+  const price = report.selectors.find(s => s.selector === 'span.price-value')
+  assert.equal(product?.instances, 2)
+  assert.equal(price?.instances, 2)
+  assert.equal(report.selectors.some(s => s.selector === 'article.price-value'), false)
+  assert.equal(report.readyForIngestion, false)
+  assert.equal(report.permissionVerified, false)
+})
