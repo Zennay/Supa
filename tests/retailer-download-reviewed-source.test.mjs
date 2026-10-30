@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createHash } from 'node:crypto'
-import { mkdtemp, writeFile, readFile, stat, rm } from 'node:fs/promises'
+import { mkdtemp, writeFile, readFile, stat, rm, chmod, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { main } from '../scripts/retailer-download-reviewed-source.mjs'
+import { main, cleanupOnlyOwnSnapshotFile } from '../scripts/retailer-download-reviewed-source.mjs'
 import { main as inspect } from '../scripts/retailer-inspect-snapshot-cli.mjs'
+import { replayPrivateSelectorHtmlSnapshot } from '../scripts/retailer-replay-private-html-product.mjs'
 
 const url = 'https://www.plus.nl/producten'
 const grant = {
@@ -118,5 +119,71 @@ test('rejects unsafe output name and wrong arguments without network', async () 
       await assert.rejects(main([grantFile, path], { testGateDocument: gate }), /Invalid private snapshot output name/)
     }
     await assert.rejects(main([]), /Usage:/)
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
+
+
+test('a preexisting world-listable output directory must block fetch before transport', async () => {
+  const { dir, grantFile } = await temp()
+  try {
+    const publicDir = join(dir, 'shared')
+    await mkdir(publicDir)
+    await chmod(publicDir, 0o755)
+    const output = join(publicDir, 'capture.html')
+    let requests = 0
+    await assert.rejects(main([grantFile, output], {
+      testGateDocument: gate,
+      fetchFn: async () => {
+        requests++
+        return new Response('<html>fictional</html>', {
+          headers: { 'content-type': 'text/html' },
+        })
+      },
+    }), /[Uu]ntrusted private snapshot parent/)
+    assert.equal(requests, 0)
+    await assert.rejects(stat(output), /ENOENT/)
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
+
+test('authorized synthetic catalog capture reopens through private selector replay end-to-end', async () => {
+  const { dir, grantFile } = await temp()
+  try {
+    const out = join(dir, 'secure', 'capture.html')
+    await main([grantFile, out], {
+      testGateDocument: gate, writeOutput() {},
+      fetchFn: async () => new Response(
+        '<html><article class="product-card">Fictional private listing</article></html>',
+        { status: 200, headers: { 'content-type': 'text/html' } }),
+    })
+    const result = await replayPrivateSelectorHtmlSnapshot(out)
+    assert.equal(result.source.kind, 'catalog')
+    assert.equal(result.proposals.selectors[0].field, 'product')
+    assert.equal(result.published, false)
+    assert.equal(result.priceExtractionEnabled, false)
+  } finally { await rm(dir, { recursive: true, force: true }) }
+})
+
+
+test('failed-capture cleanup cannot delete a competing replacement or unowned symlink', async () => {
+  const { dir } = await temp()
+  try {
+    const output = join(dir, 'capture.html')
+    await writeFile(output, 'first-private-original', { mode: 0o600 })
+    const inode = await stat(output)
+    await rm(output)
+    await writeFile(output, 'other-writer-content', { mode: 0o600 })
+    await cleanupOnlyOwnSnapshotFile(output, inode)
+    assert.equal(await readFile(output, 'utf8'), 'other-writer-content')
+
+    const original = await stat(output)
+    await cleanupOnlyOwnSnapshotFile(output, original)
+    await assert.rejects(stat(output), /ENOENT/)
+
+    const alternate = join(dir, 'alternative.html')
+    await writeFile(alternate, 'should-stay', { mode: 0o600 })
+    const { symlink } = await import('node:fs/promises')
+    await symlink(alternate, output)
+    await cleanupOnlyOwnSnapshotFile(output, await stat(alternate))
+    assert.equal(await readFile(alternate, 'utf8'), 'should-stay')
   } finally { await rm(dir, { recursive: true, force: true }) }
 })

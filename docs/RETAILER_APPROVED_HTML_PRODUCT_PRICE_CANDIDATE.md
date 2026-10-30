@@ -265,3 +265,17 @@ Onbesliste productreviews hebben voortaan een niet-gevoelige reviewReason:
 toont uitsluitend geaggregeerde reviewReasonCounts zodat de operator kan zien
 of heropname, voorraadcontrole of bronnenreview zinvol is, zonder artikelprijzen
 of URL's via stdout te delen.
+
+### Veilige originele capture-opslag vóór offline review
+
+De bestaande toestemming-gated eenpagina-downloader deelt nu dezelfde
+privé-directory-eis met de offline replay. Als een reeds bestaande
+HTML-doelmap groeps- of wereldtoegang heeft, wordt de actie vóór het
+netwerkverzoek geweigerd; nieuw aangemaakte doelmappen zijn 0700.
+De HTML en het manifest blijven exclusief 0600. Mislukt de tweede bestandswrite,
+dan worden alleen de fysiek door deze uitvoering aangemaakte originele
+inodes opgeruimd: een andere schrijver die een naam intussen heeft vervangen,
+of een symlink, wordt nooit verwijderd. Dit maakt de synthetisch geteste
+capture → manifest → selector-reviewroute uitvoerbaar zonder die
+veiligheidsvoorwaarden te versoepelen. De canonieke PLUS-/Deka-permissiongate
+blijft disabled en wordt vóór ieder echt netwerkverzoek toegepast.

@@ -28,6 +28,39 @@ async function refuseExistingOutput(filename) {
   }
 }
 
+// Never issue even a permission-approved request when its known output parent
+// is already world/group accessible. Such files cannot later be replayed
+// through the strict owner-only private source reader.
+async function refusePublicExistingParent(path) {
+  let parent
+  try { parent = await lstat(dirname(path)) }
+  catch (error) {
+    if (error?.code === 'ENOENT') return
+    throw error
+  }
+  if (!parent.isDirectory() || parent.isSymbolicLink() ||
+      (parent.mode & 0o077) !== 0) {
+    throw new Error('Untrusted private snapshot parent')
+  }
+}
+
+// A second process may have replaced a name after we opened it with wx.
+// The failure handler must never unlink another writer's replacement.
+export async function cleanupOnlyOwnSnapshotFile(path, originalInode) {
+  if (!originalInode) return
+  await assertNoSymlinkedM3OutputParents(path)
+  let current
+  try { current = await lstat(path) }
+  catch (error) {
+    if (error?.code === 'ENOENT') return
+    throw error
+  }
+  if (current.isFile() && !current.isSymbolicLink() &&
+      current.dev === originalInode.dev && current.ino === originalInode.ino) {
+    await rm(path)
+  }
+}
+
 // For real execution this CLI always reads the permission source gate PINNED
 // in this repository. Dependency injection exists only for offline tests.
 // No M1 permissions = no network. It NEVER uses free proxies or rotates 403/429.
@@ -45,6 +78,7 @@ export async function main(argv = process.argv.slice(2), {
   await assertNoSymlinkedM3OutputParents(output)
   await refuseExistingOutput(output)
   await refuseExistingOutput(manifestFile)
+  await refusePublicExistingParent(output)
 
   const permissionGate = testGateDocument ?? JSON.parse(
     await readFile(CANONICAL_PERMISSION_DOCUMENT, 'utf8'),
@@ -75,17 +109,21 @@ export async function main(argv = process.argv.slice(2), {
   await mkdir(dirname(output), { recursive: true, mode: 0o700 })
   await assertNoSymlinkedM3OutputParents(output)
   const directory = await lstat(dirname(output))
-  if (!directory.isDirectory() || directory.isSymbolicLink()) {
+  if (!directory.isDirectory() || directory.isSymbolicLink() ||
+      (directory.mode & 0o077) !== 0) {
     throw new Error('Untrusted private snapshot parent')
   }
 
   let htmlHandle, manifestHandle
   let htmlCreated = false, manifestCreated = false
+  let htmlInode = null, manifestInode = null
   try {
     htmlHandle = await open(output, 'wx', 0o600)
     htmlCreated = true
+    htmlInode = await htmlHandle.stat()
     manifestHandle = await open(manifestFile, 'wx', 0o600)
     manifestCreated = true
+    manifestInode = await manifestHandle.stat()
 
     await htmlHandle.writeFile(payload)
     await htmlHandle.chmod(0o600)
@@ -94,16 +132,16 @@ export async function main(argv = process.argv.slice(2), {
     await manifestHandle.chmod(0o600)
     await manifestHandle.sync()
     await htmlHandle.close()
-    await manifestHandle.close()
     htmlHandle = undefined
+    await manifestHandle.close()
     manifestHandle = undefined
   } catch {
     if (htmlHandle) await htmlHandle.close()
     if (manifestHandle) await manifestHandle.close()
     try {
       await assertNoSymlinkedM3OutputParents(output)
-      if (htmlCreated) await rm(output, { force: true })
-      if (manifestCreated) await rm(manifestFile, { force: true })
+      if (htmlCreated) await cleanupOnlyOwnSnapshotFile(output, htmlInode)
+      if (manifestCreated) await cleanupOnlyOwnSnapshotFile(manifestFile, manifestInode)
     } catch {
       // Do not chase a possibly changed parent on cleanup.
     }
