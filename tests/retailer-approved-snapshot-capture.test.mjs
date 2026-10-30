@@ -124,3 +124,61 @@ test('HTTP 403/429, redirects, HTML errors, and oversized bodies cannot rotate t
 test('missing injected network transport is fail-closed even with paper authorization', async () => {
   await assert.rejects(captureApprovedRetailerPage({ source, permissionGate: gate, grant }), /Approved fetch transport required/)
 })
+
+test('empty retailer product roots never become real product captures', async () => {
+  const allowed = structuredClone(gate)
+  allowed.sources[1].permissionStatus = 'permitted'
+  allowed.sources[1].productionEnabled = true
+  allowed.sources[1].evidence = [{ kind: 'written_permission',
+    url: 'https://example.test/synthetic-grant',
+    finding: 'SYNTHETIC CI only, not permission' }]
+  let calls = 0
+  const fetchFn = async () => {
+    calls++
+    return new Response('<html>SYNTHETIC</html>',
+      { status: 200, headers: {'content-type': 'text/html'} })
+  }
+  const make = (store, path) => {
+    const itemUrl = 'https://www.' + store + '.nl' + path
+    return { source: {supermarket: store, kind: 'product', url: itemUrl},
+      permissionGate: allowed, grant: {...grant, supermarket: store,
+        kind: 'product', sourceUrl: itemUrl}, fetchFn }
+  }
+  for (const store of ['plus', 'dekamarkt']) {
+    const root = store === 'plus' ? '/product/' : '/producten/'
+    for (const path of [root, root + '/']) {
+      await assert.rejects(captureApprovedRetailerPage(make(store, path)),
+        /outside exact approved HTTPS route/)
+    }
+    const valid = await captureApprovedRetailerPage(
+      make(store, root + 'synthetic-123'))
+    assert.equal(valid.source.kind, 'product')
+    assert.equal(valid.published, false)
+  }
+  assert.equal(calls, 2)
+})
+
+test('impossible Gregorian UTC provenance is rejected before fetch', async () => {
+  let calls = 0
+  const fetchFn = async () => {
+    calls++
+    return new Response('<html>SYNTHETIC</html>',
+      {status: 200, headers: {'content-type': 'text/html'}})
+  }
+  for (const capturedAt of [
+    '2026-02-30T12:00:00.000Z', '2025-02-29T12:00:00.000Z',
+    '2026-04-31T12:00:00.000Z', '2026-01-01T24:00:00.000Z',
+  ]) {
+    await assert.rejects(captureApprovedRetailerPage({
+      source, permissionGate: gate, grant, fetchFn, capturedAt,
+    }), /Invalid source capture clock/)
+  }
+  assert.equal(calls, 0)
+  const valid = await captureApprovedRetailerPage({
+    source, permissionGate: gate, grant, fetchFn,
+    capturedAt: '2024-02-29T12:00:00.000Z',
+  })
+  assert.equal(valid.source.capturedAt, '2024-02-29T12:00:00.000Z')
+  assert.equal(valid.published, false)
+  assert.equal(calls, 1)
+})
