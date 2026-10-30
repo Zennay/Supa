@@ -523,6 +523,23 @@ test('live canonical source URL cannot attribute foreign product pages to PLUS',
     /Ambiguous canonical retailer source URL/)
 })
 
+test('source-observed named HTML href entities yield actual DOM-equivalent product selectors', () => {
+  const markup = '<html><body>' +
+    '<a href="&sol;product/mock-111">SYNTHETIC</a>' +
+    '<a href="https&colon;//www.plus.nl/product/mock-222">SYNTHETIC</a>' +
+    '<a href="&SOL;product/not-real">Unknown entity, no selector</a>' +
+    '<a href="&sol;producten/deka-only">Wrong merchant route</a>' +
+    '</body></html>'
+  const review = proposeOfflineRetailerSelectors({ html: markup, origin }, true)
+  assert.equal(review.selectors.find(x => x.selector === 'a[href^="/product/"]')?.instances, 1)
+  assert.equal(review.selectors.find(x =>
+    x.selector === 'a[href^="https://www.plus.nl/product/"]')?.instances, 1)
+  assert.equal(review.observedProductLinkOccurrences, 2)
+  assert.equal(review.distinctObservedProductPaths, 2)
+  assert.equal(review.readyForIngestion, false)
+  assert.doesNotMatch(JSON.stringify(review), /mock-111|mock-222|not-real/i)
+})
+
 test('offline archive cannot forge same-store SKU identity or entity-encoded base', () => {
   const cases = [
     { canonical: '/product/different-sku' },

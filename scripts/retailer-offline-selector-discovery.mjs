@@ -149,7 +149,11 @@ function parseHtmlAttributes(text) {
 // remains inert and can never invent a selector. No DOM/scripts/network.
 function staticAttributeValue(value) {
   if (typeof value !== 'string') return value
-  return value.replace(/&#(?:x([0-9a-f]{1,6})|([0-9]{1,7}));/gi, (raw, hex, decimal) => {
+  // Common exact-case HTML named character references are also decoded by
+  // DOM attribute access. An invented or wrong-case entity stays untouched.
+  const named = Object.freeze({ sol: '/', colon: ':', amp: '&' })
+  const decoded = value.replace(/&(sol|colon|amp);/g, (_, name) => named[name])
+  return decoded.replace(/&#(?:x([0-9a-f]{1,6})|([0-9]{1,7}));/gi, (raw, hex, decimal) => {
     const point = Number.parseInt(hex ?? decimal, hex === undefined ? 10 : 16)
     return point > 0 && point <= 0x10ffff &&
       !(point >= 0xd800 && point <= 0xdfff)
