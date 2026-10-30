@@ -1,7 +1,7 @@
 import { ambiguousRetailerRoute, isAllowedM1RetailerSourcePath } from './retailer-source-route-safety.mjs'
 import { scanOfflineRetailerMarkup } from './retailer-offline-structural-scan.mjs'
 import { admittedJsonScriptType, admittedRetailerScriptId } from './retailer-json-script-mime.mjs'
-import { proposeOfflineRetailerSelectors, summarizeOfflineSelectorProposals, assertObservedRetailerHtmlIdentity, openingTags } from './retailer-offline-selector-discovery.mjs'
+import { proposeOfflineRetailerSelectors, summarizeOfflineSelectorProposals, assertObservedRetailerHtmlIdentity, openingTags, staticAttributeValue } from './retailer-offline-selector-discovery.mjs'
 import { parseUniqueKeyRetailerJson } from './retailer-private-unique-key-json.mjs'
 import { decodeExactRetailerHtmlBytes } from './retailer-private-html-byte-identity.mjs'
 /**
@@ -238,7 +238,9 @@ export function proposeRetailerSelectors(source, html) {
     htmlTagCount++
     if (htmlTagCount > MAX_HTML_TAGS) reject('unbounded HTML tag count')
     const tagName=tag.tag
-    const classText=tag.attrs.get('class')
+    // Decode classList as a browser does, exactly once, sharing the primary
+    // source scanner rather than inventing selectors from encoded strings.
+    const classText=staticAttributeValue(tag.attrs.get('class'))
     if (typeof classText !== 'string' || classText.length > 512) continue
     const classes=classText.trim().split(/[ \t\n\f\r]+/).slice(0,24)
     for (const name of classes) {

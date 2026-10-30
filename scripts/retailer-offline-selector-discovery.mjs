@@ -166,7 +166,7 @@ function parseHtmlAttributes(text) {
 // before classList, dataset, itemprop or href are read. Only known valid
 // Unicode scalars with an explicit terminator are decoded; ambiguous input
 // remains inert and can never invent a selector. No DOM/scripts/network.
-function staticAttributeValue(value) {
+export function staticAttributeValue(value) {
   if (typeof value !== 'string') return value
   // A browser decodes named and numeric references in a SINGLE pass. Two
   // sequential replacements can invent Product selectors from &amp;#117;.

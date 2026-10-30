@@ -634,3 +634,16 @@ test('archived source URL alias disagreement refuses selector extraction before 
   assert.equal(proposeRetailerSelectors({...valid,finalUrl:valid.requestedUrl,url:valid.requestedUrl},html)
     .source.url,valid.requestedUrl)
 })
+
+test('historical CSS selectors use browser-decoded observed class tokens exactly once',()=>{
+  for(const retailer of ['plus','dekamarkt']){
+    const html='<article class="produc&#116;-card price&#45;label">SYNTHETIC</article>'
+    const review=proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',html),html)
+    assert.ok(review.proposedSelectors.some(x=>x.selector==='article.product-card'),retailer)
+    assert.ok(review.proposedSelectors.some(x=>x.selector==='article.price-label'),retailer)
+    assert.equal(review.readyForScraping,false)
+    const nested='<article class="produc&amp;#116;-card">SYNTHETIC</article>'
+    const refused=proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',nested),nested)
+    assert.equal(refused.proposedSelectors.some(x=>x.selector==='article.product-card'),false)
+  }
+})
