@@ -80,6 +80,8 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
   const scripts = includeScripts ? [] : null;
   const signals = { schemaOrgProduct:false, nextData:false, nuxtData:false, jsonLd:false };
   const hidden = [];
+  // Keep live HTML base href facts separate from visible DOM selectors.
+  const baseHrefs = [];
   let pos = 0;
   let inspected = 0;
   while (pos < html.length) {
@@ -127,6 +129,12 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
     // Ignore any apparent script/selector tags following it.
     if (tag === 'plaintext') break;
     const suppressed = hidden.length > 0;
+    if (tag === 'base' && (hidden.length === 0 ||
+        hidden.length === 1 && hidden[0] === 'head') &&
+        values.has('href')) {
+      if (baseHrefs.length) throw new Error('Multiple live HTML base URLs');
+      baseHrefs.push(values.get('href'));
+    }
     if (!suppressed && !HIDDEN.has(tag) && tag !== 'script') {
       // Retain the *actual* start tag only. Never reinterpret its attributes
       // as independent HTML elements, even if they contain "<span ...>".
@@ -172,5 +180,5 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
   }
   if (hidden.length) throw new Error('Unbalanced inert HTML element');
   return { visible: visible.join(''), structuredSignals: signals,
-    ...(includeScripts ? { scripts } : {}) };
+    baseHrefs, ...(includeScripts ? { scripts } : {}) };
 }
