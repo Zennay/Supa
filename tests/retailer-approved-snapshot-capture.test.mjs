@@ -728,3 +728,38 @@ test('ambiguous or uncheckable Content-Digest is refused before downloading upst
     assert.equal(cancelled, 1)
   }
 })
+
+test('RFC 9530 SHA-512 and dual-algorithm Content-Digest evidence are fully checked', async () => {
+  const html = '<html><body>SYNTHETIC BOTH-ALGORITHMS</body></html>'
+  const sha256 = createHash('sha256').update(html).digest('base64')
+  const sha512 = createHash('sha512').update(html).digest('base64')
+  const valid = [
+    'sha-512=:' + sha512 + ':',
+    'sha-256=:' + sha256 + ':, sha-512=:' + sha512 + ':',
+    'sha-512=:' + sha512 + ':, sha-256=:' + sha256 + ':',
+  ]
+  for (const digest of valid) {
+    const record = await captureApprovedRetailerPage({
+      source, permissionGate: gate, grant,
+      fetchFn: async () => new Response(html, {status: 200, headers: {
+        'content-type': 'text/html', 'content-digest': digest,
+      }}),
+    })
+    assert.equal(record.source.sha256,
+      createHash('sha256').update(html).digest('hex'))
+    assert.equal(record.published, false)
+  }
+  const bad512 = createHash('sha512').update('different representation').digest('base64')
+  for (const header of [
+    'sha-512=:' + bad512 + ':',
+    'sha-256=:' + sha256 + ':, sha-512=:' + bad512 + ':',
+    'sha-256=:' + sha256 + ':, sha-256=:' + sha256 + ':',
+  ]) {
+    await assert.rejects(captureApprovedRetailerPage({
+      source, permissionGate: gate, grant,
+      fetchFn: async () => new Response(html, {status: 200, headers: {
+        'content-type': 'text/html', 'content-digest': header,
+      }}),
+    }), /Content-Digest/)
+  }
+})

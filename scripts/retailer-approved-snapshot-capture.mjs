@@ -256,13 +256,27 @@ function trustedHttpContentEncoding(headers) {
 function checkedHttpContentDigest(headers) {
   const raw = headers?.get?.('content-digest')
   if (raw === null || raw === undefined) return null
-  const match = typeof raw === 'string'
-    ? /^sha-256=:([A-Za-z0-9+/]{43}=):$/.exec(raw.trim()) : null
-  if (!match || Buffer.from(match[1], 'base64').toString('base64') !== match[1] ||
+  if (typeof raw !== 'string' || raw.length > 240 ||
       trustedHttpContentEncoding(headers) !== 'identity') {
     throw new Error('Unsupported or ambiguous retailer Content-Digest')
   }
-  return match[1]
+  // RFC 9530 permits SHA-256 and SHA-512 in one structured dictionary.
+  // Verify every provided supported algorithm; never pick a convenient valid
+  // member while silently discarding a contradictory digest or duplicate.
+  const expected = Object.create(null)
+  for (const item of raw.split(',')) {
+    const match = /^(sha-256|sha-512)=:([A-Za-z0-9+/]+={0,2}):$/.exec(item.trim())
+    const algorithm = match?.[1]
+    const canonical = match?.[2]
+    const size = algorithm === 'sha-256' ? 32 : 64
+    if (!algorithm || Object.hasOwn(expected, algorithm) ||
+        Buffer.from(canonical, 'base64').length !== size ||
+        Buffer.from(canonical, 'base64').toString('base64') !== canonical) {
+      throw new Error('Unsupported or ambiguous retailer Content-Digest')
+    }
+    expected[algorithm] = canonical
+  }
+  return expected
 }
 
 async function collectBoundedBody(response, expectedDigest) {
@@ -324,7 +338,11 @@ async function collectBoundedBody(response, expectedDigest) {
   }
   const all = Buffer.concat(chunks)
   const digest = createHash('sha256').update(all).digest()
-  if (expectedDigest !== null && digest.toString('base64') !== expectedDigest) {
+  if (expectedDigest !== null &&
+      ((expectedDigest['sha-256'] &&
+        digest.toString('base64') !== expectedDigest['sha-256']) ||
+       (expectedDigest['sha-512'] &&
+        createHash('sha512').update(all).digest('base64') !== expectedDigest['sha-512']))) {
     throw new Error('Retailer Content-Digest mismatch')
   }
   const html = decodeExactRetailerHtmlBytes(all)
