@@ -136,6 +136,11 @@ function assertDocumentSourceIdentity(html, target) {
   if (document.hasMetaRefresh) throw new Error('Retailer HTML navigation refused')
   const expected = new URL(target)
   for (const href of document.baseHrefs) {
+    // The browser resolves HTML character references before interpreting
+    // href. Never validate their undecoded source text as a safe URL.
+    if (typeof href !== 'string' || !href || href.length > 2048 || href.includes('&')) {
+      throw new Error('Untrusted HTML base URL')
+    }
     let destination
     try { destination = new URL(href, target) }
     catch { throw new Error('Untrusted HTML base URL') }
@@ -145,6 +150,9 @@ function assertDocumentSourceIdentity(html, target) {
     }
   }
   for (const href of document.canonicalHrefs) {
+    if (typeof href !== 'string' || !href || href.length > 2048 || href.includes('&')) {
+      throw new Error('Untrusted HTML canonical source URL')
+    }
     let destination
     try { destination = new URL(href, target) }
     catch { throw new Error('Untrusted HTML canonical source URL') }

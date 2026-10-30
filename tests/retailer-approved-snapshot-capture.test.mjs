@@ -296,6 +296,9 @@ test('source-identity capture refuses mismatched canonical/base and live refresh
     ['<html><head><link rel="canonical" href="https://other.test/producten"></head><body>Fake</body></html>', /canonical/],
     ['<html><head><link rel="canonical" href="https://www.plus.nl/product/other-sku"></head><body>Fake</body></html>', /canonical/],
     ['<html><head><base href="//other.test/"></head><body>Fake</body></html>', /base/],
+    ['<html><head><base href="&#47;&#47;other.test/"></head><body>Fake</body></html>', /base/],
+    ['<html><head><base href="https&#58;//other.test/"></head><body>Fake</body></html>', /base/],
+    ['<html><head><link rel="canonical" href="&#x2f;&#x2f;other.test/producten"></head><body>Fake</body></html>', /canonical/],
     ['<html><head><meta http-equiv="refresh" content="0;url=/product/other"></head><body>Fake</body></html>', /navigation/],
   ]
   for (const [html, pattern] of scenarios) {
