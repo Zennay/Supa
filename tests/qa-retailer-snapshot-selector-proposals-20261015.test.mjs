@@ -726,3 +726,20 @@ test('M1 reviewed script evidence rejects oversized JSON-LD script collections a
     assert.deepEqual(read(good+block('text/javascript','var debug = 1;')).jsonLdTypes,['Product'])
   }
 })
+
+test('standalone HTTPS references in Schema.org retail relations remain non-executable, non-Offer evidence',()=>{
+  for(const retailer of ['plus','dekamarkt']) {
+    const read=payload=>{const html='<script type="application/ld+json">'+JSON.stringify(payload)+'</script>';return proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',html),html).embeddedSignals}
+    const product={'@context':'https://schema.org','@type':'Product',sku:'PRIVATE_ONLY',offers:'https://example.invalid/offer/1'}
+    const allowed=read(product)
+    assert.equal(allowed.invalidJsonLdCount,0,retailer)
+    assert.deepEqual(allowed.jsonLdTypes,['Product'],retailer)
+    assert.equal(allowed.jsonLdTypes.includes('Offer'),false)
+    for(const bad of [42,'javascript:alert(1)','http://untrusted.invalid/offer','https://user:pass@example.invalid/x']) {
+      const rejected=read({...product,offers:bad})
+      assert.ok(rejected.invalidJsonLdCount>0,retailer+' '+bad)
+      assert.deepEqual(rejected.jsonLdTypes,[])
+    }
+    assert.equal(read({'@context':'https://schema.org','@type':'Product','@graph':'https://example.invalid/graph'}).invalidJsonLdCount,1)
+  }
+})

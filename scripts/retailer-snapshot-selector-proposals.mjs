@@ -157,9 +157,19 @@ function jsonLdShape(text, types, keys) {
       // This is an offline structural review hint, not a product price parser.
       if (['@graph','mainEntity','itemListElement','item','offers',
            'priceSpecification'].includes(key)) {
-        if (child === null || typeof child !== 'object')
-          throw new Error('Malformed JSON-LD graph relation')
-        visit(child,depth+1,trusted)
+        // JSON-LD permits remote IRI references for several properties.
+        // Preserve valid HTTPS URI leaves without following them or treating
+        // them as a source-observed Product/Offer node. @graph must be local.
+        if (typeof child === 'string' && key !== '@graph') {
+          let url
+          try { url = new URL(child) } catch { throw new Error('Malformed JSON-LD reference') }
+          if (url.protocol !== 'https:' || url.username || url.password ||
+              url.href !== child) throw new Error('Untrusted JSON-LD reference')
+        } else {
+          if (child === null || typeof child !== 'object')
+            throw new Error('Malformed JSON-LD graph relation')
+          visit(child,depth+1,trusted)
+        }
       }
     }
   }
