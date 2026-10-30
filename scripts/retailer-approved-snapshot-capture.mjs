@@ -376,6 +376,11 @@ export async function captureApprovedRetailerPage(options = {}) {
     cache: 'no-store',
     headers: {
       'accept': 'text/html',
+      // Prefer identity so server-provided HTTP digests describe the exact
+      // bytes read by Fetch, rather than compressed wire representation.
+      'accept-encoding': 'identity',
+      // RFC 9530 is optional: a retailer may omit the digest entirely.
+      'want-content-digest': 'sha-256=10, sha-512=9',
       'user-agent': 'SUPA-authorized-source-review/0.1',
     },
     signal: AbortSignal.timeout(TIMEOUT_MS),

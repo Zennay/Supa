@@ -47,6 +47,8 @@ test('synthetic approved fetch produces bounded hash-pinned local HTML for selec
       assert.equal(options.credentials, 'omit')
       assert.equal(options.cache, 'no-store')
       assert.equal(options.headers.accept, 'text/html')
+      assert.equal(options.headers['accept-encoding'], 'identity')
+      assert.equal(options.headers['want-content-digest'], 'sha-256=10, sha-512=9')
       return new Response(html, { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } })
     },
   })
