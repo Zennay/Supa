@@ -1,3 +1,4 @@
+import { parseUniqueKeyRetailerJson } from './retailer-private-unique-key-json.mjs'
 import { decodeExactRetailerHtmlBytes } from './retailer-private-html-byte-identity.mjs'
 /**
  * OFFLINE selector discovery from a previously approved and integrity-linked M1
@@ -223,8 +224,9 @@ export async function proposeFromM1CaptureDirectory(dir) {
   await checkNonSymlinkParents(manifestPath)
   let manifest
   try {
-    manifest = JSON.parse(new TextDecoder('utf-8', { fatal:true })
-      .decode(await readPinnedCaptureFile(manifestPath, 512 * 1024)))
+    manifest = parseUniqueKeyRetailerJson(
+      new TextDecoder('utf-8', { fatal:true })
+        .decode(await readPinnedCaptureFile(manifestPath, 512 * 1024)), 512 * 1024)
   } catch { reject('invalid manifest JSON or file') }
   if (!manifest || !Array.isArray(manifest.results) ||
       manifest.results.length < 1 || manifest.results.length > MAX_CAPTURE_SOURCES ||
