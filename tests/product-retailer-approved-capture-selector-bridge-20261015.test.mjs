@@ -264,3 +264,32 @@ test('approved one-capture bridge preserves only observed safe Schema.org and ge
     assert.equal(review.currentPricesExtracted,false)
   }
 })
+
+test('M1 two-store captured web-component selectors remain reviewable without leaking identifier-bearing tags',async()=>{
+  for(const [supermarket,kind,url] of [
+    ['plus','catalog','https://www.plus.nl/producten'],
+    ['dekamarkt','offers','https://www.dekamarkt.nl/aanbiedingen'],
+  ]) {
+    const html='<retailer-product-card class="product-card" data-testid="product-card">'+
+      '<retailer-price-label data-testid="price-value">PRIVATE_PRICE_299</retailer-price-label>'+
+      '<retailer-pack-size class="pack-size" data-testid="pack-size">PRIVATE_PACK_300</retailer-pack-size>'+
+      '<retailer-product-991-card class="product-card">PRIVATE_SKU_991</retailer-product-991-card>'+
+      '<customer-secret-name-card data-testid="price-value">PRIVATE_ID</customer-secret-name-card>'+
+      '</retailer-product-card>'
+    const reviewed=await captureToPrivateSelectorReview({
+      source:{supermarket,kind,url},grant:consent(supermarket,kind,url),
+      permissionGate:syntheticGate(),capturedAt:at,
+      fetchFn:async()=>new Response(html,{status:200,headers:{'content-type':'text/html'}}),
+    })
+    for(const selector of [
+      'retailer-product-card.product-card',
+      'retailer-product-card[data-testid="product-card"]',
+      'retailer-price-label[data-testid="price-value"]',
+      'retailer-pack-size[data-testid="pack-size"]',
+      'retailer-pack-size.pack-size',
+    ]) assert.ok(reviewed.selectorProposals.some(x=>x.selector===selector),supermarket+': '+selector)
+    assert.doesNotMatch(JSON.stringify(reviewed),/retailer-product-991|customer-secret-name|PRIVATE_PRICE_299|PRIVATE_PACK_300|PRIVATE_SKU_991|PRIVATE_ID/)
+    assert.equal(reviewed.readyForIngestion,false)
+    assert.equal(reviewed.sourceRightsForPublicationVerified,false)
+  }
+})

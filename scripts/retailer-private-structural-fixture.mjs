@@ -4,6 +4,7 @@ import { open, lstat, mkdtemp, rename, rm, readdir } from 'node:fs/promises'
 import { constants as fsFlags } from 'node:fs'
 import { parseUniqueKeyRetailerJson } from './retailer-private-unique-key-json.mjs'
 import { isPublicMerchantProductHrefSelector } from './retailer-public-product-href-selectors.mjs'
+import { isSafeStructuralReviewTag } from './retailer-public-structural-tag.mjs'
 import { resolve, join, dirname } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { replayPrivateProductHtmlSnapshot, replayPrivateSelectorHtmlSnapshot } from './retailer-replay-private-html-product.mjs'
@@ -18,30 +19,16 @@ const MICRODATA_PRODUCT = /^(article|section|div|li|a)\[itemtype="(https?:\/\/sc
 const ELEMENT = '(?:article|section|div|span|p|li|h[1-6]|strong|a|data|time|[a-z][a-z0-9]*-[a-z0-9-]{1,31})'
 const TAG = new RegExp('^(' + ELEMENT + ')\\.([a-z][a-z0-9_-]{0,58})$', 'i')
 const ATTRIBUTE = new RegExp('^(' + ELEMENT + '|meta|link)\\[(data-testid|itemprop)="([a-z][a-z0-9_-]{1,59})"\\]$', 'i')
-// Prevent copying arbitrary SKU, price or personal tokens embedded in custom
-// element names. Source stays in the private original; replay uses only public
-// generic component vocabulary observed in the source itself.
-const GENERIC_COMPONENT_TOKENS = new Set([
-  'retailer','store','plus','deka','dekamarkt','product','item','card','tile',
-  'name','title','label','price','pack','size','unit','offer','deal',
-  'stock','availability','listing','catalog','web','component','custom',
-])
-function safeStructuralElementTag(tag) {
-  if (!tag.includes('-')) return true
-  const tokens=tag.toLowerCase().split('-')
-  return tokens.length >= 2 && tokens.length <= 5 &&
-    tokens.every(token => GENERIC_COMPONENT_TOKENS.has(token))
-}
 const refuse = () => { throw Error('Private synthetic structural fixture refused') }
 function elementFor(row, retailerId) {
   if (!FIELD.has(row.field) || row.status !== 'needs-human-review' ||
       !Number.isSafeInteger(row.instances) || row.instances < 1) return null
   let match = TAG.exec(row.selector)
-  if (match && !safeStructuralElementTag(match[1])) return null
+  if (match && !isSafeStructuralReviewTag(match[1])) return null
   if (match) return '<'+match[1].toLowerCase()+' class="'+match[2]+
     '" data-synthetic="true">SYNTHETIC STRUCTURE</'+match[1].toLowerCase()+'>'
   match = ATTRIBUTE.exec(row.selector)
-  if (match && !safeStructuralElementTag(match[1])) return null
+  if (match && !isSafeStructuralReviewTag(match[1])) return null
   if (match) {
     const tag = match[1].toLowerCase()
     const opening = '<'+tag+' '+match[2]+'="'+match[3]+'" data-synthetic="true">'

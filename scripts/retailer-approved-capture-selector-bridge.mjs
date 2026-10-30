@@ -10,6 +10,7 @@ import { types as nodeTypes } from 'node:util'
 import { captureApprovedRetailerPage } from './retailer-approved-snapshot-capture.mjs'
 import { proposeOfflineRetailerSelectors } from './retailer-offline-selector-discovery.mjs'
 import { isPublicMerchantProductHrefSelector } from './retailer-public-product-href-selectors.mjs'
+import { isSafeStructuralReviewTag } from './retailer-public-structural-tag.mjs'
 
 const refuse = () => { throw new Error('Authorized retailer capture-to-selector review refused') }
 
@@ -71,7 +72,7 @@ function inertCaptureOptions(options) {
 // source tokens: class names or data-testid attributes can encode a product
 // identifier or price. Only a bounded vocabulary of generic selectors leaves
 // the private captured HTML scope; unknown selectors stay in private review.
-const GENERIC_SELECTOR = /^[a-z][a-z0-9-]{0,30}\.(?:product|item|card|tile|name|title|label|price|pack|size|unit|offer|deal|sale|discount|stock|availability|product-card|price-label|price-value|offer-card|product-name|item-card|item-name|price-tag|stock-label)$/
+const GENERIC_SELECTOR = /^[a-z][a-z0-9-]{0,30}\.(?:product|item|card|tile|name|title|label|price|pack|size|unit|offer|deal|sale|discount|stock|availability|product-card|price-label|price-value|offer-card|product-name|item-card|item-name|price-tag|stock-label|pack-size|offer-label)$/
 // These are actual standards-based selectors from the captured DOM, not
 // inferred retail fields. Allow exact public Schema.org tokens and a bounded
 // vocabulary of generic test IDs across the privacy/review boundary.
@@ -89,10 +90,14 @@ const GENERIC_TEST_ID_FIELDS = Object.freeze({
   'pack-size':'pack', 'offer-card':'offer', 'offer-label':'offer',
   'stock-label':'availability',
 })
-const SCHEMA_PROP_SELECTOR = /^(article|section|div|li|a|span|h2|h3|p|strong|meta|link|data|time)\[itemprop="([a-zA-Z]+)"\]$/
-const GENERIC_TEST_ID_SELECTOR = /^(article|section|div|li|a|span|h2|h3|p|strong|meta|link|data|time)\[data-testid="([a-z][a-z-]+)"\]$/
+const SCHEMA_PROP_SELECTOR = /^(article|section|div|li|a|span|h2|h3|p|strong|meta|link|data|time|[a-z][a-z0-9]*-[a-z0-9-]{1,31})\[itemprop="([a-zA-Z]+)"\]$/
+const GENERIC_TEST_ID_SELECTOR = /^(article|section|div|li|a|span|h2|h3|p|strong|meta|link|data|time|[a-z][a-z0-9]*-[a-z0-9-]{1,31})\[data-testid="([a-z][a-z-]+)"\]$/
 const SCHEMA_PRODUCT_SELECTOR = /^(article|section|div|li|a)\[itemtype="https?:\/\/schema\.org\/Product"\]$/
 function publicReviewSelector(row, retailerId) {
+  // Source tag names may themselves be user/product identifiers; the same
+  // bounded structural vocabulary applies to both independent review paths.
+  const tag = /^[a-z][a-z0-9-]*/.exec(row.selector)?.[0]
+  if (!isSafeStructuralReviewTag(tag)) return false
   if (GENERIC_SELECTOR.test(row.selector)) return true
   const schemaProperty = SCHEMA_PROP_SELECTOR.exec(row.selector)
   if (schemaProperty) return Object.hasOwn(SCHEMA_FIELDS, schemaProperty[2]) &&
