@@ -370,9 +370,10 @@ const PUBLIC_GENERIC_TOKENS = new Set([
 // usable observed absolute selectors for the operator's human drift review.
 export function summarizeOfflineSelectorProposals(report) {
   const safe = report.selectors.filter(row => {
-    if (row.selector === 'a[href^="/product/"]' ||
-        row.selector === 'a[href^="/producten/"]' ||
-        (row.field === 'product' && isPublicMerchantProductHrefSelector(report.source.retailerId, row.selector))) return true
+    if (row.field === 'product' &&
+        (isPublicMerchantProductHrefSelector(report.source.retailerId, row.selector) ||
+         (!Object.hasOwn(KNOWN_MERCHANT_HOSTS, report.source.retailerId) &&
+          ['a[href^="/product/"]','a[href^="/producten/"]'].includes(row.selector)))) return true
     const match = /^[a-z][a-z0-9-]{0,30}(?:\.([a-z][a-z0-9_-]{1,59})|\[(?:data-testid|itemprop)="([a-z][a-z0-9_-]{1,59})"\])$/.exec(row.selector)
     return match && PUBLIC_GENERIC_TOKENS.has(match[1] ?? match[2])
   })

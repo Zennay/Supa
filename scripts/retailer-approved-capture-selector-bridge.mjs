@@ -71,7 +71,7 @@ function inertCaptureOptions(options) {
 // source tokens: class names or data-testid attributes can encode a product
 // identifier or price. Only a bounded vocabulary of generic selectors leaves
 // the private captured HTML scope; unknown selectors stay in private review.
-const GENERIC_SELECTOR = /^(?:a\[href\^="\/(?:product|producten)\/"\]|[a-z][a-z0-9-]{0,30}\.(?:product|item|card|tile|name|title|label|price|pack|size|unit|offer|deal|sale|discount|stock|availability|product-card|price-label|offer-card|product-name|item-card|item-name|price-tag|stock-label))$/
+const GENERIC_SELECTOR = /^[a-z][a-z0-9-]{0,30}\.(?:product|item|card|tile|name|title|label|price|pack|size|unit|offer|deal|sale|discount|stock|availability|product-card|price-label|offer-card|product-name|item-card|item-name|price-tag|stock-label)$/
 // The only absolute href prefixes allowed out of private source review are
 // known official merchant product roots, never a SKU, query or arbitrary URL.
 function safeSelectorProposals(selectors, retailerId) {
@@ -80,7 +80,8 @@ function safeSelectorProposals(selectors, retailerId) {
     row && row.status === 'needs-human-review' &&
     typeof row.selector === 'string' &&
     (GENERIC_SELECTOR.test(row.selector) ||
-      isPublicMerchantProductHrefSelector(retailerId, row.selector)) &&
+      (row.field === 'product' &&
+        isPublicMerchantProductHrefSelector(retailerId, row.selector))) &&
     typeof row.field === 'string' && /^[a-z]{2,20}$/.test(row.field) &&
     typeof row.instances === 'number' && Number.isSafeInteger(row.instances) &&
     row.instances >= 1

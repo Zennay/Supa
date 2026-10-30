@@ -2,10 +2,12 @@
 // historic selector drift. Never contains product URLs/IDs or source grants.
 const roots = Object.freeze({
   plus: Object.freeze([
+    'a[href^="/product/"]',
     'a[href^="https://www.plus.nl/product/"]',
     'a[href^="//www.plus.nl/product/"]',
   ]),
   dekamarkt: Object.freeze([
+    'a[href^="/producten/"]',
     'a[href^="https://www.dekamarkt.nl/producten/"]',
     'a[href^="//www.dekamarkt.nl/producten/"]',
   ]),
