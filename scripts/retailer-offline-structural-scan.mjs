@@ -85,6 +85,7 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
   const canonicalHrefs = [];
   let hasMetaRefresh = false;
   let hasMetaNoStore = false;
+  let hasConflictingCharset = false;
   let pos = 0;
   let inspected = 0;
   while (pos < html.length) {
@@ -165,6 +166,21 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
         /(?:^|,)\s*no-store(?:\s*(?:[=;,]|$))/i.test(values.get('content'))) {
       hasMetaNoStore = true;
     }
+    // A browser may decode the same captured bytes differently when an HTML
+    // meta declaration disagrees with our UTF-8-only snapshot contract.
+    if (tag === 'meta' && (hidden.length === 0 ||
+        hidden.length === 1 && hidden[0] === 'head')) {
+      const declared = values.get('charset')
+      if (values.has('charset') &&
+          (typeof declared !== 'string' || !/^utf-?8$/i.test(declared.trim()))) {
+        hasConflictingCharset = true
+      }
+      if (values.get('http-equiv')?.trim().toLowerCase() === 'content-type' &&
+          !/^text\/html\s*;\s*charset\s*=\s*["']?utf-?8["']?\s*$/i
+            .test(values.get('content') ?? '')) {
+        hasConflictingCharset = true
+      }
+    }
     if (!suppressed && !HIDDEN.has(tag) && tag !== 'script') {
       // Retain the *actual* start tag only. Never reinterpret its attributes
       // as independent HTML elements, even if they contain "<span ...>".
@@ -210,6 +226,6 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
   }
   if (hidden.length) throw new Error('Unbalanced inert HTML element');
   return { visible: visible.join(''), structuredSignals: signals,
-    baseHrefs, canonicalHrefs, hasMetaRefresh, hasMetaNoStore,
+    baseHrefs, canonicalHrefs, hasMetaRefresh, hasMetaNoStore, hasConflictingCharset,
     ...(includeScripts ? { scripts } : {}) };
 }
