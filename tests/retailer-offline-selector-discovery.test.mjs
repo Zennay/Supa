@@ -1237,3 +1237,19 @@ test('HTML-encoded and literal underscore former price labels cannot become curr
     }
   }
 })
+
+test('one malformed or duplicate-key JSON-LD script cannot leave a trusted Product source signal from another script',async()=>{
+  const {readAuthorizedHtmlScriptEvidence}=await import('../scripts/retailer-approved-html-script-evidence.mjs')
+  const good='<script type="application/ld+json">{"@context":"https://schema.org","@type":"Product"}</script>'
+  const broken='<script type="application/ld+json">{"@context":"https://schema.org","@type":"Offer","price":1,"price":2}</script>'
+  for(const [retailerId,url] of [['plus','https://www.plus.nl/producten'],['dekamarkt','https://www.dekamarkt.nl/aanbiedingen']]){
+    assert.equal(proposeOfflineRetailerSelectors({html:good,origin:{...origin,retailerId,url}}).structuredSignals.schemaOrgProduct,true)
+    for(const html of [good+broken,broken+good]){
+      const strict=readAuthorizedHtmlScriptEvidence(html,url)
+      assert.equal(strict.invalid,true)
+      const report=proposeOfflineRetailerSelectors({html,origin:{...origin,retailerId,url}})
+      assert.equal(report.structuredSignals.schemaOrgProduct,false,retailerId)
+      assert.equal(report.readyForIngestion,false)
+    }
+  }
+})

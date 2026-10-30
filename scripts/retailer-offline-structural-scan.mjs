@@ -140,7 +140,7 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
   let nuxtScriptCount = 0, nextScriptCount = 0;
   // As with the SHA-bound private reader, Product context is a property of
   // the complete captured JSON-LD source, not just the first positive block.
-  let foreignJsonLdContext = false;
+  let foreignJsonLdContext = false, malformedJsonLdBlock = false;
   const hidden = [];
   // Keep live HTML base href facts separate from visible DOM selectors.
   const baseHrefs = [];
@@ -326,10 +326,16 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
           // JSON grammar as the private priced evidence reader. Duplicate
           // keys (including escaped aliases) must not create false proof.
           try { parsed = parseUniqueKeyRetailerJson(content); } catch {}
-          if (type === 'application/ld+json' && parsed !== null) {
-            signals.jsonLd = true;
-            if (hasUntrustedNestedSchemaContext(parsed)) foreignJsonLdContext = true;
-            else if (hasProduct(parsed)) signals.schemaOrgProduct = true;
+          if (type === 'application/ld+json') {
+            // A second malformed or duplicate-key block vetoes Product source
+            // confidence even if another independent script parsed cleanly.
+            // The strict private review also refuses the entire capture.
+            if (parsed === null) malformedJsonLdBlock = true;
+            else {
+              signals.jsonLd = true;
+              if (hasUntrustedNestedSchemaContext(parsed)) foreignJsonLdContext = true;
+              else if (hasProduct(parsed)) signals.schemaOrgProduct = true;
+            }
           }
           if (id === '__NUXT_DATA__' && (type === undefined || type === 'application/json') &&
               Array.isArray(parsed)) signals.nuxtData = true;
@@ -346,7 +352,7 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
   if (hidden.length) throw new Error('Unbalanced inert HTML element');
   // One foreign node invalidates the combined official Product source claim,
   // regardless of script ordering. JSON presence itself remains observable.
-  if (foreignJsonLdContext) signals.schemaOrgProduct = false;
+  if (foreignJsonLdContext || malformedJsonLdBlock) signals.schemaOrgProduct = false;
   if (nuxtScriptCount !== 1) signals.nuxtData = false;
   if (nextScriptCount !== 1) signals.nextData = false;
   return { visible: visible.join(''), structuredSignals: signals,
