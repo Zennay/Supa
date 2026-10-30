@@ -202,6 +202,30 @@ function sameRetailerContentLocation(raw, source) {
     path(claimed.pathname) === path(expected.pathname)
 }
 
+function sameRetailerCanonicalLink(raw, source) {
+  if (raw == null) return true
+  if (typeof raw !== 'string' || raw.length > 8192) return false
+  // A Link header may include ordinary preload hints and a canonical link.
+  // Never infer/override a canonical source from an unparseable relation.
+  for (const item of raw.split(/,\s*(?=<)/)) {
+    const relation = /(?:^|;)\s*rel\s*=\s*(?:"([^"]*)"|'([^']*)'|([^;,\s]+))/ig
+    let match
+    let canonical = false
+    while ((match = relation.exec(item)) !== null) {
+      const relations = (match[1] ?? match[2] ?? match[3]).split(/[ \t]+/)
+      if (relations.some(x => x.toLowerCase() === 'canonical')) canonical = true
+    }
+    if (!canonical) {
+      // Malformed canonical declarations must not escape the parser.
+      if (/\brel\s*=.*canonical/i.test(item)) return false
+      continue
+    }
+    const target = /^\s*<([^<>]{1,2048})>/.exec(item)?.[1]
+    if (!target || !sameRetailerContentLocation(target, source)) return false
+  }
+  return true
+}
+
 async function collectBoundedBody(response) {
   if (!response?.body || typeof response.body.getReader !== 'function') {
     throw new Error('Missing streaming HTML body')
@@ -323,8 +347,10 @@ export async function captureApprovedRetailerPage(options = {}) {
   // identity without a 3xx. Refuse it before reading private source bytes.
   const refresh = response.headers?.get?.('refresh')
   const contentLocation = response.headers?.get?.('content-location')
+  const links = response.headers?.get?.('link')
   if ((refresh != null && refresh.trim() !== '') ||
-      (contentLocation != null && !sameRetailerContentLocation(contentLocation, target))) {
+      (contentLocation != null && !sameRetailerContentLocation(contentLocation, target)) ||
+      !sameRetailerCanonicalLink(links, target)) {
     await closeRejectedBody()
     throw new Error('Retailer response navigation/source identity refused')
   }

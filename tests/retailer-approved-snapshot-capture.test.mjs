@@ -430,3 +430,31 @@ test('HTTP 200 Refresh and Content-Location cannot rebind one-page capture', asy
   assert.equal(accepted.source.sha256, createHash('sha256').update(body).digest('hex'))
   assert.equal(accepted.readyForIngestion, false)
 })
+
+test('HTTP canonical Link header cannot silently reattribute a 200 HTML snapshot', async () => {
+  const invalid = [
+    '<https://foreign.example/product/123>; rel="canonical"',
+    '</product/different>; rel=canonical',
+    '<https://www.plus.nl/producten?site=other>; rel="canonical"',
+    '<https://www.plus.nl/product/different>; rel="alternate canonical"; title="wrong"',
+    '<https://www.plus.nl/producten>; rel="canonical',
+  ]
+  for (const link of invalid) {
+    await assert.rejects(captureApprovedRetailerPage({
+      source, permissionGate: gate, grant,
+      fetchFn: async () => new Response('<html>MOCK</html>', {
+        headers: { 'content-type': 'text/html', link },
+      }),
+    }), /response navigation\/source identity refused/)
+  }
+  const html = '<html><body>SYNTHETIC</body></html>'
+  const allowed = await captureApprovedRetailerPage({
+    source, permissionGate: gate, grant,
+    fetchFn: async () => new Response(html, {
+      headers: { 'content-type': 'text/html',
+        link: '</styles.css>; rel=preload, <https://www.plus.nl/producten/>; rel="canonical"' },
+    }),
+  })
+  assert.equal(allowed.source.sha256, createHash('sha256').update(html).digest('hex'))
+  assert.equal(allowed.readyForIngestion, false)
+})
