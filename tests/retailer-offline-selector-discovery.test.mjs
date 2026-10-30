@@ -688,3 +688,15 @@ test('private offline proposals refuse live no-store meta while ignoring inert f
   assert.equal(allowed.selectors.find(x=>x.selector==='a[href^="/product/"]')?.instances,1)
   assert.equal(allowed.readyForIngestion,false)
 })
+
+test('in-memory selector proposals refuse HTML BOM/NUL that browser parsing would normalize', () => {
+  const origin={retailerId:'plus',url:'https://www.plus.nl/producten',
+    capturedAt:'2026-10-14T12:00:00.000Z'}
+  const sample='<html><body><a href="/product/synthetic-1">SYNTHETIC</a></body></html>'
+  for (const html of ['\uFEFF'+sample,sample+'\u0000']) {
+    assert.throws(()=>proposeOfflineRetailerSelectors({html,origin}),
+      /Invalid or oversized offline retailer snapshot/)
+  }
+  const valid=proposeOfflineRetailerSelectors({html:sample,origin})
+  assert.equal(valid.selectors.find(x=>x.selector==='a[href^="/product/"]')?.instances,1)
+})
