@@ -181,6 +181,15 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
       if (baseHrefs.length) throw new Error('Multiple live HTML base URLs');
       baseHrefs.push(values.get('href'));
     }
+    // Browsers decode character references in rel tokens too. Otherwise a
+    // rel="canon&#105;cal" could silently hide a cross-origin canonical URL.
+    if (tag === 'link' && (hidden.length === 0 ||
+        hidden.length === 1 && hidden[0] === 'head') && values.has('rel')) {
+      const rel = decodedMeta(values.get('rel'));
+      if (typeof rel !== 'string' || rel.includes('&'))
+        throw new Error('Ambiguous canonical retailer source URL');
+      values.set('rel',rel);
+    }
     // Only genuine live <link rel=canonical> elements count as source page
     // identity. Quoted fake markup and inert template/script tags are ignored.
     if (tag === 'link' && (hidden.length === 0 ||

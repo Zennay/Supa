@@ -610,3 +610,10 @@ test('live HTML charset declarations cannot contradict the UTF-8 source byte ide
   assert.equal(allowed.published,false)
   assert.equal(allowed.readyForIngestion,false)
 })
+
+test('entity-encoded canonical rel cannot launder the wrong captured retailer page',async()=>{
+  const html='<html><head><link rel="canon&#105;cal" href="https://other.test/producten"></head><body>synthetic</body></html>'
+  await assert.rejects(captureApprovedRetailerPage({source,permissionGate:gate,grant,
+    fetchFn:async()=>new Response(html,{status:200,headers:{'content-type':'text/html'}}),
+  }),/canonical/)
+})

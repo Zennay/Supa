@@ -747,3 +747,8 @@ test('private HTML selector review refuses conflicting declared encoding, not in
   assert.equal(allowed.selectors.find(x=>x.selector==='a[href^="/product/"]')?.instances,1)
   assert.equal(allowed.readyForIngestion,false)
 })
+
+test('numeric canonical rel attribute identity cannot be hidden from offline source review',()=>{
+  const html='<html><head><link rel="canon&#105;cal" href="https://other.example/producten"></head><body><a href="/product/synthetic-42">synthetic</a></body></html>'
+  assert.throws(()=>proposeOfflineRetailerSelectors({html,origin}),/canonical/)
+})
