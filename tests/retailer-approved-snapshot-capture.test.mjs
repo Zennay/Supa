@@ -325,6 +325,7 @@ test('source capture refuses ambiguous route bytes before any injected network',
   let called = 0
   for (const badPath of [
     '/product/a%2fb', '/product/a%5cb', '/product/a%2eb', '/product/a%252fb',
+    '/product/a%00b', '/product/a%0ab', '/product/a%1fb', '/product/a%7fb',
   ]) {
     const targetUrl = 'https://www.plus.nl' + badPath
     await assert.rejects(captureApprovedRetailerPage({

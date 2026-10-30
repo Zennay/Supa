@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { types as nodeTypes } from 'node:util'
 import { evaluateSourcePermissionGate } from './m1-check-source-permission-gate.mjs'
 import { scanOfflineRetailerMarkup } from './retailer-offline-structural-scan.mjs'
+import { ambiguousRetailerRoute } from './retailer-source-route-safety.mjs'
 
 /**
  * A direct approved capture must not rely on getter/proxy fields that can
@@ -122,7 +123,7 @@ function checkedTarget(source) {
   }
   // Encoded separators and dot segments can be interpreted differently by
   // an upstream router/proxy. A source grant must map to one unambiguous path.
-  if (/(?:%2f|%5c|%2e|%25|\\)/i.test(target.pathname)) {
+  if (ambiguousRetailerRoute(target.pathname)) {
     throw new Error('Ambiguous retailer capture route')
   }
   return target.href

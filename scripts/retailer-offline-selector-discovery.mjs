@@ -3,6 +3,7 @@ import { isIP } from 'node:net'
 import { types as nodeTypes } from 'node:util'
 import { scanOfflineRetailerMarkup } from './retailer-offline-structural-scan.mjs'
 import { isPublicMerchantProductHrefSelector } from './retailer-public-product-href-selectors.mjs'
+import { ambiguousRetailerRoute } from './retailer-source-route-safety.mjs'
 
 // Offline-first DOM selector proposal. NEVER downloads a page, executes scripts,
 // exports product/price text, or labels proposed selectors as confirmed.
@@ -65,7 +66,7 @@ function validSnapshotOrigin(origin) {
       const knownRoute = origin.retailerId === 'plus'
         ? /^\/(?:product\/[^/]+|producten(?:\/.*)?|aanbiedingen(?:\/.*)?)$/.test(path)
         : /^\/(?:producten(?:\/.*)?|aanbiedingen(?:\/.*)?)$/.test(path)
-      if (!knownRoute || /%(?:2f|5c|2e|25)/i.test(path) || path.includes('\\'))
+      if (!knownRoute || ambiguousRetailerRoute(path))
         return false
     }
     return exact && url.protocol === 'https:' &&
@@ -191,7 +192,7 @@ function observedProductHrefPrefix(origin, href, documentBaseUrl) {
         if (target.origin !== base.origin || target.username || target.password ||
             !target.pathname.startsWith(prefix) ||
             !slug || slug.startsWith('/') ||
-            /%(?:2f|5c|2e|25)/i.test(slug)) return null
+            ambiguousRetailerRoute(slug)) return null
         return observed
       } catch { return null }
     }

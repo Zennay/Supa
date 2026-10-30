@@ -523,6 +523,25 @@ test('live canonical source URL cannot attribute foreign product pages to PLUS',
     /Ambiguous canonical retailer source URL/)
 })
 
+test('archived snapshot origin and product anchors reject encoded HTTP control bytes', () => {
+  const bad=['%00','%09','%1f','%7f','%2e','%25']
+  for (const control of bad) {
+    const html='<html><body><a href="/product/synthetic'+control+
+      'bad">SYNTHETIC</a></body></html>'
+    const source=proposeOfflineRetailerSelectors({html,origin})
+    assert.equal(source.selectors.filter(s=>s.field==='product').length,0)
+    assert.throws(()=>proposeOfflineRetailerSelectors({
+      html:'<article class="product-card">SYNTHETIC</article>',
+      origin:{...origin,url:'https://www.plus.nl/product/synthetic'+control+'bad'},
+    }),/Invalid or oversized offline retailer snapshot/)
+  }
+  const valid=proposeOfflineRetailerSelectors({
+    html:'<a href="/product/observed-%20space">SYNTHETIC</a>',origin,
+  })
+  assert.equal(valid.selectors.find(x=>x.selector==='a[href^="/product/"]')?.instances,1)
+  assert.equal(valid.readyForIngestion,false)
+})
+
 test('source-observed named HTML href entities yield actual DOM-equivalent product selectors', () => {
   const markup = '<html><body>' +
     '<a href="&sol;product/mock-111">SYNTHETIC</a>' +
