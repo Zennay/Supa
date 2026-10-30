@@ -13,7 +13,7 @@ const FIELD = new Set(['product','name','price','pack','offer','availability'])
 const MICRODATA_PRODUCT = /^(article|section|div|li|a)\[itemtype="(https?:\/\/schema\.org\/Product)"\]$/
 
 const TAG = /^(article|section|div|span|p|li|h[1-6]|a)\.([a-z][a-z0-9_-]{0,58})$/i
-const ATTRIBUTE = /^(article|section|div|span|p|li|h[1-6])\[(data-testid|itemprop)="([a-z][a-z0-9_-]{1,59})"\]$/i
+const ATTRIBUTE = /^(article|section|div|span|p|li|h[1-6]|meta)\[(data-testid|itemprop)="([a-z][a-z0-9_-]{1,59})"\]$/i
 const refuse = () => { throw Error('Private synthetic structural fixture refused') }
 function elementFor(row, retailerId) {
   if (!FIELD.has(row.field) || row.status !== 'needs-human-review' ||
@@ -22,8 +22,13 @@ function elementFor(row, retailerId) {
   if (match) return '<'+match[1].toLowerCase()+' class="'+match[2]+
     '" data-synthetic="true">SYNTHETIC STRUCTURE</'+match[1].toLowerCase()+'>'
   match = ATTRIBUTE.exec(row.selector)
-  if (match) return '<'+match[1].toLowerCase()+' '+match[2]+'="'+match[3]+
-    '" data-synthetic="true">SYNTHETIC STRUCTURE</'+match[1].toLowerCase()+'>'
+  if (match) {
+    const tag = match[1].toLowerCase()
+    const opening = '<'+tag+' '+match[2]+'="'+match[3]+'" data-synthetic="true">'
+    // The source's original content=price or ID is never retained. Meta is
+    // an HTML void element and must not receive a fake closing element.
+    return tag==='meta' ? opening : opening+'SYNTHETIC STRUCTURE</'+tag+'>'
+  }
   match=MICRODATA_PRODUCT.exec(row.selector)
   if (row.field === 'product' && match)
     return '<'+match[1]+' itemscope itemtype="'+match[2]+

@@ -455,3 +455,27 @@ test('anchor-backed Product microdata survives private source to review-only HTM
     x.selector==='a[itemtype="https://schema.org/Product"]'))
   assert.equal((await verifyPrivateSyntheticHtmlFixture(filename,out)).verified,true)
 })
+
+test('real observed meta itemprop price is replayed as a void structural node, without value',async t=>{
+  for(const retailer of ['plus','dekamarkt']) {
+    const source='<html><head><meta charset="UTF-8"></head><body>'+
+      '<article class="product-card" itemscope itemtype="https://schema.org/Product">'+
+      '<span itemprop="name">PRIVATE_NAME_DO_NOT_EXPORT</span>'+
+      '<meta itemprop="price" content="123.45">'+
+      '</article></body></html>'
+    const kind=retailer==='plus'?'catalog':'offers'
+    const {filename,dir,capture}=await archive(t,retailer,kind,source)
+    const out=join(dir,'sanitized-microdata-price')
+    await buildPrivateSyntheticHtmlFixture(filename,out)
+    const html=await readFile(join(out,'synthetic-structure.html'),'utf8')
+    const selector='meta[itemprop="price"]'
+    assert.match(html,/<meta itemprop="price" data-synthetic="true">/)
+    assert.doesNotMatch(html,/content="123.45"|PRIVATE_NAME_DO_NOT_EXPORT|<\/meta>/)
+    const replay=proposeOfflineRetailerSelectors({html,origin:{
+      retailerId:retailer,url:capture.source.url,capturedAt:capture.source.capturedAt}})
+    assert.ok(replay.selectors.some(row=>row.field==='price'&&row.selector===selector))
+    assert.equal(replay.readyForIngestion,false)
+    assert.equal(replay.productionEnabled,false)
+    assert.equal((await verifyPrivateSyntheticHtmlFixture(filename,out)).verified,true)
+  }
+})
