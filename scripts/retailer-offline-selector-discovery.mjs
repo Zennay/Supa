@@ -61,10 +61,13 @@ function validSnapshotOrigin(origin) {
   try {
     const url = new URL(origin.url)
     const exact = url.href === origin.url
-    const syntax = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(origin.capturedAt)
+    const syntax = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/.test(origin.capturedAt)
     if (!syntax) return false
     const timestamp = Date.parse(origin.capturedAt)
     if (!Number.isFinite(timestamp) || timestamp > Date.now()) return false
+    // Preserve up to nine explicit UTC fractional digits, as historical M1
+    // capture manifests do; Date.parse truncates to milliseconds only for
+    // the civil-date validation, never rewrites original source provenance.
     // Date.parse silently normalizes impossible Gregorian dates (e.g. Feb 30).
     // Preserve the user's ORIGINAL UTC clock in SHA-linked source metadata.
     const civilUtc = new Date(timestamp).toISOString().slice(0, 19)

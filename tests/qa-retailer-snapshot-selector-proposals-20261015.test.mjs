@@ -779,3 +779,16 @@ test('legacy nanosecond capture clocks never cause an unverified old-price field
     assert.equal(report.source.capturedAt,record.capturedAt)
   }
 })
+
+test('legacy M1 nanosecond clocks can corroborate a genuine source-observed current-price selector', () => {
+  const html='<article class="product-card"><span class="price-value">SYNTHETIC_CURRENT</span></article>'
+  for (const [store,kind] of [['plus','catalog'],['dekamarkt','offers']]) {
+    const record=source(store,kind,html)
+    record.capturedAt='2026-10-04T12:00:00.123456789Z'
+    const report=proposeRetailerSelectors(record,html)
+    assert.ok(report.possibleFieldSelectors.price.some(x=>x.selector==='span.price-value'),store)
+    assert.equal(report.source.capturedAt,record.capturedAt)
+    assert.equal(report.readyForScraping,false)
+    assert.equal(report.currentPricesExtracted,false)
+  }
+})

@@ -1036,3 +1036,17 @@ test('unmatched closing tags cannot escape an old-price wrapper and forge curren
   assert.ok(report.selectors.some(x=>x.selector==='div.current-price'&&x.field==='price'))
   assert.equal(report.productionEnabled,false)
 })
+
+test('exact UTC nanosecond-precision capture clocks preserve source evidence without changing its timestamp', () => {
+  const capturedAt = '2026-10-04T12:00:00.123456789Z'
+  const markup = '<article class="product-card"><span class="price-value">SYNTHETIC_CURRENT</span></article>'
+  for (const [retailerId,url] of [['plus','https://www.plus.nl/producten'],['dekamarkt','https://www.dekamarkt.nl/aanbiedingen']]) {
+    const report=proposeOfflineRetailerSelectors({html:markup,origin:{retailerId,url,capturedAt}})
+    assert.equal(report.source.capturedAt,capturedAt)
+    assert.ok(report.selectors.some(x=>x.selector==='span.price-value'&&x.field==='price'))
+    assert.equal(report.productionEnabled,false)
+  }
+  for (const capturedAt of ['2026-02-30T12:00:00.123456789Z','2026-10-04T12:00:00.1234567890Z']) {
+    assert.throws(()=>proposeOfflineRetailerSelectors({html:markup,origin:{...origin,capturedAt}}),/Invalid or oversized/)
+  }
+})
