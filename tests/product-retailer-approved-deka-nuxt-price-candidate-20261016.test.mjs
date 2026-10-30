@@ -368,3 +368,20 @@ test('standalone Deka Nuxt replay refuses ambiguous SKU routes even with corrobo
     assert.equal(output.type,'abstain',sourceUrl)
   }
 })
+
+test('Deka private fallback refuses Product.url for a different SKU even when mpn and Offer match', async () => {
+  for (const claim of [
+    'https://www.dekamarkt.nl/producten/other/999999',
+    'https://foreign.invalid/producten/115873',
+  ]) {
+    const ld=structuredClone(fixture.jsonLdProduct)
+    ld.url=claim
+    const result=await captureApprovedProductPriceCandidate(options(html(fixture.nuxtPayload,ld)))
+    assert.equal(result.status,'review_required',claim)
+    assert.equal(result.observation,null)
+  }
+  const same=structuredClone(fixture.jsonLdProduct)
+  same.url=url
+  const good=await captureApprovedProductPriceCandidate(options(html(fixture.nuxtPayload,same)))
+  assert.equal(good.status,'candidate_needs_review')
+})

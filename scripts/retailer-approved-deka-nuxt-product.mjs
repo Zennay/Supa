@@ -176,6 +176,9 @@ export function parseDekaNuxtFromAuthorizedHtml({ html, provenance, jsonLdBlocks
         !consistentOfferPriceEvidence(offer, cents) ||
         normalizeMoneyToCents(String(offer.Price)) !== cents ||
         (ld['@id'] !== undefined && ld['@id'] !== provenance.url + '#product') ||
+        // Schema Product.url is its own source-identity assertion. A correct
+        // mpn/Offer cannot corroborate a different explicit Product URL.
+        (ld.url !== undefined && ld.url !== provenance.url) ||
         (offer.url !== undefined && offer.url !== provenance.url)) return fail()
 
     const observation = validateRawProductObservation({
