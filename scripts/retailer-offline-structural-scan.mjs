@@ -90,16 +90,23 @@ function schemaContext(value) {
     Object.keys(value).length === 1 && Object.hasOwn(value,'@vocab') &&
     official.has(value['@vocab']);
 }
-function hasProduct(value, depth = 0) {
+function hasProduct(value, depth = 0, inheritedSchemaContext = false) {
   if (depth > 5 || !value || typeof value !== 'object') return false;
-  if (Array.isArray(value)) return value.some(x => hasProduct(x,depth+1));
-  if (Object.hasOwn(value,'@context') && !schemaContext(value['@context']))
-    return false;
-  if (isType(value,'Product')) return true;
-  // Schema.org ItemList stores catalog products in ListItem.item, not
-  // necessarily directly in itemListElement. Keep the same bounded depth.
+  if (Array.isArray(value)) return value.some(x => hasProduct(x,depth+1,inheritedSchemaContext));
+  const declaresContext=Object.hasOwn(value,'@context');
+  if (declaresContext && !schemaContext(value['@context'])) return false;
+  const officialContext=inheritedSchemaContext || declaresContext;
+  // A plain @type="Product" is only a Schema.org class when an official
+  // context defines the term. A fully qualified official class IRI is
+  // independently unambiguous, even without a surrounding @context.
+  const rawType=value['@type'];
+  const fullOfficial=['https://schema.org/Product','http://schema.org/Product'];
+  const explicitOfficial=typeof rawType==='string'
+    ? fullOfficial.includes(rawType)
+    : Array.isArray(rawType) && rawType.some(type=>fullOfficial.includes(type));
+  if ((officialContext || explicitOfficial) && isType(value,'Product')) return true;
   return ['@graph','mainEntity','itemListElement','item'].some(key =>
-    hasProduct(value[key],depth+1));
+    hasProduct(value[key],depth+1,officialContext));
 }
 
 // includeScripts is for the trusted private PRICE parser only. The public

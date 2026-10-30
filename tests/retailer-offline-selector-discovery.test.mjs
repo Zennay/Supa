@@ -12,7 +12,7 @@ const sample = [
   '<section class="plp-product-card"><a href="/product/test-product-1234"><span class="product-name">Fictional item</span></a>',
   '<span class="price-value">€1,99</span><div data-testid="pack-size">200 ml</div></section>',
   '<div class="offer-label">Fictional deal</div>',
-  '<script type="application/ld+json">{"@type":"Product","name":"Fake"}</script>',
+  '<script type="application/ld+json">{"@context":"https://schema.org","@type":"Product","name":"Fake"}</script>',
   '</body></html>',
 ].join('')
 
@@ -330,7 +330,7 @@ test('real HTML custom-element retail tags generate only observed selectors, nev
 })
 
 test('valid omitted head close before body preserves real JSON-LD and visible source DOM', () => {
-  const html='<html><head><script type="application/ld+json">{"@type":"Product"}</script><body><article class="product-card">SYNTHETIC</article></body></html>'
+  const html='<html><head><script type="application/ld+json">{"@context":"https://schema.org","@type":"Product"}</script><body><article class="product-card">SYNTHETIC</article></body></html>'
   const report=proposeOfflineRetailerSelectors({html,origin})
   assert.equal(report.structuredSignals.schemaOrgProduct,true)
   assert.ok(report.selectors.some(x=>x.selector==='article.product-card'))
@@ -396,7 +396,7 @@ test('CSS hints reflect actual decoded numeric HTML attribute references, never 
 test('structural capture signals match valid script type whitespace and still refuse attribute aliases', () => {
   const html = [
     '<html><head>',
-    '<script type="  Application/LD+JSON  ">{"@type":"Product","name":"Synthetic"}</script>',
+    '<script type="  Application/LD+JSON  ">{"@context":"https://schema.org","@type":"Product","name":"Synthetic"}</script>',
     '<script id="__NUXT_DATA__" type="  APPLICATION/JSON  ">[42]</script>',
     '<script data-type="application/ld+json">{"@type":"Product"}</script>',
     '</head><body><span class="product-name">Observed</span></body></html>',
@@ -924,5 +924,27 @@ test('DOM-decoded official Schema.org Product itemtype is consistent across sign
       .structuredSignals.schemaOrgProduct,false)
     assert.equal(proposeOfflineRetailerSelectors({html:'<template>'+source+'</template>',origin:pageOrigin})
       .structuredSignals.schemaOrgProduct,false)
+  }
+})
+
+test('unscoped JSON-LD Product words never forge official Schema.org product evidence',()=>{
+  const pageOrigin={...origin}
+  const sample=body=>'<script type="application/ld+json">'+JSON.stringify(body)+'</script>'
+  for(const body of [
+    {'@type':'Product',name:'SYNTHETIC'},
+    {'@graph':[{'@type':'Product'}]},
+    {'@context':'https://foreign.example','@type':'Product'},
+    {'@context':'https://schema.org','@graph':[{'@context':'https://foreign.example','@type':'Product'}]},
+  ]){
+    const signals=proposeOfflineRetailerSelectors({html:sample(body),origin:pageOrigin}).structuredSignals
+    assert.equal(signals.jsonLd,true)
+    assert.equal(signals.schemaOrgProduct,false)
+  }
+  for(const body of [
+    {'@type':'https://schema.org/Product'},
+    {'@context':'https://schema.org','@graph':[{'@type':'Product'}]},
+  ]){
+    assert.equal(proposeOfflineRetailerSelectors({html:sample(body),origin:pageOrigin})
+      .structuredSignals.schemaOrgProduct,true)
   }
 })
