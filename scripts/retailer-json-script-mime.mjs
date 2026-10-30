@@ -9,13 +9,15 @@
 function browserScriptMime(raw) {
   let invalid = false
   const names = { semi: ';', equals: '=', quot: '"', apos: "'", sol: '/', plus: '+', period: '.', colon: ':', lowbar: '_', num: '#', Tab: '\t', NewLine: '\n' }
-  const decoded = raw.replace(/&(?:#(?:x([0-9a-f]+)|([0-9]+))([^a-z0-9]|$)|([a-z][a-z0-9]*)(;?))/gi,
-    (whole, hex, dec, ending, name, terminator) => {
+  // Numeric references may omit the semicolon in an actual HTML attribute.
+  // Never greedily accept a prefix of an oversized numeric reference, or
+  // decode its output twice. Only printable ASCII is MIME/script-id evidence.
+  const decoded = raw.replace(/&(?:#(?:[xX]([0-9a-fA-F]{1,6})(?![0-9a-fA-F])|([0-9]{1,7})(?![0-9]))(;?)|([a-z][a-z0-9]*)(;?))/gi,
+    (whole, hex, dec, _numericTerminator, name, nameTerminator) => {
       if (name !== undefined) {
-        if (terminator !== ';' || !Object.hasOwn(names, name)) { invalid = true; return whole }
+        if (nameTerminator !== ';' || !Object.hasOwn(names, name)) { invalid = true; return whole }
         return names[name]
       }
-      if (ending !== ';') { invalid = true; return whole }
       const code = Number.parseInt(hex ?? dec, hex === undefined ? 10 : 16)
       if (!Number.isSafeInteger(code) || code < 32 || code > 126) { invalid = true; return whole }
       return String.fromCharCode(code)

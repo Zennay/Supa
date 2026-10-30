@@ -1073,3 +1073,21 @@ test('one-pass HTML attribute reference decoder never splits oversized or nested
     ['&#0;', '&#0;'],['&#xD800;', '&#xD800;'],
   ])assert.equal(decodeObservedHtmlAttribute(raw),expected,raw)
 })
+
+test('browser-valid semicolonless numeric HTML script id/MIME evidence stays consistent with private markup', () => {
+  const scripts = '<script id="__NUXT_D&#65TA__" type="application&#47json">[]</script>' +
+    '<script id="__NEXT_D&#x41TA__" type="application&#x2fjson">{}</script>' +
+    '<script type="application&#47ld+json">{"@context":"https://schema.org","@type":"Product"}</script>'
+  for (const [retailerId,url] of [['plus','https://www.plus.nl/producten'],['dekamarkt','https://www.dekamarkt.nl/aanbiedingen']]) {
+    const report=proposeOfflineRetailerSelectors({html:scripts,origin:{...origin,retailerId,url}})
+    assert.equal(report.structuredSignals.nuxtData,true,retailerId)
+    assert.equal(report.structuredSignals.nextData,true,retailerId)
+    assert.equal(report.structuredSignals.schemaOrgProduct,true,retailerId)
+    assert.equal(report.structuredSignals.jsonLd,true,retailerId)
+    assert.equal(report.readyForIngestion,false)
+  }
+  for (const invalid of ['application&amp;#47ld+json','application&#99999999ld+json','application&#0ld+json']) {
+    const html='<script type="'+invalid+'">{"@context":"https://schema.org","@type":"Product"}</script>'
+    assert.equal(proposeOfflineRetailerSelectors({html,origin}).structuredSignals.jsonLd,false,invalid)
+  }
+})

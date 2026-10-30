@@ -954,3 +954,16 @@ test('SHA-pinned private replay refuses byte-normalizing HTML even with matching
   assert.equal(replay.source.sha256,original.source.sha256)
   assert.equal(replay.published,false)
 })
+
+test('actual private SHA-pinned product replay parses browser-valid semicolonless JSON-LD MIME from synthetic source',async t=>{
+  const html=page.replace('type="application/ld+json"','type="application&#47ld+json"')
+  const output=await capture(t,html)
+  const replay=await replayPrivateProductHtmlSnapshot(output)
+  assert.equal(replay.source.sha256,createHash('sha256').update(html).digest('hex'))
+  assert.equal(replay.status,'candidate_for_human_review')
+  assert.equal(replay.observation.currentPriceCents,325)
+  assert.equal(replay.observation.pack.amount,500)
+  assert.equal(replay.permissionVerifiedForThisReplay,false)
+  assert.equal(replay.readyForIngestion,false)
+  assert.equal(replay.published,false)
+})
