@@ -96,7 +96,7 @@ function validSnapshotOrigin(origin) {
 
 // Only actual opening tags count. A quoted attribute may contain '<tag>'
 // text; that text must never be interpreted as an independent DOM element.
-function* openingTags(markup) {
+export function* openingTags(markup) {
   let cursor = 0
   while (cursor < markup.length) {
     const start = markup.indexOf('<', cursor)

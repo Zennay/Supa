@@ -1,6 +1,6 @@
 import { ambiguousRetailerRoute } from './retailer-source-route-safety.mjs'
 import { scanOfflineRetailerMarkup } from './retailer-offline-structural-scan.mjs'
-import { proposeOfflineRetailerSelectors, summarizeOfflineSelectorProposals, assertObservedRetailerHtmlIdentity } from './retailer-offline-selector-discovery.mjs'
+import { proposeOfflineRetailerSelectors, summarizeOfflineSelectorProposals, assertObservedRetailerHtmlIdentity, openingTags } from './retailer-offline-selector-discovery.mjs'
 import { parseUniqueKeyRetailerJson } from './retailer-private-unique-key-json.mjs'
 import { decodeExactRetailerHtmlBytes } from './retailer-private-html-byte-identity.mjs'
 /**
@@ -178,18 +178,20 @@ export function proposeRetailerSelectors(source, html) {
   const activeHtml=document.visible
   const counts = new Map()
   let htmlTagCount = 0
-  for (const tag of activeHtml.matchAll(/<([a-z][a-z0-9-]{0,30})\b([^<>]{0,2048})>/gi)) {
+  // Use quote-aware parsed opening tags, not a second regex over HTML.
+  // A literal '<span class=...>' inside an attribute is NOT a live element.
+  // The same parser is shared with the strict source-observed M1 extractor.
+  for (const tag of openingTags(activeHtml)) {
     htmlTagCount++
     if (htmlTagCount > MAX_HTML_TAGS) reject('unbounded HTML tag count')
-    const tagName = tag[1].toLowerCase()
-    // Values become *review-only* CSS proposals, not trusted selectors.
-    const classAttr = /\bclass\s*=\s*(?:"([^"]{0,512})"|'([^']{0,512})')/i.exec(tag[2])
-    if (!classAttr) continue
-    const classes = (classAttr[1] ?? classAttr[2]).trim().split(/\s+/).slice(0, 24)
+    const tagName=tag.tag
+    const classText=tag.attrs.get('class')
+    if (typeof classText !== 'string' || classText.length > 512) continue
+    const classes=classText.trim().split(/[ \t\n\f\r]+/).slice(0,24)
     for (const name of classes) {
       if (!CLASS_PATTERN.test(name) || !RELEVANCE_PATTERN.test(name)) continue
-      const selector = tagName + '.' + name
-      counts.set(selector, (counts.get(selector) ?? 0) + 1)
+      const selector=tagName+'.'+name
+      counts.set(selector,(counts.get(selector)??0)+1)
     }
   }
   const suggestions = [...counts.entries()]

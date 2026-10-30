@@ -466,3 +466,25 @@ test('trusted live Nuxt/JSON-LD scripts survive inert-aware legacy M1 parsing',(
   assert.ok(report.proposedSelectors.some(x=>x.selector==='article.product-card'))
   assert.equal(report.publicationAllowed,false)
 })
+
+test('live HTML with quoted markup-shaped attributes cannot mint fake selector candidates',()=>{
+  const html='<html><head><meta charset="UTF-8"></head><body>'+
+    '<article class="product-card" data-copy="<span class=\'price-fake-quoted\'>">'+
+    '<span class="product-name">SYNTHETIC</span></article></body></html>'
+  const result=proposeRetailerSelectors(source('plus','catalog',html),html)
+  assert.ok(result.proposedSelectors.some(x=>x.selector==='article.product-card'))
+  assert.ok(result.proposedSelectors.some(x=>x.selector==='span.product-name'))
+  assert.ok(!result.proposedSelectors.some(x=>x.selector.includes('price-fake-quoted')),
+    'quoted attribute content is never a real HTML element')
+})
+
+test('valid source-observed unquoted HTML class tokens remain reviewable in legacy M1 capture',()=>{
+  const html='<html><head><meta charset="UTF-8"></head><body>'+
+    '<article class=product-card><span class=price-value>PRIVATE_PRICE</span>'+
+    '</article></body></html>'
+  const report=proposeRetailerSelectors(source('plus','catalog',html),html)
+  assert.ok(report.proposedSelectors.some(row=>row.selector==='article.product-card'))
+  assert.ok(report.proposedSelectors.some(row=>row.selector==='span.price-value'))
+  assert.equal(report.readyForScraping,false)
+  assert.doesNotMatch(JSON.stringify(report),/PRIVATE_PRICE/)
+})
