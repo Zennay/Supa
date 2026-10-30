@@ -714,7 +714,8 @@ test('two PLUS catalog snapshots derive stable selectors only from real supplied
   const summary = await savePrivateSelectorStabilityArchive([original,variant],out)
   assert.equal(summary.sampleCount,2)
   assert.equal(summary.stableCandidateCount,2)
-  assert.equal(summary.unstableCandidateCount,2)
+  // product-name is one observed NAME token, never a second product card.
+  assert.equal(summary.unstableCandidateCount,1)
   assert.equal(summary.published,false)
   assert.equal((await stat(out)).mode & 0o777,0o600)
   assert.doesNotMatch(JSON.stringify(summary),/price-value|SECRET|www\.plus\.nl|captured\.html/)
@@ -723,8 +724,8 @@ test('two PLUS catalog snapshots derive stable selectors only from real supplied
   assert.deepEqual(saved.stableCandidates.map(x=>x.selector).sort(),
     ['article.product-card','span.price-value'].sort())
   assert.equal(saved.samples.length,2)
-  assert.equal(saved.unstableCandidates.length,2)
-  assert.deepEqual(saved.unstableCandidates.map(x=>x.field).sort(),['name','product'])
+  assert.equal(saved.unstableCandidates.length,1)
+  assert.deepEqual(saved.unstableCandidates.map(x=>x.field).sort(),['name'])
   assert.deepEqual(saved.fieldCoverage.price,{observedCandidates:1,stableCandidates:1})
   assert.deepEqual(saved.fieldCoverage.pack,{observedCandidates:0,stableCandidates:0})
   assert.ok(saved.samples.every(x=>/^[a-f0-9]{64}$/.test(x.sha256)))
@@ -754,7 +755,10 @@ test('offline Deka offers selector stability CLI publishes only counts and a 060
   const {stdout}=await run(process.execPath,
     ['--experimental-strip-types',tool,'--selector-stability',archive,a,b])
   const receipt=JSON.parse(stdout)
-  assert.equal(receipt.stableCandidateCount,3)
+  // offer-card is an OFFER, not a phantom product-container selector.
+  assert.equal(receipt.stableCandidateCount,2)
+  const archiveReport=JSON.parse(await readFile(archive,'utf8'))
+  assert.deepEqual(archiveReport.stableCandidates.map(x=>x.field).sort(),['offer','price'])
   assert.equal(receipt.published,false)
   assert.doesNotMatch(stdout,/offer-card|price-value|SYNTHETIC|dekamarkt\.nl|captured\.html|stable-offers/)
   assert.equal((await stat(archive)).mode & 0o777,0o600)
