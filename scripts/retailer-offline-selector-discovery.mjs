@@ -4,7 +4,7 @@ import { types as nodeTypes } from 'node:util'
 import { scanOfflineRetailerMarkup } from './retailer-offline-structural-scan.mjs'
 import { isPublicMerchantProductHrefSelector } from './retailer-public-product-href-selectors.mjs'
 import { isSafeStructuralReviewTag } from './retailer-public-structural-tag.mjs'
-import { isFormerPriceTag, PUBLIC_OBSERVED_TOKEN_FIELDS } from './retailer-public-observed-token-fields.mjs'
+import { isFormerPriceTag, isFormerPriceToken, PUBLIC_OBSERVED_TOKEN_FIELDS } from './retailer-public-observed-token-fields.mjs'
 import { ambiguousRetailerRoute, isAllowedM1RetailerSourcePath } from './retailer-source-route-safety.mjs'
 
 // Offline-first DOM selector proposal. NEVER downloads a page, executes scripts,
@@ -305,6 +305,9 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
     origin.url,baseHrefs,canonicalHrefs)
 
   const candidates = new Map()
+  // Any generic selector matching an old-price-labelled element cannot be
+  // trusted as a current-price hint, even when it also matches new prices.
+  const ambiguousCurrentPriceSelectors = new Set()
   // Duplicate links to one SKU on a listing are not independent products.
   // Keep URL identities only in this short-lived private scan; expose count
   // aggregates, never product paths, search params or identifiers.
@@ -329,28 +332,36 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
     // not multiple CSS elements; counting duplicates creates false drift.
     const classes = (staticAttributeValue(attrs.get('class')) ?? '').split(/[ \t\n\f\r]+/)
     const values = [...new Set(classes.filter(x => STATIC_NAME.test(x)))].slice(0, 20)
+    const formerPriceContext = !isFormerPriceTag(tag) &&
+      (values.some(isFormerPriceToken) ||
+       isFormerPriceToken(staticAttributeValue(attrs.get('data-testid'))))
+    const addObserved = (field, selector) => {
+      if (formerPriceContext && field === 'price') {
+        ambiguousCurrentPriceSelectors.add(selector)
+        return
+      }
+      recordSelector(candidates, field, selector, tag)
+    }
     for (const name of values) {
       const exact = Object.hasOwn(PUBLIC_OBSERVED_TOKEN_FIELDS,name)
         ? PUBLIC_OBSERVED_TOKEN_FIELDS[name] : null
-      if (exact) recordSelector(candidates, exact, tag + '.' + name, tag)
+      if (exact) addObserved(exact, tag + '.' + name)
       else for (const [field, rule] of Object.entries(FIELD_RULES)) {
-        if (rule.test(name)) recordSelector(candidates, field, tag + '.' + name, tag)
+        if (rule.test(name)) addObserved(field, tag + '.' + name)
       }
     }
     for (const name of ['data-testid', 'itemprop']) {
       const token = staticAttributeValue(attrs.get(name))
       if (!token || !STATIC_NAME.test(token)) continue
       if (name === 'itemprop' && Object.hasOwn(SCHEMA_ITEMPROP_FIELDS,token)) {
-        recordSelector(candidates,SCHEMA_ITEMPROP_FIELDS[token],
-          tag + '[itemprop="' + token + '"]',tag)
+        addObserved(SCHEMA_ITEMPROP_FIELDS[token],
+          tag + '[itemprop="' + token + '"]')
       } else {
         const exact = Object.hasOwn(PUBLIC_OBSERVED_TOKEN_FIELDS,token)
           ? PUBLIC_OBSERVED_TOKEN_FIELDS[token] : null
-        if (exact) recordSelector(candidates, exact,
-          tag + '[' + name + '="' + token + '"]', tag)
+        if (exact) addObserved(exact, tag + '[' + name + '="' + token + '"]')
         else for (const [field, rule] of Object.entries(FIELD_RULES)) {
-          if (rule.test(token)) recordSelector(candidates, field,
-            tag + '[' + name + '="' + token + '"]', tag)
+          if (rule.test(token)) addObserved(field, tag + '[' + name + '="' + token + '"]')
         }
       }
     }
@@ -394,6 +405,8 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
       return 1
     return 0
   }
+  for (const selector of ambiguousCurrentPriceSelectors)
+    candidates.delete('price\u0000' + selector)
   const selectors = [...candidates.values()]
     .sort((a, b) => observedStructuralConfidence(b)-observedStructuralConfidence(a) ||
       b.instances - a.instances || a.field.localeCompare(b.field) ||

@@ -713,3 +713,23 @@ test('retailer price-before/old-price DOM hints are never counted as the current
     assert.equal((await verifyPrivateSyntheticHtmlFixture(filename,out)).verified,true)
   }
 })
+
+test('SHA-private replay suppresses ambiguous shared price CSS from old and new shelves',async t=>{
+  for(const retailerId of ['plus','dekamarkt']){
+    const html='<article class="product-card">'+
+      '<span class="old-price price-value" data-testid="price-value" itemprop="price">PRIVATE_PRIOR_4.99</span>'+
+      '<span class="product-price" itemprop="price">PRIVATE_CURRENT_2.49</span></article>'
+    const {filename,dir,capture}=await archive(t,retailerId,retailerId==='plus'?'catalog':'offers',html)
+    const origin={retailerId,url:capture.source.url,capturedAt:capture.source.capturedAt}
+    const output=join(dir,'unambiguous-price-only')
+    await buildPrivateSyntheticHtmlFixture(filename,output)
+    const synthetic=await readFile(join(output,'synthetic-structure.html'),'utf8')
+    const replay=proposeOfflineRetailerSelectors({html:synthetic,origin})
+    for(const selector of ['span[itemprop="price"]','span.price-value','span[data-testid="price-value"]'])
+      assert.equal(replay.selectors.some(x=>x.selector===selector),false,selector)
+    assert.equal(replay.selectors.find(x=>x.selector==='span.old-price')?.field,'offer')
+    assert.equal(replay.selectors.find(x=>x.selector==='span.product-price')?.field,'price')
+    assert.doesNotMatch(synthetic,/PRIVATE_PRIOR|PRIVATE_CURRENT/)
+    assert.equal((await verifyPrivateSyntheticHtmlFixture(filename,output)).verified,true)
+  }
+})

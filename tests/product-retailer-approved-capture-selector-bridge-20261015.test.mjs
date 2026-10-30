@@ -434,3 +434,25 @@ test('captured old/was price class tokens stay offer-only for PLUS and Deka and 
     assert.doesNotMatch(JSON.stringify(review),/PRIVATE_OLD|PRIVATE_NEW/)
   }
 })
+
+test('private PLUS/Deka capture refuses generic price hints shared by historical and current shelf prices',async()=>{
+  for(const [supermarket,kind,url] of [
+    ['plus','catalog','https://www.plus.nl/producten'],
+    ['dekamarkt','offers','https://www.dekamarkt.nl/aanbiedingen']]){
+    const html='<article class="product-card">'+
+      '<span class="old-price price-value" data-testid="price-value" itemprop="price">PRIVATE_PRIOR</span>'+
+      '<span class="product-price" itemprop="price">PRIVATE_CURRENT</span></article>'
+    let calls=0
+    const review=await captureToPrivateSelectorReview({source:{supermarket,kind,url},
+      grant:consent(supermarket,kind,url),permissionGate:syntheticGate(),capturedAt:at,
+      fetchFn:async()=>{calls++;return new Response(html,{status:200,headers:{'content-type':'text/html'}})}})
+    assert.equal(calls,1)
+    for(const selector of ['span[itemprop="price"]','span.price-value','span[data-testid="price-value"]'])
+      assert.equal(review.selectorProposals.some(x=>x.selector===selector),false,supermarket+': '+selector)
+    assert.equal(review.selectorProposals.find(x=>x.selector==='span.old-price')?.field,'offer')
+    assert.equal(review.selectorProposals.find(x=>x.selector==='span.product-price')?.field,'price')
+    assert.equal(review.currentPricesExtracted,false)
+    assert.equal(review.readyForIngestion,false)
+    assert.doesNotMatch(JSON.stringify(review),/PRIVATE_PRIOR|PRIVATE_CURRENT/)
+  }
+})

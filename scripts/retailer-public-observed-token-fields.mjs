@@ -17,3 +17,8 @@ export const PUBLIC_OBSERVED_TOKEN_FIELDS = Object.freeze({
 
 // These tags represent a struck-through FORMER price, never a current quote.
 export const isFormerPriceTag = tag => tag === 'del' || tag === 's' || tag === 'strike'
+
+const FORMER_PRICE_TOKENS = new Set([
+  'old-price','price-old','price-before','previous-price','was-price','original-price',
+])
+export const isFormerPriceToken = token => FORMER_PRICE_TOKENS.has(token)

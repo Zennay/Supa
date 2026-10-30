@@ -886,3 +886,21 @@ test('HTML class or test-id named like JavaScript Object prototype cannot crash 
     assert.doesNotMatch(JSON.stringify(report),/PRIVATE_NAME|PRIVATE_PRICE/)
   }
 })
+
+test('mixed old/current itemprop price elements cannot propose ambiguous CSS price selectors',()=>{
+  for(const [retailerId,url] of [
+    ['plus','https://www.plus.nl/producten'],
+    ['dekamarkt','https://www.dekamarkt.nl/aanbiedingen']]){
+    const html='<article class="product-card">'+
+      '<span class="old-price price-value" data-testid="price-value" itemprop="price">PRIVATE_OLD_4.99</span>'+
+      '<span class="product-price" itemprop="price">PRIVATE_NEW_2.49</span></article>'
+    const result=proposeOfflineRetailerSelectors({html,origin:{...origin,retailerId,url}})
+    assert.equal(result.selectors.some(x=>x.selector==='span[itemprop="price"]'),false,retailerId+' mixed microdata')
+    assert.equal(result.selectors.some(x=>x.selector==='span.price-value'),false,retailerId+' mixed price class')
+    assert.equal(result.selectors.some(x=>x.selector==='span[data-testid="price-value"]'),false,retailerId+' mixed test id')
+    assert.deepEqual(result.selectors.filter(x=>x.selector==='span.old-price').map(x=>x.field),['offer'])
+    assert.deepEqual(result.selectors.filter(x=>x.selector==='span.product-price').map(x=>x.field),['price'])
+    assert.equal(result.readyForIngestion,false)
+    assert.doesNotMatch(JSON.stringify(result),/PRIVATE_OLD|PRIVATE_NEW/)
+  }
+})
