@@ -528,3 +528,42 @@ test('SHA-bound two-store synthetic fixture preserves observed anchor and strong
     assert.equal(verified.productionEnabled,false)
   }
 })
+
+test('observed retailer custom web components survive both-store private SHA HTML fixture generation and replay', async t => {
+  for (const retailerId of ['plus','dekamarkt']) {
+    const markup = '<retailer-product-card class="product-card" data-testid="product-card">' +
+      '<retailer-price-label data-testid="price-value">PRIVATE_CUSTOM_PRICE_991</retailer-price-label>' +
+      '<retailer-pack-size class="pack-size">PRIVATE_CUSTOM_PACK_500</retailer-pack-size>' +
+      '</retailer-product-card>'
+    const {filename,dir,capture} = await archive(t,retailerId,retailerId==='plus'?'catalog':'offers',markup)
+    const output=join(dir,'private-custom-synthetic')
+    await buildPrivateSyntheticHtmlFixture(filename,output)
+    const generated=await readFile(join(output,'synthetic-structure.html'),'utf8')
+    const selectors=proposeOfflineRetailerSelectors({html:generated,origin:{
+      retailerId,url:capture.source.url,capturedAt:capture.source.capturedAt,
+    }}).selectors
+    for (const selector of [
+      'retailer-product-card.product-card',
+      'retailer-product-card[data-testid="product-card"]',
+      'retailer-price-label[data-testid="price-value"]',
+      'retailer-pack-size.pack-size',
+    ]) assert.ok(selectors.some(x=>x.selector===selector),retailerId+': '+selector)
+    assert.doesNotMatch(generated,/PRIVATE_CUSTOM_PRICE_991|PRIVATE_CUSTOM_PACK_500/)
+    assert.equal((await verifyPrivateSyntheticHtmlFixture(filename,output)).verified,true)
+  }
+})
+
+test('private synthetic HTML cannot copy SKU/price-bearing custom element tag names',async t=>{
+  for(const retailerId of ['plus','dekamarkt']) {
+    const html='<retailer-product-card class="product-card">Synthetic safe card</retailer-product-card>'+
+      '<retailer-product-991-card class="product-card">PRIVATE_SKU_991</retailer-product-991-card>'+
+      '<customer-secret-name-card data-testid="price-value">PRIVATE_VALUE</customer-secret-name-card>'
+    const {filename,dir}=await archive(t,retailerId,retailerId==='plus'?'catalog':'offers',html)
+    const out=join(dir,'anonymous-structure')
+    await buildPrivateSyntheticHtmlFixture(filename,out)
+    const generated=await readFile(join(out,'synthetic-structure.html'),'utf8')
+    assert.match(generated,/<retailer-product-card class="product-card"/)
+    assert.doesNotMatch(generated,/retailer-product-991|customer-secret-name|PRIVATE_SKU|PRIVATE_VALUE/)
+    assert.equal((await verifyPrivateSyntheticHtmlFixture(filename,out)).verified,true)
+  }
+})
