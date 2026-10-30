@@ -2,7 +2,7 @@
 import { createHash } from 'node:crypto'
 import { open, lstat } from 'node:fs/promises'
 import { constants } from 'node:fs'
-import { resolve } from 'node:path'
+import { resolve, dirname } from 'node:path'
 import { assertNoSymlinkedM3OutputParents } from './m3-source-output-preservation.mjs'
 import { readAuthorizedHtmlScriptEvidence } from './retailer-approved-html-script-evidence.mjs'
 import { parseSchemaOrgProductForPage } from '../src/data/schemaOrgProductPageSelection.ts'
@@ -15,13 +15,17 @@ const HOST = Object.freeze({ plus: 'www.plus.nl', dekamarkt: 'www.dekamarkt.nl' 
 const fail = () => { throw Error('Private source replay refused: untrusted HTML or manifest') }
 async function privateBytes(path, size) {
   await assertNoSymlinkedM3OutputParents(path)
+  const parent = await lstat(dirname(path))
+  if (!parent.isDirectory() || parent.isSymbolicLink() ||
+      (parent.mode & 0o077) !== 0) fail()
   // No path-based read after checking metadata: a replaced symlink must not
   // redirect the read to an unrelated source. Validate the opened inode.
   const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW |
     constants.O_NONBLOCK)
   try {
     const meta = await handle.stat()
-    if (!meta.isFile() || (meta.mode & 0o077) !== 0 ||
+    if (!meta.isFile() || meta.nlink !== 1 ||
+        (meta.mode & 0o077) !== 0 ||
         meta.size <= 0 || meta.size > size) fail()
     const bytes = await handle.readFile()
     if (bytes.length !== meta.size || bytes.length > size) fail()

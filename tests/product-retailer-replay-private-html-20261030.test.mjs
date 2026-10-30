@@ -372,3 +372,27 @@ test('CLI --drift-save emits only a private review completion status', async t =
   assert.doesNotMatch(stdout, /fictional|www\.plus|product-card|item-card|captured\.html/i)
   assert.equal((await stat(out)).mode & 0o777, 0o600)
 })
+
+
+test('hardlinked private HTML or manifest cannot impersonate a second source capture', async t => {
+  const { link } = await import('node:fs/promises')
+  const original = await capture(t)
+  const sameHtmlAlias = original.replace('captured.html', 'other-hardlink.html')
+  await link(original, sameHtmlAlias)
+  await assert.rejects(replayPrivateProductHtmlSnapshot(original), /refused/)
+  await rm(sameHtmlAlias)
+  const manifest = original + '.manifest.json'
+  const alias = original.replace('captured.html', 'other-manifest-hardlink.json')
+  await link(manifest, alias)
+  await assert.rejects(replayPrivateProductHtmlSnapshot(original), /refused/)
+  await rm(alias)
+  assert.equal((await replayPrivateProductHtmlSnapshot(original)).status,
+    'candidate_for_human_review')
+})
+
+test('replay refuses source HTML in publicly listable parent directories', async t => {
+  const original = await capture(t)
+  const parent = original.slice(0, original.lastIndexOf('/'))
+  await chmod(parent, 0o755)
+  await assert.rejects(replayPrivateProductHtmlSnapshot(original), /refused/)
+})

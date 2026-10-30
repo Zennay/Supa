@@ -209,3 +209,10 @@ individuele prijs of bron-URL. Een operator kan het bestand later onafhankelijk
 controleren met `sha256sum /private/nieuw-reviewpakket.json`. Deze receipt
 bevestigt lokale bestandsintegriteit, **niet** dat de bronrechten, kassaprijs
 of menselijke review zijn goedgekeurd.
+
+Voor herinspectie van de originele HTML en manifest gelden dezelfde
+privé-mapvoorwaarden als voor de review-uitvoer: de map moet voor andere
+gebruikers ontoegankelijk zijn, beide bestanden moeten slechts een fysieke
+hardlink hebben en hun mode moet eigenaar-only zijn. Hardlinks of publieke
+directorynamen worden geweigerd om dubbele historische herkomstclaims te
+voorkomen.
