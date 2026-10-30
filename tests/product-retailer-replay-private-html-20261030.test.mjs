@@ -5,7 +5,7 @@ import { mkdtemp, writeFile, readFile, rm, chmod, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { main as download } from '../scripts/retailer-download-reviewed-source.mjs'
-import { replayPrivateProductHtmlSnapshot, savePrivateOfflineProductReview, compareArchivedPrivateProductSnapshots } from '../scripts/retailer-replay-private-html-product.mjs'
+import { replayPrivateProductHtmlSnapshot, savePrivateOfflineProductReview, compareArchivedPrivateProductSnapshots, savePrivateOfflineReviewBatch } from '../scripts/retailer-replay-private-html-product.mjs'
 
 const url = 'https://www.plus.nl/product/fictional-flour-123'
 const grant = { supermarket: 'plus', kind: 'product', sourceUrl: url,
@@ -202,4 +202,99 @@ test('same URL with changed product name cannot masquerade as comparable price',
   assert.equal(report.privateProductEvidence.priceChangeCount, null)
   assert.equal(report.privateProductEvidence.packChangeCount, null)
   assert.doesNotMatch(JSON.stringify(report), /Different synthetic flour|0\.01/)
+})
+
+
+test('offline two-product batch writes independent historical review without public quotes', async t => {
+  const first = await capture(t)
+  const secondUrl = 'https://www.plus.nl/product/fictional-flour-999'
+  const second = await capture(t, page.replaceAll(url, secondUrl), secondUrl)
+  const output = first.replace('captured.html', 'batch-review.json')
+  const summary = await savePrivateOfflineReviewBatch([first, second], output)
+  assert.equal(summary.count, 2)
+  assert.equal(summary.candidateCount, 2)
+  assert.equal(summary.unverifiedCount, 0)
+  assert.equal(summary.published, false)
+  assert.deepEqual(summary.retailerCounts, {
+    plus: { candidates: 2, unverified: 0 }, dekamarkt: { candidates: 0, unverified: 0 },
+  })
+  const disk = JSON.parse(await readFile(output, 'utf8'))
+  assert.equal(disk.mode, 'offline-private-product-review-batch')
+  assert.equal(disk.verifiedCurrentCheckoutPrices, 0)
+  assert.equal(disk.entries.length, 2)
+  assert.equal(new Set(disk.entries.map(x => x.source.productUrlSha256)).size, 2)
+  assert.equal((await stat(output)).mode & 0o777, 0o600)
+  await assert.rejects(savePrivateOfflineReviewBatch([first, second], output), /refused/)
+  await assert.rejects(savePrivateOfflineReviewBatch([first, first],
+    output.replace('batch-review.json', 'duplicate.json')), /refused/)
+})
+
+test('offline review batch CLI never exposes SKU, source URL or price', async t => {
+  const { execFile } = await import('node:child_process')
+  const { promisify } = await import('node:util')
+  const run = promisify(execFile)
+  const first = await capture(t)
+  const secondUrl = 'https://www.plus.nl/product/fictional-flour-999'
+  const second = await capture(t, page.replaceAll(url, secondUrl), secondUrl)
+  const script = new URL('../scripts/retailer-replay-private-html-product.mjs', import.meta.url).pathname
+  const output = first.replace('captured.html', 'batch-cli.json')
+  const { stdout } = await run(process.execPath,
+    ['--experimental-strip-types', script, '--batch', output, first, second])
+  assert.equal(JSON.parse(stdout).count, 2)
+  assert.doesNotMatch(stdout, /fictional-flour|www\.plus\.nl|3\.25|captured\.html/i)
+  assert.equal((await stat(output)).mode & 0o777, 0o600)
+})
+
+
+test('batch never counts an out-of-stock SKU as price; still retains review evidence', async t => {
+  const first = await capture(t)
+  const secondUrl = 'https://www.plus.nl/product/fictional-out-of-stock-999'
+  const noStock = page.replaceAll(url, secondUrl).replace('InStock', 'OutOfStock')
+  const second = await capture(t, noStock, secondUrl)
+  const output = first.replace('captured.html', 'out-of-stock-batch.json')
+  const summary = await savePrivateOfflineReviewBatch([first, second], output)
+  assert.equal(summary.candidateCount, 1)
+  assert.equal(summary.unverifiedCount, 1)
+  assert.equal(summary.retailerCounts.plus.unverified, 1)
+  const archived = JSON.parse(await readFile(output, 'utf8'))
+  assert.equal(archived.entries[1].observation, null)
+  assert.equal(archived.entries[1].status, 'unverified_product')
+  assert.equal(archived.verifiedCurrentCheckoutPrices, 0)
+})
+
+test('mixed offline pilot batch processes independently attributed PLUS and Deka evidence', async t => {
+  const plus = await capture(t)
+  const dir = await mkdtemp(join(tmpdir(), 'supa-deka-batch-'))
+  t.after(() => rm(dir, { recursive: true, force: true }))
+  const fixture = JSON.parse(await readFile(new URL(
+    '../fixtures/m1/dekamarkt-product-halfvolle-melk.v1.json', import.meta.url), 'utf8'))
+  const sourceUrl = fixture.source.url
+  const markup = '<html><script id="__NUXT_DATA__">' +
+    JSON.stringify(fixture.nuxtPayload) + '</script><script type="application/ld+json">' +
+    JSON.stringify(fixture.jsonLdProduct) + '</script></html>'
+  const grantFile = join(dir, 'fictional-deka-grant.json')
+  const deka = join(dir, 'deka.html')
+  const synthetic = structuredClone(gate)
+  synthetic.sources[1].permissionStatus = 'permitted'
+  synthetic.sources[1].productionEnabled = true
+  await writeFile(grantFile, JSON.stringify({
+    ...grant, supermarket: 'dekamarkt', sourceUrl,
+  }), { mode: 0o600 })
+  await download([grantFile, deka], {
+    testGateDocument: synthetic,
+    fetchFn: async () => new Response(markup, {
+      headers: { 'content-type': 'text/html' }, status: 200,
+    }), writeOutput() {},
+  })
+  const review = plus.replace('captured.html', 'mixed-pilot-review.json')
+  const result = await savePrivateOfflineReviewBatch([plus, deka], review)
+  assert.deepEqual(result.retailerCounts, {
+    plus: { candidates: 1, unverified: 0 },
+    dekamarkt: { candidates: 1, unverified: 0 },
+  })
+  const archive = JSON.parse(await readFile(review, 'utf8'))
+  assert.deepEqual(archive.entries.map(x => x.source.retailerId), ['plus', 'dekamarkt'])
+  assert.equal(archive.entries[1].observation.currentPriceCents, 85)
+  assert.equal(archive.published, false)
+  assert.equal(archive.sourceRightsForPublicationVerified, false)
 })

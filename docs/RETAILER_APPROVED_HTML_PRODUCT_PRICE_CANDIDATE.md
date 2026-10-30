@@ -143,3 +143,27 @@ vergelijkbaar artikel worden alleen geaggregeerde 0/1-tellingen voor gewijzigde
 prijs of verpakking getoond. Eurobedragen, oorspronkelijke URLs en HTML blijven
 buiten stdout en elk resultaat blijft menselijke review vereisen. Dit is
 een historische bronkandidaatvergelijking, niet een actuele kassaprijs.
+
+### Tot 22 bestaande private HTML-opnamen in één reviewbestand
+
+Voor een reeds rechtmatig en afzonderlijk gemaakte lokale snapshot per artikel
+biedt dezelfde offline CLI nu een **batch**-actie voor maximaal 22 verschillende
+producten (PLUS en/of DekaMarkt); de bestaande bronregistergate mag hiermee
+niet worden overgeslagen tijdens de oorspronkelijke capture:
+
+```bash
+node --experimental-strip-types scripts/retailer-replay-private-html-product.mjs \
+  --batch /private/nieuw-reviewpakket.json \
+  /private/plus-artikel.html /private/deka-artikel.html
+```
+
+Elke HTML+manifestcombinatie wordt zelfstandig gecontroleerd (SHA, UTC, URL
+en fysieke private bestandsrechten). Een dubbele product-URL per retailer
+wordt geweigerd, ook als dezelfde pagina onder een andere datum is vastgelegd.
+Een artikel zonder bewezen beschikbaarheid blijft `unverified_product`
+met `observation:null` en wordt nooit als prijs-kandidaat meegeteld.
+Het archief wordt eenmaal exclusief met `0600` aangemaakt. In stdout staan
+alleen aantallen kandidaten en onbesliste records per keten, nooit individuele
+producten, bedragen of URLs. De synthetische end-to-endtests gebruiken
+speciaal fictieve toestemming; dit activeert geen live retailercapture of
+publicatie.

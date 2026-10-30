@@ -158,13 +158,12 @@ export async function compareArchivedPrivateProductSnapshots(beforeHtml, afterHt
  * Durable private operator review. Never changes the canonical price store,
  * source-permission register, scheduler or any public output.
  */
-export async function savePrivateOfflineProductReview(htmlFile, reviewFile) {
+async function writePrivateReviewRecord(record, reviewFile) {
   if (typeof reviewFile !== 'string' || reviewFile.length > 512 ||
       reviewFile.trim() !== reviewFile) fail()
   const target = resolve(reviewFile)
   const { basename, dirname } = await import('node:path')
   if (!/^[a-z0-9][a-z0-9_.-]{0,79}\.json$/i.test(basename(target))) fail()
-  const record = await replayPrivateProductHtmlSnapshot(htmlFile)
   await assertNoSymlinkedM3OutputParents(target)
   const { open, lstat, rm } = await import('node:fs/promises')
   const dir = await lstat(dirname(target))
@@ -193,11 +192,69 @@ export async function savePrivateOfflineProductReview(htmlFile, reviewFile) {
     published: false, productionEnabled: false }
 }
 
+export async function savePrivateOfflineProductReview(htmlFile, reviewFile) {
+  return writePrivateReviewRecord(await replayPrivateProductHtmlSnapshot(htmlFile),
+    reviewFile)
+}
+
+/**
+ * Offline operator batch: up to 22 independently pinned archived pages.
+ * Prevent a duplicate SKU counting twice; no automatic price selection.
+ */
+export async function savePrivateOfflineReviewBatch(htmlFiles, reviewFile) {
+  const { types: nodeTypes } = await import('node:util')
+  if (nodeTypes.isProxy(htmlFiles) || !Array.isArray(htmlFiles) ||
+      Object.getPrototypeOf(htmlFiles) !== Array.prototype ||
+      htmlFiles.length < 1 || htmlFiles.length > 22) fail()
+  const descriptors = Object.getOwnPropertyDescriptors(htmlFiles)
+  if (Reflect.ownKeys(descriptors).length !== htmlFiles.length + 1) fail()
+  const records = []
+  const seen = new Set()
+  for (let index = 0; index < htmlFiles.length; index++) {
+    if (!descriptors[index] || !Object.hasOwn(descriptors[index], 'value') ||
+        typeof descriptors[index].value !== 'string') fail()
+    const record = await replayPrivateProductHtmlSnapshot(descriptors[index].value)
+    const identity = record.source.retailerId + ':' + record.source.productUrlSha256
+    if (seen.has(identity)) fail()
+    seen.add(identity)
+    records.push(record)
+  }
+  const retailerCounts = Object.fromEntries(['plus', 'dekamarkt'].map(store => [
+    store, {
+      candidates: records.filter(x => x.source.retailerId === store &&
+        x.status === 'candidate_for_human_review').length,
+      unverified: records.filter(x => x.source.retailerId === store &&
+        x.status === 'unverified_product').length,
+    },
+  ]))
+  const saved = await writePrivateReviewRecord({
+    schemaVersion: 1, mode: 'offline-private-product-review-batch',
+    status: 'private-batch-needs-review',
+    count: records.length,
+    candidateCount: records.filter(x => x.status === 'candidate_for_human_review').length,
+    unverifiedCount: records.filter(x => x.status === 'unverified_product').length,
+    entries: records, retailerCounts, humanReviewRequired: true,
+    sourceRightsForPublicationVerified: false, verifiedCurrentCheckoutPrices: 0,
+    productionEnabled: false, published: false, publicSavingsClaimEligible: false,
+  }, reviewFile)
+  return { ...saved, count: records.length,
+    candidateCount: records.filter(x => x.status === 'candidate_for_human_review').length,
+    unverifiedCount: records.filter(x => x.status === 'unverified_product').length,
+    retailerCounts }
+}
+
 // Operator CLI: no network and no source URL, price, HTML or private path stdout.
 const { pathToFileURL } = await import('node:url')
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const args = process.argv.slice(2)
-  if (args.length === 3 && args[0] === '--drift') {
+  if (args[0] === '--batch' && args.length >= 3 && args.length <= 24) {
+    savePrivateOfflineReviewBatch(args.slice(2), args[1])
+      .then(result => process.stdout.write(JSON.stringify(result) + '\n'))
+      .catch(() => {
+        console.error('Private offline review batch refused; no price was published')
+        process.exitCode = 2
+      })
+  } else if (args.length === 3 && args[0] === '--drift') {
     compareArchivedPrivateProductSnapshots(args[1], args[2])
       .then(report => process.stdout.write(JSON.stringify(report) + '\n'))
       .catch(() => {
@@ -212,7 +269,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
         process.exitCode = 2
       })
   } else {
-    console.error('Usage: retailer-replay-private-html-product.mjs <captured.html> <new-review.json> OR --drift <before.html> <after.html>')
+    console.error('Usage: retailer-replay-private-html-product.mjs <captured.html> <new-review.json> OR --drift <before.html> <after.html> OR --batch <new-review.json> <source1.html> [source2.html ...]')
     process.exitCode = 2
   }
 }
