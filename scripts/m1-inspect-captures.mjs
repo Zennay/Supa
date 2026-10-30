@@ -60,12 +60,18 @@ function liveEmbeddedScripts(html) {
 
 export function extractJsonLdValues(html) {
   const values=[]
+  let jsonLdScriptCount=0
   let scripts
   try { scripts=liveEmbeddedScripts(html) } catch { return [{__supaParseError:true}] }
   for(const script of scripts) {
     const type=admittedJsonScriptType(script.attrs.get('type'))
     if (type === null) { values.push({__supaParseError:true}); continue }
     if(type !== 'application/ld+json') continue
+    // A partial set of more than 16 JSON-LD scripts is not source evidence.
+    if (++jsonLdScriptCount > 16) {
+      values.push({__supaParseError:true})
+      break
+    }
     if(script.attrs.has('src') || !script.content.trim()) {
       values.push({__supaParseError:true})
       continue
@@ -198,7 +204,9 @@ export async function inspectCaptureDirectory(rootDir) {
         capturedAt: result.capturedAt,
         sha256: result.sha256,
       }
-      const schemaResults = extractJsonLdValues(html)
+      const parsedBlocks=extractJsonLdValues(html)
+      const invalidScriptEvidence=parsedBlocks.some(value=>value?.__supaParseError===true)
+      const schemaResults = (invalidScriptEvidence ? [] : parsedBlocks)
         // The generic Product parser accepts legacy short names. At the M1
         // source boundary, require explicit official Schema.org context or
         // absolute Product IRI before even proposing a priced observation.
@@ -217,9 +225,11 @@ export async function inspectCaptureDirectory(rootDir) {
           : {
               type: 'abstain',
               reasons:
-                observations.length > 1
-                  ? ['multiple independently parseable Product JSON-LD blocks']
-                  : schemaResults.map((value) => value.reason).filter(Boolean),
+                invalidScriptEvidence
+                  ? ['invalid or excessive JSON-LD source evidence']
+                  : observations.length > 1
+                    ? ['multiple independently parseable Product JSON-LD blocks']
+                    : schemaResults.map((value) => value.reason).filter(Boolean),
             }
     }
 

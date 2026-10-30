@@ -265,3 +265,23 @@ test('M1 inspection binds archived product bytes to one verified retailer URL an
     }
   } finally {await rm(root,{recursive:true,force:true})}
 })
+
+test('one malformed or excessive JSON-LD block prevents a historical priced source observation',async()=>{
+  const {rm}=await import('node:fs/promises')
+  const root=await mkdtemp(path.join(os.tmpdir(),'supa-m1-price-provenance-'))
+  try {
+    await mkdir(path.join(root,'plus'))
+    const product=JSON.stringify({'@context':'https://schema.org','@type':'Product',name:'SYNTHETIC',sku:'TEST',offers:{'@type':'Offer',price:'1.99',priceCurrency:'EUR'}})
+    const block=body=>'<script type="application/ld+json">'+body+'</script>'
+    const parse=async html=>{
+      await writeFile(path.join(root,'plus','plus-product.html'),html)
+      await writeFile(path.join(root,'manifest.json'),JSON.stringify({milestone:'M1 Data Feasibility',bounded:true,sourceCount:1,results:[{id:'plus-product',supermarket:'plus',kind:'product',requestedUrl:'https://www.plus.nl/product/test',finalUrl:'https://www.plus.nl/product/test',capturedAt:'2026-10-04T00:00:00.000Z',sha256:createHash('sha256').update(html).digest('hex'),success:true}]}))
+      return (await inspectCaptureDirectory(root)).sources[0].schemaOrgProduct
+    }
+    assert.equal((await parse(block(product))).type,'observation')
+    for(const markup of [block(product)+block('{bad'),block('{bad')+block(product),Array(17).fill(block(product)).join('')]){
+      const result=await parse(markup)
+      assert.equal(result.type,'abstain')
+    }
+  }finally{await rm(root,{recursive:true,force:true})}
+})
