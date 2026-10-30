@@ -4,7 +4,7 @@ import {createHash} from 'node:crypto'
 import {mkdtemp,writeFile,readFile,stat,rm,link,unlink,symlink,readdir} from 'node:fs/promises'
 import {join} from 'node:path'
 import {tmpdir} from 'node:os'
-import {buildPrivateSyntheticHtmlFixture,verifyPrivateSyntheticHtmlFixture,buildPrivateSyntheticFixturePair,verifyPrivateSyntheticFixturePair} from '../scripts/retailer-private-structural-fixture.mjs'
+import {buildPrivateSyntheticHtmlFixture,verifyPrivateSyntheticHtmlFixture,buildPrivateSyntheticFixturePair,verifyPrivateSyntheticFixturePair,comparePrivateSyntheticFixturePairs} from '../scripts/retailer-private-structural-fixture.mjs'
 import {replayPrivateProductHtmlSnapshot,replayPrivateSelectorHtmlSnapshot} from '../scripts/retailer-replay-private-html-product.mjs'
 import {proposeOfflineRetailerSelectors,summarizeOfflineSelectorProposals} from '../scripts/retailer-offline-selector-discovery.mjs'
 
@@ -357,4 +357,63 @@ test('legacy v1 private pair keeps SHA-bound verification without falsely claimi
   legacy.schemaVersion=3
   await writeFile(path,JSON.stringify(legacy,null,2)+'\n',{mode:0o600})
   await assert.rejects(verifyPrivateSyntheticFixturePair(plus.filename,deka.filename,dir))
+})
+
+test('pair recapture comparison detects source and selector drift without exposing prices',async t=>{
+  const oldP=await archive(t,'plus','catalog'),oldD=await archive(t,'dekamarkt','offers')
+  const p=await archive(t,'plus','catalog',oldP.html.replace('product-card','new-card'))
+  const d=await archive(t,'dekamarkt','offers')
+  const oldDir=join(oldP.dir,'before'),newDir=join(p.dir,'after')
+  for(const record of [p,d]){
+    const file=record.filename+'.manifest.json'
+    const manifest=JSON.parse(await readFile(file,'utf8'))
+    manifest.source.capturedAt='2026-10-15T12:00:00.000Z'
+    await writeFile(file,JSON.stringify(manifest,null,2)+'\n',{mode:0o600})
+  }
+  await buildPrivateSyntheticFixturePair(oldP.filename,oldD.filename,oldDir)
+  await buildPrivateSyntheticFixturePair(p.filename,d.filename,newDir)
+  const args=[oldP.filename,oldD.filename,oldDir,p.filename,d.filename,newDir]
+  const result=await comparePrivateSyntheticFixturePairs(...args)
+  assert.equal(result.verified,true)
+  assert.equal(result.allCapturesAdvanced,true)
+  assert.equal(result.anySelectorDrift,true)
+  assert.deepEqual(result.retailers.map(x=>x.outcome),
+    ['review-selector-drift','unchanged-recapture'])
+  assert.equal(result.priceClaimsEligible,false)
+  assert.ok(result.retailers.every(x=>x.humanReviewRequired))
+  const {spawnSync}=await import('node:child_process')
+  const executable=new URL('../scripts/retailer-private-structural-fixture.mjs',import.meta.url).pathname
+  const cli=spawnSync(process.execPath,['--experimental-strip-types',executable,'--compare-pair',...args],
+    {encoding:'utf8',timeout:20000})
+  assert.equal(cli.status,0,cli.stderr)
+  assert.deepEqual(JSON.parse(cli.stdout),result)
+  assert.doesNotMatch(cli.stdout+cli.stderr,/PRIVATE_SECRET|PRIVATE PRODUCT NAME|€999|www\.plus\.nl/)
+  const path=join(newDir,'pair-provenance.json')
+  const original=await readFile(path)
+  await writeFile(path,original.toString('utf8').replace('"published": false','"published": true'))
+  await assert.rejects(comparePrivateSyntheticFixturePairs(...args))
+})
+
+test('same-time changed HTML is stale and older v1 pairs do not promote newer v1 evidence',async t=>{
+  const oldP=await archive(t,'plus','catalog'),oldD=await archive(t,'dekamarkt','offers')
+  const newP=await archive(t,'plus','catalog',oldP.html.replace('PRIVATE_SECRET_123','ANOTHER_SECRET'))
+  const newD=await archive(t,'dekamarkt','offers')
+  const oldDir=join(oldP.dir,'old-pair'),newDir=join(newP.dir,'new-pair')
+  await buildPrivateSyntheticFixturePair(oldP.filename,oldD.filename,oldDir)
+  await buildPrivateSyntheticFixturePair(newP.filename,newD.filename,newDir)
+  async function toLegacy(dir){
+    const file=join(dir,'pair-provenance.json')
+    const manifest=JSON.parse(await readFile(file,'utf8'))
+    manifest.schemaVersion=1
+    for(const entry of manifest.sources) delete entry.sourceUrlSha256
+    await writeFile(file,JSON.stringify(manifest,null,2)+'\n',{mode:0o600})
+  }
+  await toLegacy(oldDir)
+  const args=[oldP.filename,oldD.filename,oldDir,newP.filename,newD.filename,newDir]
+  const result=await comparePrivateSyntheticFixturePairs(...args)
+  assert.equal(result.allCapturesAdvanced,false)
+  assert.equal(result.retailers[0].htmlChanged,true)
+  assert.equal(result.retailers[0].outcome,'stale-capture')
+  await toLegacy(newDir)
+  await assert.rejects(comparePrivateSyntheticFixturePairs(...args))
 })

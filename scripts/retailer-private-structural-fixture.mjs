@@ -221,6 +221,46 @@ export async function verifyPrivateSyntheticFixturePair(plusFile,dekaFile,direct
     productionEnabled:false,published:false}
 }
 
+// Compare two fully verified private capture pairs without revealing retailer
+// text, raw URLs, prices, product IDs or source HTML to the operator's stdout.
+export async function comparePrivateSyntheticFixturePairs(
+  olderPlus,olderDeka,olderDir,newerPlus,newerDeka,newerDir) {
+  const [before,after] = await Promise.all([
+    verifyPrivateSyntheticFixturePair(olderPlus,olderDeka,olderDir),
+    verifyPrivateSyntheticFixturePair(newerPlus,newerDeka,newerDir)
+  ])
+  // Old bundles may predate URL hashes; new evidence must use version 2.
+  if(!before.verified||!after.verified||!after.sourceUrlHashBound) refuse()
+  const oldSources=await Promise.all([olderPlus,olderDeka]
+    .map(derivePrivateSyntheticFixture))
+  const newSources=await Promise.all([newerPlus,newerDeka]
+    .map(derivePrivateSyntheticFixture))
+  const retailers=oldSources.map((older,i)=>{
+    const newer=newSources[i]
+    if(older.manifest.source.retailerId!==newer.manifest.source.retailerId) refuse()
+    const first=older.manifest.source, last=newer.manifest.source
+    const previousTime=Date.parse(first.capturedAt)
+    const latestTime=Date.parse(last.capturedAt)
+    if(!Number.isFinite(previousTime)||!Number.isFinite(latestTime)) refuse()
+    const laterCapture=latestTime>previousTime
+    const sourceChanged=first.sourceUrlSha256!==last.sourceUrlSha256 ||
+      first.kind!==last.kind
+    const htmlChanged=first.sha256!==last.sha256
+    const selectorDrift=older.manifest.syntheticHtmlSha256!==
+      newer.manifest.syntheticHtmlSha256
+    return {retailerId:first.retailerId,
+      outcome:!laterCapture?'stale-capture':
+        sourceChanged?'review-source-change':
+        selectorDrift?'review-selector-drift':
+        htmlChanged?'review-html-change':'unchanged-recapture',
+      laterCapture,sourceChanged,htmlChanged,selectorDrift,
+      humanReviewRequired:true}
+  })
+  return {verified:true,retailers,allCapturesAdvanced:retailers.every(x=>x.laterCapture),
+    anySelectorDrift:retailers.some(x=>x.selectorDrift),
+    productionEnabled:false,published:false,priceClaimsEligible:false}
+}
+
 export async function buildPrivateSyntheticFixturePair(plusFile,dekaFile,newDirectory) {
   if(typeof newDirectory!=='string'||!newDirectory.trim()) refuse()
   const plus=(await derivePrivateSyntheticFixture(plusFile)).manifest
@@ -272,10 +312,12 @@ if(process.argv[1] && import.meta.url===pathToFileURL(resolve(process.argv[1])).
     job=buildPrivateSyntheticFixturePair(args[1],args[2],args[3])
   else if(mode==='--verify-pair' && args.length===4)
     job=verifyPrivateSyntheticFixturePair(args[1],args[2],args[3])
+  else if(mode==='--compare-pair' && args.length===7)
+    job=comparePrivateSyntheticFixturePairs(...args.slice(1))
   else if(args.length===2 && !args[0].startsWith('--'))
     job=buildPrivateSyntheticHtmlFixture(args[0],args[1])
   else {
-    console.error('Usage: <source.html> <new-dir> | --verify <source.html> <dir> | --pair <plus.html> <deka.html> <new-dir> | --verify-pair <plus.html> <deka.html> <dir>')
+    console.error('Usage: <source.html> <new-dir> | --verify <source.html> <dir> | --pair <plus.html> <deka.html> <new-dir> | --verify-pair <plus.html> <deka.html> <dir> | --compare-pair <oldPlus.html> <oldDeka.html> <oldDir> <newPlus.html> <newDeka.html> <newDir>')
     process.exitCode=2
   }
   if(job) job.then(x=>process.stdout.write(JSON.stringify(x)+'\n'))
