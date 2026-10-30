@@ -15,6 +15,9 @@ const m1JobScripts = [
   'scripts/m1-evaluate-freshness.mjs',
   'scripts/m1-export-sanitized-candidates.mjs',
   'scripts/m1-build-evidence-summary.mjs',
+  // Direct authorized HTML -> private-only price and archive is M1 source code.
+  // Its changes must also activate the permanent capture/evidence gate.
+  'scripts/retailer-approved-price-archive-run.mjs',
 ]
 
 function localModule(parent, specifier) {
