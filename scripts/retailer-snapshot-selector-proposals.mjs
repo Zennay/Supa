@@ -1,3 +1,4 @@
+import { decodeExactRetailerHtmlBytes } from './retailer-private-html-byte-identity.mjs'
 /**
  * OFFLINE selector discovery from a previously approved and integrity-linked M1
  * capture. A proposal is NEVER an extracted product, verified selector, license
@@ -105,7 +106,8 @@ function assertClosedInertMarkup(html) {
 
 export function proposeRetailerSelectors(source, html) {
   const identity = validCapture(source)
-  if (typeof html !== 'string' ||
+  if (typeof html !== 'string' || html.startsWith('\uFEFF') ||
+      html.includes('\u0000') ||
       Buffer.byteLength(html, 'utf8') > MAX_HTML_BYTES ||
       Buffer.from(html, 'utf8').toString('utf8') !== html ||
       sha256(html) !== identity.sha256) reject('HTML must be bounded, UTF-8 and match source SHA-256')
@@ -209,7 +211,7 @@ export async function proposeFromM1CaptureDirectory(dir) {
     await checkNonSymlinkParents(filename)
     const info = await lstat(filename)
     if (!info.isFile() || info.size > MAX_HTML_BYTES) reject('capture HTML not a bounded regular file')
-    const html = await readFile(filename, 'utf8')
+    const html = decodeExactRetailerHtmlBytes(await readFile(filename), MAX_HTML_BYTES)
     proposals.push(proposeRetailerSelectors(source, html))
   }
   return {
