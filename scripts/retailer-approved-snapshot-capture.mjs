@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { types as nodeTypes } from 'node:util'
 import { evaluateSourcePermissionGate } from './m1-check-source-permission-gate.mjs'
+import { scanOfflineRetailerMarkup } from './retailer-offline-structural-scan.mjs'
 
 /**
  * A direct approved capture must not rely on getter/proxy fields that can
@@ -119,7 +120,43 @@ function checkedTarget(source) {
       target.search || target.hash || target.href !== source.url || !route) {
     throw new Error('Retailer source outside exact approved HTTPS route')
   }
+  // Encoded separators and dot segments can be interpreted differently by
+  // an upstream router/proxy. A source grant must map to one unambiguous path.
+  if (/(?:%2f|%5c|%2e|%25|\\)/i.test(target.pathname)) {
+    throw new Error('Ambiguous retailer capture route')
+  }
   return target.href
+}
+
+function assertDocumentSourceIdentity(html, target) {
+  // The HTTP 200 destination is not sufficient source provenance: HTML may
+  // navigate the browser or rebase relative links to a different storefront.
+  // Use the same inert offline HTML tokenizer as selector and price replay.
+  const document = scanOfflineRetailerMarkup(html)
+  if (document.hasMetaRefresh) throw new Error('Retailer HTML navigation refused')
+  const expected = new URL(target)
+  for (const href of document.baseHrefs) {
+    let destination
+    try { destination = new URL(href, target) }
+    catch { throw new Error('Untrusted HTML base URL') }
+    if (destination.origin !== expected.origin || destination.username ||
+        destination.password || destination.protocol !== 'https:') {
+      throw new Error('Untrusted HTML base URL')
+    }
+  }
+  for (const href of document.canonicalHrefs) {
+    let destination
+    try { destination = new URL(href, target) }
+    catch { throw new Error('Untrusted HTML canonical source URL') }
+    // A canonical for another product cannot prove the requested SKU's
+    // provenance, even when both URLs share the retailer host.
+    const path = p => p.replace(/\/$/, '') || '/'
+    if (destination.origin !== expected.origin || destination.username ||
+        destination.password || destination.search || destination.hash ||
+        path(destination.pathname) !== path(expected.pathname)) {
+      throw new Error('Untrusted HTML canonical source URL')
+    }
+  }
 }
 
 function permittedForCapture(gate, source, grant, target) {
@@ -156,6 +193,12 @@ async function collectBoundedBody(response) {
   const declared = response.headers?.get?.('content-length')
   if (declared && (!/^\d+$/.test(declared) || Number(declared) > MAX_BODY_BYTES)) {
     throw new Error('Declared snapshot exceeds size budget')
+  }
+  // A misleading declared charset can change price/name semantics downstream.
+  // Only validated UTF-8 is accepted for source snapshots.
+  const charsets = [...contentType.matchAll(/;\s*charset\s*=\s*['"]?([^;'",\s]+)['"]?/gi)]
+  if (charsets.length > 1 || (charsets.length && !/^utf-?8$/i.test(charsets[0][1]))) {
+    throw new Error('Unsupported or ambiguous retailer HTML charset')
   }
   const reader = response.body.getReader()
   const chunks = []
@@ -248,6 +291,7 @@ export async function captureApprovedRetailerPage(options = {}) {
     await closeRejectedBody()
     throw error
   }
+  assertDocumentSourceIdentity(body.html, target)
   return {
     mode: 'authorized-one-page-capture-needs-review',
     source: {

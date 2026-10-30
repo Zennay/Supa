@@ -206,11 +206,12 @@ test('synthetic approved PLUS price cannot cross a foreign canonical/base HTML s
     '<link rel="canonical" href="http://www.plus.nl/product/fictional-123">',
   ]) {
     const markup=normal.replace('<head>','<head>'+extra)
-    const result=await captureApprovedProductPriceCandidate(options('plus',markup))
-    assert.equal(result.status,'review_required')
-    assert.equal(result.reason,'missing_or_invalid_jsonld')
-    assert.equal(result.observation,null)
-    assert.equal(result.published,false)
+    // The transport now refuses invalid source provenance before raw HTML
+    // can enter candidate parsing, rather than returning a review object.
+    await assert.rejects(
+      captureApprovedProductPriceCandidate(options('plus',markup)),
+      /Untrusted HTML (canonical source URL|base URL)/
+    )
   }
   for (const extra of [
     '<link rel="canonical" href="https://www.plus.nl/product/fictional-milk-123">',

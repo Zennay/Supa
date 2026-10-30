@@ -290,3 +290,59 @@ test('denied status and non-HTML source responses cancel unread network streams'
     assert.equal(cancelled, 1)
   }
 })
+
+test('source-identity capture refuses mismatched canonical/base and live refresh before archive', async () => {
+  const scenarios = [
+    ['<html><head><link rel="canonical" href="https://other.test/producten"></head><body>Fake</body></html>', /canonical/],
+    ['<html><head><link rel="canonical" href="https://www.plus.nl/product/other-sku"></head><body>Fake</body></html>', /canonical/],
+    ['<html><head><base href="//other.test/"></head><body>Fake</body></html>', /base/],
+    ['<html><head><meta http-equiv="refresh" content="0;url=/product/other"></head><body>Fake</body></html>', /navigation/],
+  ]
+  for (const [html, pattern] of scenarios) {
+    const fetchFn = async () => new Response(html, {
+      status: 200, headers: { 'content-type': 'text/html; charset=utf-8' },
+    })
+    await assert.rejects(captureApprovedRetailerPage({
+      source, permissionGate: gate, grant, fetchFn,
+    }), pattern)
+  }
+  // Quotes inside inert comment/script data cannot forge page-level identity.
+  const legitimate = '<html><head><base href="/producten/"><link rel="canonical" href="/producten"></head><body><!-- <base href="https://evil.test"> --><script>const s = "<meta http-equiv=refresh>";</script><a class="product-card" href="/product/mock">Mock</a></body></html>'
+  const valid = await captureApprovedRetailerPage({
+    source, permissionGate: gate, grant,
+    fetchFn: async () => new Response(legitimate, {
+      headers: { 'content-type': 'text/html; charset="UTF-8"' },
+    }),
+  })
+  assert.equal(valid.html, legitimate)
+  assert.equal(valid.readyForIngestion, false)
+})
+
+test('source capture refuses ambiguous route bytes before any injected network', async () => {
+  let called = 0
+  for (const badPath of [
+    '/product/a%2fb', '/product/a%5cb', '/product/a%2eb', '/product/a%252fb',
+  ]) {
+    const targetUrl = 'https://www.plus.nl' + badPath
+    await assert.rejects(captureApprovedRetailerPage({
+      source: { supermarket: 'plus', kind: 'product', url: targetUrl },
+      permissionGate: gate, grant: { ...grant, kind: 'product', sourceUrl: targetUrl },
+      fetchFn: async () => { called++; throw Error('not allowed') },
+    }), /Ambiguous retailer capture route/)
+  }
+  assert.equal(called, 0)
+})
+
+test('captured HTML requires unambiguous UTF-8 charset before trusting price provenance', async () => {
+  for (const contentType of [
+    'text/html; charset=iso-8859-1',
+    'text/html; charset=UTF-8; charset=windows-1252',
+  ]) {
+    await assert.rejects(captureApprovedRetailerPage({
+      source, permissionGate: gate, grant,
+      fetchFn: async () => new Response('<html>synthetic</html>', {
+        headers: { 'content-type': contentType },
+      }),
+    }), /charset/)
+  }
+})
