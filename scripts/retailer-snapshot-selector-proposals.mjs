@@ -1,3 +1,4 @@
+import { ambiguousRetailerRoute } from './retailer-source-route-safety.mjs'
 import { scanOfflineRetailerMarkup } from './retailer-offline-structural-scan.mjs'
 import { parseUniqueKeyRetailerJson } from './retailer-private-unique-key-json.mjs'
 import { decodeExactRetailerHtmlBytes } from './retailer-private-html-byte-identity.mjs'
@@ -57,6 +58,10 @@ function validCapture(source, requireHash = true) {
   const capturedAt = owned(source, 'capturedAt')
   const id = owned(source, 'id')
   const expectedSha = owned(source, 'sha256')
+  const requestedUrl = owned(source, 'requestedUrl')
+  const finalUrl = owned(source, 'finalUrl')
+  if (requestedUrl !== undefined && finalUrl !== undefined &&
+      requestedUrl !== finalUrl) reject('unexpected retailer source redirect')
   if (!Object.hasOwn(HOSTS, supermarket) || !KINDS.has(kind) ||
       typeof id !== 'string' || !/^[a-z0-9][a-z0-9._-]{0,99}$/i.test(id) ||
       (requireHash ? (typeof expectedSha !== 'string' || !/^[a-f0-9]{64}$/.test(expectedSha)) : (expectedSha !== undefined && (typeof expectedSha !== 'string' || !/^[a-f0-9]{64}$/.test(expectedSha)))) ||
@@ -65,7 +70,8 @@ function validCapture(source, requireHash = true) {
       (!Number.isFinite(Date.parse(capturedAt)) || Date.parse(capturedAt) > Date.now())) reject('invalid capture identity/hash/timestamp')
   let url
   try { url = new URL(urlValue) } catch { reject('invalid source URL') }
-  if (url.protocol !== 'https:' || url.hostname !== HOSTS[supermarket] ||
+  if (url.href !== urlValue || ambiguousRetailerRoute(url.pathname) ||
+      url.protocol !== 'https:' || url.hostname !== HOSTS[supermarket] ||
       url.port || url.username || url.password || url.search || url.hash) {
     reject('unapproved source host, URL or credentials')
   }
