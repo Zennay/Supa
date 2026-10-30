@@ -113,6 +113,23 @@ export const curatedFigmaRecipes: CuratedFigmaRecipe[] = [
       'Meng de spaghetti door de groentesaus en verdeel over twee borden.',
     ],
   },
+  {
+    id: 'supa-burrito-bowl', title: 'Burrito bowl', minutes: 25, servings: 2,
+    estimatedCost: Number.NaN, tags: ['rijst', 'vegetarisch'], source: 'supa-original-recipe',
+    ingredients: [
+      ingredient('basmati-rice', 'Basmati rijst', 'basmati rijst', 150, 'g'),
+      ingredient('supa-beans', 'Kidneybonen', 'kidneybonen', 200, 'g'),
+      ingredient('supa-paprika', 'Paprika', 'paprika', 1, 'piece'),
+      ingredient('tomato-cubes', 'Tomatenblokjes', 'tomatenblokjes', 200, 'g'),
+      ingredient('supa-cheese', 'Geraspte kaas', 'geraspte kaas', 80, 'g'),
+    ],
+    steps: [
+      'Kook 150 g basmatirijst volgens de verpakking.',
+      'Snijd de paprika in blokjes en verwarm samen met 200 g kidneybonen en 200 g tomatenblokjes in een pan.',
+      'Verdeel de rijst over twee kommen en schep de bonenmix erop.',
+      'Strooi 80 g geraspte kaas over de bowl en serveer direct.',
+    ],
+  },
 ]
 
 for (const recipe of curatedFigmaRecipes) {

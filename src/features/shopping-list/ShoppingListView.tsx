@@ -5,7 +5,7 @@ import { quantityUnitLabelNl } from '../../lib/quantityPresentation'
 import { euro } from '../../lib/money'
 import { ShoppingListCompletionBanner } from './ShoppingListCompletionBanner'
 import { ShoppingListCopyButton } from './ShoppingListCopyButton'
-import { PrintableShoppingChecklist } from './PrintableShoppingChecklist'
+import { PrintableShoppingChecklist } from './PrintableShoppingChecklist.tsx'
 import {
   restoreShoppingListProgress,
   restorePhysicalShoppingProgress,

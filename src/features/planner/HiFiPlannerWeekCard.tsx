@@ -1,5 +1,6 @@
 import type { PlannedMeal } from '../../domain/types'
 import { FigmaImage } from '../../components/FigmaImage'
+import { upcomingHomeWeek } from '../home/homeWeekDates'
 import './hifiPlannerWeek.css'
 
 export const weekdayNames: Record<string, string> = {
@@ -10,8 +11,14 @@ const weekdayIndexes: Record<string, number> = {
   Ma: 0, Di: 1, Wo: 2, Do: 3, Vr: 4, Za: 5, Zo: 6,
 }
 
-/** Local calendar date of a planner weekday in the current Monday-based week. */
+/**
+ * Local calendar date of a planner weekday. Sunday–Thursday follow the same
+ * upcoming dates as the Home week strip; other days use the current
+ * Monday-based week.
+ */
 export function plannerWeekDate(day: string, today = new Date()) {
+  const upcoming = upcomingHomeWeek(today).find(entry => entry.plannerDay === day)
+  if (upcoming) return new Date(upcoming.year, upcoming.month, upcoming.date)
   const date = new Date(today.getFullYear(), today.getMonth(), today.getDate())
   date.setDate(date.getDate() - ((date.getDay() + 6) % 7) + (weekdayIndexes[day] ?? 0))
   return date
@@ -52,12 +59,12 @@ export function HiFiPlannerWeekCard({
             <button
               key={day}
               type="button"
-              className={active ? 'hifi-planner-day selected' : 'hifi-planner-day'}
+              className={`hifi-planner-day${active ? ' selected' : ''}${date.toDateString() === today.toDateString() ? ' today' : ''}`}
               aria-label={`${weekdayNames[day] ?? day} ${date.getDate()} ${active ? 'uit planning halen' : 'aan planning toevoegen'}`}
               aria-pressed={active}
               onClick={() => onToggleDay(day)}
             >
-              <span className="hifi-planner-day-label">{day.slice(0, 1)}</span>
+              <span className="hifi-planner-day-label">{day === 'Zo' ? 'Z' : day.slice(0, 1)}</span>
               <span className={active && dayImages[day]
                 ? 'hifi-planner-day-number with-photo'
                 : day === nextOpenDay ? 'hifi-planner-day-number next-open' : 'hifi-planner-day-number'}>
@@ -68,7 +75,7 @@ export function HiFiPlannerWeekCard({
           )
         })}
       </div>
-      <p className="hifi-planner-week-count" aria-live="polite">
+      <p className="hifi-sr-only" aria-live="polite">
         {plannedMeals.filter(({ day }) => activeDays.includes(day)).length} van {plannedMeals.length} dagen geselecteerd
       </p>
     </section>

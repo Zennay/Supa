@@ -75,4 +75,40 @@ export const figmaRecipeImages: Record<string, string> = {
 export const figmaPlannerThumbs: Record<string, string> = {
   ...figmaRecipeImages,
   'supa-thai': plannerThaiThumb,
+  'supa-burrito-bowl': plannerBurritoThumb,
 }
+
+import plannerBurritoThumb from '../../assets/figma/planner/burrito-thumb.png'
+import navHomeActive from '../../assets/figma/nav/home-active.svg'
+import navPlannerActive from '../../assets/figma/nav/planner-active.svg'
+import navRecipesActive from '../../assets/figma/nav/recipes-active.svg'
+import navProductsActive from '../../assets/figma/nav/products-active.svg'
+import navListActive from '../../assets/figma/nav/list-active.svg'
+import storeJumbo from '../../assets/figma/stores/jumbo.png'
+import storeDirk from '../../assets/figma/stores/dirk.png'
+import storeAh from '../../assets/figma/stores/ah.png'
+import storeLidl from '../../assets/figma/stores/lidl.png'
+import storePlus from '../../assets/figma/stores/plus.png'
+import storeVomar from '../../assets/figma/stores/vomar.png'
+import storeAldi from '../../assets/figma/stores/aldi.png'
+import storeHoogvliet from '../../assets/figma/stores/hoogvliet.png'
+
+/** Ingredient pictures (Twemoji, CC-BY 4.0) keyed by file name, e.g. `1f35a`. */
+const ingredientModules = import.meta.glob('../../assets/ingredients/*.svg', {
+  eager: true, query: '?url', import: 'default',
+}) as Record<string, string>
+export const ingredientIconFiles: Record<string, string> = Object.fromEntries(
+  Object.entries(ingredientModules).map(([path, url]) => [path.split('/').pop()!.replace('.svg', ''), url]),
+)
+
+export const storeLogos = {
+  jumbo: storeJumbo, dirk: storeDirk, ah: storeAh, lidl: storeLidl,
+  plus: storePlus, vomar: storeVomar, aldi: storeAldi, hoogvliet: storeHoogvliet,
+}
+
+/** Additional reviewed, bundled images accepted by <FigmaImage>. */
+export const figmaExtraAssets: string[] = [
+  navHomeActive, navPlannerActive, navRecipesActive, navProductsActive, navListActive,
+  plannerBurritoThumb, ...Object.values(storeLogos), ...Object.values(ingredientIconFiles),
+]
+export { plannerBurritoThumb }

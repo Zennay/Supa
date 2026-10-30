@@ -3,7 +3,7 @@ import type { SavedRecipe } from './recipeLibrary.ts'
 import { toPlannerRecipe } from './plannerRecipes.ts'
 import { scaleOwnRecipe } from './scaleOwnRecipe.ts'
 import type { UserRecipeDraft } from '../../domain/userRecipeImport.ts'
-import { m2InitialPlan } from '../../data/m2Fixture.ts'
+import { appInitialPlan } from '../../data/appPlan'
 import { combinedImportedRecipeGroceries } from './combinedImportedRecipeGroceries.ts'
 import { formatOwnRecipeChecklist } from './recipeShoppingChecklist.ts'
 import { exportOwnRecipeChecklistCsv } from './recipeShoppingCsv.ts'
@@ -40,7 +40,7 @@ export function ImportedRecipeGroceriesPanel({
   const [selectedIds, setSelectedIds] = useState<string[]>(() =>
     (recentIds.length ? recentIds : recipes.slice(0, 3).map(recipe => recipe.id)).slice(0, 15))
   const [query, setQuery] = useState('')
-  const [startDay, setStartDay] = useState(m2InitialPlan[0].day)
+  const [startDay, setStartDay] = useState(appInitialPlan[0].day)
   const [dayOverrides, setDayOverrides] = useState<Record<string, string>>({})
   const [portionsById, setPortionsById] = useState<Record<string, number>>({})
   const [checked, setChecked] = useState<Record<string, boolean>>({})
@@ -76,7 +76,7 @@ export function ImportedRecipeGroceriesPanel({
   const allPlannerReady = selected.length > 0 && selected.every(recipe =>
     !!toPlannerRecipe(recipe) && (Object.hasOwn(portionsById, recipe.id)
       ? portionsById[recipe.id] === recipe.servings : true))
-  const plannerDays = m2InitialPlan.map(meal => meal.day)
+  const plannerDays = appInitialPlan.map(meal => meal.day)
   const startDayIndex = plannerDays.indexOf(startDay)
   const plannerAssignments = selected.length <= plannerDays.length && startDayIndex >= 0
     ? selected.map((recipe, index) => ({
