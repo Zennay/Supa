@@ -289,9 +289,10 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
   const sha256 = createHash('sha256').update(html, 'utf8').digest('hex')
   // Inspect real HTML element boundaries; never infer signal tags from
   // comments, attributes, script strings or inert DOM containers.
-  const { visible, structuredSignals, baseHrefs, canonicalHrefs, hasMetaRefresh, hasMetaNoStore, hasConflictingCharset } = scanOfflineRetailerMarkup(html)
+  const { visible, structuredSignals, baseHrefs, canonicalHrefs, hasMetaRefresh, hasMetaNoStore, hasMetaNoArchive, hasConflictingCharset } = scanOfflineRetailerMarkup(html)
   if (hasMetaRefresh) throw new Error('Untrusted HTML redirect evidence')
   if (hasMetaNoStore) throw new Error('Untrusted HTML no-store archival directive')
+  if (hasMetaNoArchive) throw new Error('Untrusted HTML robots noarchive directive')
   if (hasConflictingCharset) throw new Error('Untrusted HTML charset declaration')
   const documentBaseUrl=assertObservedRetailerHtmlIdentity(
     origin.url,baseHrefs,canonicalHrefs)

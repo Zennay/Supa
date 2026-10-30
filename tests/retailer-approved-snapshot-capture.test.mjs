@@ -537,6 +537,24 @@ test('live HTML meta no-store refuses archival without header no-store', async (
   assert.equal(allowed.readyForIngestion,false)
 })
 
+test('real capture path refuses semicolon cache no-store and robots noarchive, but not inert copy', async () => {
+  const page=tag=>'<html><head>'+tag+'</head><body><a href="/product/synthetic-1">SYNTHETIC</a></body></html>'
+  const fetchFn=html=>async()=>new Response(html,{status:200,headers:{'content-type':'text/html'}})
+  for (const meta of [
+    '<meta http-equiv="Cache-Control" content="private; no-store">',
+    '<meta name="robots" content="index, noarchive, follow">',
+    '<meta name="Googlebot" content="NOARCHIVE">',
+  ]) {
+    await assert.rejects(captureApprovedRetailerPage({
+      source,permissionGate:gate,grant,fetchFn:fetchFn(page(meta)),
+    }),/HTML disallows snapshot archival/,meta)
+    const allowed=await captureApprovedRetailerPage({
+      source,permissionGate:gate,grant,fetchFn:fetchFn(page('<template>'+meta+'</template>')),
+    })
+    assert.equal(allowed.readyForIngestion,false)
+  }
+})
+
 test('HTTP 200 Content-Range cannot launder a partial document into a complete snapshot', async () => {
   let cancelled=false
   const fragment='<html><body>PARTIAL SYNTHETIC'

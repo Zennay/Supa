@@ -152,7 +152,7 @@ export function proposeRetailerSelectors(source, html) {
   // archival contract. Never derive candidate selectors from a page that
   // explicitly forbids retention, redirects, or declares a non-UTF8 DOM.
   const document = scanOfflineRetailerMarkup(html,{includeScripts:true})
-  if (document.hasMetaNoStore || document.hasMetaRefresh ||
+  if (document.hasMetaNoStore || document.hasMetaNoArchive || document.hasMetaRefresh ||
       document.hasConflictingCharset) {
     reject('retailer HTML source directives prohibit selector review')
   }

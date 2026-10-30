@@ -136,7 +136,7 @@ function assertDocumentSourceIdentity(html, target) {
   // Use the same inert offline HTML tokenizer as selector and price replay.
   const document = scanOfflineRetailerMarkup(html)
   if (document.hasMetaRefresh) throw new Error('Retailer HTML navigation refused')
-  if (document.hasMetaNoStore) throw new Error('Retailer HTML disallows snapshot archival')
+  if (document.hasMetaNoStore || document.hasMetaNoArchive) throw new Error('Retailer HTML disallows snapshot archival')
   if (document.hasConflictingCharset) throw new Error('Untrusted retailer HTML charset')
   const expected = new URL(target)
   for (const href of document.baseHrefs) {

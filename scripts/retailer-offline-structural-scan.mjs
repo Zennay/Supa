@@ -100,6 +100,7 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
   const canonicalHrefs = [];
   let hasMetaRefresh = false;
   let hasMetaNoStore = false;
+  let hasMetaNoArchive = false;
   let hasConflictingCharset = false;
   let pos = 0;
   let inspected = 0;
@@ -178,8 +179,18 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
         typeof values.get('http-equiv') === 'string' &&
         values.get('http-equiv').trim().toLowerCase() === 'cache-control' &&
         typeof values.get('content') === 'string' &&
-        /(?:^|,)\s*no-store(?:\s*(?:[=;,]|$))/i.test(values.get('content'))) {
+        /(?:^|[,;])\s*no-store(?:\s*(?:[=;,]|$))/i.test(values.get('content'))) {
       hasMetaNoStore = true;
+    }
+    // Respect genuine document-level search-engine archival opt-outs too.
+    // A noarchive directive is not price evidence and must not enter a
+    // persistent capture or selector archive. Ignore template/script fakes.
+    if (tag === 'meta' && (hidden.length === 0 ||
+        hidden.length === 1 && hidden[0] === 'head') &&
+        /^(?:robots|googlebot|bingbot)$/i.test(values.get('name') ?? '') &&
+        typeof values.get('content') === 'string' &&
+        /(?:^|[,;\s])noarchive(?=$|[,;\s])/i.test(values.get('content'))) {
+      hasMetaNoArchive = true;
     }
     // A browser may decode the same captured bytes differently when an HTML
     // meta declaration disagrees with our UTF-8-only snapshot contract.
@@ -254,6 +265,6 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
   }
   if (hidden.length) throw new Error('Unbalanced inert HTML element');
   return { visible: visible.join(''), structuredSignals: signals,
-    baseHrefs, canonicalHrefs, hasMetaRefresh, hasMetaNoStore, hasConflictingCharset,
+    baseHrefs, canonicalHrefs, hasMetaRefresh, hasMetaNoStore, hasMetaNoArchive, hasConflictingCharset,
     ...(includeScripts ? { scripts } : {}) };
 }

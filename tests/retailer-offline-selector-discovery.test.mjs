@@ -689,6 +689,24 @@ test('private offline proposals refuse live no-store meta while ignoring inert f
   assert.equal(allowed.readyForIngestion,false)
 })
 
+test('captured HTML archival directives disallow semicolon no-store and robots noarchive, never inert fakes', () => {
+  const anchor='<a href="/product/synthetic-1">SYNTHETIC</a>'
+  const page=tag=>'<html><head>'+tag+'</head><body>'+anchor+'</body></html>'
+  for (const meta of [
+    '<meta http-equiv="Cache-Control" content="private; no-store">',
+    '<meta http-equiv="Cache-Control" content="max-age=0;NO-STORE">',
+    '<meta name="robots" content="index, noarchive, follow">',
+    '<meta name="Googlebot" content="NOARCHIVE">',
+  ]) {
+    assert.throws(()=>proposeOfflineRetailerSelectors({html:page(meta),origin}),
+      /Untrusted HTML (?:no-store archival|robots noarchive) directive/,meta)
+    const inert=proposeOfflineRetailerSelectors({html:page('<template>'+meta+'</template>'),origin})
+    assert.equal(inert.selectors.some(x=>x.selector==='a[href^="/product/"]'),true)
+  }
+  const benign=proposeOfflineRetailerSelectors({html:page('<meta name="robots" content="index, follow">'),origin})
+  assert.equal(benign.readyForIngestion,false)
+})
+
 test('in-memory selector proposals refuse HTML BOM/NUL that browser parsing would normalize', () => {
   const origin={retailerId:'plus',url:'https://www.plus.nl/producten',
     capturedAt:'2026-10-14T12:00:00.000Z'}
