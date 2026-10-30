@@ -498,6 +498,10 @@ test('HTTP no-store and attachment HTML cannot enter a SHA-pinned snapshot archi
   for (const headers of [
     { 'cache-control': 'max-age=30, no-store' },
     { 'cache-control': 'NO-STORE' },
+    { 'cache-control': 'max-age=30; no-store' },
+    { 'x-robots-tag': 'noarchive' },
+    { 'x-robots-tag': 'googlebot: noarchive' },
+    { 'x-robots-tag': 'index, follow, noarchive' },
     { 'content-disposition': 'attachment; filename="export.html"' },
   ]) {
     let cancelled = false

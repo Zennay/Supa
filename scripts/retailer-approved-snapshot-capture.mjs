@@ -386,7 +386,11 @@ export async function captureApprovedRetailerPage(options = {}) {
   // protected local 0600 operator archive; they are not source permissions.
   const cacheControl = response.headers?.get?.('cache-control') || ''
   const disposition = response.headers?.get?.('content-disposition') || ''
-  if (/(?:^|,)\s*no-store(?:\s*[;,]|\s*$)/i.test(cacheControl) ||
+  const robotsHeader = response.headers?.get?.('x-robots-tag') || ''
+  // Source archive opt-outs may be conveyed as HTTP headers rather than
+  // HTML meta. Refuse before reading a response body or storing a SHA.
+  if (/(?:^|[,;])\s*no-store(?:\s*[;,]|\s*$)/i.test(cacheControl) ||
+      /(?:^|[,:;\s])noarchive(?=$|[,:;\s])/i.test(robotsHeader) ||
       /^\s*attachment(?:\s*;|\s*$)/i.test(disposition)) {
     await closeRejectedBody()
     throw new Error('Retailer HTML response disallows snapshot archival')
