@@ -222,7 +222,10 @@ async function collectBoundedBody(response) {
       if (!(value instanceof Uint8Array)) throw new Error('Invalid HTML chunk')
       bytes += value.byteLength
       if (bytes > MAX_BODY_BYTES) throw new Error('Snapshot exceeds size budget')
-      chunks.push(value)
+      // A streaming reader may recycle a Uint8Array/backing buffer between
+      // reads. Own every chunk immediately or earlier source bytes could be
+      // overwritten before SHA calculation and archival.
+      chunks.push(Buffer.from(value))
     }
   } catch (error) {
     // Cancel the underlying response stream on size or read failure. Merely

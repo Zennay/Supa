@@ -372,3 +372,30 @@ test('transport refuses BOM and NUL HTML whose decoded DOM could differ from SHA
   })
   assert.equal(allowed.source.sha256, createHash('sha256').update(html).digest('hex'))
 })
+
+test('streamed capture snapshots chunks before a transport reuses its Uint8Array', async () => {
+  const parts = ['<html>','<body>','SYNTHET','IC</body>','</html>']
+  const shared = new Uint8Array(16)
+  let index = 0
+  const expected = parts.join('')
+  const captured = await captureApprovedRetailerPage({
+    source, permissionGate: gate, grant,
+    fetchFn: async () => ({
+      status: 200, ok: true, url,
+      headers: new Headers({ 'content-type': 'text/html; charset=utf-8',
+        'content-length': String(Buffer.byteLength(expected)) }),
+      body: { getReader: () => ({
+        read: async () => {
+          if (index === parts.length) return { done: true }
+          const part = Buffer.from(parts[index++])
+          shared.set(part)
+          return { done: false, value: shared.subarray(0, part.length) }
+        },
+        releaseLock() {}, cancel: async () => {},
+      }) },
+    }),
+  })
+  assert.equal(captured.html, expected)
+  assert.equal(captured.source.sha256, createHash('sha256').update(expected).digest('hex'))
+  assert.equal(captured.readyForIngestion, false)
+})
