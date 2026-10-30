@@ -159,9 +159,34 @@ function sameRetailerContentLocation(raw, source) {
 function sameRetailerCanonicalLink(raw, source) {
   if (raw == null) return true
   if (typeof raw !== 'string' || raw.length > 8192) return false
-  // A Link header may include ordinary preload hints and a canonical link.
-  // Never infer/override a canonical source from an unparseable relation.
-  for (const item of raw.split(/,\s*(?=<)/)) {
+  // Split *every* Link element, not only commas followed by '<'. Otherwise
+  // a malformed second rel=canonical could silently attach to a safe first
+  // canonical and reuse its target URL. Quoted commas and commas inside an
+  // angle-bracket URI belong to the same link element.
+  const items = []
+  let start = 0, inUri = false, quote = null, escaped = false
+  for (let index = 0; index < raw.length; index++) {
+    const character = raw[index]
+    if (quote !== null) {
+      if (escaped) escaped = false
+      else if (character === '\\') escaped = true
+      else if (character === quote) quote = null
+    } else if (inUri) {
+      if (character === '>') inUri = false
+      else if (character === '<') return false
+    } else if (character === '<') inUri = true
+    else if (character === '"' || character === "'") quote = character
+    else if (character === ',') {
+      items.push(raw.slice(start, index))
+      start = index + 1
+    }
+  }
+  if (inUri || quote !== null || escaped) return false
+  items.push(raw.slice(start))
+  // Do not use a preceding good target when a later Link value is malformed.
+  for (const item of items) {
+    const target = /^\s*<([^<>]{1,2048})>\s*(?:;.*)?$/.exec(item)?.[1]
+    if (!target) return false
     const relation = /(?:^|;)\s*rel\s*=\s*(?:"([^"]*)"|'([^']*)'|([^;,\s]+))/ig
     let match
     let canonical = false
@@ -174,8 +199,7 @@ function sameRetailerCanonicalLink(raw, source) {
       if (/\brel\s*=.*canonical/i.test(item)) return false
       continue
     }
-    const target = /^\s*<([^<>]{1,2048})>/.exec(item)?.[1]
-    if (!target || !sameRetailerContentLocation(target, source)) return false
+    if (!sameRetailerContentLocation(target, source)) return false
   }
   return true
 }

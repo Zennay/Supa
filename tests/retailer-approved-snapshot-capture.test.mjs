@@ -946,3 +946,25 @@ test('HTTP and HTML source identities reject incomplete same-scheme absolute URL
     }
   }
 })
+
+test('malformed second HTTP Link element cannot hide an unreviewed canonical behind a valid first URL',async()=>{
+  const invalid=[
+    '<https://www.plus.nl/producten>; rel=canonical, https://foreign.example/; rel=canonical',
+    '<https://www.plus.nl/producten>; rel=canonical, ; rel=canonical',
+    '<https://www.plus.nl/producten>; rel=canonical, <https://foreign.example/; rel=canonical',
+  ]
+  for(const link of invalid){
+    await assert.rejects(captureApprovedRetailerPage({
+      source,permissionGate:gate,grant,
+      fetchFn:async()=>new Response('<html>SYNTHETIC</html>',{headers:{
+        'content-type':'text/html',link,
+      }}),
+    }),/response navigation\/source identity refused/,link)
+  }
+  const allowed='<https://www.plus.nl/producten>; rel=canonical; title="mock, product", </mock.css>; rel=preload'
+  const data=await captureApprovedRetailerPage({source,permissionGate:gate,grant,
+    fetchFn:async()=>new Response('<html>SYNTHETIC</html>',{headers:{
+      'content-type':'text/html',link:allowed,
+    }})})
+  assert.equal(data.readyForIngestion,false)
+})
