@@ -1,0 +1,139 @@
+/**
+ * Static, bounded HTML token scan for OFFLINE selector *proposals*.
+ * Script JSON and quoted markup are never executed or promoted as prices.
+ * Not a DOM validation or an approval for live retailer access.
+ */
+const RAW = new Set(['script','style','textarea','title','xmp','iframe']);
+const HIDDEN = new Set(['template','noscript','svg','head','style','textarea','title','xmp','iframe']);
+const VOID = new Set(['area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr']);
+
+function attrs(raw) {
+  const result = new Map();
+  let at = 0;
+  while (at < raw.length) {
+    while (/\s/.test(raw[at] ?? '')) at++;
+    if (at >= raw.length || (raw[at] === '/' && !raw.slice(at + 1).trim())) break;
+    const name = /^[a-z_:][a-z0-9_.:-]*/i.exec(raw.slice(at))?.[0];
+    if (!name || result.size >= 64) throw new Error('Invalid offline attribute');
+    at += name.length;
+    const key = name.toLowerCase();
+    if (result.has(key)) throw new Error('Duplicate offline attribute');
+    while (/\s/.test(raw[at] ?? '')) at++;
+    let value = null;
+    if (raw[at] === '=') {
+      at++;
+      while (/\s/.test(raw[at] ?? '')) at++;
+      if (raw[at] === '"' || raw[at] === "'") {
+        const mark = raw[at++];
+        const end = raw.indexOf(mark, at);
+        if (end < 0) throw new Error('Unterminated offline attribute');
+        value = raw.slice(at, end);
+        at = end + 1;
+      } else {
+        const match = /^[^\s<>=`"']+/.exec(raw.slice(at));
+        if (!match) throw new Error('Invalid offline unquoted attribute');
+        value = match[0];
+        at += value.length;
+      }
+      if (value.length > 1000) throw new Error('Oversized offline attribute');
+    }
+    result.set(key, value);
+  }
+  return result;
+}
+
+function tagEnd(html, start) {
+  let quote = null;
+  for (let i = start; i < html.length; i++) {
+    const char = html[i];
+    if (quote) {
+      if (char === quote) quote = null;
+    } else if (char === '"' || char === "'") quote = char;
+    else if (char === '<') throw new Error('Malformed offline tag');
+    else if (char === '>') return i;
+  }
+  throw new Error('Unterminated offline tag');
+}
+
+function isType(record, type) {
+  if (!record || typeof record !== 'object') return false;
+  const t = record['@type'];
+  return t === type || (Array.isArray(t) && t.includes(type));
+}
+function hasProduct(value, depth = 0) {
+  if (depth > 5 || !value || typeof value !== 'object') return false;
+  if (Array.isArray(value)) return value.some(x => hasProduct(x, depth + 1));
+  if (isType(value, 'Product')) return true;
+  return ['@graph','mainEntity','itemListElement'].some(key => hasProduct(value[key], depth + 1));
+}
+
+export function scanOfflineRetailerMarkup(html) {
+  const visible = [];
+  const signals = { schemaOrgProduct:false, nextData:false, nuxtData:false, jsonLd:false };
+  const hidden = [];
+  let pos = 0;
+  let inspected = 0;
+  while (pos < html.length) {
+    const start = html.indexOf('<', pos);
+    if (start < 0) break;
+    if (html.startsWith('<!--', start)) {
+      const end = html.indexOf('-->', start + 4);
+      if (end < 0) throw new Error('Unterminated HTML comment');
+      pos = end + 3;
+      continue;
+    }
+    if (html.startsWith('<![CDATA[', start)) {
+      const end = html.indexOf(']]>', start + 9);
+      if (end < 0) throw new Error('Unterminated HTML CDATA');
+      pos = end + 3;
+      continue;
+    }
+    const token = /^<\s*(\/?)\s*([a-z][a-z0-9-]{0,32})\b/i.exec(html.slice(start));
+    if (!token) { pos = start + 1; continue; }
+    if (++inspected > 25000) throw new Error('Offline token budget exceeded');
+    const end = tagEnd(html, start + token[0].length);
+    const tag = token[2].toLowerCase();
+    const close = token[1] === '/';
+    const attrText = html.slice(start + token[0].length, end);
+    if (close) {
+      // Suppressed HTML is not a source of selector or structured evidence.
+      if (hidden.at(-1) === tag) hidden.pop();
+      pos = end + 1;
+      continue;
+    }
+    const values = attrs(attrText);
+    const suppressed = hidden.length > 0;
+    if (!suppressed && !HIDDEN.has(tag) && tag !== 'script') {
+      // Retain the *actual* start tag only. Never reinterpret its attributes
+      // as independent HTML elements, even if they contain "<span ...>".
+      visible.push(html.slice(start, end + 1));
+    }
+    if (RAW.has(tag)) {
+      const closer = new RegExp('<\\/\\s*' + tag + '\\s*>', 'gi');
+      closer.lastIndex = end + 1;
+      const closing = closer.exec(html);
+      if (!closing) throw new Error('Unbalanced inert HTML element');
+      if (!hidden.some(name => name !== 'head') && tag === 'script' && !values.has('src')) {
+        const type = values.get('type')?.toLowerCase();
+        const id = values.get('id');
+        const content = html.slice(end + 1, closing.index).trim();
+        if (content.length <= 1024 * 1024) {
+          let parsed = null;
+          try { parsed = JSON.parse(content); } catch {}
+          if (type === 'application/ld+json' && parsed !== null) {
+            signals.jsonLd = true;
+            if (hasProduct(parsed)) signals.schemaOrgProduct = true;
+          }
+          if (id === '__NUXT_DATA__' && Array.isArray(parsed)) signals.nuxtData = true;
+          if (id === '__NEXT_DATA__' && parsed && typeof parsed === 'object') signals.nextData = true;
+        }
+      }
+      pos = closer.lastIndex;
+      continue;
+    }
+    if (HIDDEN.has(tag) && !VOID.has(tag)) hidden.push(tag);
+    pos = end + 1;
+  }
+  if (hidden.length) throw new Error('Unbalanced inert HTML element');
+  return { visible: visible.join(''), structuredSignals: signals };
+}

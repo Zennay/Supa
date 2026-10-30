@@ -120,3 +120,53 @@ test('HTML-like text inside a quoted attribute must never create fake DOM select
   assert.equal(result.selectors.length, 0)
   assert.equal(result.readyForIngestion, false)
 })
+
+test('quoted fake script and template markup cannot alter structured source signals or valid product hints', () => {
+  const html = [
+    '<html><body><article class="product-card"',
+    ' data-note="<script type=\'application/ld+json\'>{&quot;@type&quot;:&quot;Product&quot;}</script>"',
+    ' data-other="<template><span class=\'price-value\'>fake</span></template>">',
+    '<span class="product-name">A &lt; B</span></article></body></html>',
+  ].join('')
+  const result = proposeOfflineRetailerSelectors({ html, origin })
+  assert.deepEqual(result.structuredSignals, {
+    schemaOrgProduct: false, nextData: false, nuxtData: false, jsonLd: false,
+  })
+  assert.ok(result.selectors.some(x => x.field === 'name'))
+  assert.ok(result.selectors.some(x => x.field === 'product'))
+  assert.equal(result.selectors.some(x => x.field === 'price'), false)
+})
+
+test('genuine JSON-LD in head is detected while inert script and embedded attribute text are rejected', () => {
+  const product = '{"@context":"https://schema.org","@type":"Product","name":"Synthetic"}'
+  const html = [
+    '<html><head><script type="application/ld+json">', product, '</script>',
+    '<style>.price-value{color:red}</style></head><body>',
+    '<template><script id="__NUXT_DATA__" type="application/json">[]</script></template>',
+    '<noscript><script id="__NEXT_DATA__" type="application/json">{}</script></noscript>',
+    '<span class="price-value">0</span></body></html>',
+  ].join('')
+  const result = proposeOfflineRetailerSelectors({ html, origin })
+  assert.deepEqual(result.structuredSignals, {
+    schemaOrgProduct: true, nextData: false, nuxtData: false, jsonLd: true,
+  })
+  assert.ok(result.selectors.some(x => x.field === 'price'))
+})
+
+test('quoted tag-like content does not consume following visible price selectors', () => {
+  const html = '<article data-description="<script id=\'__NUXT_DATA__\'>[]</script>">' +
+    '<span class="price-value">0</span></article>'
+  const report = proposeOfflineRetailerSelectors({ html, origin })
+  assert.equal(report.structuredSignals.nuxtData, false)
+  assert.ok(report.selectors.some(x => x.selector === 'span.price-value'))
+})
+
+test('invalid or ambiguous structural evidence fails closed without a selector or price promotion', () => {
+  for (const html of [
+    '<article class="price-value" class="product-name">Duplicate</article>',
+    '<article data-note="unterminated><span class="price-value">0</span>',
+    '<script type="application/ld+json">{"@type":"Product"}',
+  ]) {
+    assert.throws(() => proposeOfflineRetailerSelectors({ html, origin }), /Duplicate|Unterminated|Unbalanced/)
+  }
+})

@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { isIP } from 'node:net'
+import { scanOfflineRetailerMarkup } from './retailer-offline-structural-scan.mjs'
 
 // Offline-first DOM selector proposal. NEVER downloads a page, executes scripts,
 // exports product/price text, or labels proposed selectors as confirmed.
@@ -48,14 +49,6 @@ function validSnapshotOrigin(origin) {
   } catch {
     return false
   }
-}
-
-function removeInertMarkup(html) {
-  // Conservative best-effort static analysis, NOT a browser-equivalent parser.
-  // Never inspect nested scripts, comments, inputs, head/style or inert markup.
-  return html
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<(script|style|template|noscript|textarea|head|svg)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '')
 }
 
 // Only actual opening tags count. A quoted attribute may contain '<tag>'
@@ -139,30 +132,11 @@ export function proposeOfflineRetailerSelectors({ html, origin } = {}) {
   }
 
   const sha256 = createHash('sha256').update(html, 'utf8').digest('hex')
-  const signalMarkup = html
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<(template|noscript|textarea|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '')
-  const structuredSignals = {
-    schemaOrgProduct: /"@type"\s*:\s*"Product"/i.test(signalMarkup),
-    nextData: /<script\b[^>]*\bid=["']__NEXT_DATA__["']/i.test(signalMarkup),
-    nuxtData: /<script\b[^>]*\bid=["']__NUXT_DATA__["']/i.test(signalMarkup),
-    jsonLd: /<script\b[^>]*\btype=["']application\/ld\+json["']/i.test(signalMarkup),
-  }
-
-  // Ambiguous unterminated inert markup is rejected; do not accidentally
-  // attribute text or selectors from a comment/template to live product DOM.
-  if (html.includes('<!--') &&
-      (html.match(/<!--/g) || []).length !== (html.match(/-->/g) || []).length) {
-    throw new Error('Unterminated HTML comment')
-  }
-  for (const tag of ['script', 'style', 'template', 'noscript', 'textarea']) {
-    const opens = [...html.matchAll(new RegExp('<' + tag + '\\b', 'gi'))].length
-    const closes = [...html.matchAll(new RegExp('<\\/' + tag + '\\s*>', 'gi'))].length
-    if (opens !== closes) throw new Error('Unbalanced inert HTML element')
-  }
+  // Inspect real HTML element boundaries; never infer signal tags from
+  // comments, attributes, script strings or inert DOM containers.
+  const { visible, structuredSignals } = scanOfflineRetailerMarkup(html)
 
   const candidates = new Map()
-  const visible = removeInertMarkup(html)
   let inspectedTags = 0
   for (const match of openingTags(visible)) {
     if (++inspectedTags > MAX_TAGS) {
