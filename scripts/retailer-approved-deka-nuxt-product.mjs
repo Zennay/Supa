@@ -13,6 +13,7 @@ import { validateRawProductObservation } from '../src/data/ingestion.ts'
 import { normalizeSchemaOrgAvailability } from '../src/data/schemaOrgProduct.ts'
 import { readAuthorizedHtmlScriptEvidence } from './retailer-approved-html-script-evidence.mjs'
 import { parseSchemaOrgProductForPage } from '../src/data/schemaOrgProductPageSelection.ts'
+import { structuredSchemaOrgPack } from '../src/data/schemaOrgQuantitativePack.ts'
 
 const fail = () => ({ type: 'abstain', reason: 'DekaMarkt Nuxt product cannot be independently corroborated' })
 const data = value => value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -44,6 +45,28 @@ function oneDekaProduct(jsonLdBlocks) {
         !knownSchemaContext(value['@context'])))) return null
   const products = values.filter(value => value['@type'] === 'Product')
   return products.length === 1 ? products[0] : null
+}
+
+// Nuxt packaging cannot override a second, contradictory physical pack
+// claimed by the same captured JSON-LD Product. Historical Deka's plain
+// `{weight:{value:'1 liter'}}` and canonical QuantitativeValue both work.
+function corroborateExplicitDekaPack(product, nuxtPack) {
+  const selected = structuredSchemaOrgPack(product)
+  if (selected.status === 'unsafe') return false
+  const hasWeight = product.weight !== undefined && product.weight !== null
+  const hasSize = product.size !== undefined && product.size !== null
+  if (!hasWeight && !hasSize) return true
+  if (hasWeight && hasSize) return false
+  let weightText = selected.status === 'normalized' ? selected.weightText : null
+  if (weightText === null) {
+    const raw = hasWeight ? product.weight : product.size
+    if (typeof raw === 'string') weightText = raw
+    else if (data(raw) && Object.keys(raw).length === 1 &&
+        typeof raw.value === 'string') weightText = raw.value
+    else return false
+  }
+  const declared = normalizePackText(weightText)
+  return equivalentPhysicalPack(declared, nuxtPack)
 }
 
 // Deka's historical SSR uses capital Price. Additional price claims are
@@ -137,6 +160,7 @@ export function parseDekaNuxtFromAuthorizedHtml({ html, provenance, jsonLdBlocks
     const ld = oneDekaProduct(scriptEvidence.jsonLdBlocks)
     const offer = ld?.offers
     if (!ld || !data(offer) || ld.name !== name ||
+        !corroborateExplicitDekaPack(ld, pack) ||
         String(ld.mpn) !== expectedId || offer.priceCurrency !== 'EUR' ||
         typeof offer.Price !== 'number' ||
         !consistentOfferPriceEvidence(offer, cents) ||

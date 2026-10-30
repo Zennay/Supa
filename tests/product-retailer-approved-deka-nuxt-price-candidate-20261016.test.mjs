@@ -321,3 +321,23 @@ test('Deka fallback refuses product-shaped JSON-LD from a foreign vocabulary', a
     assert.equal(result.observation,null)
   }
 })
+
+test('direct Deka HTML fallback corroborates explicit physical pack facts before private price candidate', async () => {
+  const { parseDekaNuxtFromAuthorizedHtml } = await import('../scripts/retailer-approved-deka-nuxt-product.mjs')
+  const { createHash } = await import('node:crypto')
+  for (const [field,value,allowed] of [
+    ['weight',{value:'1 liter'},true],
+    ['weight',{value:'500 ml'},false],
+    ['size',{value:1,unitCode:'LTR'},true],
+    ['size',{value:500,unitCode:'MLT'},false],
+    ['size',{value:1,unitCode:'INVALID'},false],
+  ]) {
+    const ld=structuredClone(fixture.jsonLdProduct)
+    ld[field]=value
+    const page=html(fixture.nuxtPayload,ld)
+    const provenance={supermarket:'dekamarkt',kind:'product',url,
+      capturedAt:time,sha256:createHash('sha256').update(page).digest('hex')}
+    const output=parseDekaNuxtFromAuthorizedHtml({html:page,provenance,jsonLdBlocks:[ld]})
+    assert.equal(output.type,allowed?'observation':'abstain',JSON.stringify({field,value}))
+  }
+})
