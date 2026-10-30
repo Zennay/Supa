@@ -80,6 +80,13 @@ async function derivePrivateSyntheticFixture(htmlFile) {
     humanReviewRequired:true,productionEnabled:false,published:false}
   return {synthetic,manifest}
 }
+async function assertVacantPrivateOutput(out) {
+  try {
+    await lstat(out)
+    throw Object.assign(new Error('EEXIST: private fixture destination exists'),{code:'EEXIST'})
+  } catch(e) { if(e?.code!=='ENOENT') throw e }
+}
+
 export async function buildPrivateSyntheticHtmlFixture(htmlFile, newDirectory) {
   if (typeof newDirectory !== 'string' || !newDirectory.trim()) refuse()
   const {synthetic,manifest} = await derivePrivateSyntheticFixture(htmlFile)
@@ -88,11 +95,7 @@ export async function buildPrivateSyntheticHtmlFixture(htmlFile, newDirectory) {
   const parent = dirname(out)
   const parentBefore = await lstat(parent)
   if (!parentBefore.isDirectory() || parentBefore.isSymbolicLink()) refuse()
-  const assertVacant = async () => {
-    try { await lstat(out); throw Object.assign(new Error('EEXIST: private fixture destination exists'),{code:'EEXIST'}) }
-    catch (e) { if (e?.code !== 'ENOENT') throw e }
-  }
-  await assertVacant()
+  await assertVacantPrivateOutput(out)
   // An incomplete two-file output must never appear as the final fixture.
   // Stage both private files, verify all bytes and source lineage, then move
   // the complete private directory into place in one same-parent rename.
@@ -107,7 +110,7 @@ export async function buildPrivateSyntheticHtmlFixture(htmlFile, newDirectory) {
     if (parentNow.dev !== parentBefore.dev || parentNow.ino !== parentBefore.ino ||
         !parentNow.isDirectory()) refuse()
     await assertNoSymlinkedM3OutputParents(out)
-    await assertVacant()
+    await assertVacantPrivateOutput(out)
     // Node lacks renameat2(RENAME_NOREPLACE), so this private-path check is
     // not a hostile shared-filesystem race guarantee.
     await rename(staged,out)
@@ -171,17 +174,95 @@ export async function verifyPrivateSyntheticHtmlFixture(htmlFile, directory) {
   return {verified:true,syntheticNodes:manifest.syntheticNodes,
     htmlSha256:manifest.syntheticHtmlSha256,productionEnabled:false,published:false}
 }
+function pairManifest(plus, deka) {
+  return {schemaVersion:1,kind:'synthetic-two-retailer-private-fixtures',
+    sources:[plus,deka].map(m=>({
+      retailerId:m.source.retailerId,kind:m.source.kind,
+      capturedAt:m.source.capturedAt,sha256:m.source.sha256,
+      syntheticHtmlSha256:m.syntheticHtmlSha256,
+    })),retailers:['plus','dekamarkt'],originalHtmlRetained:false,
+    pricePublicationEnabled:false,humanReviewRequired:true,
+    productionEnabled:false,published:false}
+}
+
+export async function verifyPrivateSyntheticFixturePair(plusFile,dekaFile,directory) {
+  if(typeof directory!=='string'||!directory.trim()) refuse()
+  const out=resolve(directory)
+  await assertNoSymlinkedM3OutputParents(out)
+  const dir=await lstat(out)
+  if(!dir.isDirectory()||dir.isSymbolicLink()||(dir.mode&0o077)!==0) refuse()
+  const p=(await derivePrivateSyntheticFixture(plusFile)).manifest
+  const d=(await derivePrivateSyntheticFixture(dekaFile)).manifest
+  if(p.source.retailerId!=='plus'||d.source.retailerId!=='dekamarkt') refuse()
+  const sourceChecks=await Promise.all([
+    verifyPrivateSyntheticHtmlFixture(plusFile,join(out,'plus')),
+    verifyPrivateSyntheticHtmlFixture(dekaFile,join(out,'dekamarkt'))])
+  if(sourceChecks.some(x=>x.verified!==true)) refuse()
+  const data=await readPinnedSyntheticFile(join(out,'pair-provenance.json'),16384)
+  let parsed
+  try {parsed=parseUniqueKeyRetailerJson(new TextDecoder('utf-8',{fatal:true})
+    .decode(data),16384)} catch {refuse()}
+  if(JSON.stringify(parsed)!==JSON.stringify(pairManifest(p,d))) refuse()
+  return {verified:true,retailers:2,productionEnabled:false,published:false}
+}
+
+export async function buildPrivateSyntheticFixturePair(plusFile,dekaFile,newDirectory) {
+  if(typeof newDirectory!=='string'||!newDirectory.trim()) refuse()
+  const plus=(await derivePrivateSyntheticFixture(plusFile)).manifest
+  const deka=(await derivePrivateSyntheticFixture(dekaFile)).manifest
+  if(plus.source.retailerId!=='plus'||deka.source.retailerId!=='dekamarkt')
+    refuse()
+  const out=resolve(newDirectory)
+  await assertNoSymlinkedM3OutputParents(out)
+  const parent=dirname(out)
+  const pinnedParent=await lstat(parent)
+  if(!pinnedParent.isDirectory()||pinnedParent.isSymbolicLink()) refuse()
+  await assertVacantPrivateOutput(out)
+  const staged=await mkdtemp(join(parent,'.supa-two-store-'))
+  const identity=await lstat(staged)
+  let published=false
+  try {
+    await buildPrivateSyntheticHtmlFixture(plusFile,join(staged,'plus'))
+    await buildPrivateSyntheticHtmlFixture(dekaFile,join(staged,'dekamarkt'))
+    await writePrivate(join(staged,'pair-provenance.json'),
+      JSON.stringify(pairManifest(plus,deka),null,2)+'\n')
+    await verifyPrivateSyntheticFixturePair(plusFile,dekaFile,staged)
+    const parentNow=await lstat(parent)
+    if(!parentNow.isDirectory()||parentNow.ino!==pinnedParent.ino||
+        parentNow.dev!==pinnedParent.dev) refuse()
+    await assertNoSymlinkedM3OutputParents(out)
+    await assertVacantPrivateOutput(out)
+    // Atomic visibility of both stores; no claim of hostile-race immunity.
+    await rename(staged,out)
+    published=true
+  } finally {
+    if(!published) {
+      try {
+        const now=await lstat(staged)
+        if(now.isDirectory()&&now.ino===identity.ino&&now.dev===identity.dev)
+          await rm(staged,{recursive:true,force:true})
+      } catch { /* do not remove unrecognized replacements */ }
+    }
+  }
+  return {created:true,retailers:2,productionEnabled:false,published:false}
+}
+
 if(process.argv[1] && import.meta.url===pathToFileURL(resolve(process.argv[1])).href) {
   const args=process.argv.slice(2)
-  const verification=args.length===3 && args[0]==='--verify'
-  if(!verification && args.length!==2) {
-    console.error('Usage: <private-source.html> <new-private-folder> | --verify <private-source.html> <existing-private-folder>')
+  const mode=args[0]
+  let job
+  if(mode==='--verify' && args.length===3)
+    job=verifyPrivateSyntheticHtmlFixture(args[1],args[2])
+  else if(mode==='--pair' && args.length===4)
+    job=buildPrivateSyntheticFixturePair(args[1],args[2],args[3])
+  else if(mode==='--verify-pair' && args.length===4)
+    job=verifyPrivateSyntheticFixturePair(args[1],args[2],args[3])
+  else if(args.length===2 && !args[0].startsWith('--'))
+    job=buildPrivateSyntheticHtmlFixture(args[0],args[1])
+  else {
+    console.error('Usage: <source.html> <new-dir> | --verify <source.html> <dir> | --pair <plus.html> <deka.html> <new-dir> | --verify-pair <plus.html> <deka.html> <dir>')
     process.exitCode=2
-  } else {
-    const job=verification
-      ?verifyPrivateSyntheticHtmlFixture(args[1],args[2])
-      :buildPrivateSyntheticHtmlFixture(args[0],args[1])
-    job.then(x=>process.stdout.write(JSON.stringify(x)+'\n'))
-      .catch(()=>{console.error('Private synthetic fixture operation refused');process.exitCode=2})
   }
+  if(job) job.then(x=>process.stdout.write(JSON.stringify(x)+'\n'))
+    .catch(()=>{console.error('Private synthetic fixture operation refused');process.exitCode=2})
 }
