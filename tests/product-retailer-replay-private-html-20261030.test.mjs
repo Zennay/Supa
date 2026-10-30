@@ -753,3 +753,33 @@ test('captured SPA custom elements retain evidence-backed selectors across priva
   assert.equal(data.automatedSelectorPromotion,false)
   assert.doesNotMatch(JSON.stringify(summary),/plus-product-tile|price-value|SYNTHETIC|FICTIONAL/)
 })
+
+test('independent SHA-bound catalog captures distinguish a stable product route from changing CSS href form', async t => {
+  const catalogUrl = 'https://www.plus.nl/producten'
+  const first = await archivedSelectorPage(t, 'plus', 'catalog', catalogUrl,
+    '<html><body><a href="/product/fictional-123">SYNTHETIC 1</a></body></html>')
+  const next = await archivedSelectorPage(t, 'plus', 'catalog', catalogUrl,
+    '<html><body><a href="https://www.plus.nl/product/fictional-456">SYNTHETIC 2</a></body></html>')
+  const file = first.replace('captured.html', 'route-stability.json')
+  const receipt = await savePrivateSelectorStabilityArchive([first, next], file)
+  assert.equal(receipt.stableCandidateCount, 0) // CSS href formats differ
+  assert.equal(receipt.stableObservedProductRouteCount, 1)
+  const archived = JSON.parse(await readFile(file, 'utf8'))
+  assert.equal((await stat(file)).mode & 0o777, 0o600)
+  assert.deepEqual(archived.stableObservedProductRoutes, [{
+    routePrefix: '/product/', observedInSnapshots: 2,
+    observedLinkForms: ['absolute', 'relative'],
+    isCssSelector: false, status: 'needs-human-review',
+    autoPromotionAllowed: false,
+  }])
+  assert.equal(archived.automatedSelectorPromotion, false)
+  assert.equal(archived.readyForIngestion, false)
+  assert.doesNotMatch(JSON.stringify(receipt), /fictional|www\.plus\.nl|product\//)
+
+  const foreign = await archivedSelectorPage(t, 'plus', 'catalog', catalogUrl,
+    '<a href="/producten/not-a-plus-product">Wrong retailer path</a>')
+  const review2 = first.replace('captured.html', 'missing-route.json')
+  const missing = await savePrivateSelectorStabilityArchive([first, foreign], review2)
+  assert.equal(missing.stableObservedProductRouteCount, 0)
+  assert.deepEqual(JSON.parse(await readFile(review2, 'utf8')).stableObservedProductRoutes, [])
+})
