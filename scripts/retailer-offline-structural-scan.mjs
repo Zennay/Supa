@@ -116,6 +116,10 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
       continue;
     }
     const values = attrs(attrText);
+    // HTML permits an omitted </head> when <body> starts. This is the one
+    // implicit close we can prove statically without a complete DOM parser;
+    // nested inert/template contexts still fail closed.
+    if (tag === 'body' && hidden.length === 1 && hidden[0] === 'head') hidden.pop();
     // HTML plaintext mode consumes the rest of the document as literal text;
     // even a matching </plaintext> is not a real closing tag in the DOM.
     // Ignore any apparent script/selector tags following it.

@@ -322,3 +322,15 @@ test('Deka Nuxt refuses duplicate nested keys even when final value corroborates
   assert.equal(result.observation,null)
   assert.equal(result.published,false)
 })
+
+test('private PLUS parser accepts real JSON-LD from valid omitted head end-tag HTML', async () => {
+  const source='<html><head>'+script('type="application/ld+json"',plusProduct)+
+    '<body><article class="product-card">Synthetic</article></body></html>'
+  const evidence=readAuthorizedHtmlScriptEvidence(source)
+  assert.equal(evidence.invalid,false)
+  assert.equal(evidence.jsonLdBlocks.length,1)
+  const candidate=await run('plus',source)
+  assert.equal(candidate.status,'candidate_needs_review')
+  assert.equal(candidate.observation.currentPriceCents,199)
+  assert.equal(candidate.published,false)
+})

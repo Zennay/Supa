@@ -308,3 +308,14 @@ test('real HTML custom-element retail tags generate only observed selectors, nev
   const fake='<template>'+html+'</template>'
   assert.equal(proposeOfflineRetailerSelectors({html:fake,origin}).selectors.length,0)
 })
+
+test('valid omitted head close before body preserves real JSON-LD and visible source DOM', () => {
+  const html='<html><head><script type="application/ld+json">{"@type":"Product"}</script><body><article class="product-card">SYNTHETIC</article></body></html>'
+  const report=proposeOfflineRetailerSelectors({html,origin})
+  assert.equal(report.structuredSignals.schemaOrgProduct,true)
+  assert.ok(report.selectors.some(x=>x.selector==='article.product-card'))
+  assert.equal(report.productionEnabled,false)
+  assert.throws(()=>proposeOfflineRetailerSelectors({html:
+    '<head><template><body><article class="price-value">Fake</article></body>',origin,
+  }),/Unbalanced inert HTML element/)
+})

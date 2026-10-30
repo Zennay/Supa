@@ -469,3 +469,11 @@ plaats van een arbitraire prijs te kiezen. De strikte invoergrens per
 JSON-bron is 256 KiB; grotere payloads vragen apart operatoronderzoek en
 worden niet automatisch gepubliceerd. Zowel PLUS als DekaMarkt blijven
 onder de bestaande bronrechten- en reviewgates vallen.
+
+### Toegestane HTML-head zonder expliciete eindtag
+
+In HTML mag de `</head>`-eindtag ontbreken als vervolgens een echte `<body>`
+start. De gedeelde structurele scanner sluit `head` in dat beperkte geval nu
+impliciet, zodat echt aanwezige JSON-LD in de head en productkaarten in de
+body behouden blijven. Een ongebalanceerde `template`/andere verborgen
+context krijgt nooit zo'n impliciete goedkeuring en blijft geweigerd.
