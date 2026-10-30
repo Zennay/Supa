@@ -48,6 +48,7 @@ test('Figma Planner 3359:4896 meal rows and total card keep real state and make 
     assert.match(html, /aria-label="Snel weekbudget instellen"/)
     assert.match(html, /Weekbudget: /)
     assert.match(html, /Winkelkosten nog onbekend/)
+    assert.match(html, /aria-controls="custom-weekbudget-form"[^>]*>Eigen bedrag instellen/)
     assert.equal((html.match(/class="planner-mobile-budget-options"/g) ?? []).length, 1)
     assert.equal((html.match(/aria-pressed="true"/g) ?? []).length >= 1, true)
     assert.match(html, /<summary>Bekijk berekening<\/summary>/)

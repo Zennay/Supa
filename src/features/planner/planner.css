@@ -274,6 +274,10 @@
     font-weight: 700;
     cursor: pointer;
   }
+  .planner-mobile-budget-options .planner-mobile-custom-budget {
+    grid-column: 1 / -1;
+    text-align: center;
+  }
   .planner-mobile-budget-options button[aria-pressed="true"] {
     background: #176c50;
     color: #fff;

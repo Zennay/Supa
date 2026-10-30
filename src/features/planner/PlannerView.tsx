@@ -114,6 +114,24 @@ export function PlannerView({
   const [customDraft, setCustomDraft] = useState('')
   const [customError, setCustomError] = useState('')
   const customActive = validCustomWeekBudgetEuros(budget) !== null && !budgetOptions.includes(budget)
+  const [focusCustomBudget, setFocusCustomBudget] = useState(false)
+  useEffect(() => {
+    if (!focusCustomBudget || !customOpen) return
+    const input = document.getElementById('custom-weekbudget-value')
+    if (!input) return
+    input.scrollIntoView({ block: 'center' })
+    input.focus({ preventScroll: true })
+    setFocusCustomBudget(false)
+  }, [customOpen, focusCustomBudget])
+
+  const jumpToCustomBudget = () => {
+    const calc = document.querySelector<HTMLDetailsElement>('.hifi-planner-calc')
+    if (calc) calc.open = true
+    setCustomDraft(budget.toFixed(2).replace('.', ','))
+    setCustomError('')
+    setCustomOpen(true)
+    setFocusCustomBudget(true)
+  }
 
   const commitCustomBudget = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -259,6 +277,10 @@ export function PlannerView({
                   {euro.format(option)}
                 </button>
               ))}
+              <button type="button" className="planner-mobile-custom-budget"
+                aria-controls="custom-weekbudget-form" onClick={jumpToCustomBudget}>
+                Eigen bedrag instellen
+              </button>
             </div>
           </div>
           <div className="planner-mobile-jump-buttons">
