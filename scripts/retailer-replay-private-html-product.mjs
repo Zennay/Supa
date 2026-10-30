@@ -1,3 +1,4 @@
+import { decodeExactRetailerHtmlBytes } from './retailer-private-html-byte-identity.mjs'
 /** Offline 0600 HTML+manifest replay. No HTTP, rights grant or publication. */
 import { createHash } from 'node:crypto'
 import { open, lstat } from 'node:fs/promises'
@@ -91,7 +92,7 @@ async function readPrivateCapture(filename) {
   const bytes = await privateBytes(path, LIMIT)
   if (bytes.length !== manifest.bytes ||
       createHash('sha256').update(bytes).digest('hex') !== src.sha256) fail()
-  const html = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+  const html = decodeExactRetailerHtmlBytes(bytes)
   const provenance = { supermarket: src.retailerId, kind: src.kind,
     url: src.url, capturedAt: src.capturedAt, sha256: src.sha256 }
   return { html, src, provenance }
