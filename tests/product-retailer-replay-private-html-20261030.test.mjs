@@ -783,3 +783,15 @@ test('independent SHA-bound catalog captures distinguish a stable product route 
   assert.equal(missing.stableObservedProductRouteCount, 0)
   assert.deepEqual(JSON.parse(await readFile(review2, 'utf8')).stableObservedProductRoutes, [])
 })
+
+test('private SHA-pinned HTML may archive evidence but cross-origin base prevents selector replay',async t=>{
+  const url='https://www.plus.nl/producten'
+  const file=await archivedSelectorPage(t,'plus','catalog',url,
+    '<html><head><base href="https://foreign.example/"></head><body>' +
+    '<a href="/product/fictional-123">SYNTHETIC link</a></body></html>')
+  assert.equal((await stat(file)).mode & 0o777,0o600)
+  await assert.rejects(replayPrivateSelectorHtmlSnapshot(file),/Untrusted HTML base URL/)
+  const review=file.replace('captured.html','untrusted-selector-review.json')
+  await assert.rejects(savePrivateSelectorHtmlReview(file,review),/Untrusted HTML base URL/)
+  await assert.rejects(stat(review),/ENOENT/)
+})
