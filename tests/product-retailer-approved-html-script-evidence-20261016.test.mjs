@@ -167,10 +167,17 @@ test('unclosed inert markup and external script evidence fail closed', async () 
   ]) {
     const read = readAuthorizedHtmlScriptEvidence(malformed)
     assert.equal(read.invalid, true)
-    const result = await run('plus', malformed)
-    assert.equal(result.status, 'review_required')
-    assert.equal(result.observation, null)
-    assert.equal(result.publicSavingsClaimEligible, false)
+    if (malformed.startsWith('<script src=')) {
+      const result = await run('plus', malformed)
+      assert.equal(result.status, 'review_required')
+      assert.equal(result.observation, null)
+      assert.equal(result.publicSavingsClaimEligible, false)
+    } else {
+      // Truncated markup is now rejected at transport, before any private
+      // source snapshot/candidate can be created.
+      await assert.rejects(run('plus', malformed),
+        /Unterminated HTML comment|Unbalanced inert HTML element/)
+    }
   }
 })
 
