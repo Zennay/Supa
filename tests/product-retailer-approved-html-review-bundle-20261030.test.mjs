@@ -55,3 +55,20 @@ test('canonical source rights refuse both retailers before any transport',async(
  }
  assert.equal(calls,0)
 })
+
+test('one-shot product bundle does not leak price/SKU-bearing captured selector tokens', async()=>{
+ const body=markup('plus').replace('</body>',
+  '<div class="price-249-private">Private label</div>'+
+  '<span data-testid="price-249-secret">Sensitive source</span>'+
+  '<a class="product-mock-sku-123" href="/product/mock-123">Link</a></body>')
+ const result=await review(opts('plus',body))
+ assert.equal(result.priceReview.status,'candidate_needs_review')
+ assert.equal(result.priceReview.observation.currentPriceCents,249)
+ assert.equal(result.selectorReview.privateProposalsOmitted>0,true)
+ assert.ok(result.selectorReview.proposals.some(x=>x.selector==='div.product-card'))
+ assert.ok(result.selectorReview.proposals.some(x=>x.selector==='span.price-value'))
+ assert.doesNotMatch(JSON.stringify(result.selectorReview),
+  /249-private|249-secret|mock-sku-123|Sensitive source|Private label/)
+ assert.equal(result.selectorReview.approvedSelectors,0)
+ assert.equal(result.publicSavingsClaimEligible,false)
+})

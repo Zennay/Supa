@@ -13,6 +13,7 @@ import { createHash } from 'node:crypto'
 import { captureApprovedRetailerPage } from './retailer-approved-snapshot-capture.mjs'
 import { readAuthorizedHtmlScriptEvidence } from './retailer-approved-html-script-evidence.mjs'
 import { proposeOfflineRetailerSelectors } from './retailer-offline-selector-discovery.mjs'
+import { safeSelectorProposals } from './retailer-approved-capture-selector-bridge.mjs'
 import { parseSchemaOrgProductForPage } from '../src/data/schemaOrgProductPageSelection.ts'
 import { corroborateDekaNuxtProduct } from './retailer-approved-deka-nuxt-product.mjs'
 
@@ -169,6 +170,9 @@ export async function captureApprovedProductReviewBundle(options = {}) {
       selectors.selectors.some(row => row.status !== 'needs-human-review')) {
     throw new Error('Authorized product selector and price provenance disagree')
   }
+  // Never expose captured CSS tokens (which may contain private SKU, price or
+  // account identifiers). Reuse the existing source-bound bridge allowlist.
+  const safeSelectors = safeSelectorProposals(selectors.selectors, captured.source.retailerId)
   return {
     schemaVersion: 1,
     mode: 'private-authorized-one-capture-product-review',
@@ -179,7 +183,8 @@ export async function captureApprovedProductReviewBundle(options = {}) {
     selectorReview: {
       mode: 'private-unapproved-selector-proposals',
       structuredSignals: selectors.structuredSignals,
-      proposals: selectors.selectors,
+      proposals: safeSelectors,
+      privateProposalsOmitted: selectors.selectors.length - safeSelectors.length,
       inspectedTags: selectors.scannedTags,
       humanReviewRequired: true,
       approvedSelectors: 0,
