@@ -853,3 +853,25 @@ test('even complete two-store selector coverage never opens real price or rights
     assert.equal(receipt.published,false)
   }
 })
+
+test('two-retailer encoded Product microdata remains source-proven through private SHA archive and sanitized replay',async t=>{
+  for(const retailerId of ['plus','dekamarkt']){
+    const html='<section itemscope itemtype="https:&sol;&sol;schema.org&sol;Prod&#117;ct">'+
+      '<span itemprop="name">PRIVATE_ONLY_SYNTHETIC_FIELD</span></section>'
+    const {filename,dir,capture}=await archive(t,retailerId,'catalog',html)
+    const origin={retailerId,url:capture.source.url,capturedAt:capture.source.capturedAt}
+    const selector='section[itemtype="https://schema.org/Product"]'
+    const observed=proposeOfflineRetailerSelectors({html,origin})
+    assert.equal(observed.structuredSignals.schemaOrgProduct,true)
+    assert.ok(observed.selectors.some(row=>row.selector===selector && row.field==='product'))
+    const dest=join(dir,'encoded-schema-private')
+    await buildPrivateSyntheticHtmlFixture(filename,dest)
+    const sanitized=await readFile(join(dest,'synthetic-structure.html'),'utf8')
+    const replay=proposeOfflineRetailerSelectors({html:sanitized,origin})
+    assert.equal(replay.structuredSignals.schemaOrgProduct,true)
+    assert.ok(replay.selectors.some(row=>row.selector===selector && row.field==='product'))
+    assert.doesNotMatch(sanitized,/PRIVATE_ONLY_SYNTHETIC_FIELD/)
+    assert.equal((await verifyPrivateSyntheticHtmlFixture(filename,dest)).verified,true)
+    assert.equal(replay.productionEnabled,false)
+  }
+})

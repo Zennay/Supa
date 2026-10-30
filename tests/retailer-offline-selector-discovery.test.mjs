@@ -904,3 +904,25 @@ test('mixed old/current itemprop price elements cannot propose ambiguous CSS pri
     assert.doesNotMatch(JSON.stringify(result),/PRIVATE_OLD|PRIVATE_NEW/)
   }
 })
+
+test('DOM-decoded official Schema.org Product itemtype is consistent across signal and selector for both stores', () => {
+  for (const [retailerId, url] of [
+    ['plus','https://www.plus.nl/producten'],
+    ['dekamarkt','https://www.dekamarkt.nl/producten'],
+  ]) {
+    const pageOrigin = { ...origin, retailerId, url }
+    const source = '<section itemscope itemtype="https:&sol;&sol;schema.org&sol;Prod&#117;ct">' +
+      '<span itemprop="name">SYNTHETIC_ITEM</span></section>'
+    const report = proposeOfflineRetailerSelectors({html:source,origin:pageOrigin})
+    assert.equal(report.structuredSignals.schemaOrgProduct,true,retailerId)
+    assert.ok(report.selectors.some(x=>x.field==='product' &&
+      x.selector==='section[itemtype="https://schema.org/Product"]'),retailerId)
+    assert.equal(report.readyForIngestion,false)
+    assert.equal(report.productionEnabled,false)
+    const foreign = source.replace('schema.org','foreign.example')
+    assert.equal(proposeOfflineRetailerSelectors({html:foreign,origin:pageOrigin})
+      .structuredSignals.schemaOrgProduct,false)
+    assert.equal(proposeOfflineRetailerSelectors({html:'<template>'+source+'</template>',origin:pageOrigin})
+      .structuredSignals.schemaOrgProduct,false)
+  }
+})

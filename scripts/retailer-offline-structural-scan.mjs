@@ -60,15 +60,15 @@ function tagEnd(html, start) {
 
 // Meta controls are interpreted by browsers after HTML entity decoding.
 // Numeric entities and common ASCII named entities are decoded only for
-// security-related metadata; unresolved entities fail closed below.
+// security metadata and explicit microdata itemtypes; unresolved entities fail closed.
 function decodedMeta(raw) {
   if (typeof raw !== 'string') return raw;
-  const named={Tab:'\t',NewLine:'\n',comma:',',semi:';',colon:':',amp:'&'};
+  const named={Tab:'\t',NewLine:'\n',comma:',',semi:';',colon:':',amp:'&',sol:'/'};
   return raw.replace(/&#(?:x([0-9a-f]{1,6})|([0-9]{1,7}));?/gi,(original,h,d)=>{
     const n=parseInt(h??d,h===undefined?10:16);
     return n>0 && n<=0x10ffff && !(n>=0xd800 && n<=0xdfff)
       ? String.fromCodePoint(n) : original;
-  }).replace(/&(Tab|NewLine|comma|semi|colon|amp);/g,(raw,key)=>named[key]??raw);
+  }).replace(/&(Tab|NewLine|comma|semi|colon|amp|sol);/g,(raw,key)=>named[key]??raw);
 }
 
 function isType(record, type) {
@@ -248,7 +248,10 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
       // Only explicit live itemscope + exact official itemtype is a product
       // hint. Never infer an item from similarly named foreign vocabularies.
       if (values.has('itemscope') && typeof values.get('itemtype') === 'string') {
-        const types = values.get('itemtype').trim().split(/[ \t\n\f\r]+/);
+        // Browser DOM decodes itemtype entities before Schema.org microdata parsing.
+        // Use the same one-pass decoding as source-identity controls, never
+        // interpret encoded foreign vocabularies as official Product.
+        const types = decodedMeta(values.get('itemtype')).trim().split(/[ \t\n\f\r]+/);
         const official = new Set(['https://schema.org/Product',
           'http://schema.org/Product','https://schema.org/Thing',
           'http://schema.org/Thing']);
