@@ -317,3 +317,12 @@ selectoren blijven uitsluitend in de oorspronkelijke privé-HTML voor
 menselijke review; alleen hun **aantal** verschijnt op stdout als
 `privateSelectorCount`. De invoer blijft SHA-/inode-pinned. Geen individuele
 productnaam, prijs of ruwe unieke CSS-token mag als publiek resultaat dienen.
+
+### Snapshotinspectie vereist exclusieve bronmap
+
+De CLI voor SHA-gepinde HTML weigert ook symbolisch gelinkte ouders en
+wereld-/groeps-toegankelijke invoermappen. De directe stagingmap hoort
+`0700` te zijn, mag tijdens het inspecteren niet van fysiek inode veranderen,
+en het geopende bronbestand moet aan de bestaande SHA- en hardlinkregels
+blijven voldoen. Dat beschermt de privé-reviewroute onafhankelijk van de
+veilige terminalexport.

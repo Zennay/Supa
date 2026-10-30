@@ -1,9 +1,10 @@
 import { open, lstat } from 'node:fs/promises'
 import { constants as fsFlags } from 'node:fs'
 import { createHash } from 'node:crypto'
-import { resolve } from 'node:path'
+import { resolve, dirname } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { proposeOfflineRetailerSelectors, summarizeOfflineSelectorProposals } from './retailer-offline-selector-discovery.mjs'
+import { assertNoSymlinkedM3OutputParents } from './m3-source-output-preservation.mjs'
 
 // A reviewer can run this ONLY on a locally saved HTML snapshot with a pinned
 // SHA from an approved capture manifest. No browser/network/scrape entrypoint.
@@ -16,6 +17,11 @@ export async function main(argv = process.argv.slice(2), writeOutput = text => p
     throw new Error('Offline source SHA-256 required')
   }
   const path = resolve(filename)
+  await assertNoSymlinkedM3OutputParents(path)
+  const parent = await lstat(dirname(path))
+  if (!parent.isDirectory() || parent.isSymbolicLink() || (parent.mode & 0o077) !== 0) {
+    throw new Error('Private HTML snapshot directory must have exclusive 0700 permissions')
+  }
   // Bind size/SHA validation to the same open file descriptor. Path-based
   // lstat() followed by readFile(path) admitted a symlink/filename swap.
   // O_NONBLOCK also avoids waiting forever on a malicious FIFO.
@@ -29,6 +35,11 @@ export async function main(argv = process.argv.slice(2), writeOutput = text => p
     raw = await fd.readFile()
     const after = await fd.stat()
     const named = await lstat(path)
+    const parentAfter = await lstat(dirname(path))
+    if (!parentAfter.isDirectory() || parentAfter.dev !== parent.dev ||
+        parentAfter.ino !== parent.ino || (parentAfter.mode & 0o077) !== 0) {
+      throw new Error('Private HTML snapshot directory changed during inspection')
+    }
     if (!named.isFile() || named.isSymbolicLink() ||
         named.dev !== after.dev || named.ino !== after.ino || after.nlink !== 1 ||
         before.dev !== after.dev || before.ino !== after.ino ||

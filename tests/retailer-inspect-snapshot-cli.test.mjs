@@ -84,3 +84,21 @@ test('CLI excludes identifier-bearing CSS selectors and testids from stdout, ret
     assert.equal(report.productionEnabled, false)
   } finally { await rm(root, { recursive: true, force: true }) }
 })
+
+test('CLI refuses world-readable HTML parents and symlinked ancestors before review', async () => {
+  const { mkdir, chmod, symlink } = await import('node:fs/promises')
+  const root = await mkdtemp(join(tmpdir(), 'supa-inspector-dir-'))
+  try {
+    const privatePath = join(root, 'private')
+    const alias = join(root, 'alias')
+    await mkdir(privatePath, { mode: 0o700 })
+    await symlink(privatePath, alias, 'dir')
+    const html = '<article class="product-card">Synthetic</article>'
+    await writeFile(join(privatePath, 'capture.html'), html, { mode: 0o600 })
+    const args = ['plus', 'https://www.plus.nl/producten', '2026-10-14T12:00:00.000Z',
+      createHash('sha256').update(html).digest('hex')]
+    await assert.rejects(main([...args, join(alias, 'capture.html')]), /symlinked M3 output parent/)
+    await chmod(privatePath, 0o755)
+    await assert.rejects(main([...args, join(privatePath, 'capture.html')]), /exclusive 0700/)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
