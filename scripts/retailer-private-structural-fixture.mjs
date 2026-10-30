@@ -1,9 +1,9 @@
 /** Private synthetic HTML topology from one verified source, never real retailer HTML. */
 import { createHash } from 'node:crypto'
-import { mkdir, open, lstat } from 'node:fs/promises'
+import { open, lstat, mkdtemp, rename, rm } from 'node:fs/promises'
 import { constants as fsFlags } from 'node:fs'
 import { parseUniqueKeyRetailerJson } from './retailer-private-unique-key-json.mjs'
-import { resolve, join } from 'node:path'
+import { resolve, join, dirname } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { replayPrivateProductHtmlSnapshot, replayPrivateSelectorHtmlSnapshot } from './retailer-replay-private-html-product.mjs'
 import { summarizeOfflineSelectorProposals } from './retailer-offline-selector-discovery.mjs'
@@ -72,9 +72,42 @@ export async function buildPrivateSyntheticHtmlFixture(htmlFile, newDirectory) {
   const {synthetic,manifest} = await derivePrivateSyntheticFixture(htmlFile)
   const out = resolve(newDirectory)
   await assertNoSymlinkedM3OutputParents(out)
-  await mkdir(out,{mode:0o700})
-  await writePrivate(join(out,'synthetic-structure.html'),synthetic)
-  await writePrivate(join(out,'provenance.json'),JSON.stringify(manifest,null,2)+'\n')
+  const parent = dirname(out)
+  const parentBefore = await lstat(parent)
+  if (!parentBefore.isDirectory() || parentBefore.isSymbolicLink()) refuse()
+  const assertVacant = async () => {
+    try { await lstat(out); throw Object.assign(new Error('EEXIST: private fixture destination exists'),{code:'EEXIST'}) }
+    catch (e) { if (e?.code !== 'ENOENT') throw e }
+  }
+  await assertVacant()
+  // An incomplete two-file output must never appear as the final fixture.
+  // Stage both private files, verify all bytes and source lineage, then move
+  // the complete private directory into place in one same-parent rename.
+  const staged = await mkdtemp(join(parent,'.supa-synthetic-fixture-'))
+  const stageInfo = await lstat(staged)
+  let published = false
+  try {
+    await writePrivate(join(staged,'synthetic-structure.html'),synthetic)
+    await writePrivate(join(staged,'provenance.json'),JSON.stringify(manifest,null,2)+'\n')
+    await verifyPrivateSyntheticHtmlFixture(htmlFile,staged)
+    const parentNow = await lstat(parent)
+    if (parentNow.dev !== parentBefore.dev || parentNow.ino !== parentBefore.ino ||
+        !parentNow.isDirectory()) refuse()
+    await assertNoSymlinkedM3OutputParents(out)
+    await assertVacant()
+    // Node lacks renameat2(RENAME_NOREPLACE), so this private-path check is
+    // not a hostile shared-filesystem race guarantee.
+    await rename(staged,out)
+    published = true
+  } finally {
+    if (!published) {
+      try {
+        const now=await lstat(staged)
+        if (now.isDirectory() && now.dev===stageInfo.dev && now.ino===stageInfo.ino)
+          await rm(staged,{recursive:true,force:true})
+      } catch { /* leave unknown replacement untouched */ }
+    }
+  }
   return {created:true,htmlSha256:manifest.syntheticHtmlSha256,
     syntheticNodes:manifest.syntheticNodes,productionEnabled:false,published:false}
 }
