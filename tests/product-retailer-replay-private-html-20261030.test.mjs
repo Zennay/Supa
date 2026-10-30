@@ -795,3 +795,17 @@ test('private SHA-pinned HTML may archive evidence but cross-origin base prevent
   await assert.rejects(savePrivateSelectorHtmlReview(file,review),/Untrusted HTML base URL/)
   await assert.rejects(stat(review),/ENOENT/)
 })
+
+test('SHA-verified private catalog capture with alien canonical identity never writes a selector review',async t=>{
+  const url='https://www.plus.nl/producten'
+  const file=await archivedSelectorPage(t,'plus','catalog',url,
+    '<html><head><link rel="canonical" href="https://foreign.example/catalog"></head>' +
+    '<body><a href="/product/fictional-123">Private mock</a></body></html>')
+  assert.equal((await stat(file)).mode & 0o777,0o600)
+  await assert.rejects(replayPrivateSelectorHtmlSnapshot(file),
+    /Untrusted HTML canonical source URL/)
+  const archive=file.replace('captured.html','alien-canonical-selector-review.json')
+  await assert.rejects(savePrivateSelectorHtmlReview(file,archive),
+    /Untrusted HTML canonical source URL/)
+  await assert.rejects(stat(archive),/ENOENT/)
+})
