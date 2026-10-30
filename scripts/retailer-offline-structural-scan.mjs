@@ -112,6 +112,9 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
   const visible = [];
   const scripts = includeScripts ? [] : null;
   const signals = { schemaOrgProduct:false, nextData:false, nuxtData:false, jsonLd:false };
+  // Distinct source scripts may share a visible JSON schema, but duplicate
+  // browser-equivalent SSR IDs do not establish unambiguous source evidence.
+  let nuxtScriptCount = 0, nextScriptCount = 0;
   const hidden = [];
   // Keep live HTML base href facts separate from visible DOM selectors.
   const baseHrefs = [];
@@ -277,6 +280,11 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
       const closing = closer.exec(html);
       if (!closing) throw new Error('Unbalanced inert HTML element');
       const trustedScriptContext = !hidden.some(name => name !== 'head') && tag === 'script';
+      const id = trustedScriptContext ? admittedRetailerScriptId(values.get('id')) : null;
+      // Count IDs even on external scripts so duplicates never masquerade
+      // as a unique, source-bound Nuxt/Next state script.
+      if (id === '__NUXT_DATA__') nuxtScriptCount++;
+      if (id === '__NEXT_DATA__') nextScriptCount++;
       if (trustedScriptContext && includeScripts) {
         scripts.push({ attrs: values, rawAttributeLength: attrText.length,
           content: html.slice(end + 1, closing.index) });
@@ -285,7 +293,6 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
         // MIME type matching ignores surrounding ASCII whitespace, matching
         // the already strict private JSON-LD/Nuxt source evidence reader.
         const type = admittedJsonScriptType(values.get('type'));
-        const id = admittedRetailerScriptId(values.get('id'));
         const content = html.slice(end + 1, closing.index).trim();
         if (type !== null && id !== null && Buffer.byteLength(content, 'utf8') <= 1024 * 1024) {
           let parsed = null;
@@ -310,6 +317,8 @@ export function scanOfflineRetailerMarkup(html, { includeScripts = false } = {})
     pos = end + 1;
   }
   if (hidden.length) throw new Error('Unbalanced inert HTML element');
+  if (nuxtScriptCount !== 1) signals.nuxtData = false;
+  if (nextScriptCount !== 1) signals.nextData = false;
   return { visible: visible.join(''), structuredSignals: signals,
     baseHrefs, canonicalHrefs, hasMetaRefresh, hasMetaNoStore, hasMetaNoArchive, hasConflictingCharset,
     ...(includeScripts ? { scripts } : {}) };

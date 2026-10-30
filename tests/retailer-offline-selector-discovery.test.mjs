@@ -1126,3 +1126,32 @@ test('browser implicit table row/cell ends expose genuine current price without 
     assert.equal(former.selectors.some(x=>x.field==='price'),false,retailerId)
   }
 })
+
+test('duplicate browser-equivalent Nuxt/Next script ids cannot create a trusted offline source signal',()=>{
+  const nuxt='<script id="__NUXT_DATA__" type="application/json">[]</script>'
+  const duplicateNuxt='<script id="__NUXT_D&#65TA__" type="application&#47json">[]</script>'
+  const next='<script id="__NEXT_DATA__" type="application/json">{}</script>'
+  const duplicateNext='<script id="__NEXT_D&#x41TA__" type="application&#47json">{}</script>'
+  for(const [retailerId,url] of [['plus','https://www.plus.nl/producten'],['dekamarkt','https://www.dekamarkt.nl/aanbiedingen']]) {
+    const source={...origin,retailerId,url}
+    assert.equal(proposeOfflineRetailerSelectors({html:nuxt,origin:source}).structuredSignals.nuxtData,true)
+    assert.equal(proposeOfflineRetailerSelectors({html:next,origin:source}).structuredSignals.nextData,true)
+    const double=proposeOfflineRetailerSelectors({html:nuxt+duplicateNuxt+next+duplicateNext,origin:source})
+    assert.equal(double.structuredSignals.nuxtData,false,retailerId)
+    assert.equal(double.structuredSignals.nextData,false,retailerId)
+    assert.equal(double.productionEnabled,false)
+  }
+})
+
+test('inert script duplicates are excluded but real external duplicate SSR IDs cannot validate offline source evidence',async()=>{
+  const source='<script id="__NUXT_DATA__" type="application/json">[]</script>'
+  const other='<script src="/assets/synthetic.js" id="__NUXT_D&#65TA__"></script>'
+  const hidden='<template><script id="__NUXT_DATA__" type="application/json">[]</script></template>'
+  const only=proposeOfflineRetailerSelectors({html:source+hidden,origin})
+  assert.equal(only.structuredSignals.nuxtData,true)
+  const ambiguity=proposeOfflineRetailerSelectors({html:source+other,origin})
+  assert.equal(ambiguity.structuredSignals.nuxtData,false)
+  const {readAuthorizedHtmlScriptEvidence}=await import('../scripts/retailer-approved-html-script-evidence.mjs')
+  assert.equal(readAuthorizedHtmlScriptEvidence(source+other,origin.url).invalid,true)
+  assert.equal(readAuthorizedHtmlScriptEvidence(source+hidden,origin.url).invalid,false)
+})
