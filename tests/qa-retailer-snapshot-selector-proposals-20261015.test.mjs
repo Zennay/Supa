@@ -356,3 +356,34 @@ test('M1 legacy capture review reuses observed microdata selectors from the stri
       /PRIVATE_LEGACY_PRODUCT|PRIVATE_SKU_321|99.99|DO NOT PUBLISH/)
   }
 })
+
+test('legacy and current capture review share source-observed Offer and inventory itemprops',()=>{
+  for (const [retailer,kind,url] of [
+    ['plus','catalog','https://www.plus.nl/producten'],
+    ['dekamarkt','offers','https://www.dekamarkt.nl/aanbiedingen']]){
+    const html='<html><head><meta charset="UTF-8"></head><body>'+
+      '<article itemscope itemtype="https://schema.org/Product">'+
+      '<div itemprop="offers" itemscope itemtype="https://schema.org/Offer">'+
+      '<data itemprop="lowPrice" value="88.22">PRIVATE</data>'+
+      '<meta itemprop="priceCurrency" content="EUR">'+
+      '<link itemprop="availability" href="https://schema.org/OutOfStock">'+
+      '</div><data itemprop="inventoryLevel" value="44"></data>'+
+      '<span itemprop="unitText">PRIVATE_PACK</span></article></body></html>'
+    const src=source(retailer,kind,html)
+    src.requestedUrl=url
+    const review=proposeRetailerSelectors(src,html)
+    for(const selector of ['div[itemprop="offers"]','data[itemprop="lowPrice"]',
+      'meta[itemprop="priceCurrency"]','link[itemprop="availability"]',
+      'data[itemprop="inventoryLevel"]','span[itemprop="unitText"]']){
+      assert.ok(review.proposedSelectors.some(x=>x.selector===selector),
+        'legacy capture lost observed selector '+selector)
+    }
+    assert.ok(review.possibleFieldSelectors.availability.some(x=>
+      x.selector==='data[itemprop="inventoryLevel"]'))
+    assert.ok(review.possibleFieldSelectors.price.some(x=>
+      x.selector==='data[itemprop="lowPrice"]'))
+    assert.equal(review.readyForScraping,false)
+    assert.equal(review.sourcePermissionVerified,false)
+    assert.doesNotMatch(JSON.stringify(review),/PRIVATE_PACK|88.22|OutOfStock/)
+  }
+})

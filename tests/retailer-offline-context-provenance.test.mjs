@@ -209,3 +209,49 @@ test('Schema.org name, price, availability and pack fields survive noisy catalog
   assert.equal(report.publicSavingsClaimEligible,false)
   assert.doesNotMatch(JSON.stringify(safe),/PRIVATE VALUE|99.99|PRIVATE PRODUCT/)
 })
+
+test('source-observed nested Offer microdata survives noisy listings as review-only selectors',()=>{
+  const clutter=Array.from({length:55},(_,i)=>
+    '<span class="price-noise-'+i+'">DO_NOT_PUBLISH_PRICE</span>').join('')
+  const html='<html><head><meta charset="UTF-8"></head><body>'+clutter+
+    '<article itemscope itemtype="https://schema.org/Product">'+
+    '<span itemprop="name">PRIVATE_PRODUCT_941</span>'+
+    '<div itemscope itemtype="https://schema.org/Offer" itemprop="offers">'+
+    '<data itemprop="lowPrice" value="1.23"></data>'+
+    '<meta itemprop="highPrice" content="9.99">'+
+    '<meta itemprop="priceCurrency" content="EUR">'+
+    '<link itemprop="availability" href="https://schema.org/InStock">'+
+    '<time itemprop="priceValidUntil" datetime="2026-12-01">SOON</time>'+
+    '</div><meta itemprop="unitCode" content="KGM">'+
+    '<span itemprop="unitText">PRIVATE_PACK</span>'+
+    '<data itemprop="inventoryLevel" value="999">PRIVATE_COUNT</data>'+
+    '</article></body></html>'
+  for(const [retailerId,site] of [['plus','plus'],['dekamarkt','dekamarkt']]){
+    const origin={retailerId,url:'https://www.'+site+'.nl/producten',
+      capturedAt:'2026-10-14T12:00:00.000Z'}
+    const report=proposeOfflineRetailerSelectors({html,origin},true)
+    const exposed=summarizeOfflineSelectorProposals(report)
+    const names=[
+      ['product','article[itemtype="https://schema.org/Product"]'],
+      ['offer','div[itemprop="offers"]'],
+      ['price','data[itemprop="lowPrice"]'],
+      ['price','meta[itemprop="highPrice"]'],
+      ['price','meta[itemprop="priceCurrency"]'],
+      ['availability','link[itemprop="availability"]'],
+      ['offer','time[itemprop="priceValidUntil"]'],
+      ['pack','meta[itemprop="unitCode"]'],
+      ['pack','span[itemprop="unitText"]'],
+      ['availability','data[itemprop="inventoryLevel"]'],
+    ]
+    for(const [field,selector] of names){
+      assert.ok(exposed.selectors.some(row=>row.field===field&&row.selector===selector),
+        retailerId+' lost '+field+': '+selector)
+    }
+    assert.equal(report.candidateLimitReached,true)
+    assert.equal(report.readyForIngestion,false)
+    assert.equal(report.permissionVerified,false)
+    assert.equal(report.publicSavingsClaimEligible,false)
+    assert.doesNotMatch(JSON.stringify(exposed),
+      /DO_NOT_PUBLISH_PRICE|PRIVATE_PRODUCT_941|PRIVATE_PACK|PRIVATE_COUNT|1\.23|9\.99/)
+  }
+})

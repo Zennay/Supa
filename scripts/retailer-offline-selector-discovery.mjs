@@ -12,6 +12,18 @@ const MAX_TAGS = 25000
 const MAX_SELECTORS = 24
 const STATIC_NAME = /^[a-z][a-z0-9_-]{1,59}$/i
 const MICRODATA_PRODUCT = /^(?:article|section|div|li|a)\[itemtype="https?:\/\/schema\.org\/Product"\]$/
+// Exact public Schema.org Microdata attribute names: an observed name alone
+// is a *review hint*, never verified price, stock, permission or product data.
+// Canonical camelCase fields are common in actual nested Product/Offer markup
+// and must not be discarded by heuristics written for CSS class tokens.
+const SCHEMA_ITEMPROP_FIELDS = Object.freeze({
+  name:'name', price:'price', lowPrice:'price', highPrice:'price',
+  priceCurrency:'price', priceSpecification:'price',
+  priceValidUntil:'offer', offers:'offer',
+  weight:'pack', size:'pack', unitCode:'pack', unitText:'pack',
+  availability:'availability', inventoryLevel:'availability',
+})
+
 
 const KNOWN_MERCHANT_HOSTS = Object.freeze({ plus: 'www.plus.nl', dekamarkt: 'www.dekamarkt.nl' })
 const FIELD_RULES = Object.freeze({
@@ -290,7 +302,7 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
     }
     const tag = match.tag
     const standardCandidate = ['article', 'a', 'div', 'li', 'section', 'span',
-      'h2', 'h3', 'p', 'strong', 'meta'].includes(tag)
+      'h2', 'h3', 'p', 'strong', 'meta', 'link', 'data', 'time'].includes(tag)
     // Real SPA/retailer custom elements are valid HTML with a hyphenated
     // tag name. Only offer selectors whose exact tags/classes exist in the
     // approved local source; no made-up shadow DOM or descendant paths.
@@ -310,9 +322,14 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
     for (const name of ['data-testid', 'itemprop']) {
       const token = staticAttributeValue(attrs.get(name))
       if (!token || !STATIC_NAME.test(token)) continue
-      for (const [field, rule] of Object.entries(FIELD_RULES)) {
-        if (rule.test(token)) {
-          recordSelector(candidates, field, tag + '[' + name + '="' + token + '"]', tag)
+      if (name === 'itemprop' && Object.hasOwn(SCHEMA_ITEMPROP_FIELDS,token)) {
+        recordSelector(candidates,SCHEMA_ITEMPROP_FIELDS[token],
+          tag + '[itemprop="' + token + '"]',tag)
+      } else {
+        for (const [field, rule] of Object.entries(FIELD_RULES)) {
+          if (rule.test(token)) {
+            recordSelector(candidates, field, tag + '[' + name + '="' + token + '"]', tag)
+          }
         }
       }
     }
@@ -351,7 +368,8 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
     // Known public Schema.org property names are more stable than ephemeral
     // CSS classes on a large listing. This is only a selector review order;
     // values, price trust and permission gates remain untouched.
-    if (/\[itemprop="(?:name|price|availability|size)"\]$/.test(row.selector))
+    if (Object.entries(SCHEMA_ITEMPROP_FIELDS).some(([prop,field]) =>
+      row.field === field && row.selector.endsWith('[itemprop="'+prop+'"]')))
       return 1
     return 0
   }
@@ -408,6 +426,10 @@ const PUBLIC_GENERIC_TOKENS = new Set([
 export function summarizeOfflineSelectorProposals(report) {
   const safe = report.selectors.filter(row => {
     if (row.field === 'product' && MICRODATA_PRODUCT.test(row.selector)) return true
+    if (Object.entries(SCHEMA_ITEMPROP_FIELDS).some(([prop,field]) =>
+      row.field === field && row.selector.endsWith('[itemprop="'+prop+'"]') &&
+      /^(?:article|a|div|li|section|span|h[23]|p|strong|meta|link|data|time)\[itemprop="/.test(row.selector)))
+      return true
     if (row.field === 'product' &&
         (isPublicMerchantProductHrefSelector(report.source.retailerId, row.selector) ||
          (!Object.hasOwn(KNOWN_MERCHANT_HOSTS, report.source.retailerId) &&

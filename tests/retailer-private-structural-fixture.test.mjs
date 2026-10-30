@@ -479,3 +479,34 @@ test('real observed meta itemprop price is replayed as a void structural node, w
     assert.equal((await verifyPrivateSyntheticHtmlFixture(filename,out)).verified,true)
   }
 })
+
+test('private retailer Offer microdata creates structural link/data/time with no sensitive values',async t=>{
+  for(const retailer of ['plus','dekamarkt']){
+    const html='<html><head><meta charset="UTF-8"></head><body>'+
+      '<article itemscope itemtype="https://schema.org/Product">'+
+      '<div itemprop="offers" itemscope itemtype="https://schema.org/Offer">'+
+      '<data itemprop="lowPrice" value="123.45">PRIVATE_123</data>'+
+      '<meta itemprop="priceCurrency" content="EUR">'+
+      '<link itemprop="availability" href="https://schema.org/OutOfStock">'+
+      '<time itemprop="priceValidUntil" datetime="2026-12-01">PRIVATE_DATE</time>'+
+      '</div><span itemprop="unitText">PRIVATE_PACK</span></article></body></html>'
+    const kind=retailer==='plus'?'catalog':'offers'
+    const {filename,dir,capture}=await archive(t,retailer,kind,html)
+    const out=join(dir,'offer-microdata-structure')
+    await buildPrivateSyntheticHtmlFixture(filename,out)
+    const transformed=await readFile(join(out,'synthetic-structure.html'),'utf8')
+    assert.match(transformed,/<link itemprop="availability" data-synthetic="true">/)
+    assert.match(transformed,/<data itemprop="lowPrice" data-synthetic="true">/)
+    assert.match(transformed,/<time itemprop="priceValidUntil" data-synthetic="true">/)
+    assert.doesNotMatch(transformed,/PRIVATE_123|PRIVATE_PACK|PRIVATE_DATE|123\.45|OutOfStock|datetime=|value=|<\/link>/)
+    const replay=proposeOfflineRetailerSelectors({html:transformed,origin:{
+      retailerId:retailer,url:capture.source.url,capturedAt:capture.source.capturedAt}})
+    const expected=['link[itemprop="availability"]','data[itemprop="lowPrice"]',
+      'time[itemprop="priceValidUntil"]','div[itemprop="offers"]']
+    for(const selector of expected)
+      assert.ok(replay.selectors.some(row=>row.selector===selector),
+        'unreplayable source-observed Offer selector '+selector)
+    assert.equal((await verifyPrivateSyntheticHtmlFixture(filename,out)).verified,true)
+    assert.equal(replay.readyForIngestion,false)
+  }
+})

@@ -40,7 +40,7 @@ function mapCandidateFields(suggestions) {
     price: /price|prijs/i,
     package: /pack|complementary|unit|weight|size|gewicht/i,
     offer: /offer|promo|aanbied|korting/i,
-    availability: /stock|availability|beschik/i,
+    availability: /stock|availability|inventory|beschik/i,
   }
   return Object.fromEntries(Object.entries(patterns).map(([field, expression]) => [
     field,
@@ -198,8 +198,10 @@ export function proposeRetailerSelectors(source, html) {
     const discovered = proposeOfflineRetailerSelectors({html,origin:{
       retailerId:identity.supermarket,url:identity.url,capturedAt:identity.capturedAt}})
     semantic = summarizeOfflineSelectorProposals(discovered).selectors
+      // Only the modern scanner's pre-sanitized, public vocabulary hints.
+      // No original price, ID, href or arbitrary CSS token is copied.
       .filter(row => row.field === 'product' ||
-        /\[itemprop="(?:name|price|availability|size)"\]$/.test(row.selector))
+        row.selector.includes('[itemprop="'))
       .map(row => ({selector:row.selector,occurrences:row.instances,
         status:'UNVERIFIED_PROPOSAL',requiresReviewedSnapshotAndHumanApproval:true}))
   } catch { /* No new review proposals when the strict modern scanner refuses. */ }
