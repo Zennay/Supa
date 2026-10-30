@@ -819,3 +819,29 @@ test('uncheckable compressed or malformed representation checksums fail before s
     assert.equal(cancelled,1)
   }
 })
+
+test('encoded dot/percent source aliases cannot rebind a 200 HTML capture to the requested page', async () => {
+  const html='<html><body>FICTIONAL encoded source identity</body></html>'
+  // WHATWG URL normalizes encoded dot segments; evaluating only the resolved
+  // target would silently accept an ambiguous response source identity.
+  for(const alias of [
+    '/producten/%2e%2e/producten',
+    '/producten/%2E%2E/producten',
+    '/producten/%252e%252e/producten',
+  ]) {
+    const inputs=[
+      {headers:{'content-location':alias}, body:html},
+      {headers:{link:'<'+alias+'>; rel="canonical"'}, body:html},
+      {headers:{},body:'<html><head><link rel="canonical" href="'+alias+'"></head><body>SYNTHETIC</body></html>'},
+      {headers:{},body:'<html><head><base href="'+alias+'"></head><body>SYNTHETIC</body></html>'},
+    ]
+    for (const input of inputs) {
+      await assert.rejects(captureApprovedRetailerPage({
+        source,permissionGate:gate,grant,
+        fetchFn:async()=>new Response(input.body,{status:200,headers:{
+          'content-type':'text/html',...input.headers,
+        }}),
+      }),/Untrusted HTML|response navigation\/source identity refused/)
+    }
+  }
+})

@@ -123,7 +123,7 @@ function assertDocumentSourceIdentity(html, target) {
   for (const href of document.baseHrefs) {
     // The browser resolves HTML character references before interpreting
     // href. Never validate their undecoded source text as a safe URL.
-    if (typeof href !== 'string' || !href || href.length > 2048 || href.includes('&')) {
+    if (typeof href !== 'string' || !href || href.length > 2048 || (href.includes('&') || ambiguousRetailerRoute(href))) {
       throw new Error('Untrusted HTML base URL')
     }
     let destination
@@ -135,7 +135,7 @@ function assertDocumentSourceIdentity(html, target) {
     }
   }
   for (const href of document.canonicalHrefs) {
-    if (typeof href !== 'string' || !href || href.length > 2048 || href.includes('&')) {
+    if (typeof href !== 'string' || !href || href.length > 2048 || (href.includes('&') || ambiguousRetailerRoute(href))) {
       throw new Error('Untrusted HTML canonical source URL')
     }
     let destination
@@ -176,7 +176,8 @@ function permittedForCapture(gate, source, grant, target) {
 }
 
 function sameRetailerContentLocation(raw, source) {
-  if (typeof raw !== 'string' || !raw || raw.length > 2048 || raw.includes('&'))
+  if (typeof raw !== 'string' || !raw || raw.length > 2048 ||
+      raw.includes('&') || ambiguousRetailerRoute(raw))
     return false
   let claimed
   try { claimed = new URL(raw, source) } catch { return false }
