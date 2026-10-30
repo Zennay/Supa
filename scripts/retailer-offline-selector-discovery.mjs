@@ -6,8 +6,6 @@ import { isIP } from 'node:net'
 const MAX_HTML_BYTES = 2 * 1024 * 1024
 const MAX_TAGS = 25000
 const MAX_SELECTORS = 24
-const HTML_TAG = /<([a-z][a-z0-9-]{0,32})\b([^<>]{0,1500})>/gi
-const CLASS_ATTR = /\bclass\s*=\s*(?:"([^"]{0,1000})"|'([^']{0,1000})')/i
 const STATIC_NAME = /^[a-z][a-z0-9_-]{1,59}$/i
 const KNOWN_MERCHANT_HOSTS = Object.freeze({ plus: 'www.plus.nl', dekamarkt: 'www.dekamarkt.nl' })
 const FIELD_RULES = Object.freeze({
@@ -60,17 +58,76 @@ function removeInertMarkup(html) {
     .replace(/<(script|style|template|noscript|textarea|head|svg)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '')
 }
 
+// Only actual opening tags count. A quoted attribute may contain '<tag>'
+// text; that text must never be interpreted as an independent DOM element.
+function* openingTags(markup) {
+  let cursor = 0
+  while (cursor < markup.length) {
+    const start = markup.indexOf('<', cursor)
+    if (start < 0) return
+    const match = /^<([a-z][a-z0-9-]{0,32})\b/i.exec(markup.slice(start))
+    if (!match) { cursor = start + 1; continue }
+    const attributeStart = start + match[0].length
+    let quote = null
+    let end = attributeStart
+    for (; end < markup.length; end++) {
+      const character = markup[end]
+      if (quote) {
+        if (character === quote) quote = null
+      } else if (character === '"' || character === "'") {
+        quote = character
+      } else if (character === '<') {
+        throw new Error('Untrusted malformed opening tag')
+      } else if (character === '>') break
+    }
+    if (end >= markup.length || quote) throw new Error('Unterminated opening tag')
+    const attrs = parseHtmlAttributes(markup.slice(attributeStart, end))
+    if (attrs === null) throw new Error('Invalid HTML attributes')
+    yield { tag: match[1].toLowerCase(), attrs }
+    cursor = end + 1
+  }
+}
+
+function parseHtmlAttributes(text) {
+  const attrs = new Map()
+  let pos = 0
+  while (pos < text.length) {
+    while (/\s/.test(text[pos] ?? '')) pos++
+    if (pos === text.length || text.slice(pos).trim() === '/') break
+    const name = /^[a-z_:][a-z0-9_.:-]*/i.exec(text.slice(pos))?.[0]
+    if (!name || attrs.size >= 64) return null
+    pos += name.length
+    const key = name.toLowerCase()
+    if (attrs.has(key)) return null
+    while (/\s/.test(text[pos] ?? '')) pos++
+    let value = null
+    if (text[pos] === '=') {
+      pos++
+      while (/\s/.test(text[pos] ?? '')) pos++
+      if (text[pos] === '"' || text[pos] === "'") {
+        const quote = text[pos++]
+        const end = text.indexOf(quote, pos)
+        if (end < 0) return null
+        value = text.slice(pos, end)
+        pos = end + 1
+      } else {
+        const token = /^[^\s<>=`"']+/.exec(text.slice(pos))?.[0]
+        if (!token) return null
+        value = token
+        pos += token.length
+      }
+      if (value.length > 1000) return null
+    }
+    attrs.set(key, value)
+  }
+  return attrs
+}
+
 function recordSelector(counters, field, selector, tag) {
   const key = field + '\u0000' + selector
   const prior = counters.get(key)
   if (prior) prior.instances += 1
   else counters.set(key, { field, selector, tag, instances: 1 })
-}
-
-function attribute(attrs, name) {
-  const pattern = new RegExp('\\b' + name + '\\s*=\\s*(?:"([^"]{0,140})"|\\x27([^\\x27]{0,140})\\x27)', 'i')
-  const match = pattern.exec(attrs)
-  return match ? (match[1] ?? match[2]) : null
 }
 
 export function proposeOfflineRetailerSelectors({ html, origin } = {}) {
@@ -107,15 +164,14 @@ export function proposeOfflineRetailerSelectors({ html, origin } = {}) {
   const candidates = new Map()
   const visible = removeInertMarkup(html)
   let inspectedTags = 0
-  for (const match of visible.matchAll(HTML_TAG)) {
+  for (const match of openingTags(visible)) {
     if (++inspectedTags > MAX_TAGS) {
       throw new Error('Offline selector scan exceeded bounded tag budget')
     }
-    const tag = match[1].toLowerCase()
+    const tag = match.tag
     if (!['article', 'a', 'div', 'li', 'section', 'span', 'h2', 'h3', 'p', 'strong', 'meta'].includes(tag)) continue
-    const attrs = match[2]
-    const rawClass = CLASS_ATTR.exec(attrs)
-    const classes = rawClass ? (rawClass[1] ?? rawClass[2]).split(/\s+/) : []
+    const attrs = match.attrs
+    const classes = (attrs.get('class') ?? '').split(/\s+/)
     const values = classes.filter(x => STATIC_NAME.test(x)).slice(0, 20)
     for (const name of values) {
       for (const [field, rule] of Object.entries(FIELD_RULES)) {
@@ -123,7 +179,7 @@ export function proposeOfflineRetailerSelectors({ html, origin } = {}) {
       }
     }
     for (const name of ['data-testid', 'itemprop']) {
-      const token = attribute(attrs, name)
+      const token = attrs.get(name)
       if (!token || !STATIC_NAME.test(token)) continue
       for (const [field, rule] of Object.entries(FIELD_RULES)) {
         if (rule.test(token)) {
@@ -132,7 +188,7 @@ export function proposeOfflineRetailerSelectors({ html, origin } = {}) {
       }
     }
     if (tag === 'a') {
-      const href = attribute(attrs, 'href')
+      const href = attrs.get('href')
       if (href?.startsWith('/product/')) {
         recordSelector(candidates, 'product', 'a[href^="/product/"]', tag)
       } else if (href?.startsWith('/producten/')) {

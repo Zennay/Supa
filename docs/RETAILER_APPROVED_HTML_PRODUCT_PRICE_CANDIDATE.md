@@ -279,3 +279,15 @@ of een symlink, wordt nooit verwijderd. Dit maakt de synthetisch geteste
 capture → manifest → selector-reviewroute uitvoerbaar zonder die
 veiligheidsvoorwaarden te versoepelen. De canonieke PLUS-/Deka-permissiongate
 blijft disabled en wordt vóór ieder echt netwerkverzoek toegepast.
+
+### Alleen werkelijke HTML-tags en attributen als selectorbewijs
+
+De selectorvoorstellen gebruiken nu quote-bewuste statische openingstag- en
+attribuutparsing in plaats van regex-substrings in willekeurige attribuuttekst.
+Aliassen zoals data-class, data-data-testid, aria-itemprop en data-href
+kunnen geen geldige class-, data-testid-, itemprop- of href-claim vervalsen.
+Een tekst zoals een ingesloten span-tag binnen een geciteerde data-note is
+geen zelfstandig DOM-element en mag nooit als selector worden voorgesteld.
+Ongebalanceerde of niet-eenduidige HTML-attributen worden fail-closed
+geweigerd. Er worden geen scripts uitgevoerd of actuele productprijzen
+gepubliceerd; validatie blijft menselijke review vereisen.

@@ -105,3 +105,18 @@ test('bounded, deterministic output for repeated tags and oversized HTML; no liv
   assert.ok(first.selectors.length <= 24)
   assert.throws(() => proposeOfflineRetailerSelectors({ html: 'x'.repeat(2 * 1024 * 1024 + 1), origin }), /Invalid or oversized/)
 })
+
+test('attribute aliases cannot impersonate real class, data-testid, itemprop or href selectors', () => {
+  const spoofed = '<article data-class="price-value" data-data-testid="pack-size" ' +
+    'aria-itemprop="product-name" data-href="/product/fictional-123">Synthetic</article>'
+  const result = proposeOfflineRetailerSelectors({ html: spoofed, origin })
+  assert.deepEqual(result.selectors, [])
+  assert.equal(result.productionEnabled, false)
+})
+
+test('HTML-like text inside a quoted attribute must never create fake DOM selector candidates', () => {
+  const markup = `<div data-note="<span class='offer-promo'>fake</span>" class="ordinary"></div>`
+  const result = proposeOfflineRetailerSelectors({ html: markup, origin })
+  assert.equal(result.selectors.length, 0)
+  assert.equal(result.readyForIngestion, false)
+})
