@@ -326,3 +326,12 @@ wereld-/groeps-toegankelijke invoermappen. De directe stagingmap hoort
 en het geopende bronbestand moet aan de bestaande SHA- en hardlinkregels
 blijven voldoen. Dat beschermt de privé-reviewroute onafhankelijk van de
 veilige terminalexport.
+
+### Privé HTML-invoer vereist ook filemode 0600
+
+Bij reeds bestaande snapshots is een exclusieve `0700` map niet genoeg als
+het daadwerkelijke HTML-bestand ruimere groeps-/wereldrechten heeft. De
+inspectie-CLI verifieert daarom `0600`-achtige private bestandsrechten op
+hetzelfde geopende bestand zowel vóór als na het lezen, naast het bestaande
+SHA-, size- en inodebewijs. `0640` en `0644` worden geweigerd; na veilig
+terugzetten van de filemode kan het offline rapport opnieuw worden gemaakt.

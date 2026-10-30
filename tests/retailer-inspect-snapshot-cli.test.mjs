@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createHash } from 'node:crypto'
-import { mkdtemp, writeFile, rm } from 'node:fs/promises'
+import { mkdtemp, writeFile, rm, chmod } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { main } from '../scripts/retailer-inspect-snapshot-cli.mjs'
@@ -11,7 +11,7 @@ test('approved offline snapshot + SHA yields privacy-safe selector report for hu
   try {
     const html = '<html><body><article class="product-card"><h3 class="product-name">Secret-ish test name</h3><span class="price-value">€10</span></article></body></html>'
     const path = join(root, 'sample.html')
-    await writeFile(path, html)
+    await writeFile(path, html, { mode: 0o600 })
     const sha = createHash('sha256').update(html).digest('hex')
     let logged = ''
     const result = await main(['fake-retailer','https://fixture.example/products','2026-10-14T11:00:00.000Z',sha,path], chunk => { logged += String(chunk) })
@@ -30,7 +30,7 @@ test('tampered snapshot and invalid manifest never return selector candidates', 
   const root = await mkdtemp(join(tmpdir(), 'supa-snapshot-'))
   try {
     const path = join(root, 'fake.html')
-    await writeFile(path, '<html><body>changed</body></html>')
+    await writeFile(path, '<html><body>changed</body></html>', { mode: 0o600 })
     await assert.rejects(main(['retailer','https://fixture.example/','2026-10-14T11:00:00.000Z','f'.repeat(64),path]), /SHA does not match/)
     await assert.rejects(main([]), /Usage:/)
     await assert.rejects(main(['retailer','https://fixture.example/','2026-10-14T11:00:00.000Z','x',path]), /SHA-256 required/)
@@ -47,7 +47,7 @@ test('offline inspector rejects symlink and hardlink aliases before reading snap
     const alias = join(root, 'alias.html')
     const hardlink = join(root, 'linked.html')
     const html = '<article class="product-card">Synthetic only</article>'
-    await writeFile(file, html)
+    await writeFile(file, html, { mode: 0o600 })
     const sha = createHash('sha256').update(html).digest('hex')
     const prefix = ['fake-retailer', 'https://fixture.example/products', '2026-10-14T11:00:00.000Z', sha]
     await symlink(file, alias)
@@ -70,7 +70,7 @@ test('CLI excludes identifier-bearing CSS selectors and testids from stdout, ret
       '<span data-testid="pack-size">200 ml</span></article>',
     ].join('')
     const path = join(root, 'snapshot.html')
-    await writeFile(path, html)
+    await writeFile(path, html, { mode: 0o600 })
     let stdout = ''
     const report = await main([
       'plus', 'https://www.plus.nl/producten', '2026-10-14T12:00:00.000Z',
@@ -100,5 +100,25 @@ test('CLI refuses world-readable HTML parents and symlinked ancestors before rev
     await assert.rejects(main([...args, join(alias, 'capture.html')]), /symlinked M3 output parent/)
     await chmod(privatePath, 0o755)
     await assert.rejects(main([...args, join(privatePath, 'capture.html')]), /exclusive 0700/)
+  } finally { await rm(root, { recursive: true, force: true }) }
+})
+
+
+test('private inspector rejects group/world-readable HTML bytes even inside a 0700 directory', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'supa-private-source-mode-'))
+  try {
+    const html = '<article class="product-card">Synthetic offline only</article>'
+    const path = join(root, 'capture.html')
+    await writeFile(path, html, { mode: 0o600 })
+    const args = ['plus','https://www.plus.nl/producten','2026-10-14T12:00:00.000Z',
+      createHash('sha256').update(html).digest('hex'),path]
+    await chmod(path, 0o644)
+    await assert.rejects(main(args), /single-link HTML file/)
+    await chmod(path, 0o640)
+    await assert.rejects(main(args), /single-link HTML file/)
+    await chmod(path, 0o600)
+    const report = await main(args, () => {})
+    assert.equal(report.readyForIngestion, false)
+    assert.equal(report.source.retailerId, 'plus')
   } finally { await rm(root, { recursive: true, force: true }) }
 })

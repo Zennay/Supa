@@ -29,7 +29,8 @@ export async function main(argv = process.argv.slice(2), writeOutput = text => p
   let raw
   try {
     const before = await fd.stat()
-    if (!before.isFile() || before.nlink !== 1 || before.size > 2 * 1024 * 1024) {
+    if (!before.isFile() || before.nlink !== 1 || (before.mode & 0o077) !== 0 ||
+        before.size > 2 * 1024 * 1024) {
       throw new Error('Offline input must be a bounded regular single-link HTML file')
     }
     raw = await fd.readFile()
@@ -42,6 +43,7 @@ export async function main(argv = process.argv.slice(2), writeOutput = text => p
     }
     if (!named.isFile() || named.isSymbolicLink() ||
         named.dev !== after.dev || named.ino !== after.ino || after.nlink !== 1 ||
+        (after.mode & 0o077) !== 0 || (named.mode & 0o077) !== 0 ||
         before.dev !== after.dev || before.ino !== after.ino ||
         before.size !== raw.length || after.size !== raw.length ||
         before.mtimeMs !== after.mtimeMs || before.ctimeMs !== after.ctimeMs) {
