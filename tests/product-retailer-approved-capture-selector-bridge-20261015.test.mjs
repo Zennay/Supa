@@ -140,3 +140,27 @@ test('bridge: HTTP rate limit is terminal; HTML selector uncertainty is terminal
   await assert.rejects(captureToPrivateSelectorReview(base),
     /Approved fetch transport required/)
 })
+
+test('synthetic consent-scoped capture bridge returns reviewed-safe absolute item href hints, no SKU', async () => {
+  const url = 'https://www.plus.nl/producten'
+  const html = '<html><body>' +
+    '<a href="https://www.plus.nl/product/synthetic-111">Canonical item</a>' +
+    '<a href="//www.plus.nl/product/synthetic-222">Scheme relative item</a>' +
+    '<a href="https://evil.example/product/synthetic-333">Foreign item</a>' +
+    '</body></html>'
+  const result = await captureToPrivateSelectorReview({
+    source: {supermarket: 'plus', kind: 'catalog', url},
+    permissionGate: syntheticGate(), grant: consent('plus', 'catalog', url),
+    capturedAt: at,
+    fetchFn: async () => new Response(html, {status: 200,
+      headers: {'content-type': 'text/html'}}),
+  })
+  assert.equal(result.selectorProposals.length, 2)
+  assert.equal(result.selectorProposals.some(s =>
+    s.selector === 'a[href^="https://www.plus.nl/product/"]'), true)
+  assert.equal(result.selectorProposals.some(s =>
+    s.selector === 'a[href^="//www.plus.nl/product/"]'), true)
+  assert.doesNotMatch(JSON.stringify(result), /synthetic-111|synthetic-222|synthetic-333|evil.example/)
+  assert.equal(result.readyForIngestion, false)
+  assert.equal(result.sourceRightsForPublicationVerified, false)
+})
