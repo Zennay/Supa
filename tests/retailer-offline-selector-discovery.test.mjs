@@ -805,3 +805,14 @@ test('offline Nuxt and Next signals decode genuine script id HTML entities exact
   const accepted = proposeOfflineRetailerSelectors({ html: unrelated + nuxt, origin })
   assert.equal(accepted.structuredSignals.nuxtData, true)
 })
+
+
+test('official named HTML script id references match the actual Nuxt/Next DOM metadata', () => {
+  const html = '<script id="__NUXT&lowbar;DATA__" type="application&sol;json">[]</script>' +
+    '<script id="__NEXT&lowbar;DATA__" type="application&sol;json">{}</script>'
+  const result = proposeOfflineRetailerSelectors({ html, origin })
+  assert.equal(result.structuredSignals.nuxtData, true)
+  assert.equal(result.structuredSignals.nextData, true)
+  assert.equal(result.readyForIngestion, false)
+  assert.equal(result.productionEnabled, false)
+})

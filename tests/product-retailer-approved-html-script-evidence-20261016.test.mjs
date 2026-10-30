@@ -548,3 +548,23 @@ test('encoded Nuxt script id aliases cannot bypass duplicate, bad JSON or extern
   assert.equal(readAuthorizedHtmlScriptEvidence(doubleEncoded + valid).invalid, true)
   assert.equal((await run('dekamarkt', doubleEncoded + valid)).status, 'review_required')
 })
+
+
+test('official named HTML character references in JSON type and Nuxt id are source evidence, not guessed selectors', async () => {
+  const type = 'application&sol;ld&plus;json&semi;charset&equals;utf-8'
+  const plusHtml = '<script type="' + type + '">' + JSON.stringify(plusProduct) + '</script>'
+  const plus = readAuthorizedHtmlScriptEvidence(plusHtml, plusUrl)
+  assert.equal(plus.invalid, false)
+  assert.equal(plus.jsonLdBlocks.length, 1)
+  const plusCandidate = await run('plus', plusHtml)
+  assert.equal(plusCandidate.status, 'candidate_needs_review')
+  assert.equal(plusCandidate.observation.currentPriceCents, 199)
+  const nuxt = dekaMarkup('id="__NUXT&lowbar;DATA__" type="application&sol;json"')
+  const deka = readAuthorizedHtmlScriptEvidence(nuxt, dekaFixture.source.url)
+  assert.equal(deka.invalid, false)
+  assert.deepEqual(deka.nuxtPayload, dekaFixture.nuxtPayload)
+  const candidate = await run('dekamarkt', nuxt)
+  assert.equal(candidate.status, 'candidate_needs_review')
+  assert.equal(candidate.observation.currentPriceCents, 85)
+  assert.equal(candidate.published, false)
+})

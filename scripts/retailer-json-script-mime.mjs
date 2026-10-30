@@ -8,7 +8,7 @@
 // unknown names, malformed numbers and non-ASCII controls are not evidence.
 function browserScriptMime(raw) {
   let invalid = false
-  const names = { semi: ';', equals: '=', quot: '"', apos: "'", Tab: '\t', NewLine: '\n' }
+  const names = { semi: ';', equals: '=', quot: '"', apos: "'", sol: '/', plus: '+', period: '.', colon: ':', lowbar: '_', num: '#', Tab: '\t', NewLine: '\n' }
   const decoded = raw.replace(/&(?:#(?:x([0-9a-f]+)|([0-9]+))([^a-z0-9]|$)|([a-z][a-z0-9]*)(;?))/gi,
     (whole, hex, dec, ending, name, terminator) => {
       if (name !== undefined) {
