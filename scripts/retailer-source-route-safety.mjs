@@ -27,6 +27,10 @@ export function exactRawRetailerAuthority(raw, target) {
   // normalizes percent-encoded authority. Do not skip raw-host validation
   // just because an alias has leading whitespace.
   if (/[\x00-\x20\x7f]/.test(raw)) return false
+  // With a base URL, WHATWG resolves `https:producten` and
+  // `https:/producten` as same-origin relative URLs. They must not pass as
+  // literal audited HTTPS source authority references.
+  if (/^[a-z][a-z0-9+.-]*:/i.test(raw) && !/^https:\/\//i.test(raw)) return false
   const match = /^(?:[a-z][a-z0-9+.-]*:)?\/\/([^/?#]*)/i.exec(raw)
   return !match || match[1].toLowerCase() === new URL(target).host.toLowerCase()
 }

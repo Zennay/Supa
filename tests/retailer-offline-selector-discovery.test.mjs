@@ -1002,3 +1002,13 @@ test('leading whitespace before encoded source host cannot hide raw authority fr
     }
   }
 })
+
+test('same-scheme single-slash aliases never replace an explicit retailer base or canonical URL',()=>{
+  for(const href of ['https:/producten','https:producten']){
+    assert.equal(new URL(href,origin.url).href,origin.url)
+    for(const tag of ['base','link rel="canonical"']){
+      const html='<html><head><'+tag+' href="'+href+'"></head><body><a href="/product/synthetic">SYNTHETIC</a></body></html>'
+      assert.throws(()=>proposeOfflineRetailerSelectors({html,origin}),/Untrusted HTML/,href)
+    }
+  }
+})

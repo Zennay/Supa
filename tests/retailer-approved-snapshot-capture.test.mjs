@@ -935,3 +935,14 @@ test('raw leading-space host aliases cannot become HTTP or HTML source identity'
     }
   }
 })
+
+test('HTTP and HTML source identities reject incomplete same-scheme absolute URLs',async()=>{
+  for(const href of ['https:/producten','https:producten']){
+    for(const headers of [{'content-location':href},{link:'<'+href+'>; rel=canonical'}]){
+      await assert.rejects(captureApprovedRetailerPage({source,permissionGate:gate,grant,
+        fetchFn:async()=>new Response('<html>SYNTHETIC</html>',{status:200,
+          headers:{'content-type':'text/html',...headers}}),
+      }),/source identity refused/,href)
+    }
+  }
+})
