@@ -7,6 +7,7 @@ import { parseSchemaOrgProduct } from '../src/data/schemaOrgProduct.ts'
 import { scanOfflineRetailerMarkup } from './retailer-offline-structural-scan.mjs'
 import { admittedJsonScriptType, admittedRetailerScriptId } from './retailer-json-script-mime.mjs'
 import { parseUniqueKeyRetailerJson } from './retailer-private-unique-key-json.mjs'
+import { decodeExactRetailerHtmlBytes } from './retailer-private-html-byte-identity.mjs'
 
 function sha256(text) {
   return createHash('sha256').update(text).digest('hex')
@@ -100,7 +101,11 @@ export function inspectHtml(html) {
 
 export async function inspectCaptureDirectory(rootDir) {
   const manifestPath = path.join(rootDir, 'manifest.json')
-  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+  const manifestBytes = await readFile(manifestPath)
+  if (manifestBytes.length > 512 * 1024) throw new Error('Capture manifest is oversized')
+  const manifest = parseUniqueKeyRetailerJson(
+    new TextDecoder('utf-8', { fatal: true }).decode(manifestBytes),512 * 1024)
+
 
   if (manifest.milestone !== 'M1 Data Feasibility') {
     throw new Error(`Unexpected milestone: ${manifest.milestone}`)
@@ -144,8 +149,10 @@ export async function inspectCaptureDirectory(rootDir) {
 
     if (result.success) {
       const htmlPath = path.join(rootDir, result.supermarket, `${result.id}.html`)
-      const html = await readFile(htmlPath, 'utf8')
-      const actualSha256 = sha256(html)
+      // Hash the immutable ORIGINAL bytes. Decoding with replacement chars
+      // before hashing could make a forged manifest refer to different HTML.
+      const rawHtml = await readFile(htmlPath)
+      const actualSha256 = sha256(rawHtml)
 
       if (!result.sha256 || result.sha256 !== actualSha256) {
         throw new Error(
@@ -153,6 +160,7 @@ export async function inspectCaptureDirectory(rootDir) {
         )
       }
 
+      const html = decodeExactRetailerHtmlBytes(rawHtml,5 * 1024 * 1024)
       record.integrity = 'verified'
       record.html = inspectHtml(html)
 

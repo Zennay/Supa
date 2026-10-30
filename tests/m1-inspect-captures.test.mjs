@@ -195,3 +195,31 @@ test('M1 original inspector marks duplicate JSON keys, malformed data MIME and e
   assert.ok(report.jsonLd.every(x=>x.parseError===true))
   assert.equal(report.hasNextData,false)
 })
+
+test('M1 captured HTML inspection refuses invalid original UTF-8 even if manifest hashes decoded replacement text',async()=>{
+  const {rm}=await import('node:fs/promises')
+  const root=await mkdtemp(path.join(os.tmpdir(),'supa-m1-byte-provenance-'))
+  try {
+    await mkdir(path.join(root,'plus'))
+    for(const raw of [Buffer.from('<html><head><title>OK</title></head><body>\ufffd</body></html>','utf8'),Buffer.from([0xef,0xbb,0xbf,...Buffer.from('<html><title>OK</title></html>')])]) {
+      const isBOM=raw[0]===0xef
+      const bytes=isBOM?raw:Buffer.concat([Buffer.from('<html><head><title>OK</title></head><body>'),Buffer.from([0xc3,0x28]),Buffer.from('</body></html>')])
+      await writeFile(path.join(root,'plus','plus-catalog.html'),bytes)
+      const fakeDigest=createHash('sha256').update(bytes.toString('utf8')).digest('hex')
+      const originalDigest=createHash('sha256').update(bytes).digest('hex')
+      for(const digest of [fakeDigest,originalDigest]) {
+        await writeFile(path.join(root,'manifest.json'),JSON.stringify({milestone:'M1 Data Feasibility',bounded:true,sourceCount:1,results:[{id:'plus-catalog',supermarket:'plus',kind:'catalog',requestedUrl:'https://www.plus.nl/producten',finalUrl:'https://www.plus.nl/producten',capturedAt:'2026-10-04T00:00:00.000Z',sha256:digest,success:true}]}))
+        await assert.rejects(inspectCaptureDirectory(root),/UTF-8|BOM|encoding|integrity|source bytes/i)
+      }
+    }
+  } finally {await rm(root,{recursive:true,force:true})}
+})
+
+test('M1 captured manifest duplicate identities cannot be laundered by JSON last-key-wins',async()=>{
+  const {rm}=await import('node:fs/promises')
+  const root=await mkdtemp(path.join(os.tmpdir(),'supa-m1-duplicate-manifest-'))
+  try {
+    await writeFile(path.join(root,'manifest.json'),'{"milestone":"INVALID","milestone":"M1 Data Feasibility","bounded":true,"sourceCount":0,"results":[]}')
+    await assert.rejects(inspectCaptureDirectory(root),/ambiguous|duplicate|manifest|JSON/i)
+  } finally {await rm(root,{recursive:true,force:true})}
+})
