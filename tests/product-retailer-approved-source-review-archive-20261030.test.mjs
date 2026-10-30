@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { mkdtemp, readFile, rm, stat, symlink, writeFile, chmod } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, stat, symlink, writeFile, chmod, readdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -243,4 +243,27 @@ test('read-only CLI compares real private synthetic archives with aggregate-only
   assert.equal(invalid.stdout, '')
   assert.match(invalid.stderr, /Private source review archive refused/)
   assert.doesNotMatch(invalid.stderr, /fictional-771|2\\.49|before\\.json/)
+})
+
+test('concurrent archive writers cannot replace complete source evidence or leave staging files', async t => {
+  const dir = await folder(t)
+  const file = join(dir, 'competing-captures.json')
+  const a = markup('plus')
+  const b = a.replace('price-value', 'price-label')
+  const results = await Promise.allSettled([
+    archive(options('plus', a), file),
+    archive(options('plus', b), file),
+  ])
+  assert.equal(results.filter(x => x.status === 'fulfilled').length, 1)
+  assert.equal(results.filter(x => x.status === 'rejected').length, 1)
+  const saved = JSON.parse(await readFile(file, 'utf8'))
+  assert.ok([
+    createHash('sha256').update(a).digest('hex'),
+    createHash('sha256').update(b).digest('hex'),
+  ].includes(saved.source.sha256))
+  assert.equal(saved.published, false)
+  assert.equal((await stat(file)).mode & 0o777, 0o600)
+  assert.deepEqual(await readdir(dir), ['competing-captures.json'])
+  const comparison = await compareArchivedSourceReviews(file, file)
+  assert.equal(comparison.htmlBytesDiffer, false)
 })

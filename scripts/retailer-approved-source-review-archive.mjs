@@ -3,7 +3,8 @@
  * review archive. No default HTTP, retries, scheduler, price publishing,
  * permission grants, or public report of retailer data.
  */
-import { open, lstat, rm } from 'node:fs/promises'
+import { open, lstat, rm, link } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
 import { constants } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { basename, dirname, isAbsolute } from 'node:path'
@@ -150,25 +151,35 @@ async function privatePath(file) {
 
 async function publish(file, bytes) {
   await privatePath(file)
-  let handle, created = false
+  const parentPath = dirname(file)
+  const parent = await lstat(parentPath)
+  const staging = parentPath + '/.' + basename(file) + '.staging-' + randomUUID()
+  let handle
   try {
-    handle = await open(file, 'wx', 0o600)
-    created = true
+    // A crash while writing can only leave an owner-only staging file.
+    // The final review path appears *after* all its bytes are durable.
+    handle = await open(staging, 'wx', 0o600)
     await handle.writeFile(bytes, 'utf8')
     await handle.chmod(0o600)
     await handle.sync()
     await handle.close()
     handle = null
-  } catch {
+    const current = await lstat(parentPath)
+    const staged = await lstat(staging)
+    if (!current.isDirectory() || current.dev !== parent.dev ||
+        current.ino !== parent.ino || (current.mode & 0o077) !== 0 ||
+        !staged.isFile() || staged.isSymbolicLink() ||
+        staged.nlink !== 1 || (staged.mode & 0o777) !== 0o600) refuse()
+    // link() is NO-REPLACE: unlike rename(), a competing archive cannot
+    // overwrite an existing artifact. Readers only see complete bytes.
+    await link(staging, file)
+    const dir = await open(parentPath, 'r')
+    try { await dir.sync() } finally { await dir.close() }
+  } catch { refuse() }
+  finally {
     if (handle) await handle.close()
-    if (created) {
-      try {
-        await assertNoSymlinkedM3OutputParents(file)
-        const current = await lstat(file)
-        if (current.isFile() && !current.isSymbolicLink()) await rm(file)
-      } catch { /* never traverse a swapped output parent */ }
-    }
-    refuse()
+    // Never delete the complete final output after a successful link.
+    await rm(staging, { force: true })
   }
 }
 
