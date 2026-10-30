@@ -8,6 +8,7 @@ import { readAuthorizedHtmlScriptEvidence } from './retailer-approved-html-scrip
 import { parseSchemaOrgProductForPage } from '../src/data/schemaOrgProductPageSelection.ts'
 import { parseDekaNuxtFromAuthorizedHtml } from './retailer-approved-deka-nuxt-product.mjs'
 import { proposeOfflineRetailerSelectors } from './retailer-offline-selector-discovery.mjs'
+import { compareOfflineSelectorProposals } from './retailer-private-selector-drift.mjs'
 
 const LIMIT = 2 * 1024 * 1024
 const HOST = Object.freeze({ plus: 'www.plus.nl', dekamarkt: 'www.dekamarkt.nl' })
@@ -94,11 +95,22 @@ export async function replayPrivateProductHtmlSnapshot(filename) {
     source: { retailerId: src.retailerId, capturedAt: src.capturedAt, sha256: src.sha256 },
     status: plausible ? 'candidate_for_human_review' : 'unverified_product',
     observation: plausible ? price : null,
-    selectorProposals: selectors.selectors, selectorReviewRequired: true,
+    selectorProposals: selectors.selectors,
+    selectorSnapshot: selectors, selectorReviewRequired: true,
     permissionVerifiedForThisReplay: false, sourceRightsForPublicationVerified: false,
     verifiedCurrentCheckoutPrice: false, readyForIngestion: false,
     publicSavingsClaimEligible: false, productionEnabled: false, published: false,
   }
+}
+
+/**
+ * Compare two independently SHA-verified original private HTML snapshots;
+ * returns count-only selector drift, never proposed names, HTML or prices.
+ */
+export async function compareArchivedPrivateProductSnapshots(beforeHtml, afterHtml) {
+  const before = await replayPrivateProductHtmlSnapshot(beforeHtml)
+  const after = await replayPrivateProductHtmlSnapshot(afterHtml)
+  return compareOfflineSelectorProposals(before.selectorSnapshot, after.selectorSnapshot)
 }
 
 /**
@@ -143,15 +155,23 @@ export async function savePrivateOfflineProductReview(htmlFile, reviewFile) {
 // Operator CLI: no network and no source URL, price, HTML or private path stdout.
 const { pathToFileURL } = await import('node:url')
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  if (process.argv.length !== 4) {
-    console.error('Usage: retailer-replay-private-html-product.mjs <captured.html> <new-private-review.json>')
-    process.exitCode = 2
-  } else {
-    savePrivateOfflineProductReview(process.argv[2], process.argv[3])
+  const args = process.argv.slice(2)
+  if (args.length === 3 && args[0] === '--drift') {
+    compareArchivedPrivateProductSnapshots(args[1], args[2])
+      .then(report => process.stdout.write(JSON.stringify(report) + '\n'))
+      .catch(() => {
+        console.error('Private offline selector drift refused; no data was published')
+        process.exitCode = 2
+      })
+  } else if (args.length === 2) {
+    savePrivateOfflineProductReview(args[0], args[1])
       .then(result => process.stdout.write(JSON.stringify(result) + '\n'))
       .catch(() => {
         console.error('Private offline source review refused; no price was published')
         process.exitCode = 2
       })
+  } else {
+    console.error('Usage: retailer-replay-private-html-product.mjs <captured.html> <new-review.json> OR --drift <before.html> <after.html>')
+    process.exitCode = 2
   }
 }

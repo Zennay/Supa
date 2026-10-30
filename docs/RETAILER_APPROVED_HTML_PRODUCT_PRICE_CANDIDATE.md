@@ -106,3 +106,16 @@ ruime toegang, symlinks, niet-canonieke source-URL en bestaande reviewbestanden.
 **false**; zelfs een herkenbare productprijs blijft menselijke review vereisen.
 De tests gebruiken expliciet synthetische HTML en fictieve in-memory toestemming;
 de huidige PLUS/DekaMarkt-bronrechten staan live-ophalen nog niet toe.
+
+
+Selectorwijzigingen tussen twee afzonderlijk opgeslagen bronmomenten kunnen
+rechtstreeks en volledig offline via hetzelfde manifest-gecontroleerde pad:
+
+```bash
+node --experimental-strip-types scripts/retailer-replay-private-html-product.mjs   --drift /private/voor.html /private/na.html
+```
+
+De uitvoer bestaat uitsluitend uit geaggregeerde aantallen en `reviewRequired`;
+de parser promoot geen CSS-selector, doet geen HTTP en maakt geen winkelprijs
+beschikbaar voor gebruikers. De bestaande `retailer-private-selector-drift.mjs`
+is de validator van die verschillen.

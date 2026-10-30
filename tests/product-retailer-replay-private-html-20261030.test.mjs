@@ -5,7 +5,7 @@ import { mkdtemp, writeFile, readFile, rm, chmod, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { main as download } from '../scripts/retailer-download-reviewed-source.mjs'
-import { replayPrivateProductHtmlSnapshot, savePrivateOfflineProductReview } from '../scripts/retailer-replay-private-html-product.mjs'
+import { replayPrivateProductHtmlSnapshot, savePrivateOfflineProductReview, compareArchivedPrivateProductSnapshots } from '../scripts/retailer-replay-private-html-product.mjs'
 
 const url = 'https://www.plus.nl/product/fictional-flour-123'
 const grant = { supermarket: 'plus', kind: 'product', sourceUrl: url,
@@ -25,7 +25,7 @@ const page = '<html><body><div class="product-card">Synthetic only</div>' +
     offers: { '@type': 'Offer', price: '3.25', priceCurrency: 'EUR',
       availability: 'https://schema.org/InStock' } }) + '</script></body></html>'
 
-async function capture(t) {
+async function capture(t, markup = page) {
   const dir = await mkdtemp(join(tmpdir(), 'supa-replay-fixture-'))
   t.after(() => rm(dir, { recursive: true, force: true }))
   const input = join(dir, 'synthetic-grant.json'), output = join(dir, 'captured.html')
@@ -33,7 +33,7 @@ async function capture(t) {
   let calls = 0
   await download([input, output], {
     testGateDocument: gate,
-    fetchFn: async () => { calls++; return new Response(page,
+    fetchFn: async () => { calls++; return new Response(markup,
       { status: 200, headers: { 'content-type': 'text/html' } }) },
     writeOutput() {},
   })
@@ -115,4 +115,43 @@ test('second supermarket: offline archived Deka Nuxt+JSON-LD is corroborated, ne
   assert.equal(replay.observation.sourceProductId, '115873')
   assert.equal(replay.permissionVerifiedForThisReplay, false)
   assert.equal(replay.verifiedCurrentCheckoutPrice, false)
+})
+
+
+test('two separately SHA-pinned private product snapshots yield count-only selector drift', async t => {
+  const before = await capture(t)
+  const changed = page.replace('class="product-card"', 'class="item-card"')
+  const after = await capture(t, changed)
+  const report = await compareArchivedPrivateProductSnapshots(before, after)
+  assert.equal(report.mode, 'private-offline-selector-drift-alert')
+  assert.equal(report.htmlBytesDiffer, true)
+  assert.ok(report.newSelectorCandidates > 0)
+  assert.ok(report.missingSelectorCandidates > 0)
+  assert.equal(report.productionEnabled, false)
+  assert.equal(report.externalRequests, 0)
+  assert.doesNotMatch(JSON.stringify(report), /Synthetic flour|www\.plus\.nl|product-card|item-card|3\.25/)
+  const same = await compareArchivedPrivateProductSnapshots(before, before)
+  assert.equal(same.htmlBytesDiffer, false)
+  assert.equal(same.newSelectorCandidates, 0)
+})
+
+test('operator CLI writes private candidate review and emits redacted drift counts only', async t => {
+  const { execFile } = await import('node:child_process')
+  const { promisify } = await import('node:util')
+  const run = promisify(execFile)
+  const script = new URL('../scripts/retailer-replay-private-html-product.mjs', import.meta.url).pathname
+  const first = await capture(t)
+  const second = await capture(t, page.replace('class="product-card"', 'class="item-card"'))
+  const { stdout: drift } = await run(process.execPath,
+    ['--experimental-strip-types', script, '--drift', first, second])
+  const report = JSON.parse(drift)
+  assert.equal(report.mode, 'private-offline-selector-drift-alert')
+  assert.ok(report.newSelectorCandidates > 0 && report.missingSelectorCandidates > 0)
+  assert.doesNotMatch(drift, /fictional-flour|product-card|item-card|3\.25|www\.plus\.nl/i)
+  const reviewPath = first.replace('captured.html', 'new-operator-review.json')
+  const { stdout: summary } = await run(process.execPath,
+    ['--experimental-strip-types', script, first, reviewPath])
+  assert.equal(JSON.parse(summary).created, true)
+  assert.doesNotMatch(summary, /fictional-flour|3\.25|www\.plus\.nl/i)
+  assert.equal((await stat(reviewPath)).mode & 0o777, 0o600)
 })
