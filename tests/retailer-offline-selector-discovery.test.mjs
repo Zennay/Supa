@@ -1050,3 +1050,26 @@ test('exact UTC nanosecond-precision capture clocks preserve source evidence wit
     assert.throws(()=>proposeOfflineRetailerSelectors({html:markup,origin:{...origin,capturedAt}}),/Invalid or oversized/)
   }
 })
+
+test('browser numeric references without semicolon agree across verified Schema Product signals and selector CSS', () => {
+  const html='<section itemscope itemtype="https:&#47&#47schema.org&#47Product" class="product&#45card">'+
+    '<span data-testid="price&#45value">SYNTHETIC</span></section>'
+  for(const [retailerId,url] of [['plus','https://www.plus.nl/producten'],['dekamarkt','https://www.dekamarkt.nl/producten']]) {
+    const report=proposeOfflineRetailerSelectors({html,origin:{...origin,retailerId,url}})
+    assert.equal(report.structuredSignals.schemaOrgProduct,true,retailerId)
+    assert.ok(report.selectors.some(x=>x.selector==='section[itemtype="https://schema.org/Product"]'&&x.field==='product'),retailerId)
+    assert.ok(report.selectors.some(x=>x.selector==='section.product-card'),retailerId)
+    assert.ok(report.selectors.some(x=>x.selector==='span[data-testid="price-value"]'&&x.field==='price'),retailerId)
+    assert.equal(report.permissionVerified,false)
+  }
+})
+
+test('one-pass HTML attribute reference decoder never splits oversized or nested numeric source evidence', async () => {
+  const {decodeObservedHtmlAttribute}=await import('../scripts/retailer-html-attribute-references.mjs')
+  for(const [raw,expected] of [
+    ['&#47','/'],['&#x2f','/'],['&#x2F;','/'],
+    ['&#38;sol;','&sol;'],['&amp;#47;','&#47;'],
+    ['&#12345678;', '&#12345678;'],['&#x1234567;', '&#x1234567;'],
+    ['&#0;', '&#0;'],['&#xD800;', '&#xD800;'],
+  ])assert.equal(decodeObservedHtmlAttribute(raw),expected,raw)
+})

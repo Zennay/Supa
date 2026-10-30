@@ -1,3 +1,4 @@
+import { decodeObservedHtmlAttribute } from './retailer-html-attribute-references.mjs'
 import { admittedJsonScriptType, admittedRetailerScriptId } from './retailer-json-script-mime.mjs'
 import { parseUniqueKeyRetailerJson } from './retailer-private-unique-key-json.mjs'
 
@@ -61,19 +62,7 @@ function tagEnd(html, start) {
 // Meta controls are interpreted by browsers after HTML entity decoding.
 // Numeric entities and common ASCII named entities are decoded only for
 // security metadata and explicit microdata itemtypes; unresolved entities fail closed.
-function decodedMeta(raw) {
-  if (typeof raw !== 'string') return raw;
-  const named={Tab:'\t',NewLine:'\n',comma:',',semi:';',colon:':',amp:'&',sol:'/'};
-  // Decode the ORIGINAL input once. Two .replace passes could incorrectly
-  // turn &#38;sol; into '/', though a browser sees literal '&sol;'.
-  return raw.replace(/&#(?:[xX]([0-9a-fA-F]{1,6})|([0-9]{1,7}));?|&(Tab|NewLine|comma|semi|colon|amp|sol);/g,
-    (original,h,d,key)=>{
-      if (key !== undefined) return named[key];
-      const n=parseInt(h??d,h===undefined?10:16);
-      return n>0 && n<=0x10ffff && !(n>=0xd800 && n<=0xdfff)
-        ? String.fromCodePoint(n) : original;
-    });
-}
+const decodedMeta = decodeObservedHtmlAttribute
 
 function isType(record, type) {
   if (!record || typeof record !== 'object') return false;
