@@ -232,3 +232,20 @@ test('revoked top-level and origin Proxies reject without leaking native TypeErr
     ), /Invalid or oversized offline retailer snapshot/)
   }
 })
+
+test('fake script types cannot claim Nuxt/Next hydration signals', () => {
+  for (const id of ['__NUXT_DATA__','__NEXT_DATA__']) {
+    const payload = id === '__NUXT_DATA__' ? '[{}]' : '{}'
+    const fake = proposeOfflineRetailerSelectors({
+      html: `<script id="${id}" type="text/plain">${payload}</script>`, origin,
+    })
+    assert.equal(fake.structuredSignals.nuxtData, false)
+    assert.equal(fake.structuredSignals.nextData, false)
+    const real = proposeOfflineRetailerSelectors({
+      html: `<script id="${id}" type="application/json">${payload}</script>`, origin,
+    })
+    assert.equal(real.structuredSignals[id === '__NUXT_DATA__' ? 'nuxtData' : 'nextData'], true)
+    assert.equal(real.productionEnabled, false)
+    assert.equal(real.permissionVerified, false)
+  }
+})

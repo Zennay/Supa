@@ -128,8 +128,10 @@ export function scanOfflineRetailerMarkup(html) {
             signals.jsonLd = true;
             if (hasProduct(parsed)) signals.schemaOrgProduct = true;
           }
-          if (id === '__NUXT_DATA__' && Array.isArray(parsed)) signals.nuxtData = true;
-          if (id === '__NEXT_DATA__' && parsed && typeof parsed === 'object') signals.nextData = true;
+          if (id === '__NUXT_DATA__' && (type === undefined || type === 'application/json') &&
+              Array.isArray(parsed)) signals.nuxtData = true;
+          if (id === '__NEXT_DATA__' && (type === undefined || type === 'application/json') &&
+              parsed && typeof parsed === 'object' && !Array.isArray(parsed)) signals.nextData = true;
         }
       }
       pos = closer.lastIndex;
