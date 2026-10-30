@@ -61,7 +61,12 @@ test('same product across product and catalog captures preserves both sources bu
   const product = only(batch, 'plus:product')
   const catalog = structuredClone(product)
   catalog.key = 'plus:catalog'
-  catalog.observations.forEach(o => { o.provenance.kind = 'catalog' })
+  // Synthetic second capture: a product URL cannot masquerade as a catalog
+  // source. Retain the same product facts on the reviewed catalog route.
+  catalog.observations.forEach(o => {
+    o.provenance.kind = 'catalog'
+    o.provenance.url = 'https://www.plus.nl/producten'
+  })
   const report = buildUniversalRetailerCatalog({
     summary: { mode: 'reviewed-offline-only' },
     results: [product, catalog],
