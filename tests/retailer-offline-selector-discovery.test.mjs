@@ -360,14 +360,14 @@ test('CSS hints reflect actual decoded numeric HTML attribute references, never 
   const html = [
     '<article class="product&#45;card product&#45;card">',
     '<span data-testid="price&#x2d;value">Synthetic</span>',
-    '<a href="&#47;producten&#47;synthetic-555">Source link</a>',
+    '<a href="&#47;product&#47;synthetic-555">Source link</a>',
     '<span class="price&#xD800;value">Invalid surrogate stays inert</span>',
     '</article>',
   ].join('')
   const report = proposeOfflineRetailerSelectors({ html, origin })
   assert.equal(report.selectors.find(x => x.selector === 'article.product-card')?.instances, 1)
   assert.equal(report.selectors.find(x => x.selector === 'span[data-testid="price-value"]')?.instances, 1)
-  assert.equal(report.selectors.find(x => x.selector === 'a[href^="/producten/"]')?.instances, 1)
+  assert.equal(report.selectors.find(x => x.selector === 'a[href^="/product/"]')?.instances, 1)
   assert.equal(report.selectors.some(x => x.selector === 'span.price-value'), false)
   assert.equal(report.readyForIngestion, false)
 })
@@ -386,4 +386,33 @@ test('structural capture signals match valid script type whitespace and still re
   assert.equal(result.structuredSignals.jsonLd, true)
   assert.equal(result.structuredSignals.nuxtData, true)
   assert.equal(result.readyForIngestion, false)
+})
+
+test('PLUS and Deka link selectors require genuine observed store product paths, not catalog navigation', () => {
+  const badPlus = [
+    '/product/', '/product/?sort=price', '/product//nested',
+    '/product/../admin', '/product/%2e%2e/admin',
+    '/product/%2fencoded', '/producten/deka-item-99',
+  ].map(href => '<a href="' + href + '">Synthetic navigation</a>').join('')
+  const plus = proposeOfflineRetailerSelectors({
+    html: badPlus + '<a href="/product/fictional-item-123">Valid synthetic item</a>',
+    origin,
+  })
+  assert.equal(plus.selectors.find(x => x.selector === 'a[href^="/product/"]')?.instances, 1)
+  assert.equal(plus.selectors.some(x => x.selector === 'a[href^="/producten/"]'), false)
+  const onlyBad = proposeOfflineRetailerSelectors({html: badPlus, origin})
+  assert.equal(onlyBad.selectors.length, 0)
+  const dekaOrigin = {...origin, retailerId: 'dekamarkt',
+    url: 'https://www.dekamarkt.nl/producten'}
+  const deka = proposeOfflineRetailerSelectors({
+    html: '<a href="/producten/">Catalog root</a>' +
+      '<a href="/producten/?sort=offer">Catalog navigation</a>' +
+      '<a href="/product/foreign-123">Wrong retailer route</a>' +
+      '<a href="/producten/fictional/123">Synthetic Deka item</a>',
+    origin: dekaOrigin,
+  })
+  assert.equal(deka.selectors.find(x => x.selector === 'a[href^="/producten/"]')?.instances, 1)
+  assert.equal(deka.selectors.some(x => x.selector === 'a[href^="/product/"]'), false)
+  assert.equal(deka.published, undefined)
+  assert.equal(deka.readyForIngestion, false)
 })
