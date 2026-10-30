@@ -6,7 +6,7 @@ import { parseUniqueKeyRetailerJson } from './retailer-private-unique-key-json.m
 import { resolve, join, dirname } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { replayPrivateProductHtmlSnapshot, replayPrivateSelectorHtmlSnapshot } from './retailer-replay-private-html-product.mjs'
-import { summarizeOfflineSelectorProposals } from './retailer-offline-selector-discovery.mjs'
+import { summarizeOfflineSelectorProposals, proposeOfflineRetailerSelectors } from './retailer-offline-selector-discovery.mjs'
 import { assertNoSymlinkedM3OutputParents } from './m3-source-output-preservation.mjs'
 const FIELD = new Set(['product','name','price','pack','offer','availability'])
 const TAG = /^(article|section|div|span|p|li|h[1-6]|a)\.([a-z][a-z0-9_-]{0,58})$/i
@@ -52,17 +52,30 @@ async function derivePrivateSyntheticFixture(htmlFile) {
       snapshot.humanReviewRequired !== true || snapshot.readyForIngestion !== false)
     refuse()
   const safe = summarizeOfflineSelectorProposals(snapshot).selectors
-  const htmlNodes = safe.map(elementFor).filter(Boolean).slice(0,24)
+  const rendered = safe.map(row => ({row, markup:elementFor(row)}))
+    .filter(x=>x.markup!==null).slice(0,24)
+  const htmlNodes = rendered.map(x=>x.markup)
   if (htmlNodes.length === 0) refuse()
   const synthetic = '<!doctype html>\n<html lang="nl"><head><meta charset="utf-8">'+
     '<title>SYNTHETIC STRUCTURE - NOT RETAILER HTML</title></head><body>\n'+
     htmlNodes.join('\n')+'\n</body></html>\n'
+  // Reparse the generated page with the real offline selector engine.
+  // Synthetic structure must actually reproduce each emitted selector; a
+  // string-only fixture with attractive but unusable markup is not deliverable.
+  const syntheticOrigin = {retailerId:source.retailerId,
+    url:'https://www.'+source.retailerId+'.nl/producten',
+    capturedAt:source.capturedAt}
+  const replay = proposeOfflineRetailerSelectors({html:synthetic,origin:syntheticOrigin})
+  const observed = new Set(replay.selectors.map(x=>x.field+'|'+x.selector))
+  if (replay.readyForIngestion!==false ||
+      rendered.some(({row})=>!observed.has(row.field+'|'+row.selector))) refuse()
   const manifest = {schemaVersion:1,kind:'synthetic-private-selector-fixture',
     source:{retailerId:source.retailerId,kind:source.kind,
       capturedAt:source.capturedAt,sha256:source.sha256,
       sourceUrlSha256:source.sourceUrlSha256},
     syntheticHtmlSha256:createHash('sha256').update(synthetic).digest('hex'),
     selectorsObserved:safe.length,syntheticNodes:htmlNodes.length,
+    syntheticSelectorRoundtripVerified:true,
     sourceTextRetained:false,sourcePricesRetained:false,originalHtmlRetained:false,
     humanReviewRequired:true,productionEnabled:false,published:false}
   return {synthetic,manifest}
