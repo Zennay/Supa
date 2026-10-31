@@ -967,3 +967,35 @@ test('actual private SHA-pinned product replay parses browser-valid semicolonles
   assert.equal(replay.readyForIngestion,false)
   assert.equal(replay.published,false)
 })
+
+// The durable, SHA-backed selector stability archive must preserve genuinely
+// observed data-test/data-qa semantic identity across DOM tag changes.
+for (const [retailer,kind,sourceUrl] of [
+  ['plus','catalog','https://www.plus.nl/producten'],
+  ['dekamarkt','offers','https://www.dekamarkt.nl/aanbiedingen'],
+]) {
+  test(`${retailer}: two 0600 HTML captures preserve six data-test/data-qa tokens through private stability review`,async t=>{
+    const fields=[['product','product_card'],['name','product_name'],
+      ['price','price_value'],['pack','pack_size'],
+      ['offer','offer_label'],['availability','stock_availability']]
+    const make=tag=>'<main>'+fields.map(([,token])=>
+      `<${tag} data-test="${token}" data-qa="${token}">SYNTHETIC_PRIVATE</${tag}>`).join('')+'</main>'
+    const before=await archivedSelectorPage(t,retailer,kind,sourceUrl,make('span'))
+    const after=await archivedSelectorPage(t,retailer,kind,sourceUrl,make('section'))
+    const reviewFile=before.replace('captured.html','six-portable-tokens.json')
+    const receipt=await savePrivateSelectorStabilityArchive([before,after],reviewFile)
+    const archive=JSON.parse(await readFile(reviewFile,'utf8'))
+    assert.equal(receipt.sampleCount,2)
+    assert.equal(receipt.stableCandidateCount,0)
+    for(const [field,token] of fields)
+      for(const attribute of ['data-test','data-qa'])
+        assert.ok(archive.stablePortableTokenCandidates.some(x=>
+          x.field===field && x.selector===`[${attribute}="${token}"]` &&
+          x.observedInSnapshots===2 && x.derivedFromActualHtmlTokens===true),
+        `${field} ${attribute} lost in stable portable source evidence`)
+    assert.equal(archive.automatedSelectorPromotion,false)
+    assert.equal(archive.productionEnabled,false)
+    assert.equal(archive.priceExtractionEnabled,false)
+    assert.doesNotMatch(JSON.stringify(receipt),/product_card|price_value|data-test|data-qa|SYNTHETIC_PRIVATE/)
+  })
+}

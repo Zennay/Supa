@@ -261,11 +261,12 @@ export async function savePrivateSelectorStabilityArchive(htmlFiles, reviewFile)
       } else counts.set(key, {field:row.field, selector:row.selector,
         observedInSnapshots:1, minMatchesPerSnapshot:row.instances,
         maxMatchesPerSnapshot:row.instances, status:'needs-human-review'})
-      // Stable class/data-testid/itemprop tokens can survive DOM tag changes.
+      // Stable source-observed class and generic data-test/qa/testid/itemprop
+      // tokens can survive DOM tag changes without inventing a CSS selector.
       // Normalize only tokens OBSERVED in each actual snapshot; these hints
       // remain private, human-reviewed and never auto-applied.
       const classToken = /^[a-z][a-z0-9-]*\.([a-z][a-z0-9_-]{1,59})$/i.exec(row.selector)?.[1]
-      const attribute = /^[a-z][a-z0-9-]*\[(data-testid|itemprop)="([a-z][a-z0-9_-]{1,59})"\]$/i.exec(row.selector)
+      const attribute = /^[a-z][a-z0-9-]*\[(data-testid|data-test|data-qa|itemprop)="([a-z][a-z0-9_-]{1,59})"\]$/i.exec(row.selector)
       const token = classToken ? '.'+classToken : attribute
         ? '['+attribute[1]+'="'+attribute[2]+'"]' : null
       if (token) {
