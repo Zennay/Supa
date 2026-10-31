@@ -30,9 +30,10 @@ function readData(object: object, key: string): unknown {
 
 function isProductType(raw: unknown): boolean {
   const values = Array.isArray(raw) ? raw : [raw]
-  return values.some(
-    (value) => typeof value === 'string' && value.toLowerCase() === 'product',
-  )
+  // Schema.org class terms are case-sensitive. A lower-case "product"
+  // node cannot borrow an official Product elsewhere in the same graph to
+  // inject a conflicting price for the captured source URL.
+  return values.some((value) => value === 'Product')
 }
 
 function productNodes(jsonLd: unknown): DataObject[] {
@@ -60,10 +61,17 @@ function productNodes(jsonLd: unknown): DataObject[] {
       result.push(record)
       if (result.length > 32) throw new Error('too many Product nodes')
     }
-    const graph = readData(record, '@graph')
-    if (graph !== undefined) {
-      if (!Array.isArray(graph)) throw new Error('invalid @graph')
-      inspect(graph, depth + 1)
+    // WebPage.mainEntity and ItemList.itemListElement[].item are standard
+    // Schema.org Product placements, not invented selectors. Inspect their
+    // actual nested objects while retaining the same bounded all-Product
+    // ambiguity policy as a top-level @graph.
+    for (const key of ['@graph', 'mainEntity', 'itemListElement', 'item']) {
+      const child = readData(record, key)
+      if (child === undefined) continue
+      if (key === '@graph' && !Array.isArray(child)) {
+        throw new Error('invalid @graph')
+      }
+      inspect(child, depth + 1)
     }
   }
   inspect(jsonLd, 0)
@@ -133,9 +141,17 @@ function trustedRetailerProductSource(source: SourceSnapshotRef): string | null 
   const expected = hosts[source.supermarket]
   if (!expected) return null
   const parsed = new URL(href)
+  // This price parser is also called directly on historical private HTML.
+  // It must not promote a URL the one-page M1 capture and offline selector
+  // readers refuse. Mirror isAllowedM1RetailerSourcePath's product path:
+  // no duplicate slash, encoded separator/dot/double-encoding or controls.
+  const path = parsed.pathname
+  const ambiguous = /%(?:2f|5c|2e|25|0[0-9a-f]|1[0-9a-f]|7f)/i.test(path) ||
+    path.includes('\\')
   return parsed.hostname === expected.host && parsed.port === '' &&
-    parsed.pathname.startsWith(expected.route) &&
-    parsed.pathname.length > expected.route.length ? href : null
+    !parsed.search && !parsed.hash && !ambiguous &&
+    path.startsWith(expected.route) && path.length > expected.route.length &&
+    path[expected.route.length] !== '/' ? href : null
 }
 
 /**
@@ -159,6 +175,15 @@ export function parseSchemaOrgProductForPage(
 
     if (products.length === 1) {
       const declared = readData(products[0], 'url')
+      // The legacy URL-less case applies only to a standalone Product
+      // document (or an actual top-level block). A nested ItemList
+      // recommendation is NOT evidence that the page's own item costs that
+      // price, even when it is the only Product in the JSON-LD graph.
+      const standalone = jsonLd === products[0] ||
+        (Array.isArray(jsonLd) && jsonLd.some(item => item === products[0]))
+      if (declared === undefined && !standalone) {
+        return refuses('nested Product lacks captured page URL')
+      }
       if (declared !== undefined &&
           normalizedHttpsUrl(declared) !== sourceUrl) {
         return refuses('Product URL disagrees with captured page')

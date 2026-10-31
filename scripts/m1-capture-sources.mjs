@@ -1,9 +1,12 @@
 import { createHash } from 'node:crypto'
-import { mkdir, writeFile, readFile } from 'node:fs/promises'
+import { mkdir, readFile, open, lstat } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 import path from 'node:path'
 
 import { evaluateSourcePermissionGate } from './m1-check-source-permission-gate.mjs'
+import { isAllowedM1RetailerSourcePath } from './retailer-source-route-safety.mjs'
+import { scanOfflineRetailerMarkup } from './retailer-offline-structural-scan.mjs'
+import { assertNoSymlinkedM3OutputParents } from './m3-source-output-preservation.mjs'
 
 export const SOURCES = [
   {
@@ -76,20 +79,23 @@ export function validateSources(sources = SOURCES) {
     ids.add(source.id)
 
     const host = expectedHost(source.supermarket)
+    if (!SUPPORTED_KINDS.has(source.kind)) {
+      throw new Error(`Unsupported source kind: ${source.kind}`)
+    }
     const url = new URL(source.url)
     if (
       url.protocol !== 'https:' ||
       url.hostname !== host ||
       url.port !== '' ||
       url.username !== '' ||
-      url.password !== ''
+      url.password !== '' ||
+      url.search !== '' || url.hash !== '' ||
+      url.href !== source.url ||
+      !isAllowedM1RetailerSourcePath(source.supermarket, source.kind, url.pathname)
     ) {
       throw new Error(
         `Source does not match supermarket allowlist (${source.supermarket} -> https://${host}): ${source.url}`,
       )
-    }
-    if (!SUPPORTED_KINDS.has(source.kind)) {
-      throw new Error(`Unsupported source kind: ${source.kind}`)
     }
   }
   return true
@@ -109,6 +115,84 @@ function isHtmlContentType(value) {
   return mediaType === 'text/html' || mediaType === 'application/xhtml+xml'
 }
 
+// A capture is a retained source artifact, not just a transient response.
+// Refuse wrong encodings, archive opt-outs and redirects before writing bytes.
+// This helper has NO I/O and can be exercised with synthetic source HTML.
+export function assertArchivableRetailerHtml(body, contentType) {
+  if (!isHtmlContentType(contentType) || typeof body !== 'string' ||
+      !body || body.startsWith('\uFEFF') || body.includes('\u0000') ||
+      Buffer.byteLength(body, 'utf8') > MAX_BYTES) {
+    throw new Error('Unacceptable retailer HTML source bytes')
+  }
+  const parameters = contentType.split(';').slice(1).map(p=>p.trim()).filter(Boolean)
+  if (!parameters.every(p=>/^charset\s*=\s*["']?utf-?8["']?$/i.test(p)) ||
+      parameters.length > 1) throw new Error('Ambiguous retailer HTML charset')
+  const scanned = scanOfflineRetailerMarkup(body)
+  if (scanned.hasMetaRefresh || scanned.hasMetaNoStore ||
+      scanned.hasMetaNoArchive || scanned.hasConflictingCharset)
+    throw new Error('Retailer HTML disallows reliable snapshot archival')
+  return Buffer.byteLength(body, 'utf8')
+}
+
+// Streaming byte cap protects the VPS even when a retailer sends no reliable
+// Content-Length or a decompressed payload larger than its advertised size.
+// Decode only AFTER bounding original bytes; no replacement UTF-8 characters.
+export async function readBoundedRetailerUtf8Response(response) {
+  const body = response?.body
+  if (!body || typeof body.getReader !== 'function')
+    throw new Error('Missing streamed retailer response body')
+  const reader = body.getReader()
+  const chunks = []
+  let bytes = 0
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      if (!(value instanceof Uint8Array)) throw new Error('Invalid retailer response chunk')
+      bytes += value.byteLength
+      if (bytes > MAX_BYTES) throw new Error('Retailer HTML response exceeded cap')
+      chunks.push(value)
+    }
+  } catch (error) {
+    try { await reader.cancel() } catch { /* transport already failed */ }
+    throw error
+  } finally { reader.releaseLock() }
+  const raw = Buffer.concat(chunks, bytes)
+  if (raw.length >= 3 && raw[0] === 0xef && raw[1] === 0xbb && raw[2] === 0xbf)
+    throw new Error('Retailer HTML BOM not allowed')
+  return new TextDecoder('utf-8', { fatal: true }).decode(raw)
+}
+
+// Authorized capture artifacts are private source evidence, not web assets.
+// Create new files only: no replay may silently overwrite the original HTML.
+async function ensurePrivateM1Directory(folder) {
+  await assertNoSymlinkedM3OutputParents(path.join(folder, '.probe'))
+  await mkdir(folder, { recursive: true, mode: 0o700 })
+  const info = await lstat(folder)
+  if (!info.isDirectory() || info.isSymbolicLink() || (info.mode & 0o077))
+    throw new Error('Private M1 archive requires owner-only directories')
+}
+async function writePrivateM1File(file, body) {
+  await assertNoSymlinkedM3OutputParents(file)
+  const folder = path.dirname(file)
+  await ensurePrivateM1Directory(folder)
+  const handle = await open(file, 'wx', 0o600)
+  try {
+    await handle.writeFile(body, 'utf8')
+    await handle.sync()
+  } finally { await handle.close() }
+}
+// Local-only helper for owned/synthetic HTML. Does NOT request permission or
+// perform HTTP; the caller of captureSource still enforces the real grant.
+export async function storePrivateM1SourceFixture(rootDir, source, body, contentType) {
+  validateSources([source])
+  assertArchivableRetailerHtml(body, contentType)
+  await ensurePrivateM1Directory(rootDir)
+  const file = path.join(rootDir, source.supermarket, `${source.id}.html`)
+  await writePrivateM1File(file, body)
+  return { stored: true, retailerId: source.supermarket, kind: source.kind }
+}
+
 async function captureSource(source, rootDir) {
   const capturedAt = new Date().toISOString()
   const controller = new AbortController()
@@ -126,7 +210,8 @@ async function captureSource(source, rootDir) {
 
   try {
     const response = await fetch(source.url, {
-      redirect: 'follow',
+      // Never follow an unapproved hostname or path before URL verification.
+      redirect: 'error',
       signal: controller.signal,
       headers: {
         accept: 'text/html,application/xhtml+xml',
@@ -163,8 +248,13 @@ async function captureSource(source, rootDir) {
       throw new Error(`Declared response size exceeded ${MAX_BYTES} bytes: ${contentLength}`)
     }
 
-    const body = await response.text()
-    const bytes = Buffer.byteLength(body, 'utf8')
+    // Refuse error/anti-bot/JSON responses BEFORE retaining raw HTML bytes.
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    if (!isHtmlContentType(contentType))
+      throw new Error(`Unexpected content type: ${contentType || 'missing'}`)
+
+    const body = await readBoundedRetailerUtf8Response(response)
+    const bytes = assertArchivableRetailerHtml(body, contentType)
     Object.assign(metadata, {
       finalUrl: response.url,
       status: response.status,
@@ -180,16 +270,7 @@ async function captureSource(source, rootDir) {
       throw new Error(`Response exceeded ${MAX_BYTES} bytes: ${bytes}`)
     }
 
-    const dir = path.join(rootDir, source.supermarket)
-    await mkdir(dir, { recursive: true })
-    await writeFile(path.join(dir, `${source.id}.html`), body, 'utf8')
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`)
-    }
-    if (!isHtmlContentType(contentType)) {
-      throw new Error(`Unexpected content type: ${contentType || 'missing'}`)
-    }
+    await storePrivateM1SourceFixture(rootDir, source, body, contentType)
 
     return { ...metadata, success: true }
   } catch (error) {
@@ -218,7 +299,7 @@ export async function main() {
   const rootDir = process.env.SUPA_CAPTURE_DIR ||
     path.join('artifacts', 'm1-captures', safeTimestamp(startedAt))
 
-  await mkdir(rootDir, { recursive: true })
+  await ensurePrivateM1Directory(rootDir)
   const results = []
 
   for (const source of SOURCES) {
@@ -238,10 +319,9 @@ export async function main() {
     results,
   }
 
-  await writeFile(
+  await writePrivateM1File(
     path.join(rootDir, 'manifest.json'),
     JSON.stringify(manifest, null, 2) + '\n',
-    'utf8',
   )
 
   if (manifest.failureCount > 0) {

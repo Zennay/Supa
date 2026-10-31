@@ -30,7 +30,7 @@ for (const file of files) {
     const initial = ingestReviewedEvidence(original)
     assert.equal(initial.accepted, true, 'original reviewed historical fixture still accepted')
 
-    for (const minutes of [0, 60, 330, 345, -300, -750, 840, -840]) {
+    for (const minutes of [0, 60, 330, 345, -300, -690, 840, -720]) {
       const candidate = structuredClone(original)
       candidate.source.capturedAt = sameInstantInOffset(original.source.capturedAt, minutes)
       const result = ingestReviewedEvidence(candidate)
@@ -40,7 +40,7 @@ for (const file of files) {
         row.provenance.capturedAt === candidate.source.capturedAt), true)
     }
 
-    for (const minutes of [841, -841, 900, -900, 1380, -1439]) {
+    for (const minutes of [841, -750, -840, -841, 900, -900, 1380, -1439]) {
       const candidate = structuredClone(original)
       candidate.source.capturedAt = sameInstantInOffset(original.source.capturedAt, minutes)
       const result = ingestReviewedEvidence(candidate)

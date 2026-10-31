@@ -4,6 +4,12 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import { parseSchemaOrgProduct } from '../src/data/schemaOrgProduct.ts'
+import { scanOfflineRetailerMarkup, hasVerifiedSchemaProduct } from './retailer-offline-structural-scan.mjs'
+import { assertObservedRetailerHtmlIdentity } from './retailer-offline-selector-discovery.mjs'
+import { isAllowedM1RetailerSourcePath } from './retailer-source-route-safety.mjs'
+import { admittedJsonScriptType, admittedRetailerScriptId } from './retailer-json-script-mime.mjs'
+import { parseUniqueKeyRetailerJson } from './retailer-private-unique-key-json.mjs'
+import { decodeExactRetailerHtmlBytes } from './retailer-private-html-byte-identity.mjs'
 
 function sha256(text) {
   return createHash('sha256').update(text).digest('hex')
@@ -17,6 +23,26 @@ function isSafePathSegment(value) {
   )
 }
 
+function admittedSourceUrl(record) {
+  const hosts={plus:'www.plus.nl',dekamarkt:'www.dekamarkt.nl',ah:'www.ah.nl'}
+  const raw=record.requestedUrl
+  if (!Object.hasOwn(hosts,record.supermarket) || typeof raw !== 'string' ||
+      (record.finalUrl != null && record.finalUrl !== raw))
+    throw new Error('Capture source URL identity or redirect mismatch')
+  let url
+  try { url=new URL(raw) } catch { throw new Error('Invalid capture source URL') }
+  const path=url.pathname
+  const route=record.supermarket==='ah'
+    ? record.kind==='product' && path.startsWith('/producten/product/') &&
+      path.length > '/producten/product/'.length
+    : ['product','catalog','offers'].includes(record.kind) &&
+      isAllowedM1RetailerSourcePath(record.supermarket,record.kind,path)
+  if (url.protocol!=='https:' || url.hostname!==hosts[record.supermarket] ||
+      url.port || url.username || url.password || url.search || url.hash ||
+      url.href!==raw || !route) throw new Error('Unapproved capture source URL identity')
+  return raw
+}
+
 function decodeHtmlEntities(value) {
   return value
     .replace(/&quot;/g, '"')
@@ -26,19 +52,32 @@ function decodeHtmlEntities(value) {
     .replace(/&gt;/g, '>')
 }
 
-export function extractJsonLdValues(html) {
-  const values = []
-  const pattern =
-    /<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi
+function liveEmbeddedScripts(html) {
+  // Inspect only live DOM scripts, never template/comment/quoted attribute text.
+  // Reuse the source scanner that guards the private capture replay path.
+  return scanOfflineRetailerMarkup(html,{includeScripts:true}).scripts
+}
 
-  for (const match of html.matchAll(pattern)) {
-    const raw = match[1].trim()
-    if (!raw) continue
-    try {
-      values.push(JSON.parse(raw))
-    } catch {
-      values.push({ __supaParseError: true })
+export function extractJsonLdValues(html) {
+  const values=[]
+  let jsonLdScriptCount=0
+  let scripts
+  try { scripts=liveEmbeddedScripts(html) } catch { return [{__supaParseError:true}] }
+  for(const script of scripts) {
+    const type=admittedJsonScriptType(script.attrs.get('type'))
+    if (type === null) { values.push({__supaParseError:true}); continue }
+    if(type !== 'application/ld+json') continue
+    // A partial set of more than 16 JSON-LD scripts is not source evidence.
+    if (++jsonLdScriptCount > 16) {
+      values.push({__supaParseError:true})
+      break
     }
+    if(script.attrs.has('src') || !script.content.trim()) {
+      values.push({__supaParseError:true})
+      continue
+    }
+    try { values.push(parseUniqueKeyRetailerJson(script.content.trim())) }
+    catch { values.push({__supaParseError:true}) }
   }
   return values
 }
@@ -69,21 +108,16 @@ export function inspectHtml(html) {
     }
   }
 
-  const hasNextData =
-    /<script\b[^>]*id=["']__NEXT_DATA__["'][^>]*>[\s\S]*?<\/script>/i.test(html)
-
-  const applicationJsonScripts = Array.from(
-    html.matchAll(
-      /<script\b([^>]*)type=["']application\/json["']([^>]*)>([\s\S]*?)<\/script>/gi,
-    ),
-  ).map((match) => {
-    const attrs = `${match[1]} ${match[2]}`
-    const id = attrs.match(/\bid=["']([^"']+)["']/i)?.[1] ?? null
-    return {
-      id,
-      bytes: Buffer.byteLength(match[3], 'utf8'),
-    }
-  })
+  let scripts=[]
+  try { scripts=liveEmbeddedScripts(html) } catch { /* source refused */ }
+  const applicationJsonScripts = scripts.filter(script =>
+    !script.attrs.has('src') &&
+    admittedJsonScriptType(script.attrs.get('type'))==='application/json')
+    .map(script=>({
+      id:admittedRetailerScriptId(script.attrs.get('id')) ?? null,
+      bytes:Buffer.byteLength(script.content,'utf8'),
+    }))
+  const hasNextData=applicationJsonScripts.some(script=>script.id==='__NEXT_DATA__')
 
   return {
     title,
@@ -95,7 +129,11 @@ export function inspectHtml(html) {
 
 export async function inspectCaptureDirectory(rootDir) {
   const manifestPath = path.join(rootDir, 'manifest.json')
-  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+  const manifestBytes = await readFile(manifestPath)
+  if (manifestBytes.length > 512 * 1024) throw new Error('Capture manifest is oversized')
+  const manifest = parseUniqueKeyRetailerJson(
+    new TextDecoder('utf-8', { fatal: true }).decode(manifestBytes),512 * 1024)
+
 
   if (manifest.milestone !== 'M1 Data Feasibility') {
     throw new Error(`Unexpected milestone: ${manifest.milestone}`)
@@ -138,9 +176,12 @@ export async function inspectCaptureDirectory(rootDir) {
     }
 
     if (result.success) {
+      const sourceUrl=admittedSourceUrl(result)
       const htmlPath = path.join(rootDir, result.supermarket, `${result.id}.html`)
-      const html = await readFile(htmlPath, 'utf8')
-      const actualSha256 = sha256(html)
+      // Hash the immutable ORIGINAL bytes. Decoding with replacement chars
+      // before hashing could make a forged manifest refer to different HTML.
+      const rawHtml = await readFile(htmlPath)
+      const actualSha256 = sha256(rawHtml)
 
       if (!result.sha256 || result.sha256 !== actualSha256) {
         throw new Error(
@@ -148,18 +189,28 @@ export async function inspectCaptureDirectory(rootDir) {
         )
       }
 
+      const html = decodeExactRetailerHtmlBytes(rawHtml,5 * 1024 * 1024)
+      const observed=scanOfflineRetailerMarkup(html)
+      if (observed.baseHrefs.length>1 || observed.canonicalHrefs.length>1)
+        throw new Error('Ambiguous capture canonical or base identity')
+      assertObservedRetailerHtmlIdentity(sourceUrl,observed.baseHrefs,observed.canonicalHrefs)
       record.integrity = 'verified'
       record.html = inspectHtml(html)
 
       const provenance = {
         supermarket: result.supermarket,
         kind: result.kind,
-        url: result.finalUrl ?? result.requestedUrl,
+        url: sourceUrl,
         capturedAt: result.capturedAt,
         sha256: result.sha256,
       }
-      const schemaResults = extractJsonLdValues(html)
-        .filter((value) => !value?.__supaParseError)
+      const parsedBlocks=extractJsonLdValues(html)
+      const invalidScriptEvidence=parsedBlocks.some(value=>value?.__supaParseError===true)
+      const schemaResults = (invalidScriptEvidence ? [] : parsedBlocks)
+        // The generic Product parser accepts legacy short names. At the M1
+        // source boundary, require explicit official Schema.org context or
+        // absolute Product IRI before even proposing a priced observation.
+        .filter((value) => !value?.__supaParseError && hasVerifiedSchemaProduct(value))
         .map((value) => parseSchemaOrgProduct(value, provenance))
 
       const observations = schemaResults.filter(
@@ -174,9 +225,11 @@ export async function inspectCaptureDirectory(rootDir) {
           : {
               type: 'abstain',
               reasons:
-                observations.length > 1
-                  ? ['multiple independently parseable Product JSON-LD blocks']
-                  : schemaResults.map((value) => value.reason).filter(Boolean),
+                invalidScriptEvidence
+                  ? ['invalid or excessive JSON-LD source evidence']
+                  : observations.length > 1
+                    ? ['multiple independently parseable Product JSON-LD blocks']
+                    : schemaResults.map((value) => value.reason).filter(Boolean),
             }
     }
 
@@ -208,8 +261,16 @@ export async function main() {
 
   const report = await inspectCaptureDirectory(rootDir)
   const outputPath = path.join(rootDir, 'inspection.json')
-  await writeFile(outputPath, JSON.stringify(report, null, 2) + '\n', 'utf8')
-  console.log(JSON.stringify(report, null, 2))
+  // Raw inspected product names, SKUs and unverified prices belong only in
+  // the permission-gated local report, never in shared CI console logs.
+  // Exclusive creation keeps reruns from replacing a reviewer's evidence.
+  await writeFile(outputPath, JSON.stringify(report, null, 2) + '\n',
+    {flag:'wx',mode:0o600})
+  console.log(JSON.stringify({milestone:report.milestone,
+    sourceCount:report.sourceCount,successCount:report.successCount,
+    failureCount:report.failureCount,
+    integrityVerifiedCount:report.integrityVerifiedCount,
+    privateReportWritten:true,pricesPublished:false}))
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

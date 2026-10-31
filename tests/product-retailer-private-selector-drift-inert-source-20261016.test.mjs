@@ -136,3 +136,17 @@ test('private selector-drift CLI refuses hostile argv before resolving any path'
   symbolized[Symbol('hidden')] = 'unreviewed'
   await assert.rejects(main(symbolized), denied)
 })
+
+test('private drift refuses absolute or relative product roots from another retailer', () => {
+  const before = original()
+  for (const selector of [
+    'a[href^="/producten/"]',
+    'a[href^="https://www.dekamarkt.nl/producten/"]',
+    'a[href^="//www.dekamarkt.nl/producten/"]',
+  ]) {
+    const forged = structuredClone(later())
+    forged.selectors.push({ field: 'product', selector,
+      instances: 1, status: 'needs-human-review' })
+    assert.throws(() => compareOfflineSelectorProposals(before, forged), denied)
+  }
+})

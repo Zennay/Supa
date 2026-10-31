@@ -173,3 +173,139 @@ test('rejects unsafe supermarket path segments before reading HTML', async () =>
     /Unsafe capture supermarket path segment/,
   )
 })
+
+test('M1 source inspection accepts only real DOM JSON-LD/Nuxt scripts, not inert or forged script text',()=>{
+  const actual='<script type="application/ld+json&#59;charset=UTF-8">{"@context":"https://schema.org","@type":"Product","name":"SYNTHETIC"}</script>'
+  const inert='<template><script type="application/ld+json">{"@type":"Offer","price":0.01}</script></template>'
+  const spoof='<div data-copy="<script type=\'application/ld+json\'>{&quot;@type&quot;:&quot;Offer&quot;}</script>"></div>'
+  const nested='<script id="__NEXT&#95;DATA__" type="application/json">{"props":{}}</script>'
+  const html='<!doctype html><body>'+inert+'<!--<script type="application/ld+json">{"@type":"Offer"}</script>-->'+spoof+actual+nested+'</body>'
+  const report=inspectHtml(html)
+  assert.deepEqual(report.jsonLd.map(x=>x.type),[['Product']])
+  assert.equal(report.hasNextData,true)
+  assert.deepEqual(report.applicationJsonScripts,[{id:'__NEXT_DATA__',bytes:12}])
+})
+
+test('M1 original inspector marks duplicate JSON keys, malformed data MIME and external JSON scripts invalid',()=>{
+  const html='<script type="application/ld+json">{"@context":"https://schema.org","@type":"Offer","@type":"Product"}</script>'+
+    '<script type="application/ld+json; charset=latin1">{"@type":"Offer"}</script>'+
+    '<script type="application/ld+json" src="https://outside.invalid/json">{"@type":"Product"}</script>'
+  const report=inspectHtml(html)
+  assert.ok(report.jsonLd.length>=2)
+  assert.ok(report.jsonLd.every(x=>x.parseError===true))
+  assert.equal(report.hasNextData,false)
+})
+
+test('M1 captured HTML inspection refuses invalid original UTF-8 even if manifest hashes decoded replacement text',async()=>{
+  const {rm}=await import('node:fs/promises')
+  const root=await mkdtemp(path.join(os.tmpdir(),'supa-m1-byte-provenance-'))
+  try {
+    await mkdir(path.join(root,'plus'))
+    for(const raw of [Buffer.from('<html><head><title>OK</title></head><body>\ufffd</body></html>','utf8'),Buffer.from([0xef,0xbb,0xbf,...Buffer.from('<html><title>OK</title></html>')])]) {
+      const isBOM=raw[0]===0xef
+      const bytes=isBOM?raw:Buffer.concat([Buffer.from('<html><head><title>OK</title></head><body>'),Buffer.from([0xc3,0x28]),Buffer.from('</body></html>')])
+      await writeFile(path.join(root,'plus','plus-catalog.html'),bytes)
+      const fakeDigest=createHash('sha256').update(bytes.toString('utf8')).digest('hex')
+      const originalDigest=createHash('sha256').update(bytes).digest('hex')
+      for(const digest of [fakeDigest,originalDigest]) {
+        await writeFile(path.join(root,'manifest.json'),JSON.stringify({milestone:'M1 Data Feasibility',bounded:true,sourceCount:1,results:[{id:'plus-catalog',supermarket:'plus',kind:'catalog',requestedUrl:'https://www.plus.nl/producten',finalUrl:'https://www.plus.nl/producten',capturedAt:'2026-10-04T00:00:00.000Z',sha256:digest,success:true}]}))
+        await assert.rejects(inspectCaptureDirectory(root),/UTF-8|BOM|encoding|integrity|source bytes/i)
+      }
+    }
+  } finally {await rm(root,{recursive:true,force:true})}
+})
+
+test('M1 captured manifest duplicate identities cannot be laundered by JSON last-key-wins',async()=>{
+  const {rm}=await import('node:fs/promises')
+  const root=await mkdtemp(path.join(os.tmpdir(),'supa-m1-duplicate-manifest-'))
+  try {
+    await writeFile(path.join(root,'manifest.json'),'{"milestone":"INVALID","milestone":"M1 Data Feasibility","bounded":true,"sourceCount":0,"results":[]}')
+    await assert.rejects(inspectCaptureDirectory(root),/ambiguous|duplicate|manifest|JSON/i)
+  } finally {await rm(root,{recursive:true,force:true})}
+})
+
+test('M1 capture inspection refuses unscoped fake Product price while retaining official-context source evidence',async()=>{
+  const {rm}=await import('node:fs/promises')
+  const root=await mkdtemp(path.join(os.tmpdir(),'supa-m1-schema-origin-'))
+  try {
+    await mkdir(path.join(root,'plus'))
+    const product={'@type':'Product',name:'SYNTHETIC',sku:'TEST',offers:{'@type':'Offer',price:'1.99',priceCurrency:'EUR',availability:'https://schema.org/InStock'}}
+    for(const official of [false,true]) {
+      const body=official?{'@context':'https://schema.org',...product}:product
+      const html='<script type="application/ld+json">'+JSON.stringify(body)+'</script>'
+      await writeFile(path.join(root,'plus','plus-product.html'),html)
+      await writeFile(path.join(root,'manifest.json'),JSON.stringify({milestone:'M1 Data Feasibility',bounded:true,sourceCount:1,results:[{id:'plus-product',supermarket:'plus',kind:'product',requestedUrl:'https://www.plus.nl/product/test',finalUrl:'https://www.plus.nl/product/test',capturedAt:'2026-10-04T00:00:00.000Z',sha256:createHash('sha256').update(html).digest('hex'),success:true}]}))
+      const review=await inspectCaptureDirectory(root)
+      assert.equal(review.sources[0].schemaOrgProduct.type,official?'observation':'abstain')
+      if(official)assert.equal(review.sources[0].schemaOrgProduct.observation.currentPriceCents,199)
+    }
+  } finally {await rm(root,{recursive:true,force:true})}
+})
+
+test('M1 inspection binds archived product bytes to one verified retailer URL and DOM canonical',async()=>{
+  const {rm}=await import('node:fs/promises')
+  const root=await mkdtemp(path.join(os.tmpdir(),'supa-m1-real-identity-'))
+  try {
+    await mkdir(path.join(root,'plus'))
+    const goodUrl='https://www.plus.nl/product/test'
+    const write=async(html,finalUrl=goodUrl)=>{
+      await writeFile(path.join(root,'plus','plus-product.html'),html)
+      await writeFile(path.join(root,'manifest.json'),JSON.stringify({milestone:'M1 Data Feasibility',bounded:true,sourceCount:1,results:[{id:'plus-product',supermarket:'plus',kind:'product',requestedUrl:goodUrl,finalUrl,capturedAt:'2026-10-04T00:00:00.000Z',sha256:createHash('sha256').update(html).digest('hex'),success:true}]}))
+    }
+    const product='<script type="application/ld+json">'+JSON.stringify({'@context':'https://schema.org','@type':'Product',name:'SYNTHETIC',sku:'TEST',offers:{'@type':'Offer',price:'1.99',priceCurrency:'EUR'}})+'</script>'
+    await write('<html><link rel="canonical" href="'+goodUrl+'">'+product+'</html>')
+    assert.equal((await inspectCaptureDirectory(root)).sources[0].integrity,'verified')
+    for(const wrong of ['https://www.plus.nl/product/other','https://www.dekamarkt.nl/producten/other']){
+      await write('<html>'+product+'</html>',wrong)
+      await assert.rejects(inspectCaptureDirectory(root),/origin|URL|redirect|source|identity/i)
+    }
+    for(const declaration of ['<link rel="canonical" href="https://www.plus.nl/product/other">','<base href="https://other.invalid/">']){
+      await write('<html>'+declaration+product+'</html>')
+      await assert.rejects(inspectCaptureDirectory(root),/canonical|base|origin|source|identity/i)
+    }
+  } finally {await rm(root,{recursive:true,force:true})}
+})
+
+test('one malformed or excessive JSON-LD block prevents a historical priced source observation',async()=>{
+  const {rm}=await import('node:fs/promises')
+  const root=await mkdtemp(path.join(os.tmpdir(),'supa-m1-price-provenance-'))
+  try {
+    await mkdir(path.join(root,'plus'))
+    const product=JSON.stringify({'@context':'https://schema.org','@type':'Product',name:'SYNTHETIC',sku:'TEST',offers:{'@type':'Offer',price:'1.99',priceCurrency:'EUR'}})
+    const block=body=>'<script type="application/ld+json">'+body+'</script>'
+    const parse=async html=>{
+      await writeFile(path.join(root,'plus','plus-product.html'),html)
+      await writeFile(path.join(root,'manifest.json'),JSON.stringify({milestone:'M1 Data Feasibility',bounded:true,sourceCount:1,results:[{id:'plus-product',supermarket:'plus',kind:'product',requestedUrl:'https://www.plus.nl/product/test',finalUrl:'https://www.plus.nl/product/test',capturedAt:'2026-10-04T00:00:00.000Z',sha256:createHash('sha256').update(html).digest('hex'),success:true}]}))
+      return (await inspectCaptureDirectory(root)).sources[0].schemaOrgProduct
+    }
+    assert.equal((await parse(block(product))).type,'observation')
+    for(const markup of [block(product)+block('{bad'),block('{bad')+block(product),Array(17).fill(block(product)).join('')]){
+      const result=await parse(markup)
+      assert.equal(result.type,'abstain')
+    }
+  }finally{await rm(root,{recursive:true,force:true})}
+})
+
+test('M1 inspection CLI prints only aggregate receipt and writes private non-overwriting report',async()=>{
+  const {rm,readFile,stat}=await import('node:fs/promises')
+  const {spawnSync}=await import('node:child_process')
+  const root=await mkdtemp(path.join(os.tmpdir(),'supa-m1-inspector-stdout-'))
+  try {
+    await mkdir(path.join(root,'plus'))
+    const data={'@context':'https://schema.org','@type':'Product',name:'SYNTHETIC_PRIVATE_PRODUCT',sku:'SYNTHETIC_PRIVATE_SKU',offers:{'@type':'Offer',price:'19.99',priceCurrency:'EUR'}}
+    const html='<script type="application/ld+json">'+JSON.stringify(data)+'</script>'
+    await writeFile(path.join(root,'plus','plus-product.html'),html)
+    await writeFile(path.join(root,'manifest.json'),JSON.stringify({milestone:'M1 Data Feasibility',bounded:true,sourceCount:1,results:[{id:'plus-product',supermarket:'plus',kind:'product',requestedUrl:'https://www.plus.nl/product/test',finalUrl:'https://www.plus.nl/product/test',capturedAt:'2026-10-04T00:00:00.000Z',sha256:createHash('sha256').update(html).digest('hex'),success:true}]}))
+    const command=[ '--experimental-strip-types',new URL('../scripts/m1-inspect-captures.mjs',import.meta.url).pathname,root ]
+    const run=()=>spawnSync(process.execPath,command,{encoding:'utf8',timeout:30000})
+    const first=run()
+    assert.equal(first.status,0,first.stderr)
+    assert.doesNotMatch(first.stdout,/SYNTHETIC_PRIVATE|19\.99|1999|www\.plus\.nl|sha256/i)
+    const receipt=JSON.parse(first.stdout)
+    assert.equal(receipt.integrityVerifiedCount,1)
+    assert.equal((await stat(path.join(root,'inspection.json'))).mode & 0o777,0o600)
+    const report=JSON.parse(await readFile(path.join(root,'inspection.json'),'utf8'))
+    assert.equal(report.sources[0].schemaOrgProduct.type,'observation')
+    assert.equal(run().status===0,false,'cannot silently overwrite existing private report')
+  }finally{await rm(root,{recursive:true,force:true})}
+})

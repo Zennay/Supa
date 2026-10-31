@@ -5,6 +5,37 @@ on:
     paths:
       - "scripts/m1-capture-sources.mjs"
       - "scripts/m1-check-source-permission-gate.mjs"
+      - "scripts/retailer-source-route-safety.mjs"
+      - "scripts/retailer-offline-structural-scan.mjs"
+      - "scripts/retailer-html-attribute-references.mjs"
+      - "scripts/retailer-private-html-byte-identity.mjs"
+      - "scripts/retailer-observed-schema-product-selector.mjs"
+      - "scripts/retailer-offline-selector-discovery.mjs"
+      - "scripts/retailer-public-observed-token-fields.mjs"
+      - "scripts/retailer-public-product-href-selectors.mjs"
+      - "scripts/retailer-public-structural-tag.mjs"
+      - "scripts/retailer-approved-capture-selector-bridge.mjs"
+      - "scripts/retailer-approved-deka-nuxt-product.mjs"
+      - "scripts/retailer-approved-html-product-price-candidate.mjs"
+      - "scripts/retailer-approved-html-script-evidence.mjs"
+      - "scripts/retailer-approved-price-archive-run.mjs"
+      - "scripts/retailer-approved-source-review-archive.mjs"
+      - "scripts/retailer-private-selector-drift.mjs"
+      - "scripts/retailer-replay-private-html-product.mjs"
+      - "scripts/retailer-private-structural-fixture.mjs"
+      - "tests/product-retailer-replay-private-html-20261030.test.mjs"
+      - "tests/retailer-private-structural-fixture.test.mjs"
+      - "tests/product-retailer-private-selector-drift-20261015.test.mjs"
+      - "tests/product-retailer-approved-source-review-archive-20261030.test.mjs"
+      - "tests/product-retailer-approved-http-digest-private-archive-20261030.test.mjs"
+      - "scripts/retailer-approved-private-price-snapshot-store.mjs"
+      - "scripts/retailer-approved-snapshot-capture.mjs"
+      - "tests/retailer-approved-snapshot-capture.test.mjs"
+      - "src/data/schemaOrgProductPageSelection.ts"
+      - "src/data/schemaOrgQuantitativePack.ts"
+      - "scripts/retailer-json-script-mime.mjs"
+      - "scripts/retailer-private-unique-key-json.mjs"
+      - "scripts/m3-source-output-preservation.mjs"
       - "evidence/m1/source-permission-gate.v1.json"
       - "tests/m1-capture-sources.test.mjs"
       - "tests/ingestion-contract.test.mjs"
@@ -43,6 +74,7 @@ on:
       - "tests/schema-org-product.test.mjs"
       - "tests/m1-workflow-fork-safety-contract.test.mjs"
       - "tests/m1-workflow-transitive-trigger-closure.test.mjs"
+      - "tests/product-m1-workflow-offline-pr-capture-20261030.test.mjs"
       - ".github/workflows/m1-data-capture.yml"
       - "docs/M1_DATA_FEASIBILITY.md"
   workflow_dispatch:
@@ -92,16 +124,16 @@ jobs:
         run: node scripts/m1-capture-sources.mjs
 
       - name: Inspect capture integrity and structured data
+        if: always() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
         id: inspect
-        if: always()
         run: |
           capture_dir="$(find artifacts/m1-captures -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1)"
           test -n "$capture_dir"
           npm run m1:inspect-captures -- "$capture_dir"
 
       - name: Evaluate capture freshness evidence
+        if: always() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
         id: freshness
-        if: always()
         run: |
           capture_dir="$(find artifacts/m1-captures -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1)"
           test -n "$capture_dir"
@@ -109,7 +141,7 @@ jobs:
 
       - name: Export sanitized product candidates
         id: export
-        if: steps.inspect.outcome == 'success'
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && steps.inspect.outcome == 'success'
         run: |
           capture_dir="$(find artifacts/m1-captures -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1)"
           test -n "$capture_dir"
@@ -117,23 +149,30 @@ jobs:
 
       - name: Build M1 evidence summary
         id: evidence
-        if: steps.inspect.outcome == 'success' && steps.freshness.outcome == 'success' && steps.export.outcome == 'success'
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && steps.inspect.outcome == 'success' && steps.freshness.outcome == 'success' && steps.export.outcome == 'success'
         run: |
           capture_dir="$(find artifacts/m1-captures -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1)"
           test -n "$capture_dir"
           npm run m1:evidence-summary -- "$capture_dir"
 
       - name: Upload capture evidence
-        if: always()
+        if: always() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: supa-m1-source-captures
-          path: artifacts/m1-captures/
+          # Never publish raw .html snapshots in Actions artifacts. Source
+          # bytes remain owner-only on the authorized VPS for offline review.
+          path: |
+            artifacts/m1-captures/**/manifest.json
+            artifacts/m1-captures/**/inspection.json
+            artifacts/m1-captures/**/freshness.json
+            artifacts/m1-captures/**/evidence-summary.json
+            artifacts/m1-captures/**/sanitized-candidates/index.json
           if-no-files-found: error
           retention-days: 14
 
       - name: Fail visibly when capture evidence fails
-        if: steps.capture.outcome != 'success' || steps.inspect.outcome != 'success' || steps.freshness.outcome != 'success' || steps.export.outcome == 'failure' || steps.evidence.outcome == 'failure'
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && (steps.capture.outcome != 'success' || steps.inspect.outcome != 'success' || steps.freshness.outcome != 'success' || steps.export.outcome == 'failure' || steps.evidence.outcome == 'failure')
         run: |
           echo "M1 capture evidence failed. Inspect manifest.json, inspection.json, freshness.json, sanitized-candidates/index.json and evidence-summary.json in the uploaded artifact."
           exit 1

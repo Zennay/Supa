@@ -13,7 +13,7 @@ async function fixture() {
   return JSON.parse(await readFile(fixtureUrl, 'utf8'))
 }
 
-test('parses exact browser-rendered PLUS evidence into a trusted observation', async () => {
+test('historical PLUS source preserves identity but refuses unverified unit-only price', async () => {
   const evidence = await fixture()
   const result = parsePlusRenderedProductEvidence(evidence)
 
@@ -21,7 +21,8 @@ test('parses exact browser-rendered PLUS evidence into a trusted observation', a
   assert.equal(result.observation.supermarket, 'plus')
   assert.equal(result.observation.sourceProductId, '579010')
   assert.equal(result.observation.name, 'Zuivelmeester Halfvolle melk')
-  assert.equal(result.observation.currentPriceCents, 85)
+  assert.equal(result.observation.currentPriceCents, null)
+  assert.equal(result.observation.offer, null)
   assert.deepEqual(result.observation.pack, {
     rawText: '1000 ml',
     amount: 1000,
@@ -32,6 +33,20 @@ test('parses exact browser-rendered PLUS evidence into a trusted observation', a
     result.observation.provenance.sha256,
     'bce1d766ddd5044284104bf9d3247d3302393183ff2ef554fc6d7e5e3e016f5e',
   )
+})
+
+test('synthetic explicit one-offer PLUS pack price produces only an offline observation', async () => {
+  // A trusted capture with a unit-price specification alone cannot show a
+  // checkout total. This additional in-memory price is SYNTHETIC, not a
+  // retailer observation or proof of authorization.
+  const evidence = await fixture()
+  evidence.jsonLd.offers.price = '0.85'
+  evidence.jsonLd.offers.priceCurrency = 'EUR'
+  const result = parsePlusRenderedProductEvidence(evidence)
+  assert.equal(result.type, 'observation')
+  assert.equal(result.observation.currentPriceCents, 85)
+  assert.equal(result.observation.offer.offerPriceCents, 85)
+  assert.equal(result.observation.provenance.url, evidence.source.url)
 })
 
 test('PLUS rendered evidence fails closed when browser provenance drifts', async () => {

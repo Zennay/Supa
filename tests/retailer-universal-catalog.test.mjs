@@ -33,7 +33,9 @@ test('unifies both supermarket capture families with stable retailer scoped IDs 
       assert.match(capture.snapshotSha256, /^[a-f0-9]{64}$/)
       assert.ok(['product', 'catalog', 'offers'].includes(capture.sourceKind))
       assert.equal(capture.currency, 'EUR')
-      assert.ok(Number.isSafeInteger(capture.currentPriceCents))
+      // A reviewed source can identify a product without a payable pack price.
+      assert.ok(capture.currentPriceCents === null ||
+        Number.isSafeInteger(capture.currentPriceCents))
     }
   }
   const second = buildUniversalRetailerCatalog(batch)

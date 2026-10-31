@@ -132,3 +132,695 @@ test('offline selector CLI writes a private new artifact and rejects overwrite a
     await rm(temp, { recursive: true, force: true })
   }
 })
+
+test('legacy M1 selector proposals refuse leading UTF-8 BOM and embedded NUL even with matching SHA', () => {
+  for(const html of ['\uFEFF'+plusHtml,plusHtml+'\u0000']) {
+    assert.throws(()=>proposeRetailerSelectors(source('plus','catalog',html),html),
+      /Offline selector review refused/)
+  }
+  assert.equal(proposeRetailerSelectors(source('plus','catalog',plusHtml),plusHtml)
+    .publicationAllowed,false)
+})
+
+test('legacy captured-source directory refuses invalid UTF-8 with a recomputed SHA manifest', async () => {
+  const dir=await mkdtemp(join(tmpdir(),'supa-legacy-byte-'))
+  try {
+    await mkdir(join(dir,'plus'))
+    const path=join(dir,'plus','fictional-plus-catalog.html')
+    const base=Buffer.from(plusHtml)
+    for(const bytes of [
+      Buffer.concat([Buffer.from([0xef,0xbb,0xbf]),base]),
+      Buffer.concat([base,Buffer.from([0])]),
+      Buffer.concat([base,Buffer.from([0xc3,0x28])]),
+    ]) {
+      await writeFile(path,bytes)
+      const record={...source('plus','catalog',plusHtml),success:true,
+        finalUrl:'https://www.plus.nl/producten',sha256:hash(bytes)}
+      await writeFile(join(dir,'manifest.json'),JSON.stringify({
+        sourceCount:1,results:[record],
+      }))
+      await assert.rejects(proposeFromM1CaptureDirectory(dir),/BOM|encoding|UTF-8/i)
+    }
+    await writeFile(path,base)
+    const record={...source('plus','catalog',plusHtml),success:true,
+      finalUrl:'https://www.plus.nl/producten'}
+    await writeFile(join(dir,'manifest.json'),JSON.stringify({
+      sourceCount:1,results:[record],
+    }))
+    const allowed=await proposeFromM1CaptureDirectory(dir)
+    assert.equal(allowed.analyzedSources,1)
+    assert.equal(allowed.productionEnabled,false)
+  } finally { await rm(dir,{recursive:true,force:true}) }
+})
+
+test('historical M1 import refuses hardlinked HTML or manifest inode aliases', async () => {
+  const { link, unlink } = await import('node:fs/promises')
+  const root=await mkdtemp(join(tmpdir(),'supa-m1-hardlink-'))
+  try {
+    const dir=join(root,'capture')
+    await mkdir(join(dir,'plus'),{recursive:true})
+    const htmlFile=join(dir,'plus','fictional-plus-catalog.html')
+    const manifestFile=join(dir,'manifest.json')
+    const html=plusHtml
+    const record={...source('plus','catalog',html),success:true,
+      finalUrl:'https://www.plus.nl/producten'}
+    await writeFile(htmlFile,html)
+    await writeFile(manifestFile,JSON.stringify({sourceCount:1,results:[record]}))
+    const baseline=await proposeFromM1CaptureDirectory(dir)
+    assert.equal(baseline.selectorSets.length,1)
+    assert.equal(baseline.productionEnabled,false)
+    const htmlAlias=join(root,'html-alias')
+    await link(htmlFile,htmlAlias)
+    await assert.rejects(proposeFromM1CaptureDirectory(dir),/unsafe snapshot inode/)
+    await unlink(htmlAlias)
+    const manifestAlias=join(root,'manifest-alias')
+    await link(manifestFile,manifestAlias)
+    await assert.rejects(proposeFromM1CaptureDirectory(dir),/invalid manifest JSON or file/)
+    await unlink(manifestAlias)
+    assert.equal((await proposeFromM1CaptureDirectory(dir)).analyzedSources,1)
+  } finally {await rm(root,{recursive:true,force:true})}
+})
+
+test('M1 imported source refuses symbolic HTML file with a valid-looking hash', async () => {
+  const dir=await mkdtemp(join(tmpdir(),'supa-m1-symlink-'))
+  try {
+    await mkdir(join(dir,'plus'))
+    const real=join(dir,'actual.html')
+    const alias=join(dir,'plus','fictional-plus-catalog.html')
+    await writeFile(real,plusHtml)
+    await symlink(real,alias)
+    await writeFile(join(dir,'manifest.json'),JSON.stringify({
+      sourceCount:1,results:[{...source('plus','catalog',plusHtml),
+        success:true,finalUrl:'https://www.plus.nl/producten'}],
+    }))
+    await assert.rejects(proposeFromM1CaptureDirectory(dir),/symlink path components not allowed/)
+  } finally {await rm(dir,{recursive:true,force:true})}
+})
+
+test('pinned M1 manifest refuses duplicate or Unicode-aliased source identity keys', async () => {
+  const dir=await mkdtemp(join(tmpdir(),'supa-m1-duplicate-provenance-'))
+  try {
+    await mkdir(join(dir,'plus'))
+    await writeFile(join(dir,'plus','fictional-plus-catalog.html'),plusHtml)
+    const manifest=join(dir,'manifest.json')
+    const data={sourceCount:1,results:[{
+      ...source('plus','catalog',plusHtml),success:true,
+      finalUrl:'https://www.plus.nl/producten',
+    }]}
+    const valid=JSON.stringify(data)
+    assert.equal((await proposeAfter(valid)).analyzedSources,1)
+    const suspicious=[
+      valid.replace('"sourceCount":1','"sourceCount":1,"sourceCount":1'),
+      valid.replace('"sourceCount":1','"sourceCount":1,"\\u0073ourceCount":1'),
+      valid.replace('"sha256":"','"sha256":"'+ '0'.repeat(64)+'","sha256":"'),
+      valid.replace('"requestedUrl":"','"requestedUrl":"https://attacker.invalid","requestedUrl":"'),
+    ]
+    for (const raw of suspicious) {
+      await writeFile(manifest,raw)
+      await assert.rejects(proposeFromM1CaptureDirectory(dir),
+        /Offline selector review refused:/)
+    }
+    await writeFile(manifest,valid)
+    assert.equal((await proposeFromM1CaptureDirectory(dir)).analyzedSources,1)
+    async function proposeAfter(raw) {
+      await writeFile(manifest,raw)
+      return proposeFromM1CaptureDirectory(dir)
+    }
+  } finally {await rm(dir,{recursive:true,force:true})}
+})
+
+test('legacy M1 source review refuses live HTML no-store, charset drift and page redirects', () => {
+  const markup = [
+    '<article class="product-card">SYNTHETIC</article>',
+    '<a href="/product/synthetic-1">SYNTHETIC</a>',
+  ].join('')
+  const html=meta=>'<html><head>'+meta+'</head><body>'+markup+'</body></html>'
+  for (const meta of [
+    '<meta http-equiv="Cache-Control" content="no-store">',
+    '<meta charset="windows-1252">',
+    '<meta http-equiv="Content-Type" content="text/html; charset=latin1">',
+    '<meta http-equiv="refresh" content="0; URL=/redirect">',
+  ]) {
+    const sourceRecord=source('plus','catalog',html(meta))
+    assert.throws(()=>proposeRetailerSelectors(sourceRecord,html(meta)),
+      /source directives prohibit selector review/)
+  }
+  const inert='<template><meta charset="windows-1252"></template>'
+  const valid=html(inert+'<meta charset="UTF-8">')
+  const report=proposeRetailerSelectors(source('plus','catalog',valid),valid)
+  assert.equal(report.readyForScraping,false)
+  assert.ok(report.proposedSelectors.some(row=>row.selector==='article.product-card'))
+})
+
+test('historical source provenance rejects redirects, encoded separators and URL normalization aliases', () => {
+  const valid=source('plus','catalog',plusHtml)
+  const explicit={...valid,finalUrl:valid.requestedUrl}
+  assert.equal(proposeRetailerSelectors(explicit,plusHtml).readyForScraping,false)
+  for(const mutate of [
+    x=>{x.finalUrl='https://www.plus.nl/aanbiedingen'},
+    x=>{x.requestedUrl='https://www.plus.nl/producten/%2fsecret'},
+    x=>{x.requestedUrl='https://www.plus.nl:443/producten'},
+    x=>{x.requestedUrl='https://www.plus.nl/producten/../login'},
+    x=>{x.requestedUrl='https://www.plus.nl/producten/%252fsecret'},
+  ]) {
+    const candidate={...valid}
+    mutate(candidate)
+    assert.throws(()=>proposeRetailerSelectors(candidate,plusHtml),
+      /Offline selector review refused:/)
+  }
+})
+
+test('legacy capture review ignores foreign JSON-LD vocabularies as Schema.org proof',()=>{
+  const cases=[
+    {'@context':'https://foreign.invalid/','@type':'Product',name:'PRIVATE'},
+    {'@context':['https://schema.org/','https://foreign.invalid/'],
+      '@type':'Product',offers:{'@type':'Offer',price:77}},
+    {'@context':{'@vocab':'https://foreign.invalid/'},
+      '@type':'Product',price:77},
+  ]
+  for(const data of cases) {
+    const html='<html><body><script type="application/ld+json">'+
+      JSON.stringify(data)+'</script></body></html>'
+    const report=proposeRetailerSelectors(source('plus','catalog',html),html)
+    assert.deepEqual(report.embeddedSignals.jsonLdTypes,[])
+    assert.equal(report.currentPricesExtracted,false)
+    assert.equal(report.readyForScraping,false)
+  }
+})
+test('legacy source review preserves valid inherited Schema.org graph types without product data',()=>{
+  const html='<html><body><script type="application/ld+json">'+
+    JSON.stringify({'@context':'https://schema.org/',
+      '@graph':[{'@type':'Product',name:'PRIVATE',offers:{
+        '@type':'Offer',price:99.99}}]})+
+    '</script></body></html>'
+  const result=proposeRetailerSelectors(source('plus','catalog',html),html)
+  assert.deepEqual(result.embeddedSignals.jsonLdTypes,['Offer','Product'])
+  assert.ok(result.embeddedSignals.jsonLdKeys.includes('price'))
+  assert.doesNotMatch(JSON.stringify(result),/PRIVATE|99.99/)
+})
+test('duplicate JSON-LD keys cannot create a source signal in the legacy M1 snapshot review',()=>{
+  const json='{"@context":"https://schema.org","@type":"Product","@type":"Offer"}'
+  const html='<html><body><script type="application/ld+json">'+json+
+    '</script></body></html>'
+  const result=proposeRetailerSelectors(source('plus','catalog',html),html)
+  assert.equal(result.embeddedSignals.invalidJsonLdCount,1)
+  assert.deepEqual(result.embeddedSignals.jsonLdTypes,[])
+  assert.equal(result.readyForScraping,false)
+})
+
+test('M1 legacy capture review reuses observed microdata selectors from the strict offline engine',()=>{
+  for(const [retailer,kind,url] of [
+    ['plus','catalog','https://www.plus.nl/producten'],
+    ['dekamarkt','offers','https://www.dekamarkt.nl/aanbiedingen']]) {
+    const html='<html><head><meta charset="UTF-8"></head><body>'+
+      '<article itemscope itemtype="https://schema.org/Product">'+
+      '<span itemprop="name">PRIVATE_LEGACY_PRODUCT</span>'+
+      '<meta itemprop="price" content="99.99">'+
+      '<a href="'+(retailer==='plus'?'/product/':'/producten/')+
+      'PRIVATE_SKU_321">DO NOT PUBLISH</a></article></body></html>'
+    const identity=source(retailer,kind,html)
+    identity.requestedUrl=url
+    const report=proposeRetailerSelectors(identity,html)
+    for(const selector of [
+      'article[itemtype="https://schema.org/Product"]',
+      'span[itemprop="name"]','meta[itemprop="price"]']) {
+      assert.ok(report.proposedSelectors.some(row=>row.selector===selector),
+        'missing source-observed review hint '+selector)
+    }
+    assert.ok(report.possibleFieldSelectors.price.some(x=>
+      x.selector==='meta[itemprop="price"]'))
+    assert.equal(report.readyForScraping,false)
+    assert.equal(report.currentPricesExtracted,false)
+    assert.equal(report.sourcePermissionVerified,false)
+    assert.doesNotMatch(JSON.stringify(report),
+      /PRIVATE_LEGACY_PRODUCT|PRIVATE_SKU_321|99.99|DO NOT PUBLISH/)
+  }
+})
+
+test('legacy and current capture review share source-observed Offer and inventory itemprops',()=>{
+  for (const [retailer,kind,url] of [
+    ['plus','catalog','https://www.plus.nl/producten'],
+    ['dekamarkt','offers','https://www.dekamarkt.nl/aanbiedingen']]){
+    const html='<html><head><meta charset="UTF-8"></head><body>'+
+      '<article itemscope itemtype="https://schema.org/Product">'+
+      '<div itemprop="offers" itemscope itemtype="https://schema.org/Offer">'+
+      '<data itemprop="lowPrice" value="88.22">PRIVATE</data>'+
+      '<meta itemprop="priceCurrency" content="EUR">'+
+      '<link itemprop="availability" href="https://schema.org/OutOfStock">'+
+      '</div><data itemprop="inventoryLevel" value="44"></data>'+
+      '<span itemprop="unitText">PRIVATE_PACK</span></article></body></html>'
+    const src=source(retailer,kind,html)
+    src.requestedUrl=url
+    const review=proposeRetailerSelectors(src,html)
+    for(const selector of ['div[itemprop="offers"]','data[itemprop="lowPrice"]',
+      'meta[itemprop="priceCurrency"]','link[itemprop="availability"]',
+      'data[itemprop="inventoryLevel"]','span[itemprop="unitText"]']){
+      assert.ok(review.proposedSelectors.some(x=>x.selector===selector),
+        'legacy capture lost observed selector '+selector)
+    }
+    assert.ok(review.possibleFieldSelectors.availability.some(x=>
+      x.selector==='data[itemprop="inventoryLevel"]'))
+    assert.ok(review.possibleFieldSelectors.price.some(x=>
+      x.selector==='data[itemprop="lowPrice"]'))
+    assert.equal(review.readyForScraping,false)
+    assert.equal(review.sourcePermissionVerified,false)
+    assert.doesNotMatch(JSON.stringify(review),/PRIVATE_PACK|88.22|OutOfStock/)
+  }
+})
+
+test('legacy capture cannot bypass source identity via foreign HTML base or canonical',()=>{
+  const product='<article class="product-card"><span class="price-value">'+
+    'PRIVATE_PRICE</span></article>'
+  const page=header=>'<html><head>'+header+'</head><body>'+product+'</body></html>'
+  const invalid=[
+    '<base href="https://outside.invalid/producten/">',
+    '<base href="//outside.invalid/">',
+    '<base href="https://www.plus.nl@outside.invalid/">',
+    '<base href="&#47;&#47;outside.invalid/">',
+    '<link rel="canonical" href="https://outside.invalid/producten">',
+    '<link rel="canonical" href="/aanbiedingen">',
+    '<link rel="canonical" href="/producten?other=true">',
+    '<link rel="canonical" href="/producten#old">',
+    '<link rel="canonical" href="&#47;&#47;outside.invalid/">',
+    '<base href="/"><base href="/">',
+    '<link rel="canonical" href="/producten"><link rel="canonical" href="/producten">',
+  ]
+  for(const header of invalid){
+    const html=page(header)
+    assert.throws(()=>proposeRetailerSelectors(source('plus','catalog',html),html),
+      /Offline selector review refused:|Multiple live HTML base URLs|Ambiguous canonical retailer source URL/,header)
+  }
+  for(const header of [
+    '<base href="/">',
+    '<link rel="canonical" href="/producten">',
+    '<link rel="canonical" href="https://www.plus.nl/producten/">',
+    '<base href="/"><link rel="canonical" href="/producten">',
+  ]){
+    const html=page(header)
+    const report=proposeRetailerSelectors(source('plus','catalog',html),html)
+    assert.equal(report.readyForScraping,false)
+    assert.ok(report.proposedSelectors.some(row=>row.selector==='article.product-card'))
+  }
+})
+test('legacy large archival capture cannot evade canonical checks by skipping modern 2 MiB route',()=>{
+  const filler=' '.repeat(2*1024*1024+100)
+  const html='<html><head><link rel="canonical" href="https://outside.invalid/producten">'+
+    '</head><body><article class="product-card"></article>'+filler+'</body></html>'
+  assert.throws(()=>proposeRetailerSelectors(source('plus','catalog',html),html),
+    /Offline selector review refused: untrusted retailer HTML base or canonical source identity/)
+})
+
+test('legacy source review derives class and JSON-LD proposals only from live HTML tags',()=>{
+  const hostile=[
+    '<style>.x:after{content:"<article class=\"product-card\">"}'+
+      '/* <script type="application/ld+json">{ "@type":"Product" }</script> */</style>',
+    '<template><article class="product-fake-template"></article>'+
+      '<script type="application/ld+json">{"@context":"https://schema.org","@type":"Product"}</script></template>',
+    '<svg><foreignObject><article class="product-fake-svg"></article></foreignObject></svg>',
+    '<article class="product-fake-attribute" data-fake="<div class=&#39;price-fake-quoted&#39;>"></article>',
+    '<script type="application/ld+json" src="https://outside.invalid/json">{"@context":"https://schema.org","@type":"Product"}</script>',
+  ]
+  const html='<html><head><meta charset="UTF-8"></head><body>'+
+    hostile.join('')+
+    '<section class="product-card"><span class="price-value">PRIVATE_PRICE</span></section>'+
+    '<script type="application/ld+json">'+
+    JSON.stringify({'@context':'https://schema.org','@type':'Offer'})+
+    '</script></body></html>'
+  const result=proposeRetailerSelectors(source('plus','catalog',html),html)
+  const joined=JSON.stringify(result)
+  assert.ok(result.proposedSelectors.some(x=>x.selector==='section.product-card'))
+  assert.ok(result.proposedSelectors.some(x=>x.selector==='span.price-value'))
+  assert.deepEqual(result.embeddedSignals.jsonLdTypes,['Offer'])
+  assert.doesNotMatch(joined,/product-fake-template|product-fake-svg|price-fake-quoted/)
+  assert.equal(result.readyForScraping,false)
+  assert.equal(result.currentPricesExtracted,false)
+})
+test('trusted live Nuxt/JSON-LD scripts survive inert-aware legacy M1 parsing',()=>{
+  const html='<html><head><script type="application/ld+json">'+
+    JSON.stringify({'@context':'https://schema.org','@type':'Product'})+
+    '</script></head><body><script id="__NUXT_DATA__" type="application/json">[]</script>'+
+    '<article class="product-card"></article></body></html>'
+  const report=proposeRetailerSelectors(source('dekamarkt','offers',html),html)
+  assert.equal(report.embeddedSignals.nuxtDataScriptPresent,true)
+  assert.deepEqual(report.embeddedSignals.jsonLdTypes,['Product'])
+  assert.ok(report.proposedSelectors.some(x=>x.selector==='article.product-card'))
+  assert.equal(report.publicationAllowed,false)
+})
+
+test('live HTML with quoted markup-shaped attributes cannot mint fake selector candidates',()=>{
+  const html='<html><head><meta charset="UTF-8"></head><body>'+
+    '<article class="product-card" data-copy="<span class=\'price-fake-quoted\'>">'+
+    '<span class="product-name">SYNTHETIC</span></article></body></html>'
+  const result=proposeRetailerSelectors(source('plus','catalog',html),html)
+  assert.ok(result.proposedSelectors.some(x=>x.selector==='article.product-card'))
+  assert.ok(result.proposedSelectors.some(x=>x.selector==='span.product-name'))
+  assert.ok(!result.proposedSelectors.some(x=>x.selector.includes('price-fake-quoted')),
+    'quoted attribute content is never a real HTML element')
+})
+
+test('valid source-observed unquoted HTML class tokens remain reviewable in legacy M1 capture',()=>{
+  const html='<html><head><meta charset="UTF-8"></head><body>'+
+    '<article class=product-card><span class=price-value>PRIVATE_PRICE</span>'+
+    '</article></body></html>'
+  const report=proposeRetailerSelectors(source('plus','catalog',html),html)
+  assert.ok(report.proposedSelectors.some(row=>row.selector==='article.product-card'))
+  assert.ok(report.proposedSelectors.some(row=>row.selector==='span.price-value'))
+  assert.equal(report.readyForScraping,false)
+  assert.doesNotMatch(JSON.stringify(report),/PRIVATE_PRICE/)
+})
+
+test('legacy M1 source identity never executes Proxy descriptor traps or accepts custom prototypes',()=>{
+  const html='<html><body><article class="product-card"></article></body></html>'
+  const good=source('plus','catalog',html)
+  let traps=0
+  const proxy=new Proxy(good,{getOwnPropertyDescriptor(target,key){
+    traps++;return Reflect.getOwnPropertyDescriptor(target,key)
+  }})
+  assert.throws(()=>proposeRetailerSelectors(proxy,html),/Offline selector review refused:/)
+  assert.equal(traps,0,'untrusted Proxy source must be refused before descriptor inspection')
+  const inherited=Object.assign(Object.create({sourceGrant:'untrusted'}),good)
+  assert.throws(()=>proposeRetailerSelectors(inherited,html),/Offline selector review refused:/)
+  assert.equal(proposeRetailerSelectors(good,html).publicationAllowed,false)
+})
+
+test('historical source inspector decodes real JSON-LD MIME and Nuxt ID just like private DOM reader',()=>{
+  for(const retailer of ['plus','dekamarkt']){
+    const html='<script type="application/ld+json&#59;charset=utf-8">'+
+      '{"@context":"https://schema.org","@type":"Product","name":"PRIVATE_ONLY"}</script>'+
+      '<script type="application/json" id="__NUXT&#95;DATA__">[42]</script>'
+    const report=proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',html),html)
+    assert.deepEqual(report.embeddedSignals.jsonLdTypes,['Product'])
+    assert.equal(report.embeddedSignals.nuxtDataScriptPresent,true)
+    assert.equal(report.embeddedSignals.invalidJsonLdCount,0)
+    assert.equal(report.currentPricesExtracted,false)
+    assert.equal(report.readyForScraping,false)
+    assert.equal(report.publicationAllowed,false)
+    const forged=html.replace('ld+json&#59;charset=utf-8','ld+json&#59;charset=latin1')
+    const invalid=proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',forged),forged)
+    assert.deepEqual(invalid.embeddedSignals.jsonLdTypes,[])
+    assert.equal(invalid.currentPricesExtracted,false)
+  }
+})
+
+test('legacy Nuxt script ID alone never proves JSON SSR when MIME is JavaScript or malformed',()=>{
+  const sourceHtml=(type,id='__NUXT_DATA__')=>'<script id="'+id+'" type="'+type+'">[42]</script>'
+  for(const type of ['text/javascript','application/ld+json','application/json; charset=latin1','application/json; charset=UTF-8; charset=UTF-8']){
+    const html=sourceHtml(type)
+    const report=proposeRetailerSelectors(source('dekamarkt','offers',html),html)
+    assert.equal(report.embeddedSignals.nuxtDataScriptPresent,false,type)
+    assert.equal(report.readyForScraping,false)
+  }
+  const hidden=sourceHtml('application/json','__NUXT&amp;#95;DATA__')
+  assert.equal(proposeRetailerSelectors(source('dekamarkt','offers',hidden),hidden)
+    .embeddedSignals.nuxtDataScriptPresent,false)
+})
+
+test('M1 archived JSON-LD review ignores arbitrary nested metadata forged as Product/Offer nodes',()=>{
+  for(const retailer of ['plus','dekamarkt']) {
+    const make=body=>'<script type="application/ld+json">'+JSON.stringify(body)+'</script>'
+    const forged=make({'@context':'https://schema.org','@type':'WebPage',
+      debug:{'@type':'Product',sku:'NEVER_A_PRODUCT',offers:{'@type':'Offer',price:'0.01'}},
+      metadata:[{'@type':'https://schema.org/Product',name:'PRIVATE_DECOY'}],
+    })
+    const result=proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',forged),forged)
+    assert.deepEqual(result.embeddedSignals.jsonLdTypes,['WebPage'],retailer)
+    assert.equal(result.embeddedSignals.jsonLdKeys.includes('price'),false)
+    assert.equal(result.readyForScraping,false)
+    assert.equal(result.publicationAllowed,false)
+    const genuine=make({'@context':'https://schema.org','@type':'ItemList',
+      itemListElement:[{'@type':'ListItem',item:{'@type':'Product',offers:{'@type':'Offer',price:'1.00'}}}],
+    })
+    const nested=proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',genuine),genuine)
+    assert.deepEqual(nested.embeddedSignals.jsonLdTypes,['ItemList','Offer','Product'],retailer)
+    assert.equal(nested.readyForScraping,false)
+  }
+})
+
+test('Nuxt historical SSR signal requires one well-formed unique-key bounded JSON array',()=>{
+  for(const retailer of ['plus','dekamarkt']){
+    const doc=payload=>'<script id="__NUXT_DATA__" type="application/json">'+payload+'</script>'
+    for(const payload of ['{bad','{}','{"price":1}','{"sku":1,"sku":2}','[1,','"array"']) {
+      const html=doc(payload)
+      const result=proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',html),html)
+      assert.equal(result.embeddedSignals.nuxtDataScriptPresent,false,retailer+' '+payload)
+      assert.equal(result.readyForScraping,false)
+    }
+    for(const html of [doc('[]')+doc('[]'),doc('not-json')+doc('[]'),doc('[]')+doc('not-json')]){
+      assert.equal(proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',html),html)
+        .embeddedSignals.nuxtDataScriptPresent,false,retailer+' duplicate')
+    }
+    const valid=doc('[{"id":"SYNTHETIC","title":"PRIVATE"}]')
+    const result=proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',valid),valid)
+    assert.equal(result.embeddedSignals.nuxtDataScriptPresent,true)
+    assert.equal(result.currentPricesExtracted,false)
+  }
+})
+
+test('WebPage JSON-LD cannot forge product SKU, price or pack source fields in snapshot review',()=>{
+  for(const retailer of ['plus','dekamarkt']){
+    const page={'@context':'https://schema.org','@type':'WebPage',
+      name:'PRIVATE_SITE',sku:'FAKE_WEBPAGE_SKU',price:'0.01',priceCurrency:'EUR',
+      availability:'https://schema.org/InStock',weight:'99 kg',
+    }
+    const html='<script type="application/ld+json">'+JSON.stringify(page)+'</script>'
+    const result=proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',html),html)
+    assert.deepEqual(result.embeddedSignals.jsonLdTypes,['WebPage'])
+    for(const field of ['sku','price','priceCurrency','availability','weight'])
+      assert.equal(result.embeddedSignals.jsonLdKeys.includes(field),false,retailer+' '+field)
+    assert.equal(result.currentPricesExtracted,false)
+    page['@type']='Product'
+    const product='<script type="application/ld+json">'+JSON.stringify(page)+'</script>'
+    const positive=proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',product),product)
+    for(const field of ['sku','price','priceCurrency','availability','weight'])
+      assert.equal(positive.embeddedSignals.jsonLdKeys.includes(field),true,retailer+' '+field)
+  }
+})
+
+test('official absolute Product IRI without context proves source fields, foreign context cannot',()=>{
+  for(const retailer of ['plus','dekamarkt']){
+    const run=object=>{
+      const html='<script type="application/ld+json">'+JSON.stringify(object)+'</script>'
+      return proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',html),html)
+    }
+    const raw={'@type':'https://schema.org/Product',name:'PRIVATE_ITEM',sku:'EXAMPLE',price:'1.00',weight:'500 g'}
+    const official=run(raw)
+    assert.deepEqual(official.embeddedSignals.jsonLdTypes,['Product'])
+    for(const field of ['name','sku','price','weight'])
+      assert.ok(official.embeddedSignals.jsonLdKeys.includes(field),retailer+' '+field)
+    const foreign=run({...raw,'@context':'https://foreign.invalid'})
+    assert.deepEqual(foreign.embeddedSignals.jsonLdTypes,[])
+    for(const field of ['name','sku','price','weight'])
+      assert.equal(foreign.embeddedSignals.jsonLdKeys.includes(field),false,retailer+' '+field)
+    const unqualified=run({...raw,'@type':'Product'})
+    assert.deepEqual(unqualified.embeddedSignals.jsonLdTypes,[])
+    assert.equal(unqualified.embeddedSignals.jsonLdKeys.includes('price'),false)
+    assert.equal(official.currentPricesExtracted,false)
+  }
+})
+
+test('archived source URL alias disagreement refuses selector extraction before attributing retailer origin',()=>{
+  const html='<article class="product-card">SYNTHETIC</article>'
+  const valid=source('plus','catalog',html)
+  assert.ok(proposeRetailerSelectors({...valid,url:valid.requestedUrl},html).proposedSelectors.length>0)
+  for(const forged of [
+    {...valid,url:'https://www.dekamarkt.nl/producten'},
+    {...valid,url:'https://www.plus.nl/producten/other-sku'},
+    {...valid,url:'https://www.plus.nl/aanbiedingen'},
+    {...valid,finalUrl:valid.requestedUrl,url:'https://www.plus.nl/product/other-sku'},
+    {...valid,finalUrl:valid.requestedUrl,url:44},
+  ]) {
+    assert.throws(()=>proposeRetailerSelectors(forged,html),/source|redirect|alias|unapproved/i)
+  }
+  assert.equal(proposeRetailerSelectors({...valid,finalUrl:valid.requestedUrl,url:valid.requestedUrl},html)
+    .source.url,valid.requestedUrl)
+})
+
+test('historical CSS selectors use browser-decoded observed class tokens exactly once',()=>{
+  for(const retailer of ['plus','dekamarkt']){
+    const html='<article class="produc&#116;-card price&#45;label">SYNTHETIC</article>'
+    const review=proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',html),html)
+    assert.ok(review.proposedSelectors.some(x=>x.selector==='article.product-card'),retailer)
+    assert.ok(review.proposedSelectors.some(x=>x.selector==='article.price-label'),retailer)
+    assert.equal(review.readyForScraping,false)
+    const nested='<article class="produc&amp;#116;-card">SYNTHETIC</article>'
+    const refused=proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',nested),nested)
+    assert.equal(refused.proposedSelectors.some(x=>x.selector==='article.product-card'),false)
+  }
+})
+
+test('duplicated HTML class tokens count one DOM element and never crowd out distinct field selectors',()=>{
+  for(const retailer of ['plus','dekamarkt']){
+    const html='<article class="'+Array(27).fill('product-card').join(' ')+' price-label">SYNTHETIC</article>'
+    const result=proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',html),html)
+    for(const selector of ['article.product-card','article.price-label']){
+      const found=result.proposedSelectors.find(x=>x.selector===selector)
+      assert.ok(found,retailer+' '+selector+' missing')
+      assert.equal(found.occurrences,1,retailer+' '+selector+' counted repeatedly')
+    }
+    assert.equal(result.currentPricesExtracted,false)
+    assert.equal(result.readyForScraping,false)
+  }
+})
+
+test('actual HTML named Tab and NewLine class separators are shared by both offline readers',()=>{
+  for(const retailer of ['plus','dekamarkt']){
+    const html='<article class="product-card&Tab;price-label&NewLine;pack-size">SYNTHETIC</article>'
+    const result=proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',html),html)
+    for(const selector of ['article.product-card','article.price-label','article.pack-size'])
+      assert.equal(result.proposedSelectors.some(x=>x.selector===selector),true,retailer+' '+selector)
+    assert.equal(result.currentPricesExtracted,false)
+    const nested='<article class="product-card&amp;Tab;price-label">SYNTHETIC</article>'
+    const decoy=proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',nested),nested)
+    assert.equal(decoy.proposedSelectors.some(x=>x.selector==='article.price-label'),false,retailer)
+  }
+})
+
+test('M1 snapshot JSON-LD never reports partial Product evidence when a graph exceeds the scan budget',()=>{
+  for(const retailer of ['plus','dekamarkt']) {
+    const run=record=>{const html='<script type="application/ld+json">'+JSON.stringify(record)+'</script>';return proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',html),html).embeddedSignals}
+    const largeGraph={'@context':'https://schema.org','@graph':[{'@type':'Product',offers:{'@type':'Offer',price:1.99}},...Array.from({length:102},(_,i)=>({'@type':'WebPage',url:'https://example.test/'+i}))]}
+    const tall={ '@context':'https://schema.org','@type':'Product',offers:{'@type':'Offer',price:3.99}}
+    for(const [label,payload] of [['graph',largeGraph],['keys',{'@context':'https://schema.org','@type':'Product',sku:'PRIVATE',...Object.fromEntries(Array.from({length:105},(_,i)=>['padding'+i,i]))}]]) {
+      const signals=run(payload)
+      assert.equal(signals.invalidJsonLdCount,1,retailer+' '+label)
+      assert.deepEqual(signals.jsonLdTypes,[],retailer+' '+label)
+      assert.deepEqual(signals.jsonLdKeys,[],retailer+' '+label)
+    }
+    assert.deepEqual(run(tall).jsonLdTypes,['Offer','Product'])
+    assert.equal(run(tall).invalidJsonLdCount,0)
+  }
+})
+
+test('one malformed JSON-LD script or malformed graph poisons all aggregate archived Product signals',()=>{
+  for(const retailer of ['plus','dekamarkt']) {
+    const doc=blocks=>blocks.map(body=>'<script type="application/ld+json">'+body+'</script>').join('')
+    const good=JSON.stringify({'@context':'https://schema.org','@type':'Product',sku:'PRIVATE_ONLY',offers:{'@type':'Offer',price:'1.99'}})
+    const invalid=['{broken',JSON.stringify({'@context':'https://schema.org','@type':'Product','@graph':'not-a-graph'})]
+    for(const bad of invalid)for(const blocks of [[good,bad],[bad,good]]) {
+      const html=doc(blocks)
+      const out=proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',html),html).embeddedSignals
+      assert.equal(out.invalidJsonLdCount,1,retailer)
+      assert.deepEqual(out.jsonLdTypes,[],retailer)
+      assert.deepEqual(out.jsonLdKeys,[],retailer)
+    }
+    const both=doc([good,JSON.stringify({'@context':'https://schema.org','@type':'WebPage'})])
+    const valid=proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',both),both).embeddedSignals
+    assert.equal(valid.invalidJsonLdCount,0)
+    assert.deepEqual(valid.jsonLdTypes,['Offer','Product','WebPage'])
+  }
+})
+
+test('M1 reviewed script evidence rejects oversized JSON-LD script collections and malformed JSON MIME siblings',()=>{
+  for(const retailer of ['plus','dekamarkt']){
+    const read=html=>proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',html),html).embeddedSignals
+    const block=(type,body)=>'<script type="'+type+'">'+body+'</script>'
+    const good=block('application/ld+json',JSON.stringify({'@context':'https://schema.org','@type':'Product',name:'PRIVATE'}))
+    const proper16=Array(16).fill(good).join('')
+    assert.deepEqual(read(proper16).jsonLdTypes,['Product'])
+    for(const markup of [Array(17).fill(good).join(''),good+block('application/ld+json; charset=latin1','{"@type":"Offer"}'),block('application/json; charset=latin1','{}')+good]){
+      const result=read(markup)
+      assert.ok(result.invalidJsonLdCount>=1,retailer)
+      assert.deepEqual(result.jsonLdTypes,[],retailer)
+      assert.deepEqual(result.jsonLdKeys,[],retailer)
+    }
+    assert.deepEqual(read(good+block('text/javascript','var debug = 1;')).jsonLdTypes,['Product'])
+  }
+})
+
+test('standalone HTTPS references in Schema.org retail relations remain non-executable, non-Offer evidence',()=>{
+  for(const retailer of ['plus','dekamarkt']) {
+    const read=payload=>{const html='<script type="application/ld+json">'+JSON.stringify(payload)+'</script>';return proposeRetailerSelectors(source(retailer,retailer==='plus'?'catalog':'offers',html),html).embeddedSignals}
+    const product={'@context':'https://schema.org','@type':'Product',sku:'PRIVATE_ONLY',offers:'https://example.invalid/offer/1'}
+    const allowed=read(product)
+    assert.equal(allowed.invalidJsonLdCount,0,retailer)
+    assert.deepEqual(allowed.jsonLdTypes,['Product'],retailer)
+    assert.equal(allowed.jsonLdTypes.includes('Offer'),false)
+    for(const bad of [42,'javascript:alert(1)','http://untrusted.invalid/offer','https://user:pass@example.invalid/x']) {
+      const rejected=read({...product,offers:bad})
+      assert.ok(rejected.invalidJsonLdCount>0,retailer+' '+bad)
+      assert.deepEqual(rejected.jsonLdTypes,[])
+    }
+    assert.equal(read({'@context':'https://schema.org','@type':'Product','@graph':'https://example.invalid/graph'}).invalidJsonLdCount,1)
+  }
+})
+
+test('legacy M1 review may not label old-price child as current price field hint', () => {
+  const html='<article class="product-card"><div class="old-price"><span class="price-value">SYNTHETIC_OLD</span></div>'+
+    '<div class="current-price"><span class="price-value">SYNTHETIC_CURRENT</span></div></article>'
+  for (const [store,kind] of [['plus','catalog'],['dekamarkt','offers']]) {
+    const report=proposeRetailerSelectors(source(store,kind,html),html)
+    assert.ok(report.proposedSelectors.some(row=>row.selector==='span.price-value'))
+    assert.equal(report.possibleFieldSelectors.price.some(row=>row.selector==='span.price-value'),false,store)
+    assert.ok(report.possibleFieldSelectors.price.some(row=>row.selector==='div.current-price'),store)
+    assert.equal(report.currentPricesExtracted,false)
+    assert.doesNotMatch(JSON.stringify(report),/SYNTHETIC_OLD|SYNTHETIC_CURRENT/)
+  }
+})
+
+test('legacy snapshots over the strict offline byte limit cannot relabel unverified old prices as current', () => {
+  // The historical 5 MiB review accepts a snapshot that the 2 MiB strict
+  // semantic scanner declines. The field hints still must fail closed.
+  const html='<div class="old-price"><span class="price-value">SYNTHETIC_OLD</span></div>'+ ' '.repeat(2 * 1024 * 1024)
+  for (const [store,kind] of [['plus','catalog'],['dekamarkt','offers']]) {
+    const report=proposeRetailerSelectors(source(store,kind,html),html)
+    assert.ok(report.proposedSelectors.some(x=>x.selector==='span.price-value'))
+    assert.deepEqual(report.possibleFieldSelectors.price,[],store)
+    assert.equal(report.publicationAllowed,false)
+  }
+})
+
+test('legacy nanosecond capture clocks never cause an unverified old-price field promotion', () => {
+  const html='<div class="old-price"><span class="price-value">SYNTHETIC_OLD</span></div>'
+  for (const [store,kind] of [['plus','catalog'],['dekamarkt','offers']]) {
+    const record=source(store,kind,html)
+    record.capturedAt='2026-10-04T12:00:00.123456789Z'
+    const report=proposeRetailerSelectors(record,html)
+    assert.deepEqual(report.possibleFieldSelectors.price,[],store)
+    assert.equal(report.source.capturedAt,record.capturedAt)
+  }
+})
+
+test('legacy M1 nanosecond clocks can corroborate a genuine source-observed current-price selector', () => {
+  const html='<article class="product-card"><span class="price-value">SYNTHETIC_CURRENT</span></article>'
+  for (const [store,kind] of [['plus','catalog'],['dekamarkt','offers']]) {
+    const record=source(store,kind,html)
+    record.capturedAt='2026-10-04T12:00:00.123456789Z'
+    const report=proposeRetailerSelectors(record,html)
+    assert.ok(report.possibleFieldSelectors.price.some(x=>x.selector==='span.price-value'),store)
+    assert.equal(report.source.capturedAt,record.capturedAt)
+    assert.equal(report.readyForScraping,false)
+    assert.equal(report.currentPricesExtracted,false)
+  }
+})
+
+test('historical M1 structural JSON-LD review refuses official Product hints when nested foreign Offer/graph context contradicts its price source',()=>{
+  for(const [store,kind] of [['plus','catalog'],['dekamarkt','offers']]) {
+    const payloads=[
+      {'@context':'https://schema.org','@type':'Product',offers:{'@context':'https://other.example','@type':'Offer',price:'SYNTHETIC'}},
+      {'@context':'https://schema.org','@graph':[{'@type':'Product'}, {'@type':'Offer','@context':'https://other.example'}]},
+    ]
+    for(const payload of payloads) {
+      const html='<script type="application/ld+json">'+JSON.stringify(payload)+'</script>'
+      const signals=proposeRetailerSelectors(source(store,kind,html),html).embeddedSignals
+      assert.equal(signals.invalidJsonLdCount,1,store)
+      assert.deepEqual(signals.jsonLdTypes,[],store)
+      assert.deepEqual(signals.jsonLdKeys,[],store)
+    }
+  }
+})
+
+test('legacy M1 source review does not advertise verified retail Product keys across separately foreign JSON-LD scripts',()=>{
+  const block=x=>'<script type="application/ld+json">'+JSON.stringify(x)+'</script>'
+  const official=block({'@context':'https://schema.org','@type':'Product',name:'SYNTHETIC',offers:{'@type':'Offer',price:'1.20'}})
+  const foreign=block({'@context':'https://other.example','@type':'Offer',price:'999'})
+  for(const [store,kind] of [['plus','catalog'],['dekamarkt','offers']]) {
+    for(const html of [official+foreign,foreign+official]) {
+      const report=proposeRetailerSelectors(source(store,kind,html),html)
+      assert.deepEqual(report.embeddedSignals.jsonLdTypes,[],store)
+      assert.deepEqual(report.embeddedSignals.jsonLdKeys,[],store)
+      assert.equal(report.embeddedSignals.invalidJsonLdCount,1,store)
+      assert.equal(report.readyForScraping,false)
+      assert.equal(report.publicationAllowed,false)
+    }
+  }
+})

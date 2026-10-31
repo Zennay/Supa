@@ -38,7 +38,10 @@ test('six independently reviewed PLUS/DekaMarkt product/catalog/offer adapters r
       assert.match(obs.provenance.url, /^https:\/\//)
       assert.ok(Number.isFinite(Date.parse(obs.provenance.capturedAt)))
       assert.equal(obs.currency, 'EUR')
-      assert.equal(Number.isInteger(obs.currentPriceCents), true)
+      // Valid reviewed product identity can lack a concrete checkout pack
+      // price; never invent a price from unit-only Schema.org evidence.
+      assert.ok(obs.currentPriceCents === null ||
+        Number.isSafeInteger(obs.currentPriceCents))
       assert.equal(obs.supermarket + ':' + obs.provenance.kind, result.key)
     }
   }

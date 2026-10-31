@@ -179,3 +179,36 @@ test('hostile retailer currency never leaks from the legacy parser diagnosis', (
   assert.equal(result.reason, 'selected Product price, currency or provenance not verified')
   assert.doesNotMatch(result.reason, /PRIVATE_CURRENCY_CONTACT_555/)
 })
+
+test('standalone captured-product parser follows M1 exact offline product-source route admission', () => {
+  const other = { ...plus, supermarket: 'dekamarkt',
+    url: 'https://www.dekamarkt.nl/producten/fictional' }
+  const unsafe = [
+    '/product/fictional?session=synthetic',
+    '/product/fictional#review',
+    '/product/x%2fcheckout',
+    '/product/x%5ccheckout',
+    '/product/x%252fcheckout',
+    '/product/x%2ehidden',
+    '/product//admin',
+    '/product/fictional%00admin',
+    '/product/fictional%7fadmin',
+    '/product/',
+  ]
+  for (const path of unsafe) {
+    const src = { ...plus, url: 'https://www.plus.nl' + path }
+    const candidate = product(src.url)
+    const one = parseSchemaOrgProductForPage(candidate, src)
+    assert.equal(one.type, 'abstain', 'PLUS source ' + path)
+    assert.equal(one.reason, 'invalid captured product-page URL')
+  }
+  for (const path of ['/producten/x%2fcheckout', '/producten/x%252fcheckout',
+                      '/producten//admin', '/producten/fictional?view=synthetic']) {
+    const src = { ...other, url: 'https://www.dekamarkt.nl' + path }
+    assert.equal(parseSchemaOrgProductForPage(product(src.url), src).type,
+      'abstain', 'Deka source ' + path)
+  }
+  // Legitimate synthetic product URLs must remain usable for offline review.
+  assert.equal(parseSchemaOrgProductForPage(product(plus.url), plus).type,'observation')
+  assert.equal(parseSchemaOrgProductForPage(product(other.url), other).type,'observation')
+})

@@ -39,8 +39,12 @@ test('DekaMarkt availability ignores non-Schema.org lookalike identifiers', asyn
   evidence.jsonLdProduct.offers.availability = 'https://example.invalid/InStock'
 
   const result = parseDekaMarktSsrProductEvidence(evidence)
-  assert.equal(result.type, 'observation')
-  assert.equal(result.observation.availability, 'unknown')
+  // Foreign vocabulary is not a trusted availability claim. Since Nuxt
+  // cannot corroborate it, refuse the private observation entirely.
+  assert.deepEqual(result, {
+    type: 'abstain',
+    reason: 'DekaMarkt JSON-LD does not corroborate Nuxt source, identity, package, price, currency or availability',
+  })
 
   evidence.jsonLdProduct.offers.availability = 'https://schema.org/OutOfStock'
   const canonical = parseDekaMarktSsrProductEvidence(evidence)
@@ -54,7 +58,7 @@ test('DekaMarkt evidence fails closed on Nuxt/JSON-LD price disagreement', async
 
   assert.deepEqual(parseDekaMarktSsrProductEvidence(evidence), {
     type: 'abstain',
-    reason: 'DekaMarkt JSON-LD does not corroborate Nuxt product identity/price',
+    reason: 'DekaMarkt JSON-LD does not corroborate Nuxt source, identity, package, price, currency or availability',
   })
 })
 
