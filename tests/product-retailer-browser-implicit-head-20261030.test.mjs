@@ -157,3 +157,31 @@ for (const source of sources) {
       assert.ok(safe.some(r=>r.field==='price'&&r.selector===`ins[${attribute}="price_value"]`))
   })
 }
+
+for (const source of sources) {
+  test(`${source.retailerId}: bare generic observed test attributes preserve all six fields`,()=>{
+    const origin={...source,capturedAt:'2026-10-29T15:00:00Z'}
+    const html='<main><article data-test="product"><h2 data-qa="name">SYNTHETIC</h2>'+
+      '<span data-testid="price">SYNTHETIC</span><span data-test="pack">SYNTHETIC</span>'+
+      '<strong data-qa="offer">SYNTHETIC</strong><span data-test="stock">SYNTHETIC</span>'+
+      '</article></main>'
+    const raw=proposeOfflineRetailerSelectors({html,origin})
+    const safe=safeSelectorProposals(raw.selectors,source.retailerId)
+    for(const [field,selector] of [['product','article[data-test="product"]'],
+      ['name','h2[data-qa="name"]'],['price','span[data-testid="price"]'],
+      ['pack','span[data-test="pack"]'],['offer','strong[data-qa="offer"]'],
+      ['availability','span[data-test="stock"]']]){
+      assert.ok(raw.selectors.some(x=>x.field===field&&x.selector===selector),field+' observed')
+      assert.ok(safe.some(x=>x.field===field&&x.selector===selector),field+' private export')
+    }
+  })
+}
+test('private selector export refuses wrong field for generic token or old price',()=>{
+  const bad=['span.price-value','span.price_value','span[data-test="price"]',
+    'span[data-testid="price-value"]','span[data-qa="price_value"]',
+    'strong.offer-label'].map(selector=>({field:'name',selector,instances:1,status:'needs-human-review'}))
+  bad.push({field:'price',selector:'del.price-value',instances:1,status:'needs-human-review'})
+  assert.deepEqual(safeSelectorProposals(bad,'plus'),[])
+  const former={field:'offer',selector:'del.price-value',instances:1,status:'needs-human-review'}
+  assert.equal(safeSelectorProposals([former],'plus').length,1)
+})

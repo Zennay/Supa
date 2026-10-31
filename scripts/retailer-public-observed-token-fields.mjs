@@ -36,3 +36,20 @@ const FORMER_PRICE_TOKENS = new Set([
   'old_price','price_old','price_before','previous_price','was_price','original_price',
 ])
 export const isFormerPriceToken = token => FORMER_PRICE_TOKENS.has(token)
+
+// Exact generic tokens seen in source DOMs, without invented retailer CSS.
+export const PUBLIC_BARE_OBSERVED_TOKEN_FIELDS = Object.freeze({
+  product:'product', item:'product', card:'product', tile:'product',
+  name:'name', title:'name', label:'name', price:'price',
+  pack:'pack', size:'pack', unit:'pack',
+  offer:'offer', deal:'offer', sale:'offer', discount:'offer',
+  stock:'availability', availability:'availability',
+})
+export function isAllowedPublicObservedToken(field, token, tag) {
+  const expected = Object.hasOwn(PUBLIC_OBSERVED_TOKEN_FIELDS,token)
+    ? PUBLIC_OBSERVED_TOKEN_FIELDS[token] : PUBLIC_BARE_OBSERVED_TOKEN_FIELDS[token]
+  if (typeof expected !== 'string') return false
+  // A struck-through former price cannot be a current-price selector.
+  if (expected === 'price' && isFormerPriceTag(tag)) return field === 'offer'
+  return expected === field
+}

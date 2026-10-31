@@ -12,7 +12,7 @@ import { proposeOfflineRetailerSelectors } from './retailer-offline-selector-dis
 import { isPublicMerchantProductHrefSelector } from './retailer-public-product-href-selectors.mjs'
 import { matchObservedSchemaProductSelector } from './retailer-observed-schema-product-selector.mjs'
 import { isSafeStructuralReviewTag } from './retailer-public-structural-tag.mjs'
-import { isFormerPriceTag, PUBLIC_OBSERVED_TOKEN_FIELDS } from './retailer-public-observed-token-fields.mjs'
+import { isFormerPriceTag, isAllowedPublicObservedToken } from './retailer-public-observed-token-fields.mjs'
 
 const refuse = () => { throw new Error('Authorized retailer capture-to-selector review refused') }
 
@@ -74,7 +74,6 @@ function inertCaptureOptions(options) {
 // source tokens: class names or data-testid attributes can encode a product
 // identifier or price. Only a bounded vocabulary of generic selectors leaves
 // the private captured HTML scope; unknown selectors stay in private review.
-const GENERIC_SELECTOR = /^[a-z][a-z0-9-]{0,30}\.(?:product|item|card|tile|name|title|label|price|pack|size|unit|offer|deal|sale|discount|stock|availability|product-card|price-label|price-value|offer-card|product-name|item-card|item-name|product-title|item-title|product-price|item-price|price-tag|stock-label|pack-size|offer-label|old-price|price-old|price-before|previous-price|was-price|original-price)$/
 // These are actual standards-based selectors from the captured DOM, not
 // inferred retail fields. Allow exact public Schema.org tokens and a bounded
 // vocabulary of generic test IDs across the privacy/review boundary.
@@ -97,19 +96,16 @@ function publicReviewSelector(row, retailerId) {
   const tag = /^[a-z][a-z0-9-]*/.exec(row.selector)?.[0]
   if (!isSafeStructuralReviewTag(tag)) return false
   const observedGeneric = OBSERVED_GENERIC_CLASS.exec(row.selector)
-  if (observedGeneric && Object.hasOwn(PUBLIC_OBSERVED_TOKEN_FIELDS, observedGeneric[1]) &&
-      PUBLIC_OBSERVED_TOKEN_FIELDS[observedGeneric[1]] === row.field) return true
-  if (GENERIC_SELECTOR.test(row.selector)) return true
+  // A publicly recognizable token still belongs to exactly one field.
+  if (observedGeneric)
+    return isAllowedPublicObservedToken(row.field, observedGeneric[1], tag)
   const schemaProperty = SCHEMA_PROP_SELECTOR.exec(row.selector)
   if (schemaProperty) return Object.hasOwn(SCHEMA_FIELDS, schemaProperty[2]) &&
     (SCHEMA_FIELDS[schemaProperty[2]] === row.field ||
       (isFormerPriceTag(schemaProperty[1]) && row.field === 'offer' &&
         SCHEMA_FIELDS[schemaProperty[2]] === 'price'))
   const testId = GENERIC_TEST_ID_SELECTOR.exec(row.selector)
-  if (testId) return Object.hasOwn(PUBLIC_OBSERVED_TOKEN_FIELDS, testId[2]) &&
-    (PUBLIC_OBSERVED_TOKEN_FIELDS[testId[2]] === row.field ||
-      (isFormerPriceTag(testId[1]) && row.field === 'offer' &&
-       PUBLIC_OBSERVED_TOKEN_FIELDS[testId[2]] === 'price'))
+  if (testId) return isAllowedPublicObservedToken(row.field, testId[2], tag)
   return row.field === 'product' &&
     (matchObservedSchemaProductSelector(row.selector) ||
       isPublicMerchantProductHrefSelector(retailerId, row.selector))

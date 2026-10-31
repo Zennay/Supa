@@ -6,7 +6,7 @@ import { scanOfflineRetailerMarkup } from './retailer-offline-structural-scan.mj
 import { isPublicMerchantProductHrefSelector } from './retailer-public-product-href-selectors.mjs'
 import { matchObservedSchemaProductSelector } from './retailer-observed-schema-product-selector.mjs'
 import { isSafeStructuralReviewTag } from './retailer-public-structural-tag.mjs'
-import { isFormerPriceTag, isFormerPriceToken, PUBLIC_OBSERVED_TOKEN_FIELDS } from './retailer-public-observed-token-fields.mjs'
+import { isFormerPriceTag, isFormerPriceToken, PUBLIC_OBSERVED_TOKEN_FIELDS, isAllowedPublicObservedToken } from './retailer-public-observed-token-fields.mjs'
 import { ambiguousRetailerRoute, isAllowedM1RetailerSourcePath, validateObservedRetailerDocumentIdentity } from './retailer-source-route-safety.mjs'
 
 // Offline-first DOM selector proposal. NEVER downloads a page, executes scripts,
@@ -478,13 +478,6 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
 // testids can embed SKU, supplier or price data even when text values are
 // omitted. Preserve full proposals only in the caller's in-memory/private
 // review, and show the CLI only known generic selectors + an aggregate count.
-const PUBLIC_GENERIC_TOKENS = new Set([
-  'product','product-card','product-name','item','item-card','item-name',
-  'name','title','label','price','price-value','price-label','price-tag',
-  'pack','pack-size','size','unit','old-price','price-old','price-before',
-  'previous-price','was-price','original-price','offer','offer-card','offer-label',
-  'deal','sale','discount','stock','stock-label','availability',
-])
 // Offline CLI reports may reveal only the known exact merchant product roots,
 // not private per-product hrefs or arbitrary host/source metadata. Preserve
 // usable observed absolute selectors for the operator's human drift review.
@@ -510,11 +503,7 @@ export function summarizeOfflineSelectorProposals(report) {
     const match = /^[a-z][a-z0-9-]{0,30}(?:\.([a-z][a-z0-9_-]{1,59})|\[(?:data-testid|data-test|data-qa|itemprop)="([a-z][a-z0-9_-]{1,59})"\])$/.exec(row.selector)
     if (!match) return false
     const token = match[1] ?? match[2]
-    const exact = Object.hasOwn(PUBLIC_OBSERVED_TOKEN_FIELDS,token)
-      ? PUBLIC_OBSERVED_TOKEN_FIELDS[token] : null
-    if (exact) return row.field === exact ||
-      (isFormerPriceTag(tag) && exact === 'price' && row.field === 'offer')
-    return PUBLIC_GENERIC_TOKENS.has(token)
+    return isAllowedPublicObservedToken(row.field,token,tag)
   })
   return {
     ...report,
