@@ -999,3 +999,27 @@ test('two-retailer private fixture retains six source-observed fields with named
   assert.equal(built.productionEnabled,false)
   assert.equal(verified.published,false)
 })
+
+// The complete private HTML -> safe selector summary -> synthetic fixture
+// roundtrip must retain observed data-test/data-qa fields for BOTH merchants.
+// This exercises the real pinned disk fixture pipeline, never store HTTP.
+for(const retailerId of ['plus','dekamarkt']) {
+  test(`private ${retailerId} six-field data-test/data-qa captured source generates verifiable synthetic fixture`,async t=>{
+    const html='<html><head><meta charset="utf-8"></head><body>'+[
+      ['article','product_card'],['h2','product_name'],['span','price_value'],
+      ['span','pack_size'],['strong','offer_label'],['span','stock_availability'],
+    ].map(([tag,token])=>`<${tag} data-test="${token}" data-qa="${token}">PRIVATE_SOURCE_987</${tag}>`).join('')+
+      '<i data-test="sku_987_secret">PRIVATE_SOURCE_987</i></body></html>'
+    const {filename,dir}=await archive(t,retailerId,'product',html)
+    const output=join(dir,'safe-six-fields')
+    const result=await buildPrivateSyntheticHtmlFixture(filename,output)
+    assert.deepEqual(result.fieldCoverage,{product:true,name:true,price:true,pack:true,offer:true,availability:true})
+    assert.equal(result.published,false)
+    assert.equal(result.productionEnabled,false)
+    const generated=await readFile(join(output,'synthetic-structure.html'),'utf8')
+    assert.match(generated,/data-test="product_card"|data-qa="product_card"/)
+    assert.match(generated,/data-test="price_value"|data-qa="price_value"/)
+    assert.doesNotMatch(generated,/PRIVATE_SOURCE_987|sku_987_secret/)
+    assert.deepEqual((await verifyPrivateSyntheticHtmlFixture(filename,output)).fieldCoverage,result.fieldCoverage)
+  })
+}

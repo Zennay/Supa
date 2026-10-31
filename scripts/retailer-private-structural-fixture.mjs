@@ -25,7 +25,7 @@ const REVIEW_ONLY_RECEIPT = Object.freeze({
 // custom HTML elements instead of the standard div/span DOM elements.
 const ELEMENT = '(?:article|section|div|span|p|li|h[1-6]|strong|ins|del|s|strike|small|a|data|time|[a-z][a-z0-9]*-[a-z0-9-]{1,31})'
 const TAG = new RegExp('^(' + ELEMENT + ')\\.([a-z][a-z0-9_-]{0,58})$', 'i')
-const ATTRIBUTE = new RegExp('^(' + ELEMENT + '|meta|link)\\[(data-testid|itemprop)="([a-z][a-z0-9_-]{1,59})"\\]$', 'i')
+const ATTRIBUTE = new RegExp('^(' + ELEMENT + '|meta|link)\\[(data-testid|data-test|data-qa|itemprop)="([a-z][a-z0-9_-]{1,59})"\\]$', 'i')
 const refuse = () => { throw Error('Private synthetic structural fixture refused') }
 function elementFor(row, retailerId) {
   if (!FIELD.has(row.field) || row.status !== 'needs-human-review' ||

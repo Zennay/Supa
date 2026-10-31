@@ -507,7 +507,7 @@ export function summarizeOfflineSelectorProposals(report) {
         (isPublicMerchantProductHrefSelector(report.source.retailerId, row.selector) ||
          (!Object.hasOwn(KNOWN_MERCHANT_HOSTS, report.source.retailerId) &&
           ['a[href^="/product/"]','a[href^="/producten/"]'].includes(row.selector)))) return true
-    const match = /^[a-z][a-z0-9-]{0,30}(?:\.([a-z][a-z0-9_-]{1,59})|\[(?:data-testid|itemprop)="([a-z][a-z0-9_-]{1,59})"\])$/.exec(row.selector)
+    const match = /^[a-z][a-z0-9-]{0,30}(?:\.([a-z][a-z0-9_-]{1,59})|\[(?:data-testid|data-test|data-qa|itemprop)="([a-z][a-z0-9_-]{1,59})"\])$/.exec(row.selector)
     if (!match) return false
     const token = match[1] ?? match[2]
     const exact = Object.hasOwn(PUBLIC_OBSERVED_TOKEN_FIELDS,token)
