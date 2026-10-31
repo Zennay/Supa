@@ -338,7 +338,8 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
     // A nested price-looking element within a former-price wrapper is NOT
     // evidence of a current price, even when its own class is generic.
     const localFormer = isFormerPriceTag(tag) || values.some(isFormerPriceToken) ||
-      isFormerPriceToken(staticAttributeValue(attrs.get('data-testid')))
+      ['data-testid','data-test','data-qa'].some(name =>
+        isFormerPriceToken(staticAttributeValue(attrs.get(name))))
     const inheritedFormer = ancestorStack.some(row => row.former)
     const formerPriceContext = inheritedFormer || (localFormer && !isFormerPriceTag(tag))
     if (!voidTags.has(tag)) ancestorStack.push({ tag, former: inheritedFormer || localFormer })
@@ -358,7 +359,7 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
         if (rule.test(name)) addObserved(field, tag + '.' + name)
       }
     }
-    for (const name of ['data-testid', 'itemprop']) {
+    for (const name of ['data-testid', 'data-test', 'data-qa', 'itemprop']) {
       const token = staticAttributeValue(attrs.get(name))
       if (!token || !STATIC_NAME.test(token)) continue
       if (name === 'itemprop' && Object.hasOwn(SCHEMA_ITEMPROP_FIELDS,token)) {
@@ -413,7 +414,7 @@ export function proposeOfflineRetailerSelectors(options = {}, includePrivateCove
     // Existing, source-observed public class/test-id tokens are more useful
     // to an operator than hundreds of unique hashed/retailer noise tokens.
     // This prioritises review only; it NEVER creates an absent selector.
-    const match=/^[a-z][a-z0-9-]{0,32}(?:\.([a-z][a-z0-9_-]{1,59})|\[data-testid="([a-z][a-z0-9_-]{1,59})"\])$/.exec(row.selector)
+    const match=/^[a-z][a-z0-9-]{0,32}(?:\.([a-z][a-z0-9_-]{1,59})|\[(?:data-testid|data-test|data-qa)="([a-z][a-z0-9_-]{1,59})"\])$/.exec(row.selector)
     const token=match?.[1] ?? match?.[2]
     const known=token && Object.hasOwn(PUBLIC_OBSERVED_TOKEN_FIELDS,token)
       ? PUBLIC_OBSERVED_TOKEN_FIELDS[token] : null

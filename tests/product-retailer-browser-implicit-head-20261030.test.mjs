@@ -46,7 +46,7 @@ for (const source of sources) {
     const product={'@context':'https://schema.org','@type':'Product',name:'Synthetic milk',sku,url:source.url,
       weight:{value:'500 g'},offers:{'@type':'Offer',price:'2.49',priceCurrency:'EUR',availability:'https://schema.org/InStock'}}
     const html='<!doctype html><html><head><meta charset="utf-8">'+
-      '<script type="application/ld+json">'+JSON.stringify(product)+'</script><main>'+observed.replace('price_value','price-value')+'<span class="price&lowbar;value" data-testid="price&lowbar;value">SYNTHETIC_SECOND</span>'
+      '<script type="application/ld+json">'+JSON.stringify(product)+'</script><main>'+observed.replace('price_value','price-value')+'<span class="price&lowbar;value" data-testid="price&lowbar;value" data-test="price&lowbar;value" data-qa="price&lowbar;value">SYNTHETIC_SECOND</span>'
     let count=0
     const result=await captureApprovedProductReviewBundle({
       source:{supermarket:source.retailerId,kind:'product',url:source.url},
@@ -65,6 +65,8 @@ for (const source of sources) {
     assert.ok(result.selectorReview.proposals.some(x=>x.field==='price'&&x.selector==='span.price-value'))
     assert.ok(result.selectorReview.proposals.some(x=>x.field==='price'&&x.selector==='span.price_value'))
     assert.ok(result.selectorReview.proposals.some(x=>x.field==='price'&&x.selector==='span[data-testid="price_value"]'))
+    for(const attribute of ['data-test','data-qa'])
+      assert.ok(result.selectorReview.proposals.some(x=>x.field==='price'&&x.selector===`span[${attribute}="price_value"]`))
     assert.equal(result.actualTransportInvocations,1)
     for(const field of ['published','readyForIngestion','productionEnabled','publicSavingsClaimEligible','sourceRightsForPublicationVerified'])
       assert.equal(result[field],false,field)
@@ -116,5 +118,42 @@ for(const source of sources){
     }
     assert.equal(safe.some(x=>x.selector.includes('private_sku_991')),false)
     assert.equal(safe.some(x=>x.selector==='strong.offer_label'&&x.field==='name'),false)
+  })
+}
+
+// Retailer DOMs frequently use data-test / data-qa rather than data-testid.
+// Inspect the actual attribute value, never guess vendor selectors or accept
+// unbounded SKU-bearing identity tokens in the private export.
+for (const source of sources) {
+  test(`${source.retailerId}: observed data-test/data-qa six-field tokens reach private source review`,()=>{
+    const origin={...source,capturedAt:'2026-10-29T15:00:00Z'}
+    const fields=[['product','article','product_card'],['name','h2','product_name'],
+      ['price','span','price_value'],['pack','span','pack_size'],
+      ['offer','strong','offer_label'],['availability','span','stock_availability']]
+    const html='<main>'+fields.map(([,tag,token])=>
+      `<${tag} data-test="${token}" data-qa="${token}">SYNTHETIC</${tag}>`).join('')+
+      '<span data-test="price_249_very_private" data-qa="sku_90210">PRIVATE</span></main>'
+    const raw=proposeOfflineRetailerSelectors({html,origin})
+    const safe=safeSelectorProposals(raw.selectors,source.retailerId)
+    for (const [field,tag,token] of fields)
+      for (const attribute of ['data-test','data-qa']) {
+        const selector=`${tag}[${attribute}="${token}"]`
+        assert.ok(raw.selectors.some(row=>row.field===field&&row.selector===selector),`${field} observed ${attribute}`)
+        assert.ok(safe.some(row=>row.field===field&&row.selector===selector),`${field} private ${attribute}`)
+      }
+    assert.equal(safe.some(row=>/private|90210/.test(row.selector)),false)
+  })
+}
+
+for (const source of sources) {
+  test(`${source.retailerId}: historical price data-test/data-qa never becomes a current quote`,()=>{
+    const origin={...source,capturedAt:'2026-10-29T15:00:00Z'}
+    const html='<main><div data-test="old_price"><span data-test="price_value" data-qa="price_value">SYNTHETIC_OLD</span></div>'+
+      '<ins data-test="price_value" data-qa="price_value">SYNTHETIC_CURRENT</ins></main>'
+    const result=proposeOfflineRetailerSelectors({html,origin})
+    const safe=safeSelectorProposals(result.selectors,source.retailerId)
+    assert.equal(safe.some(r=>r.field==='price'&&r.selector.includes('span[')),false)
+    for(const attribute of ['data-test','data-qa'])
+      assert.ok(safe.some(r=>r.field==='price'&&r.selector===`ins[${attribute}="price_value"]`))
   })
 }

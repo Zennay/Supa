@@ -89,7 +89,8 @@ const SCHEMA_FIELDS = Object.freeze({
   availability: 'availability', inventoryLevel: 'availability',
 })
 const SCHEMA_PROP_SELECTOR = /^(article|section|div|li|a|span|h[1-6]|p|strong|ins|del|s|strike|small|meta|link|data|time|[a-z][a-z0-9]*-[a-z0-9-]{1,31})\[itemprop="([a-zA-Z]+)"\]$/
-const GENERIC_TEST_ID_SELECTOR = /^(article|section|div|li|a|span|h[1-6]|p|strong|ins|del|s|strike|small|meta|link|data|time|[a-z][a-z0-9]*-[a-z0-9-]{1,31})\[data-testid="([a-z][a-z_-]{1,44})"\]$/
+// Source-observed only: the scanner emits these selectors from literal DOM attributes.
+const GENERIC_TEST_ID_SELECTOR = /^(article|section|div|li|a|span|h[1-6]|p|strong|ins|del|s|strike|small|meta|link|data|time|[a-z][a-z0-9]*-[a-z0-9-]{1,31})\[(?:data-testid|data-test|data-qa)="([a-z][a-z_-]{1,44})"\]$/
 function publicReviewSelector(row, retailerId) {
   // Source tag names may themselves be user/product identifiers; the same
   // bounded structural vocabulary applies to both independent review paths.
