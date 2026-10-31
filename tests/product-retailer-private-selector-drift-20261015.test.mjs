@@ -112,3 +112,54 @@ test('offline drift recognizes genuine Product/Thing multi-type changes without 
     assert.doesNotMatch(JSON.stringify(alert),/schema\.org|Product|Thing|https?:/)
   }
 })
+
+test('PLUS/Deka six-field real source-observed data-test/data-qa drift comparison stays privacy-safe',()=>{
+  for (const retailer of ['plus','dekamarkt']) {
+    const first=['product_card','product_name','price_value','pack_size','offer_label','stock_availability']
+    const fields=['article','h2','span','span','strong','span']
+    const older='<main>'+first.map((token,i)=>`<${fields[i]} data-test="${token}" data-qa="${token}">SYNTHETIC</${fields[i]}>`).join('')+'</main>'
+    const newer=older.replace('data-test="price_value"','data-test="price-label"')
+    const oldReport=proposal(older,whenA,retailer)
+    const newReport=proposal(newer,whenB,retailer)
+    assert.ok(oldReport.selectors.some(s=>s.field==='price'&&s.selector==='span[data-test="price_value"]'))
+    const alert=compareOfflineSelectorProposals(oldReport,newReport)
+    assert.equal(alert.perField.price.new,1)
+    assert.equal(alert.perField.price.missing,1)
+    assert.equal(alert.automatedSelectorPromotion,false)
+    assert.equal(alert.productionEnabled,false)
+    assert.doesNotMatch(JSON.stringify(alert),/data-qa|data-test|price_value|price-label|SYNTHETIC/)
+  }
+})
+test('offline drift accepts valid nine-digit UTC capture precision without inventing a selector',()=>{
+  const first=proposal(original,'2026-10-03T12:00:00.123456788Z')
+  const second=proposal(original,'2026-10-03T12:00:00.123456789Z')
+  const result=compareOfflineSelectorProposals(first,second)
+  assert.equal(result.newSelectorCandidates,0)
+  assert.equal(result.htmlBytesDiffer,false)
+  assert.throws(()=>compareOfflineSelectorProposals(second,first),/refused/)
+  for(const bad of ['2026-02-30T10:00:00.123456789Z','2026-10-03T12:00:00.1234567890Z']) {
+    const altered=proposal(original,whenB)
+    altered.source.capturedAt=bad
+    assert.throws(()=>compareOfflineSelectorProposals(first,altered),/refused/)
+  }
+})
+
+test('full private two-store 0600 archive drift accepts nine-digit observed data-test/data-qa and exports only aggregates',()=>temp(async dir=>{
+  for(const retailer of ['plus','dekamarkt']) {
+    const initial='<article data-test="product_card"><span data-qa="price_value">SECRET_STORED_PRICE_123</span></article>'
+    const updated='<article data-test="product_card"><span data-qa="price-label">SECRET_STORED_PRICE_456</span></article>'
+    const older=proposal(initial,'2026-10-03T12:00:00.123456788Z',retailer)
+    const newer=proposal(updated,'2026-10-03T12:00:00.123456789Z',retailer)
+    const beforeFile=join(dir,retailer+'-before.json'),afterFile=join(dir,retailer+'-after.json')
+    await writeFile(beforeFile,JSON.stringify(older),{mode:0o600})
+    await writeFile(afterFile,JSON.stringify(newer),{mode:0o600})
+    const process=cli('--before',beforeFile,'--after',afterFile)
+    assert.equal(process.status,0,process.stderr)
+    const report=JSON.parse(process.stdout)
+    assert.equal(report.perField.price.new,1)
+    assert.equal(report.perField.price.missing,1)
+    assert.equal(report.automatedSelectorPromotion,false)
+    assert.equal(report.externalRequests,0)
+    assert.doesNotMatch(process.stdout+process.stderr,/SECRET_STORED_PRICE|product_card|price_value|price-label|data-qa|data-test|sha256|capturedAt/)
+  }
+}))

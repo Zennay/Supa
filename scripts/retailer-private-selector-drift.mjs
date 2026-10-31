@@ -28,15 +28,18 @@ const fail=()=>{throw new Error('Private selector drift comparison refused')}
 // A stored selector proposal is an archive claim, not a fresh HTML capture.
 // Date.parse normalizes impossible civil days: only exact physical UTC dates
 // may participate in drift/change chronology or hash-linked source proof.
-function physicalCaptureMilliseconds(value) {
+function physicalCaptureClock(value) {
   if (typeof value !== 'string') return null
-  const match = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,3}))?Z$/.exec(value)
+  const match = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,9}))?Z$/.exec(value)
   if (!match) return null
-  const milliseconds = Date.parse(value)
+  const fractional = (match[2] ?? '').padEnd(9, '0')
+  const milliseconds = Date.parse(match[1]+'.'+fractional.slice(0,3)+'Z')
   if (!Number.isFinite(milliseconds) || milliseconds > Date.now()) return null
+  // Verify physical civil-date/clock parts rather than Date.parse's ability
+  // to silently normalize impossible dates, and preserve nanosecond order.
   if (new Date(milliseconds).toISOString() !==
-      match[1] + '.' + (match[2] ?? '').padEnd(3, '0') + 'Z') return null
-  return milliseconds
+      match[1]+'.'+fractional.slice(0,3)+'Z') return null
+  return match[1]+'.'+fractional+'Z'
 }
 function canonical(report) {
   if(!record(report,KEYS)||
@@ -47,7 +50,7 @@ function canonical(report) {
     !record(report.source,['retailerId','sha256','capturedAt'])||
     !['plus','dekamarkt'].includes(report.source.retailerId)||
     typeof report.source.sha256!=='string'||!/^[a-f0-9]{64}$/.test(report.source.sha256)||
-    physicalCaptureMilliseconds(report.source.capturedAt) === null||
+    physicalCaptureClock(report.source.capturedAt) === null||
     !integer(report.bytes,2*1024*1024)||!integer(report.scannedTags,25000)||
     !record(report.structuredSignals,SIGNALS)||
     !SIGNALS.every(k=>typeof report.structuredSignals[k]==='boolean')||
@@ -59,7 +62,7 @@ function canonical(report) {
     if(!record(s,['field','selector','instances','status'])||
       !FIELDS.includes(s.field)||s.status!=='needs-human-review'||
       typeof s.selector!=='string'||s.selector.length>200||
-      !(/^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9_-]*|\[(?:data-testid|itemprop)="[a-z][a-z0-9_-]*"\])$/i.test(s.selector) ||
+      !(/^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9_-]*|\[(?:data-testid|data-test|data-qa|itemprop)="[a-z][a-z0-9_-]*"\])$/i.test(s.selector) ||
         (s.field === 'product' && (
           isPublicMerchantProductHrefSelector(report.source.retailerId, s.selector) ||
           matchObservedSchemaProductSelector(s.selector))))||
@@ -120,7 +123,7 @@ export function compareOfflineSelectorProposals(before,after) {
   after=pinnedProposal(after)
   const a=canonical(before),b=canonical(after)
   if(before.source.retailerId!==after.source.retailerId||
-    Date.parse(after.source.capturedAt)<Date.parse(before.source.capturedAt))fail()
+    physicalCaptureClock(after.source.capturedAt)<physicalCaptureClock(before.source.capturedAt))fail()
   const sameHash=before.source.sha256===after.source.sha256
   if(sameHash && (before.bytes!==after.bytes||
     before.scannedTags!==after.scannedTags||
