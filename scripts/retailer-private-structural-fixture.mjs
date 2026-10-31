@@ -261,6 +261,21 @@ export async function verifyPrivateSyntheticFixturePair(plusFile,dekaFile,direct
 
 // Compare two fully verified private capture pairs without revealing retailer
 // text, raw URLs, prices, product IDs or source HTML to the operator's stdout.
+// Preserve the exact browser capture clock, not only JS Date milliseconds.
+// SHA-pinned M1 manifests admit up to nine UTC fractional digits and a later
+// same-millisecond recapture must not be falsely declared stale.
+function physicalUtcCaptureClock(value) {
+  const match=typeof value==='string'
+    ? /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,9}))?Z$/.exec(value)
+    : null
+  if(!match) refuse()
+  const fraction=(match[2]??'').padEnd(9,'0')
+  const milliseconds=Date.parse(match[1]+'.'+fraction.slice(0,3)+'Z')
+  if(!Number.isFinite(milliseconds)||milliseconds>Date.now()||
+     new Date(milliseconds).toISOString()!==match[1]+'.'+fraction.slice(0,3)+'Z') refuse()
+  return match[1]+'.'+fraction+'Z'
+}
+
 export async function comparePrivateSyntheticFixturePairs(
   olderPlus,olderDeka,olderDir,newerPlus,newerDeka,newerDir) {
   const [before,after] = await Promise.all([
@@ -277,9 +292,8 @@ export async function comparePrivateSyntheticFixturePairs(
     const newer=newSources[i]
     if(older.manifest.source.retailerId!==newer.manifest.source.retailerId) refuse()
     const first=older.manifest.source, last=newer.manifest.source
-    const previousTime=Date.parse(first.capturedAt)
-    const latestTime=Date.parse(last.capturedAt)
-    if(!Number.isFinite(previousTime)||!Number.isFinite(latestTime)) refuse()
+    const previousTime=physicalUtcCaptureClock(first.capturedAt)
+    const latestTime=physicalUtcCaptureClock(last.capturedAt)
     const laterCapture=latestTime>previousTime
     const sourceChanged=first.sourceUrlSha256!==last.sourceUrlSha256 ||
       first.kind!==last.kind

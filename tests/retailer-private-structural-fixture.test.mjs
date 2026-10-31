@@ -1023,3 +1023,33 @@ for(const retailerId of ['plus','dekamarkt']) {
     assert.deepEqual((await verifyPrivateSyntheticHtmlFixture(filename,output)).fieldCoverage,result.fieldCoverage)
   })
 }
+
+// Private pair comparisons must not treat a genuinely later, sub-millisecond
+// captured-at timestamp as stale; the source manifest preserves all 9 digits.
+test('two-retailer verified synthetic recapture pair advances across nanosecond UTC boundary',async t=>{
+  const oldPlus=await archive(t,'plus','catalog')
+  const oldDeka=await archive(t,'dekamarkt','offers')
+  const newPlus=await archive(t,'plus','catalog')
+  const newDeka=await archive(t,'dekamarkt','offers')
+  const oldTime='2026-10-14T12:00:00.123456788Z'
+  const newTime='2026-10-14T12:00:00.123456789Z'
+  for(const [record,time] of [[oldPlus,oldTime],[oldDeka,oldTime],
+                              [newPlus,newTime],[newDeka,newTime]]) {
+    const path=record.filename+'.manifest.json'
+    const manifest=JSON.parse(await readFile(path,'utf8'))
+    manifest.source.capturedAt=time
+    await writeFile(path,JSON.stringify(manifest,null,2)+'\n',{mode:0o600})
+  }
+  const before=join(oldPlus.dir,'before-nanos')
+  const after=join(newPlus.dir,'after-nanos')
+  await buildPrivateSyntheticFixturePair(oldPlus.filename,oldDeka.filename,before)
+  await buildPrivateSyntheticFixturePair(newPlus.filename,newDeka.filename,after)
+  const compared=await comparePrivateSyntheticFixturePairs(
+    oldPlus.filename,oldDeka.filename,before,newPlus.filename,newDeka.filename,after)
+  assert.equal(compared.verified,true)
+  assert.equal(compared.allCapturesAdvanced,true)
+  assert.deepEqual(compared.retailers.map(x=>x.outcome),
+    ['unchanged-recapture','unchanged-recapture'])
+  assert.equal(compared.productionEnabled,false)
+  assert.equal(compared.published,false)
+})
